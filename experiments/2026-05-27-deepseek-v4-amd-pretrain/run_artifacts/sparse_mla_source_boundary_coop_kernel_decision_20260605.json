@@ -1,0 +1,61 @@
+{
+  "artifact": "sparse_mla_source_boundary_coop_kernel_decision",
+  "date": "2026-06-05",
+  "device": "AMD Instinct MI350X VF",
+  "scope": "S4096 layer-2 actual LightningIndexer route, source-boundary sparse-MLA backward dKV/score ownership probes",
+  "baseline_gates": {
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "ck_materialized_raw_dkv_ms": 5.743,
+    "read": "A promotable cooperative kernel has to beat or clearly approach the Triton source-boundary full-backward gate, not just a late materialized dKV-only slice."
+  },
+  "measurements": [
+    {
+      "name": "row_leader_ck_sharedkv_score_page_seq16_score_only",
+      "summary_path": "run_artifacts/sparse_mla_source_boundary_ck_sharedkv_score_decision_20260605.json",
+      "median_ms": 16.787,
+      "emits": "score/prob/dP recompute only",
+      "decision": "reject as too slow versus Triton full boundary"
+    },
+    {
+      "name": "row_leader_ck_sharedkv_score_page_seq16_score_plus_contrib_sink",
+      "summary_path": "run_artifacts/sparse_mla_source_boundary_ck_sharedkv_score_decision_20260605.json",
+      "median_ms": 36.69,
+      "emits": "score/prob/dP plus dKV contribution sink",
+      "decision": "reject"
+    },
+    {
+      "name": "row_leader_ck_sharedkv_score_page_seq1_score_only",
+      "summary_path": "run_artifacts/sparse_mla_source_boundary_ck_score_sharedkv_mode0_s4096_layer2_sc1_sb64_bd512_thr256_timing5_20260605.json",
+      "median_ms": 14.77048397064209,
+      "emits": "score/prob/dP recompute only",
+      "decision": "reject; smaller token serialization helps only modestly"
+    },
+    {
+      "name": "row_leader_ck_sharedkv_score_page_seq1_score_plus_contrib_sink",
+      "summary_path": "run_artifacts/sparse_mla_source_boundary_ck_score_sharedkv_contrib_mode1_s4096_layer2_sc1_sb64_bd512_thr256_timing5_20260605.json",
+      "median_ms": 32.79733657836914,
+      "emits": "score/prob/dP plus dKV contribution sink",
+      "decision": "reject"
+    },
+    {
+      "name": "query_headblock_ck_dkv_source_boundary",
+      "summary_path": "run_artifacts/sparse_mla_source_boundary_query_headblock_ck_dkv_s4096_layer2_sc1_sb64_bd16_thr64_timing5_20260605.json",
+      "median_ms": 47.00986862182617,
+      "emits": "dKV only from q,dO,output,lse,kv,LI route",
+      "route_atomic_reduction_x": 1.0,
+      "decision": "reject; source-boundary recompute without grouped write reduction is worse than row-leader and Triton"
+    }
+  ],
+  "mori_shmem_read": {
+    "applicability": "MORI shmem/IR exposes device-side P2P/RDMA and dispatch/combine communication primitives.",
+    "not_applicable_for": "single-GPU sibling-CTA score-tile sharing or replacing LDS/register lifetime inside a sparse-attention backward kernel",
+    "use_for_parallel_track": "EP dispatch/combine, AsyncLL split send/recv, and dX return overlap/skew reduction in the MoE path"
+  },
+  "decision": {
+    "status": "reject_current_cooperative_rungs",
+    "reason": "Both row-leader score-page and naive query/head-block CK source-boundary schedules lose badly. The query/head-block diagnostic preserved source-boundary inputs but achieved no route coalescing, so it paid expensive recompute and still issued the full indirect write pattern.",
+    "next_kernel_shape": "Keep a Triton-like query-major producer, but make the epilogue group-aware inside the same owner: token/head/selected-window CTA, compact route metadata, local segmented reduction by compressed group before global dKV writes, while avoiding D16 replay of QK/PV.",
+    "non_goal": "Do not pursue MORI shmem as a score-page sharing mechanism for sparse MLA; it is a communication primitive, not intra-kernel shared memory."
+  }
+}

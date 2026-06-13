@@ -1,0 +1,108 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "dkv_atol": 0.1,
+    "dkv_candidate_norm": 1378.1890869140625,
+    "dkv_max_abs_diff": 0.04512500762939453,
+    "dkv_mean_abs_diff": 0.0007713421946391463,
+    "dkv_reference_norm": 1378.19921875,
+    "dq_atol": 0.1,
+    "dq_candidate_norm": 1073.26611328125,
+    "dq_max_abs_diff": 0.013144493103027344,
+    "dq_mean_abs_diff": 0.00014644523616880178,
+    "dq_reference_norm": 1073.2657470703125,
+    "passed": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This tests whether a single recompute tile can reuse QK/probability work for both dQ and dKV. It is still a diagnostic Triton prototype: grad_q and grad_kv are produced through atomic accumulation, and no LightningIndexer parameter gradients are emitted here.",
+  "scope": "sparse_mla_shared_latent_kv_backward_combined_dq_dkv_recompute_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.625,
+    "materialized_shared_selected_kv_fp32_gib": 5.0,
+    "selected_count": 640,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "tile": {
+    "block_d": 512,
+    "block_h": 64,
+    "block_m": 16
+  },
+  "timing": {
+    "triton_dq_dkv_recompute_combined": {
+      "checksum_norm": {
+        "dkv_norm": 1378.1890869140625,
+        "dq_norm": 1073.2659912109375
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 84.75081634521484,
+        "mean_ms": 84.56383895874023,
+        "median_ms": 84.56383895874023,
+        "min_ms": 84.37686157226562,
+        "samples_ms": [
+          84.75081634521484,
+          84.37686157226562
+        ],
+        "stdev_ms": 0.26442595580946826
+      },
+      "label": "triton_dq_dkv_recompute_combined",
+      "peak_memory_allocated_bytes": 1459620352,
+      "peak_memory_allocated_gib": 1.359377384185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 84.82848899438977,
+        "mean_ms": 84.63092951569706,
+        "median_ms": 84.63092951569706,
+        "min_ms": 84.43337003700435,
+        "samples_ms": [
+          84.82848899438977,
+          84.43337003700435
+        ],
+        "stdev_ms": 0.27939129414258956
+      }
+    },
+    "triton_dq_plus_dkv_separate": {
+      "checksum_norm": {
+        "dkv_norm": 1378.1890869140625,
+        "dq_norm": 1073.263916015625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 18.440837860107422,
+        "mean_ms": 18.40195655822754,
+        "median_ms": 18.40195655822754,
+        "min_ms": 18.363075256347656,
+        "samples_ms": [
+          18.363075256347656,
+          18.440837860107422
+        ],
+        "stdev_ms": 0.05498646444125279
+      },
+      "label": "triton_dq_plus_dkv_separate",
+      "peak_memory_allocated_bytes": 1728055808,
+      "peak_memory_allocated_gib": 1.609377384185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 18.45917897298932,
+        "mean_ms": 18.42328894417733,
+        "median_ms": 18.42328894417733,
+        "min_ms": 18.38739891536534,
+        "samples_ms": [
+          18.38739891536534,
+          18.45917897298932
+        ],
+        "stdev_ms": 0.050756165499879116
+      }
+    }
+  }
+}

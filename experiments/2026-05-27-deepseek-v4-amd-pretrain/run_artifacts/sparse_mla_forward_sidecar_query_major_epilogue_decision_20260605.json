@@ -1,0 +1,55 @@
+{
+  "artifact": "sparse_mla_forward_sidecar_query_major_epilogue_decision",
+  "date": "2026-06-05",
+  "scope": "Forward-carried compressed-group sidecar consumed inside the fast query-major sparse-MLA dKV backward producer",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "selected_block": 512,
+    "seq_chunk": 1,
+    "threads": 256
+  },
+  "implemented_modes": {
+    "mode15": {
+      "name": "forward_sidecar_query_major_sink",
+      "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+      "define": "SCOREPAGE_PRODUCER_MODE=15",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+      "event_median_ms": 21.471811294555664,
+      "valid_dkv": false,
+      "read": "Loads group_ids[B,S,K] for the selected window once into shared memory, keeps the K16 query-major score/prob/scaled-dP loop, keeps the H16 wave-partial dKV reduction, and replaces final compressed-dKV atomics with a checksum sink."
+    },
+    "mode16": {
+      "name": "forward_sidecar_query_major_valid_dkv",
+      "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+      "define": "SCOREPAGE_PRODUCER_MODE=16",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+      "event_median_ms": 22.955167770385742,
+      "valid_dkv": true,
+      "read": "Same producer and sidecar contract as mode15, but emits final compressed-dKV global atomics."
+    }
+  },
+  "comparison": {
+    "mode16_minus_mode15_ms": 1.4833564758300781,
+    "previous_sorted_sidecar_mode3_valid_dkv_ms": 22.806007385253906,
+    "previous_direct_epilogue_mode8_valid_dkv_ms": 29.481874465942383,
+    "triton_full_sparse_attention_backward_gate_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "mode16_vs_full_gate_x": 2.062456223754337
+  },
+  "decision": {
+    "status": "not_promoted",
+    "why": "This is the requested sidecar-in-fast-loop contract: q remains the BF16 numeric activation, group_ids[B,S,K] is carried from forward and loaded beside the normal query-major producer, and the group ids are used only in the dKV epilogue. It avoids the rejected full K512 prob/scaled-dP page and avoids the rejected token-tile group-panel owner. The measured latency is still 22.96 ms for valid dKV, about 2.06x slower than the 11.13 ms sparse-attention backward boundary gate. The checksum split shows final dKV atomics add only about 1.48 ms, so the remaining wall is producer plus H-wave contribution reduction/epilogue work inside the one-token CTA, not the final global atomic alone.",
+    "next_kernel_contract": "Keep this forward sidecar contract, but do not keep trying old mode knobs. The next real kernel needs the same one-token query-major producer plus a lower-level epilogue that reduces selected contributions by compressed group before per-contribution H16 fragments hit shared/global memory, or a cooperative persistent producer/reducer that preserves q/dO reuse while creating cross-token group ownership."
+  },
+  "commands": [
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --extension-dir /workspace/torch_extensions_scorepage_mode16_forward_sidecar_20260605 --hip-define SCOREPAGE_PRODUCER_MODE=16 --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 512 --block-d 16 --threads 256 --sort-forward-group-sidecar --skip-correctness --warmup-iters 1 --timed-iters 3 --summary-path experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json --json",
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --extension-dir /workspace/torch_extensions_scorepage_mode15_forward_sidecar_20260605 --hip-define SCOREPAGE_PRODUCER_MODE=15 --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 512 --block-d 16 --threads 256 --sort-forward-group-sidecar --skip-correctness --warmup-iters 1 --timed-iters 3 --summary-path experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json --json"
+  ]
+}

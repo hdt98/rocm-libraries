@@ -1,0 +1,85 @@
+{
+  "artifact": "muon_ns1_prealloc_phase_current_1xmi350_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "For the retained NS=1 expert-Muon branch, how much optimizer latency is Newton-Schulz tensor math versus update/plumbing?",
+  "source_sync": {
+    "probe_synced_from": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+    "optimizer_synced_from": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "reason": "The first remote run used stale probe/optimizer files and contaminated phase attribution by falling back to the non-prealloc path. This artifact is from the synced local WIP."
+  },
+  "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/muon_ns1_phase_current_1xmi350_20260608/current_ns1_prealloc_synced.jsonl",
+  "command": "docker run --rm --entrypoint /bin/bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --security-opt seccomp=unconfined -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace -e HIP_VISIBLE_DEVICES=0 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True -e TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES=4 -e PYTHONPATH=/workspace/sources/wip/torchtitan onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 12 --modes muon_batched muon_batched_phase --muon-ns-steps 1 --muon-workspace-mode prealloc --muon-ns-compute-dtype bfloat16 --repeat 2'",
+  "shape": {
+    "device": "1xMI350",
+    "layers": 12,
+    "expert_tensors_per_layer": 3,
+    "local_experts": 32,
+    "matrix_count": 1152,
+    "matrix_shape_after_muon_orientation": [2048, 4096],
+    "dtype": "bfloat16",
+    "muon_ns_steps": 1,
+    "muon_ns_compute_dtype": "bfloat16",
+    "muon_workspace_mode": "prealloc",
+    "muon_norm_mode": "vector_norm",
+    "chunk_matrices": 4,
+    "chunk_count": 288
+  },
+  "step_timing": {
+    "warm_step_gpu_ms": 5825.533203125,
+    "steady_step_gpu_ms": 211.7378387451172,
+    "steady_step_wall_ms": 211.77221019752324,
+    "mem_after_step_gib": 54.26171875,
+    "peak_allocated_gib": 54.26172161102295,
+    "state_after_step_gib": 18.0,
+    "workspace_gib": 0.1875
+  },
+  "phase_profile_intrusive": {
+    "step_gpu_ms": 244.86441040039062,
+    "peak_allocated_gib": 54.38671875,
+    "stage_ms": {
+      "weight_decay": 5.832948982715607,
+      "momentum_update": 10.4725959636271,
+      "make_update": 9.113371988758445,
+      "prealloc_source_update": 43.53525196015835,
+      "ns_norm_compute": 10.62967498973012,
+      "ns_norm_apply": 12.160305008292198,
+      "ns_gram_bmm": 29.55718494206667,
+      "ns_gram_square_bmm": 20.559580996632576,
+      "ns_poly_epilogue": 10.196551015600562,
+      "ns_baddbmm": 48.923143178224564,
+      "param_add": 27.886278983205557
+    },
+    "ns_total_ms": 132.0264401305467,
+    "non_ns_total_ms": 96.84044787846506,
+    "event_sum_gap_ms": 15.998,
+    "ns_fraction_of_intrusive_step": 0.5392,
+    "non_ns_fraction_of_intrusive_step": 0.3955
+  },
+  "derived_tensor_math": {
+    "ns1_gemm_like_flops_per_matrix_tflop": {
+      "gram": 0.03436,
+      "gram_square": 0.01718,
+      "baddbmm": 0.03436,
+      "total": 0.0859
+    },
+    "ns1_gemm_like_flops_total_tflop": {
+      "gram": 39.58,
+      "gram_square": 19.79,
+      "baddbmm": 39.58,
+      "total": 98.95
+    },
+    "measured_bmm_stage_ms": 99.04,
+    "bmm_stage_effective_tflops": 999.2,
+    "bmm_stage_fraction_of_mi350_bf16_peak_2310_tflops": 0.4326,
+    "full_steady_step_effective_tflops_from_ns_bmm_only": 467.3
+  },
+  "read": {
+    "six_step_gate": "The 20-step quality run remains the promotion gate: AdamW improves more over the late window, so the longer run strengthens the AdamW baseline rather than rescuing Muon.",
+    "ns_math": "Newton-Schulz is real tensor-math work. The retained NS=1 local expert-bank update contains about 99 TFLOP of GEMM-like BMM work per GPU, and the measured BMM sub-stages reach about 999 TFLOPs/s on MI350.",
+    "why_e2e_not_promoted": "The optimizer phase is only a slice of the training step, and the current PyTorch-level Muon update still pays source-update, momentum, Nesterov blend, param-add, per-chunk launch/event overhead, and non-GEMM epilogues. The intrusive split puts NS tensor stages at about 54% of the phase-profiled step, not 100%.",
+    "optimization_target": "A useful Muon kernel should fuse source update, normalization, NS BMM/polynomial epilogue, output cast, weight decay, and param add over the expert-bank chunks. A raw NS matmul-only optimization will not recover the full AdamW-vs-Muon e2e gap."
+  },
+  "decision": "Keep NS=1 expert-Muon prealloc as the lower-memory health branch, not the throughput baseline. The next Muon promotion attempt should be a lower-level fused/chunked expert-bank update; otherwise prioritize MoE/EP compact-row helper VJP and sparse SharedKV backward."
+}

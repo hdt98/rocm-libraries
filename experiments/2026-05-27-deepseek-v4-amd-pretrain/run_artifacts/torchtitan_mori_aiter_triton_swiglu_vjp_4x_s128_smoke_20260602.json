@@ -1,0 +1,69 @@
+{
+  "artifact": "torchtitan_mori_aiter_triton_swiglu_vjp_4x_s128_smoke_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_one_step_4x_s128_gbs4_noaux",
+  "purpose": "Validate the opt-in Triton SwiGLU owner-rank VJP path inside the TorchTitan MORI+AITER routed padded backward integration.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "source_changes": {
+    "bridge": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "new_env": "TORCHTITAN_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND",
+    "allowed_values": [
+      "torch",
+      "triton"
+    ],
+    "default": "torch",
+    "selected_for_smoke": "triton"
+  },
+  "check_config": {
+    "status": "pass",
+    "command_shape": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "shape": "1 64 128 2",
+    "parallelism": "-1 4",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "dispatcher": "MoriEPTokenDispatcher.Config"
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s128_gbs4_noaux_20260602",
+    "status": "pass",
+    "command_shape": "RUN_ID=torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s128_gbs4_noaux_20260602 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=4 CANARY_SEQ_LEN=128 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G MASTER_PORT=29591 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "fsdp": 4,
+    "ep": 4,
+    "seq_len": 128,
+    "global_batch_size": 4,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 1,
+    "steps": 1,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none",
+    "dsa_indexer_loss_coeff": 0,
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_shmem_heap_size": "32G",
+    "step1": {
+      "loss": 12.14935,
+      "grad_norm": 12.0625,
+      "memory_gib": 73.79,
+      "tps_per_gpu": 10,
+      "tflops_per_gpu": 0.12,
+      "mfu_percent": 0.01
+    },
+    "training_completed_count": 4,
+    "process_group_destroyed_count": 4,
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s128_gbs4_noaux_20260602",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s128_gbs4_noaux_20260602/docker-run.log"
+  },
+  "read": "This is integration evidence for the Triton SwiGLU vector-fusion path inside TorchTitan MORI+AITER routed padded backward. It preserves the safe default by leaving the launcher and bridge on torch unless the swiglu backend is explicitly set to triton. It is not throughput evidence because the run is intentionally tiny at S128, GBS4, one step, LI aux disabled, checkpoint disabled, and no activation checkpointing."
+}

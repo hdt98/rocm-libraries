@@ -1,0 +1,48 @@
+{
+  "status": "promote_tilelang_panel_dense_fold_as_final_reducer",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_final_fold",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "topk_workspace": 640,
+    "route_pattern": "panel_capacity_random",
+    "token_block": 64,
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "panel_count": 2,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512
+  },
+  "tilelang_panel_dense_fold": {
+    "fold_backend": "tilelang_panel_dense",
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.1296706199646,
+    "s4096_fold_only_median_ms": 0.048500001430511475,
+    "s4096_peak_memory_allocated_gib": 1.7619638442993164,
+    "compact_partial_stream_mib": 128.0,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s128_valid512_tb64_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+  },
+  "previous_retained_torch_fold": {
+    "fold_backend": "torch_index_add",
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.203559875488281,
+    "s4096_fold_only_median_ms": 0.11942100152373314,
+    "artifact_decision": "run_artifacts/sparse_dkv_tilelang_final_atomic_vs_fold_decision_20260604.json"
+  },
+  "comparison": {
+    "full_output_improvement_ms": 0.07388925552368164,
+    "full_output_speedup_x": 1.0090928613079838,
+    "fold_only_improvement_ms": 0.07092100009322166,
+    "fold_only_speedup_x": 2.4622886397149536,
+    "producer_estimated_median_ms": 8.081170618534088
+  },
+  "read": "The new TileLang panel-dense final fold is correct at S128 and lowers at S4096. It replaces the PyTorch index_add diagnostic with a no-atomic final reducer that owns one compressed group and D block, then sums compact partial rows across token tiles. This is a real TileLang final-output contract and trims fold-only time from about 0.119 ms to 0.0485 ms, but full-path latency only improves from 8.204 ms to 8.130 ms. So the retained TileLang branch is now compact query-major MFMA producer plus TileLang panel-dense final fold, while the next meaningful speed lever remains the producer: reduce or fuse the 128 MiB compact partial stream, or consume compact rows directly in compressor/LI backward."
+}

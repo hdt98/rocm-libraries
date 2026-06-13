@@ -1,0 +1,231 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top4_attention_detail_sparseon_profile_8x_s4096_gbs128_mbs4_20260607",
+  "status": "diagnostic_profile_not_promoted_for_throughput",
+  "date": "2026-06-07",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_top4_attention_detail_sparseon_profile_8x_s4096_gbs128_mbs4_20260607",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top4_attention_detail_sparseon_profile_8x_s4096_gbs128_mbs4_20260607",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top4_attention_detail_sparseon_profile_8x_s4096_gbs128_mbs4_20260607/docker-run.log",
+  "local_profile_copy": "/tmp/dsv4_profile_sparseon_20260607/profiling",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": false,
+    "torch_allocator": "expandable_segments:True",
+    "config": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "layers": 12,
+    "compress_ratio_pattern": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ]
+  },
+  "sparse_env": {
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": 4096,
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "moe_env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 4,
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": false
+  },
+  "step_metrics": {
+    "step_1": {
+      "tokens_per_gpu_s": 1946,
+      "tflops_per_gpu": 98.5,
+      "peak_logged_memory_gib": 151.73,
+      "read": "warmup/first-use step"
+    },
+    "step_2": {
+      "tokens_per_gpu_s": 6181,
+      "node_tokens_s": 49448,
+      "tflops_per_gpu": 312.94,
+      "loss": 7.39764,
+      "grad_norm": 49.5,
+      "peak_logged_memory_gib": 188.91,
+      "read": "profiled step; hooks are intrusive, use for ranking only"
+    }
+  },
+  "additive_step2_rankmax_ms": {
+    "step_train_step": 9074.943,
+    "train_step_forward_backward_call": 8966.887,
+    "model_forward": 2324.633,
+    "loss": 393.746,
+    "backward": 6251.988,
+    "optimizer_step": 46.238,
+    "grad_clip": 26.818
+  },
+  "module_backward_step2_rankmax_ms": {
+    "transformer_block_total_nested": 6010.569,
+    "attention_total_nested": 3751.817,
+    "moe_total_nested": 2229.699,
+    "attention_norm_total_nested": 20.833,
+    "ffn_norm_total_nested": 18.035,
+    "final_norm_total_nested": 1.969
+  },
+  "sharedkv_step2_ms": {
+    "rank_sum_max": 1639.936,
+    "rank_sum_median": 1632.187,
+    "c4": {
+      "rank_sum_max": 1214.321,
+      "rank_sum_median": 1213.791,
+      "per_call_median": 60.676,
+      "per_call_p95": 60.974,
+      "per_call_max": 61.239,
+      "query_recompute_median": 57.892,
+      "query_recompute_max": 58.411,
+      "grad_attn_sink_median": 2.771,
+      "grad_attn_sink_max": 2.988,
+      "records": 160,
+      "shape": {
+        "compress_ratio": 4,
+        "compressed_groups": 1024,
+        "selected": 640,
+        "topk": 512,
+        "valid_selected_pairs": 8354048
+      }
+    },
+    "c128": {
+      "rank_sum_max": 426.141,
+      "rank_sum_median": 418.034,
+      "per_call_median": 20.213,
+      "per_call_p95": 21.981,
+      "per_call_max": 41.996,
+      "query_recompute_median": 17.416,
+      "query_recompute_max": 18.272,
+      "grad_attn_sink_median": 2.766,
+      "grad_attn_sink_max": 24.447,
+      "records": 160,
+      "shape": {
+        "compress_ratio": 128,
+        "compressed_groups": 32,
+        "selected": 160,
+        "topk": 32,
+        "valid_selected_pairs": 2318720
+      }
+    },
+    "per_layer_rankmax_ms": {
+      "layer2_c4": 242.358,
+      "layer3_c128": 81.637,
+      "layer4_c4": 243.215,
+      "layer5_c128": 82.548,
+      "layer6_c4": 243.598,
+      "layer7_c128": 81.997,
+      "layer8_c4": 242.822,
+      "layer9_c128": 81.77,
+      "layer10_c4": 243.934,
+      "layer11_c128": 102.801
+    }
+  },
+  "dense_attention_step2_ms": {
+    "rank_sum_max": 822.821,
+    "rank_sum_median": 814.297,
+    "layer0_rankmax": 410.487,
+    "layer1_rankmax": 412.334,
+    "recompute_forward_sum_per_rank": 156.549,
+    "grad_sum_per_rank": 659.977,
+    "read": "Only dense layers 0 and 1 are on the dense inner-attention path in this sparse-on run."
+  },
+  "linear_backward_step2_top_rankmax_ms": {
+    "dsv4.linear.attention.wo": {
+      "total": 458.405,
+      "dinput": 234.278,
+      "dweight": 224.127
+    },
+    "dsv4.linear.attention.wq_b": {
+      "total": 95.783,
+      "dinput": 48.015,
+      "dweight": 47.768
+    },
+    "dsv4.linear.moe.shared_experts.w2": {
+      "total": 91.216,
+      "dinput": 64.141,
+      "dweight": 28.5
+    },
+    "dsv4.linear.moe.shared_experts.w3": {
+      "total": 34.827,
+      "dinput": 15.879,
+      "dweight": 18.948
+    },
+    "dsv4.linear.moe.shared_experts.w1": {
+      "total": 34.681,
+      "dinput": 16.726,
+      "dweight": 17.955
+    },
+    "dsv4.linear.attention.wq_a": {
+      "total": 21.245,
+      "dinput": 9.282,
+      "dweight": 11.964
+    },
+    "dsv4.linear.attention.wkv_b": {
+      "total": 17.712,
+      "dinput": 9.148,
+      "dweight": 8.564
+    },
+    "dsv4.linear.attention.wkv_a": {
+      "total": 13.936,
+      "dinput": 7.087,
+      "dweight": 6.855
+    },
+    "dsv4.linear.indexer.wq": {
+      "total": 12.465,
+      "dweight": 12.465
+    },
+    "dsv4.linear.moe.router_gate": {
+      "total": 11.02,
+      "dinput": 6.493,
+      "dweight": 4.624
+    }
+  },
+  "loss_step2_ms": {
+    "rank_sum_max": 388.997,
+    "rank_sum_median": 379.679
+  },
+  "invalid_control_run": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top4_attention_detail_profile_8x_s4096_gbs128_mbs4_20260607",
+    "reason": "Rejected as apples-to-apples attention evidence because sparse env was omitted, so C4/C128 layers hit dense fallback with last_sparse_skip_reason=seq_len_over_threshold.",
+    "step2_tokens_per_gpu_s": 5045,
+    "dense_attention_inner_total_rankmax_ms": 4847.31,
+    "attention_wo_rankmax_ms": 444.385,
+    "read": "Useful only as a control showing the sparse env gate matters."
+  },
+  "read": [
+    "This is the corrected sparse-on attention-detail profile for the current 8xMI350 standard-EP helper-execute top-4 branch.",
+    "The old multi-second fwd/bwd residual is gone in this branch; the remaining backward wall is inside model modules.",
+    "Attention is the largest nested module bucket at 3.752s rank-max versus MoE at 2.230s, but SharedKV is 1.640s of attention rather than the whole attention bucket.",
+    "C4 SharedKV is the main direct sparse-attention target: about 1.214s rank-max across 5 C4 layers and 4 microbatches, with each B4 call around 60.7 ms.",
+    "The remaining non-SharedKV attention bucket is approximately 2.112s by nested rankmax subtraction; it includes dense layers 0/1, output projection, q/wkv/indexer linears, wrapper/autograd work, and non-SharedKV sparse attention pieces.",
+    "Dense attention layer 0/1 is real at about 0.823s rank-max, but stock AITER is not yet a D512 drop-in fix in this image; attention.wo is a separate output projection backward bucket at about 0.458s rank-max."
+  ],
+  "next": [
+    "For SharedKV, continue the HipKittens/HIP path only if it beats the current Triton C4 B1/B4 boundary at the source-output contract, not just a late dKV or row-term slice.",
+    "For MORI/AITER, port helper-side hot-row execution into the fused path; the current promoted helper branch is standard EP, not fused MORI/AITER.",
+    "For dense attention, treat PyTorch SDPA as the current D512 baseline until an MLA-specific D512 backward or better AITER/CK path is available."
+  ]
+}

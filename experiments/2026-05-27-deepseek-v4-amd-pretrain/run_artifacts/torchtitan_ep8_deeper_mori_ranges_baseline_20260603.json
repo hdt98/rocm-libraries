@@ -1,0 +1,6658 @@
+{
+  "trace_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2",
+  "rank_count": 8,
+  "summary_exact_cpu": {
+    "mori_aiter.backward.routed_vjp": {
+      "max_ms": 7965.225,
+      "mean_ms": 7935.903,
+      "min_ms": 7910.315,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 7935.564,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 7910.873,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 7935.946,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 7947.488,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 7910.315,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 7955.331,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 7965.225,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 7926.478,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x": {
+      "max_ms": 1787.251,
+      "mean_ms": 1758.32,
+      "min_ms": 1729.28,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1757.344,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1734.066,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1760.026,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1769.598,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1729.28,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1778.228,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1787.251,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 1750.768,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.call": {
+      "max_ms": 14.656,
+      "mean_ms": 13.774,
+      "min_ms": 12.284,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 13.659,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 14.455,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.146,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 12.9,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 14.656,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 13.741,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 12.284,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 14.348,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.total_recv_item": {
+      "max_ms": 1636.882,
+      "mean_ms": 1606.203,
+      "min_ms": 1576.133,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1605.3,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1581.073,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1608.305,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1618.109,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1576.133,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1626.088,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1636.882,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 1597.736,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.get_src_pos": {
+      "max_ms": 135.868,
+      "mean_ms": 135.445,
+      "min_ms": 134.592,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 135.563,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 135.598,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 134.592,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 135.85,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 135.505,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 135.377,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 135.204,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 135.868,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.clone_dispatched_x": {
+      "max_ms": 5.01,
+      "mean_ms": 4.716,
+      "min_ms": 4.444,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.534,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.444,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 4.745,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.631,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4.946,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.01,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 4.747,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4.669,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output": {
+      "max_ms": 52.344,
+      "mean_ms": 51.906,
+      "min_ms": 51.424,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 52.139,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 51.875,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 52.344,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 51.678,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 51.753,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 51.853,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 52.179,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 51.424,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.call": {
+      "max_ms": 6.336,
+      "mean_ms": 5.798,
+      "min_ms": 5.395,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 5.996,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 5.847,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 5.538,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 5.691,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.336,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.716,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 5.395,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.865,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.total_recv_item": {
+      "max_ms": 40.462,
+      "mean_ms": 39.49,
+      "min_ms": 38.41,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 39.481,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 39.448,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 40.462,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 39.445,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 38.41,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 39.404,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 40.103,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 39.166,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.get_src_pos": {
+      "max_ms": 6.06,
+      "mean_ms": 5.754,
+      "min_ms": 5.462,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 5.86,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 5.723,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 5.462,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 5.675,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.06,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.869,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 5.886,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.495,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.align_grad_output": {
+      "max_ms": 37.382,
+      "mean_ms": 35.466,
+      "min_ms": 33.549,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 36.717,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 34.529,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 33.549,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 36.421,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 37.382,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 34.406,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 35.749,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 34.973,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.local_vjp.padded": {
+      "max_ms": 4285.214,
+      "mean_ms": 4066.578,
+      "min_ms": 3555.71,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4263.204,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4199.068,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 3555.71,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4285.214,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4159.677,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3899.881,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 3904.695,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4265.174,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.route_pack": {
+      "max_ms": 32.295,
+      "mean_ms": 28.861,
+      "min_ms": 25.721,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 30.159,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 27.633,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 27.416,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 29.395,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 32.295,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 30.258,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 28.014,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 25.721,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.sort_counts": {
+      "max_ms": 52.593,
+      "mean_ms": 50.951,
+      "min_ms": 48.166,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 52.239,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 52.593,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 48.166,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 51.517,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 52.04,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 50.144,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 50.331,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 50.58,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+      "max_ms": 3.525,
+      "mean_ms": 3.404,
+      "min_ms": 3.176,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 3.472,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 3.479,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 3.176,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 3.525,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 3.399,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3.421,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 3.374,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 3.385,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+      "max_ms": 63.176,
+      "mean_ms": 26.149,
+      "min_ms": 15.076,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 25.258,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 16.199,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 15.076,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 21.564,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 63.176,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 15.412,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 36.236,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 16.271,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+      "max_ms": 23.39,
+      "mean_ms": 22.147,
+      "min_ms": 21.041,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 23.012,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 23.0,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 21.041,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 21.708,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 23.39,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 21.721,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 21.698,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 21.61,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.swiglu_forward": {
+      "max_ms": 1964.743,
+      "mean_ms": 1846.765,
+      "min_ms": 1609.581,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1955.7,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1926.181,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1609.581,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1964.743,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1832.159,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1780.676,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1743.846,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 1961.238,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+      "max_ms": 60.827,
+      "mean_ms": 39.021,
+      "min_ms": 28.976,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 38.833,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 32.09,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 28.976,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 34.061,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 60.827,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 33.396,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 51.055,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 32.927,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.dtopk_weight": {
+      "max_ms": 21.681,
+      "mean_ms": 18.78,
+      "min_ms": 15.797,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 21.681,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 20.248,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 17.613,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 19.011,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 19.174,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 15.797,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 17.749,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 18.967,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+      "max_ms": 15.256,
+      "mean_ms": 14.395,
+      "min_ms": 13.534,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 15.028,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 15.235,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.315,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 13.771,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 14.337,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 13.683,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 15.256,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 13.534,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.swiglu_backward": {
+      "max_ms": 2029.019,
+      "mean_ms": 1918.928,
+      "min_ms": 1684.289,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 2002.588,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1987.455,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1684.289,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 2023.504,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1941.327,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1851.915,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1831.329,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 2029.019,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+      "max_ms": 29.409,
+      "mean_ms": 26.911,
+      "min_ms": 24.577,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 26.765,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 25.488,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 26.162,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 29.409,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 28.891,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 24.577,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 26.936,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 27.057,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+      "max_ms": 15.898,
+      "mean_ms": 14.104,
+      "min_ms": 12.751,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 13.772,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 15.115,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.298,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 13.119,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 15.898,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 12.751,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 12.923,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 14.958,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+      "max_ms": 43.041,
+      "mean_ms": 26.603,
+      "min_ms": 17.835,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 23.479,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 23.114,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 17.835,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 28.591,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 43.041,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 20.982,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 37.216,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 18.565,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.scatter_outputs": {
+      "max_ms": 22.484,
+      "mean_ms": 21.093,
+      "min_ms": 18.171,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 22.149,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 22.484,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 20.057,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 22.294,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 20.49,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 18.171,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 20.631,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 22.467,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx": {
+      "max_ms": 1081.658,
+      "mean_ms": 945.671,
+      "min_ms": 755.403,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 929.229,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 824.362,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 755.403,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1035.912,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1051.794,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1073.951,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1081.658,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 813.062,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.reorder_to_grad_order": {
+      "max_ms": 1059.934,
+      "mean_ms": 923.044,
+      "min_ms": 734.951,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 906.748,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 800.303,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 734.951,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1011.865,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1027.622,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1052.236,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1059.934,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 790.693,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.prepare_full": {
+      "max_ms": 4.437,
+      "mean_ms": 4.076,
+      "min_ms": 3.673,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.437,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.275,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 3.673,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.267,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4.022,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3.744,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 3.931,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4.258,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.call": {
+      "max_ms": 17.768,
+      "mean_ms": 16.197,
+      "min_ms": 14.523,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 15.597,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 17.414,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.523,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 17.362,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 17.768,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 15.658,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 15.521,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 15.734,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.slice_contiguous": {
+      "max_ms": 1.026,
+      "mean_ms": 0.944,
+      "min_ms": 0.832,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1.026,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.948,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.858,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1.01,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.979,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.832,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.918,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.982,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy": {
+      "max_ms": 1729.235,
+      "mean_ms": 1025.912,
+      "min_ms": 716.113,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 844.345,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1015.742,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1729.235,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 716.113,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 825.049,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1065.179,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1051.263,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 960.368,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+      "max_ms": 2.555,
+      "mean_ms": 2.393,
+      "min_ms": 2.228,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 2.445,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 2.454,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 2.228,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 2.555,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 2.531,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 2.265,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 2.281,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 2.385,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.call": {
+      "max_ms": 6.203,
+      "mean_ms": 5.428,
+      "min_ms": 5.065,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 5.547,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 5.521,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 5.067,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 5.429,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.203,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.422,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 5.065,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.166,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.total_recv_item": {
+      "max_ms": 1712.343,
+      "mean_ms": 1008.286,
+      "min_ms": 698.316,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 826.656,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 997.938,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1712.343,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 698.316,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 805.831,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1047.608,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1034.293,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 943.306,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.get_src_pos": {
+      "max_ms": 9.437,
+      "mean_ms": 8.783,
+      "min_ms": 8.498,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 8.701,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 8.808,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 8.598,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 8.767,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 9.437,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 8.807,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 8.652,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 8.498,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk": {
+      "max_ms": 43.304,
+      "mean_ms": 40.708,
+      "min_ms": 38.488,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 41.57,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 40.191,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 38.488,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 41.29,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 43.304,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 40.177,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 41.226,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 39.417,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.reorder_to_topk_order": {
+      "max_ms": 33.56,
+      "mean_ms": 31.362,
+      "min_ms": 29.42,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 32.03,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 31.042,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 29.42,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 32.067,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 33.56,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 30.139,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 32.343,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 30.297,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.prepare_full": {
+      "max_ms": 3.662,
+      "mean_ms": 3.126,
+      "min_ms": 2.908,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 3.324,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 2.964,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 2.991,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 3.075,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 3.115,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3.662,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 2.971,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 2.908,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.call": {
+      "max_ms": 4.867,
+      "mean_ms": 4.457,
+      "min_ms": 4.251,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.443,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.482,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 4.389,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.387,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4.867,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 4.424,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 4.251,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4.41,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.slice_contiguous": {
+      "max_ms": 0.552,
+      "mean_ms": 0.525,
+      "min_ms": 0.507,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.541,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.526,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.507,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.528,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.521,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.514,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.512,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.552,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.return_casts": {
+      "max_ms": 1.304,
+      "mean_ms": 1.268,
+      "min_ms": 1.218,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1.273,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1.257,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1.249,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1.277,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1.304,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1.218,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1.297,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 1.269,
+          "count": 64
+        }
+      ]
+    },
+    "MmBackward0": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "autograd::engine::evaluate_function: MmBackward0": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::mm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::bmm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::addmm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::linear": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    }
+  },
+  "summary_exact_gpu_user_annotation": {
+    "mori_aiter.backward.routed_vjp": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.call": {
+      "max_ms": 143.972,
+      "mean_ms": 125.712,
+      "min_ms": 91.768,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 123.098,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 91.768,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 137.658,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 123.375,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 137.153,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 117.463,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 143.972,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 131.211,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.total_recv_item": {
+      "max_ms": 0.351,
+      "mean_ms": 0.311,
+      "min_ms": 0.295,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.314,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.351,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.304,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.295,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.312,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.312,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.303,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.299,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_x.get_src_pos": {
+      "max_ms": 6.601,
+      "mean_ms": 6.305,
+      "min_ms": 6.049,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.601,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.304,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.049,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.27,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.409,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.199,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.146,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.464,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.clone_dispatched_x": {
+      "max_ms": 6.008,
+      "mean_ms": 4.704,
+      "min_ms": 3.845,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.792,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.128,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 4.179,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.907,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 5.298,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.008,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 4.477,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 3.845,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.call": {
+      "max_ms": 41.941,
+      "mean_ms": 41.012,
+      "min_ms": 40.026,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 41.079,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 41.015,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 41.941,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 40.884,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 40.026,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 40.927,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 41.476,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 40.747,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.total_recv_item": {
+      "max_ms": 0.275,
+      "mean_ms": 0.267,
+      "min_ms": 0.261,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.261,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.262,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.262,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.261,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.272,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.275,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.273,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.272,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_grad_output.get_src_pos": {
+      "max_ms": 3.286,
+      "mean_ms": 3.157,
+      "min_ms": 3.016,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 3.243,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 3.148,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 3.016,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 3.126,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 3.286,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3.18,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 3.216,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 3.037,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.align_grad_output": {
+      "max_ms": 54.87,
+      "mean_ms": 48.993,
+      "min_ms": 43.335,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 52.081,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 46.092,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 44.72,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 51.568,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 54.87,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 50.705,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 48.573,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 43.335,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.local_vjp.padded": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.route_pack": {
+      "max_ms": 13.309,
+      "mean_ms": 11.418,
+      "min_ms": 9.862,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 10.6,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 12.217,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 12.683,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 10.203,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 10.971,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 9.862,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 11.499,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 13.309,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.sort_counts": {
+      "max_ms": 50.352,
+      "mean_ms": 48.764,
+      "min_ms": 45.959,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 49.835,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 50.352,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 45.959,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 49.404,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 50.017,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 47.912,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 48.183,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 48.448,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+      "max_ms": 0.312,
+      "mean_ms": 0.285,
+      "min_ms": 0.266,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.31,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.277,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.266,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.312,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.282,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.281,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.277,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.278,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+      "max_ms": 157.755,
+      "mean_ms": 105.235,
+      "min_ms": 72.415,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 108.947,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 84.253,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 78.53,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 112.916,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 157.755,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 113.203,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 113.861,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 72.415,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+      "max_ms": 366.941,
+      "mean_ms": 306.418,
+      "min_ms": 226.327,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 301.998,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 254.357,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 226.327,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 333.89,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 366.941,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 344.908,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 363.94,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 258.984,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.swiglu_forward": {
+      "max_ms": 32.734,
+      "mean_ms": 27.09,
+      "min_ms": 20.714,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 26.639,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 22.437,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 20.714,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 29.586,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 31.155,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 30.056,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 32.734,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 23.402,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+      "max_ms": 196.913,
+      "mean_ms": 166.982,
+      "min_ms": 123.81,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 164.836,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 139.87,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 123.81,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 183.269,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 195.649,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 188.817,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 196.913,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 142.693,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.dtopk_weight": {
+      "max_ms": 45.034,
+      "mean_ms": 36.268,
+      "min_ms": 25.003,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 39.528,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 32.442,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 30.228,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 41.719,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 45.034,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 43.282,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 32.905,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 25.003,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+      "max_ms": 226.008,
+      "mean_ms": 193.46,
+      "min_ms": 145.603,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 187.352,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 169.536,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 145.603,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 213.66,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 226.008,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 218.775,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 223.757,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 162.99,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.swiglu_backward": {
+      "max_ms": 49.225,
+      "mean_ms": 41.41,
+      "min_ms": 31.563,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 40.46,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 34.239,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 31.563,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 45.559,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 47.495,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 47.26,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 49.225,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 35.479,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+      "max_ms": 190.7,
+      "mean_ms": 158.538,
+      "min_ms": 116.388,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 158.822,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 134.456,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 116.388,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 172.887,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 190.7,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 175.718,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 186.364,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 132.966,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+      "max_ms": 381.109,
+      "mean_ms": 336.427,
+      "min_ms": 262.907,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 330.111,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 304.847,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 262.907,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 368.51,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 381.109,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 372.387,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 379.167,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 292.376,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+      "max_ms": 442.619,
+      "mean_ms": 385.285,
+      "min_ms": 298.71,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 375.951,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 337.037,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 298.71,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 421.758,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 441.242,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 427.953,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 442.619,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 337.007,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.scatter_outputs": {
+      "max_ms": 44.823,
+      "mean_ms": 36.185,
+      "min_ms": 24.854,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 39.85,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 32.649,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 30.26,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 41.244,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 44.823,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 43.318,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 32.481,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 24.854,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.reorder_to_grad_order": {
+      "max_ms": 59.029,
+      "mean_ms": 54.095,
+      "min_ms": 47.455,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 56.673,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 51.751,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 49.656,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 56.793,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 59.029,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 57.272,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 54.128,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 47.455,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.prepare_full": {
+      "max_ms": 7.436,
+      "mean_ms": 6.575,
+      "min_ms": 5.294,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 7.081,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.022,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.162,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.845,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 7.384,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 7.436,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.378,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.294,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.call": {
+      "max_ms": 1691.916,
+      "mean_ms": 989.838,
+      "min_ms": 680.545,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 806.404,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 983.272,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1691.916,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 680.545,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 786.132,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1025.105,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1015.92,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 929.41,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dx.slice_contiguous": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+      "max_ms": 0.396,
+      "mean_ms": 0.371,
+      "min_ms": 0.346,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.374,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.358,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.346,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.359,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.381,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.396,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.38,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.379,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.call": {
+      "max_ms": 24.827,
+      "mean_ms": 23.502,
+      "min_ms": 23.169,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 23.334,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 23.307,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 24.827,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 23.205,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 23.169,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 23.634,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 23.279,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 23.259,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.total_recv_item": {
+      "max_ms": 0.273,
+      "mean_ms": 0.264,
+      "min_ms": 0.256,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.26,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 0.257,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 0.263,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 0.256,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 0.273,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 0.27,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 0.271,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 0.265,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.dispatch_topk_dummy.get_src_pos": {
+      "max_ms": 4.434,
+      "mean_ms": 4.26,
+      "min_ms": 4.101,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.352,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.292,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 4.101,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.291,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4.434,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 4.177,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 4.186,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4.251,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.reorder_to_topk_order": {
+      "max_ms": 31.633,
+      "mean_ms": 29.829,
+      "min_ms": 27.754,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 30.413,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 29.165,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 27.754,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 30.356,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 31.633,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 30.079,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 30.67,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 28.558,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.prepare_full": {
+      "max_ms": 1.661,
+      "mean_ms": 1.565,
+      "min_ms": 1.451,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1.661,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 1.592,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 1.554,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 1.575,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 1.561,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 1.451,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 1.618,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 1.512,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.call": {
+      "max_ms": 14.441,
+      "mean_ms": 12.112,
+      "min_ms": 8.774,
+      "total_count": 512,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 11.366,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 12.617,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.441,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 11.597,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 8.774,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 12.587,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 11.783,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 13.73,
+          "count": 64
+        }
+      ]
+    },
+    "mori_aiter.backward.combine_dtopk.slice_contiguous": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "mori_aiter.backward.return_casts": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "MmBackward0": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "autograd::engine::evaluate_function: MmBackward0": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::mm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::bmm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::addmm": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    },
+    "aten::linear": {
+      "max_ms": 0.0,
+      "mean_ms": 0.0,
+      "min_ms": 0.0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0.0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0.0,
+          "count": 0
+        }
+      ]
+    }
+  },
+  "summary_prefix_cpu": {
+    "mori_aiter.backward.": {
+      "max_ms": 20194.747,
+      "mean_ms": 19681.532,
+      "min_ms": 19455.269,
+      "total_count": 14336,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 19483.276,
+          "count": 1792
+        },
+        {
+          "rank": 1,
+          "ms": 19475.225,
+          "count": 1792
+        },
+        {
+          "rank": 2,
+          "ms": 20194.747,
+          "count": 1792
+        },
+        {
+          "rank": 3,
+          "ms": 19496.92,
+          "count": 1792
+        },
+        {
+          "rank": 4,
+          "ms": 19508.361,
+          "count": 1792
+        },
+        {
+          "rank": 5,
+          "ms": 19906.74,
+          "count": 1792
+        },
+        {
+          "rank": 6,
+          "ms": 19931.716,
+          "count": 1792
+        },
+        {
+          "rank": 7,
+          "ms": 19455.269,
+          "count": 1792
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.": {
+      "max_ms": 4276.213,
+      "mean_ms": 4058.113,
+      "min_ms": 3548.001,
+      "total_count": 7168,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4254.135,
+          "count": 896
+        },
+        {
+          "rank": 1,
+          "ms": 4190.315,
+          "count": 896
+        },
+        {
+          "rank": 2,
+          "ms": 3548.001,
+          "count": 896
+        },
+        {
+          "rank": 3,
+          "ms": 4276.213,
+          "count": 896
+        },
+        {
+          "rank": 4,
+          "ms": 4150.446,
+          "count": 896
+        },
+        {
+          "rank": 5,
+          "ms": 3892.903,
+          "count": 896
+        },
+        {
+          "rank": 6,
+          "ms": 3896.594,
+          "count": 896
+        },
+        {
+          "rank": 7,
+          "ms": 4256.299,
+          "count": 896
+        }
+      ]
+    },
+    "dsv4.linear.attention.": {
+      "max_ms": 128.283,
+      "mean_ms": 126.287,
+      "min_ms": 125.159,
+      "total_count": 7680,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 125.986,
+          "count": 960
+        },
+        {
+          "rank": 1,
+          "ms": 126.352,
+          "count": 960
+        },
+        {
+          "rank": 2,
+          "ms": 125.159,
+          "count": 960
+        },
+        {
+          "rank": 3,
+          "ms": 126.894,
+          "count": 960
+        },
+        {
+          "rank": 4,
+          "ms": 126.802,
+          "count": 960
+        },
+        {
+          "rank": 5,
+          "ms": 125.502,
+          "count": 960
+        },
+        {
+          "rank": 6,
+          "ms": 128.283,
+          "count": 960
+        },
+        {
+          "rank": 7,
+          "ms": 125.321,
+          "count": 960
+        }
+      ]
+    },
+    "dsv4.linear.indexer.": {
+      "max_ms": 0,
+      "mean_ms": 0,
+      "min_ms": 0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0,
+          "count": 0
+        }
+      ]
+    },
+    "dsv4.linear.feed_forward.": {
+      "max_ms": 91.481,
+      "mean_ms": 90.486,
+      "min_ms": 88.306,
+      "total_count": 4608,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 90.902,
+          "count": 576
+        },
+        {
+          "rank": 1,
+          "ms": 89.761,
+          "count": 576
+        },
+        {
+          "rank": 2,
+          "ms": 91.481,
+          "count": 576
+        },
+        {
+          "rank": 3,
+          "ms": 90.406,
+          "count": 576
+        },
+        {
+          "rank": 4,
+          "ms": 91.214,
+          "count": 576
+        },
+        {
+          "rank": 5,
+          "ms": 88.306,
+          "count": 576
+        },
+        {
+          "rank": 6,
+          "ms": 90.87,
+          "count": 576
+        },
+        {
+          "rank": 7,
+          "ms": 90.949,
+          "count": 576
+        }
+      ]
+    },
+    "dsv4.linear.": {
+      "max_ms": 251.819,
+      "mean_ms": 248.873,
+      "min_ms": 245.217,
+      "total_count": 13824,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 248.64,
+          "count": 1728
+        },
+        {
+          "rank": 1,
+          "ms": 248.006,
+          "count": 1728
+        },
+        {
+          "rank": 2,
+          "ms": 248.192,
+          "count": 1728
+        },
+        {
+          "rank": 3,
+          "ms": 249.402,
+          "count": 1728
+        },
+        {
+          "rank": 4,
+          "ms": 251.819,
+          "count": 1728
+        },
+        {
+          "rank": 5,
+          "ms": 245.217,
+          "count": 1728
+        },
+        {
+          "rank": 6,
+          "ms": 251.404,
+          "count": 1728
+        },
+        {
+          "rank": 7,
+          "ms": 248.303,
+          "count": 1728
+        }
+      ]
+    },
+    "dsv4.attention.": {
+      "max_ms": 154.548,
+      "mean_ms": 151.197,
+      "min_ms": 148.233,
+      "total_count": 3072,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 152.558,
+          "count": 384
+        },
+        {
+          "rank": 1,
+          "ms": 153.349,
+          "count": 384
+        },
+        {
+          "rank": 2,
+          "ms": 149.885,
+          "count": 384
+        },
+        {
+          "rank": 3,
+          "ms": 154.548,
+          "count": 384
+        },
+        {
+          "rank": 4,
+          "ms": 151.016,
+          "count": 384
+        },
+        {
+          "rank": 5,
+          "ms": 149.047,
+          "count": 384
+        },
+        {
+          "rank": 6,
+          "ms": 148.233,
+          "count": 384
+        },
+        {
+          "rank": 7,
+          "ms": 150.943,
+          "count": 384
+        }
+      ]
+    },
+    "dsv4.block.": {
+      "max_ms": 2341.988,
+      "mean_ms": 2298.166,
+      "min_ms": 2274.338,
+      "total_count": 2048,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 2341.988,
+          "count": 256
+        },
+        {
+          "rank": 1,
+          "ms": 2312.112,
+          "count": 256
+        },
+        {
+          "rank": 2,
+          "ms": 2287.624,
+          "count": 256
+        },
+        {
+          "rank": 3,
+          "ms": 2301.582,
+          "count": 256
+        },
+        {
+          "rank": 4,
+          "ms": 2274.338,
+          "count": 256
+        },
+        {
+          "rank": 5,
+          "ms": 2301.257,
+          "count": 256
+        },
+        {
+          "rank": 6,
+          "ms": 2283.721,
+          "count": 256
+        },
+        {
+          "rank": 7,
+          "ms": 2282.706,
+          "count": 256
+        }
+      ]
+    }
+  },
+  "summary_prefix_gpu_user_annotation": {
+    "mori_aiter.backward.": {
+      "max_ms": 2059.147,
+      "mean_ms": 1352.874,
+      "min_ms": 1046.508,
+      "total_count": 9216,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1173.388,
+          "count": 1152
+        },
+        {
+          "rank": 1,
+          "ms": 1305.702,
+          "count": 1152
+        },
+        {
+          "rank": 2,
+          "ms": 2059.147,
+          "count": 1152
+        },
+        {
+          "rank": 3,
+          "ms": 1046.508,
+          "count": 1152
+        },
+        {
+          "rank": 4,
+          "ms": 1170.398,
+          "count": 1152
+        },
+        {
+          "rank": 5,
+          "ms": 1387.477,
+          "count": 1152
+        },
+        {
+          "rank": 6,
+          "ms": 1397.048,
+          "count": 1152
+        },
+        {
+          "rank": 7,
+          "ms": 1283.323,
+          "count": 1152
+        }
+      ]
+    },
+    "mori_aiter.local_padded_vjp.": {
+      "max_ms": 2189.179,
+      "mean_ms": 1853.764,
+      "min_ms": 1423.95,
+      "total_count": 7168,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 1835.237,
+          "count": 896
+        },
+        {
+          "rank": 1,
+          "ms": 1608.969,
+          "count": 896
+        },
+        {
+          "rank": 2,
+          "ms": 1423.95,
+          "count": 896
+        },
+        {
+          "rank": 3,
+          "ms": 2024.918,
+          "count": 896
+        },
+        {
+          "rank": 4,
+          "ms": 2189.179,
+          "count": 896
+        },
+        {
+          "rank": 5,
+          "ms": 2063.731,
+          "count": 896
+        },
+        {
+          "rank": 6,
+          "ms": 2113.926,
+          "count": 896
+        },
+        {
+          "rank": 7,
+          "ms": 1570.204,
+          "count": 896
+        }
+      ]
+    },
+    "dsv4.linear.attention.": {
+      "max_ms": 245.126,
+      "mean_ms": 218.571,
+      "min_ms": 205.711,
+      "total_count": 5120,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 229.863,
+          "count": 640
+        },
+        {
+          "rank": 1,
+          "ms": 245.126,
+          "count": 640
+        },
+        {
+          "rank": 2,
+          "ms": 209.66,
+          "count": 640
+        },
+        {
+          "rank": 3,
+          "ms": 218.38,
+          "count": 640
+        },
+        {
+          "rank": 4,
+          "ms": 206.4,
+          "count": 640
+        },
+        {
+          "rank": 5,
+          "ms": 219.203,
+          "count": 640
+        },
+        {
+          "rank": 6,
+          "ms": 205.711,
+          "count": 640
+        },
+        {
+          "rank": 7,
+          "ms": 214.224,
+          "count": 640
+        }
+      ]
+    },
+    "dsv4.linear.indexer.": {
+      "max_ms": 0,
+      "mean_ms": 0,
+      "min_ms": 0,
+      "total_count": 0,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 1,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 2,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 3,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 4,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 5,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 6,
+          "ms": 0,
+          "count": 0
+        },
+        {
+          "rank": 7,
+          "ms": 0,
+          "count": 0
+        }
+      ]
+    },
+    "dsv4.linear.feed_forward.": {
+      "max_ms": 142.705,
+      "mean_ms": 138.841,
+      "min_ms": 135.679,
+      "total_count": 3072,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 137.655,
+          "count": 384
+        },
+        {
+          "rank": 1,
+          "ms": 142.038,
+          "count": 384
+        },
+        {
+          "rank": 2,
+          "ms": 139.374,
+          "count": 384
+        },
+        {
+          "rank": 3,
+          "ms": 140.267,
+          "count": 384
+        },
+        {
+          "rank": 4,
+          "ms": 135.679,
+          "count": 384
+        },
+        {
+          "rank": 5,
+          "ms": 142.705,
+          "count": 384
+        },
+        {
+          "rank": 6,
+          "ms": 137.094,
+          "count": 384
+        },
+        {
+          "rank": 7,
+          "ms": 135.916,
+          "count": 384
+        }
+      ]
+    },
+    "dsv4.linear.": {
+      "max_ms": 399.145,
+      "mean_ms": 369.458,
+      "min_ms": 354.441,
+      "total_count": 9216,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 379.336,
+          "count": 1152
+        },
+        {
+          "rank": 1,
+          "ms": 399.145,
+          "count": 1152
+        },
+        {
+          "rank": 2,
+          "ms": 361.009,
+          "count": 1152
+        },
+        {
+          "rank": 3,
+          "ms": 370.496,
+          "count": 1152
+        },
+        {
+          "rank": 4,
+          "ms": 354.441,
+          "count": 1152
+        },
+        {
+          "rank": 5,
+          "ms": 374.312,
+          "count": 1152
+        },
+        {
+          "rank": 6,
+          "ms": 354.952,
+          "count": 1152
+        },
+        {
+          "rank": 7,
+          "ms": 361.976,
+          "count": 1152
+        }
+      ]
+    },
+    "dsv4.attention.": {
+      "max_ms": 542.797,
+      "mean_ms": 524.095,
+      "min_ms": 517.632,
+      "total_count": 3072,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 525.984,
+          "count": 384
+        },
+        {
+          "rank": 1,
+          "ms": 542.797,
+          "count": 384
+        },
+        {
+          "rank": 2,
+          "ms": 520.134,
+          "count": 384
+        },
+        {
+          "rank": 3,
+          "ms": 522.428,
+          "count": 384
+        },
+        {
+          "rank": 4,
+          "ms": 517.669,
+          "count": 384
+        },
+        {
+          "rank": 5,
+          "ms": 523.995,
+          "count": 384
+        },
+        {
+          "rank": 6,
+          "ms": 517.632,
+          "count": 384
+        },
+        {
+          "rank": 7,
+          "ms": 522.119,
+          "count": 384
+        }
+      ]
+    },
+    "dsv4.block.": {
+      "max_ms": 3.192,
+      "mean_ms": 3.118,
+      "min_ms": 3.052,
+      "total_count": 1024,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 3.151,
+          "count": 128
+        },
+        {
+          "rank": 1,
+          "ms": 3.134,
+          "count": 128
+        },
+        {
+          "rank": 2,
+          "ms": 3.074,
+          "count": 128
+        },
+        {
+          "rank": 3,
+          "ms": 3.147,
+          "count": 128
+        },
+        {
+          "rank": 4,
+          "ms": 3.052,
+          "count": 128
+        },
+        {
+          "rank": 5,
+          "ms": 3.192,
+          "count": 128
+        },
+        {
+          "rank": 6,
+          "ms": 3.108,
+          "count": 128
+        },
+        {
+          "rank": 7,
+          "ms": 3.085,
+          "count": 128
+        }
+      ]
+    }
+  },
+  "top_dense_linear_backward_cpu_all_ranks": [
+    {
+      "name": "dsv4.linear.feed_forward.w2.bwd",
+      "sum_ms_all_ranks": 158.202,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 20.014,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 19.312,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 20.364,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 19.405,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 20.019,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 19.143,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 19.767,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 20.178,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_b.bwd",
+      "sum_ms_all_ranks": 154.381,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 19.128,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 19.264,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 19.217,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 19.318,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 19.41,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 19.16,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 19.67,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 19.213,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.moe.router_gate.bwd",
+      "sum_ms_all_ranks": 135.793,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 16.785,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 16.883,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 16.693,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 16.971,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 17.85,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 16.616,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 17.068,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 16.926,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_a.bwd",
+      "sum_ms_all_ranks": 127.155,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 15.949,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 15.593,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 15.864,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 16.01,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 15.918,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 15.912,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 16.141,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 15.768,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w3.bwd",
+      "sum_ms_all_ranks": 114.407,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 14.313,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 14.368,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.262,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 14.422,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 14.3,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 14.107,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 14.38,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 14.255,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_a.bwd",
+      "sum_ms_all_ranks": 114.087,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 14.221,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 14.374,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 14.123,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 14.321,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 14.361,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 14.018,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 14.495,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 14.174,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w1.bwd",
+      "sum_ms_all_ranks": 104.193,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 12.993,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 13.1,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 12.993,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 13.201,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 13.114,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 12.721,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 13.142,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 12.93,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_b.bwd.dinput",
+      "sum_ms_all_ranks": 91.869,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 11.387,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 11.507,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 11.424,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 11.463,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 11.482,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 11.415,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 11.725,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 11.466,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w2.bwd.dinput",
+      "sum_ms_all_ranks": 89.224,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 11.274,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 10.647,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 11.768,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 10.881,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 11.403,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 10.675,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 11.126,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 11.45,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_b.bwd",
+      "sum_ms_all_ranks": 71.708,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 8.987,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 9.143,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 8.841,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 8.951,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 8.879,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 8.928,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 9.117,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 8.862,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.moe.router_gate.bwd.dinput",
+      "sum_ms_all_ranks": 71.45,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 8.884,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 8.882,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 8.695,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 8.931,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 9.36,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 8.61,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 8.946,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 9.143,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wo.bwd",
+      "sum_ms_all_ranks": 63.997,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 8.004,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 8.05,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 7.765,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 8.197,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 8.077,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 7.919,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 8.03,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 7.955,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_a.bwd.dinput",
+      "sum_ms_all_ranks": 60.99,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 7.583,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 7.468,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 7.612,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 7.67,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 7.672,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 7.694,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 7.729,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 7.561,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w2.bwd.dweight",
+      "sum_ms_all_ranks": 56.745,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 7.172,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 7.097,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 7.032,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 7.07,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 7.152,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.962,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 7.115,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 7.145,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_a.bwd.dweight",
+      "sum_ms_all_ranks": 54.849,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.938,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.751,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.831,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.921,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.84,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.827,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.941,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.8,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w3.bwd.dinput",
+      "sum_ms_all_ranks": 54.299,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.75,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.828,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.742,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.855,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.821,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.731,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.815,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.758,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_a.bwd.dinput",
+      "sum_ms_all_ranks": 53.208,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.624,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.732,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.593,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.625,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.675,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.585,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.783,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.59,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_a.bwd.dweight",
+      "sum_ms_all_ranks": 52.53,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.556,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.594,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.503,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.635,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.638,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.41,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.661,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.533,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wq_b.bwd.dweight",
+      "sum_ms_all_ranks": 52.078,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.443,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.478,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.504,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.524,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.614,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.459,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.614,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.441,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w3.bwd.dweight",
+      "sum_ms_all_ranks": 50.203,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.333,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.278,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.287,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.322,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.243,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.159,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.333,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.249,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.moe.router_gate.bwd.dweight",
+      "sum_ms_all_ranks": 49.553,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.083,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.128,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.164,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.201,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.592,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 6.183,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.237,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.964,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w1.bwd.dinput",
+      "sum_ms_all_ranks": 48.976,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 6.085,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 6.206,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 6.111,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.235,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.134,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.972,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.135,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 6.098,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.feed_forward.w1.bwd.dweight",
+      "sum_ms_all_ranks": 47.64,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 5.968,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 5.926,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 5.923,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 6.016,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 6.028,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 5.836,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 6.057,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 5.886,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_b.bwd.dinput",
+      "sum_ms_all_ranks": 37.953,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 4.725,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 4.882,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 4.679,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 4.768,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 4.692,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 4.769,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 4.799,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 4.638,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wo.bwd.dinput",
+      "sum_ms_all_ranks": 30.89,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 3.806,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 3.847,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 3.796,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 3.905,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 3.937,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 3.868,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 3.918,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 3.812,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wkv_b.bwd.dweight",
+      "sum_ms_all_ranks": 23.076,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 2.907,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 2.926,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 2.833,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 2.854,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 2.871,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 2.864,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 2.959,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 2.863,
+          "count": 64
+        }
+      ]
+    },
+    {
+      "name": "dsv4.linear.attention.wo.bwd.dweight",
+      "sum_ms_all_ranks": 21.529,
+      "per_rank": [
+        {
+          "rank": 0,
+          "ms": 2.728,
+          "count": 64
+        },
+        {
+          "rank": 1,
+          "ms": 2.741,
+          "count": 64
+        },
+        {
+          "rank": 2,
+          "ms": 2.572,
+          "count": 64
+        },
+        {
+          "rank": 3,
+          "ms": 2.73,
+          "count": 64
+        },
+        {
+          "rank": 4,
+          "ms": 2.736,
+          "count": 64
+        },
+        {
+          "rank": 5,
+          "ms": 2.675,
+          "count": 64
+        },
+        {
+          "rank": 6,
+          "ms": 2.699,
+          "count": 64
+        },
+        {
+          "rank": 7,
+          "ms": 2.647,
+          "count": 64
+        }
+      ]
+    }
+  ],
+  "rank_trace_files": [
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank0_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank1_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank2_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank3_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank4_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank5_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank6_trace.json",
+    "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2/rank7_trace.json"
+  ],
+  "artifact": "torchtitan_ep8_deeper_mori_ranges_baseline_20260603",
+  "run_id": "torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603",
+  "shape": {
+    "gpus_per_node": 8,
+    "fsdp": 8,
+    "ep": 8,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "sequence_length": 4096,
+    "layers": 4
+  },
+  "notes": [
+    "summary_exact_cpu uses cat=user_annotation only; this is the main inclusive CPU wall-time view.",
+    "summary_exact_gpu_user_annotation keeps Kineto gpu_user_annotation copies separate so child ranges are not double-counted.",
+    "Baseline path keeps TORCHTITAN_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER=0 to expose total_recv.item and get_dispatch_src_token_pos syncs."
+  ]
+}

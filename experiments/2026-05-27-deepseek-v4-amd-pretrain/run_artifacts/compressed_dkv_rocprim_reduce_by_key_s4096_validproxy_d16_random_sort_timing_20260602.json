@@ -1,0 +1,91 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_floor",
+  "scope": "compressed_shared_kv_dkv_scalar_reduce_by_group_and_d",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "mode": "random_sort_reduce",
+  "seed": 1234,
+  "num_pairs": 1572864,
+  "d_tile": 16,
+  "num_items": 25165824,
+  "groups": 1024,
+  "key_space": 16384,
+  "full_d512_multiplier": 32.0,
+  "build_seconds": 0.39448478212580085,
+  "extension_dir": "/tmp/dsv4_compressed_dkv_rocprim_reduce_by_key",
+  "workspace": {
+    "temp_bytes": 105892,
+    "resident_tensor_bytes": 604085672,
+    "resident_tensor_gib": 0.5625986233353615
+  },
+  "parity": null,
+  "timings": {
+    "reduce_only_sorted_keys": {
+      "samples_ms": [
+        0.11044099926948547,
+        0.10972099751234055,
+        0.10964100062847137,
+        0.10928100347518921,
+        0.11376100033521652
+      ],
+      "median_ms": 0.10972099751234055,
+      "min_ms": 0.10928100347518921,
+      "max_ms": 0.11376100033521652,
+      "p90_ms": 0.11243299990892411,
+      "timed_iters": 5,
+      "warmup_iters": 2
+    },
+    "torch_sort_only": {
+      "samples_ms": [
+        1.0035279989242554,
+        1.0692490339279175,
+        1.0652480125427246,
+        1.0530489683151245,
+        1.0415680408477783
+      ],
+      "median_ms": 1.0530489683151245,
+      "min_ms": 1.0035279989242554,
+      "max_ms": 1.0692490339279175,
+      "p90_ms": 1.0676486253738404,
+      "timed_iters": 5,
+      "warmup_iters": 2
+    },
+    "torch_sort_reorder_values": {
+      "samples_ms": [
+        1.3802510499954224,
+        1.358170986175537,
+        1.3470510244369507,
+        1.3348100185394287,
+        1.3417309522628784
+      ],
+      "median_ms": 1.3470510244369507,
+      "min_ms": 1.3348100185394287,
+      "max_ms": 1.3802510499954224,
+      "p90_ms": 1.3714190244674682,
+      "timed_iters": 5,
+      "warmup_iters": 2
+    },
+    "torch_sort_reorder_values_plus_reduce": {
+      "samples_ms": [
+        1.4633309841156006,
+        1.4457720518112183,
+        1.430130958557129,
+        1.4207710027694702,
+        1.4330919981002808
+      ],
+      "median_ms": 1.4330919981002808,
+      "min_ms": 1.4207710027694702,
+      "max_ms": 1.4633309841156006,
+      "p90_ms": 1.4563074111938477,
+      "timed_iters": 5,
+      "warmup_iters": 2
+    }
+  },
+  "extrapolated": {
+    "full_d512_reduce_only_ms": 3.5110719203948975,
+    "full_d512_sort_reorder_reduce_ms": 45.858943939208984
+  },
+  "read": "This is a primitive-floor diagnostic for reducing scalar dKV contributions by compressed group and D offset. It excludes sparse-MLA contribution math. sorted_balanced is an optimistic lower bound where route keys are already grouped; random_sort_reduce includes PyTorch/ROCm sort and value reorder overhead before rocPRIM reduce_by_key."
+}

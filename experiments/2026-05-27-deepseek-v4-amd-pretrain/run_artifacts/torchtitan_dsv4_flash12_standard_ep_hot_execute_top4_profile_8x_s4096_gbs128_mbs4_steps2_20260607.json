@@ -1,0 +1,108 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_two_step_profile_for_current_standard_ep_helper_execute_top4_candidate",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 4,
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_TIMING_PATH": "enabled",
+    "CANARY_DSV4_ADDITIVE_TIMING_PATH": "enabled",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "true",
+    "CANARY_DSV4_PROFILE_MODULE_BACKWARD": "true",
+    "CANARY_PROFILE_DENSE_LINEAR_BACKWARD": "true",
+    "CANARY_ENABLE_PROFILING": "false"
+  },
+  "step_metrics": {
+    "1": {"tokens_per_gpu_s": 1927.0, "tflops_per_gpu": 97.58, "loss": 12.20199, "grad_norm": 19.75, "peak_logged_memory_gib": 151.50, "read": "warmup_compile_contaminated"},
+    "2": {"tokens_per_gpu_s": 6362.0, "tflops_per_gpu": 322.14, "loss": 8.72624, "grad_norm": 54.5, "peak_logged_memory_gib": 191.88, "read": "profiled_step_with_module_hook_overhead"}
+  },
+  "profile_overhead_vs_clean_top4": {
+    "clean_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "clean_steps_2_to_6_tokens_per_gpu_s_mean": 7774.2,
+    "clean_steps_2_to_6_tflops_per_gpu_mean": 393.62,
+    "profile_step_2_tokens_per_gpu_s": 6362.0,
+    "profile_step_2_tflops_per_gpu": 322.14,
+    "tokens_per_gpu_s_delta_pct": -18.17,
+    "tflops_delta_pct": -18.16,
+    "read": "Module backward and dense-linear timing hooks are intrusive here. Use this profile for relative ranking, not throughput promotion."
+  },
+  "additive_timing_step_2_ms": {
+    "step_gpu_rankmax": 8781.592,
+    "step_wall_rankmax": 8781.638,
+    "train_step_rankmax": 8780.956,
+    "forward_backward_call_rankmax": 8669.545,
+    "model_forward_rankmax": 2267.692,
+    "loss_rankmax": 393.579,
+    "backward_rankmax": 6014.122,
+    "forward_backward_residual_rankmax": 10.473,
+    "optimizer_step_rankmax": 47.063,
+    "grad_clip_rankmax": 26.475,
+    "valid_tokens_all_reduce_rankmax": 4.837,
+    "collect_dist_metrics_rankmax": 4.766
+  },
+  "module_backward_step_2_ms": {
+    "per_microbatch_rankmax": {
+      "block_sum": 1452.203,
+      "attention_sum": 900.892,
+      "moe_sum": 536.167
+    },
+    "sum_across_microbatches_rankmax": {
+      "block_sum": 5766.544,
+      "attention_sum": 3550.839,
+      "moe_sum": 2130.161
+    },
+    "top_layer_medians": {
+      "layers_0_1_dense_attention_ms": 102.8,
+      "c4_sparse_attention_layers_2_4_6_8_10_ms": 93.9,
+      "c128_sparse_attention_layers_3_5_7_9_11_ms": 40.2,
+      "moe_layers_median_range_ms": "41.4-47.6"
+    }
+  },
+  "sharedkv_backward_step_2_ms": {
+    "rank_sum_max": 1638.587,
+    "rank_sum_median": 1632.243,
+    "rank_sum_min": 1617.504,
+    "compress_ratio_4_per_call_max": 61.244,
+    "compress_ratio_4_per_call_median": 60.642,
+    "compress_ratio_128_per_call_max": 38.903,
+    "compress_ratio_128_per_call_median": 20.107,
+    "read": "The C4 sparse shared-KV backward remains a visible wall even after standard-EP helper execution reduces the MoE scaling pressure."
+  },
+  "source_artifacts": {
+    "remote_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607/docker-run.log",
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607/additive_timing.jsonl",
+    "dsv4_profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607/dsv4_profile_timing.jsonl"
+  },
+  "read": "The current best standard-EP top4 helper-execute branch has a clean additive profile: no large forward/backward wrapper residual remains. Backward dominates, and within backward the summed attention cost is now larger than MoE. This means standard EP helper execution has reduced the MoE/EP skew wall enough that sparse-attention backward is again a first-class e2e target. MORI/AITER still needs the helper-execute mechanism ported into its fused path, but the standard-EP profile says not to ignore C4 shared-KV backward while doing that."
+}

@@ -1,0 +1,279 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 1.2698412698412698,
+    "nonempty_tiles": 4,
+    "tiles": 4,
+    "unique_groups_max": 32,
+    "unique_groups_mean_all_tiles": 20.0,
+    "unique_groups_mean_nonempty": 20.0,
+    "unique_groups_total": 80
+  },
+  "active_route_workspace": {
+    "active_counts_bytes": 16,
+    "active_groups_bytes": 512
+  },
+  "arch": "gfx950",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "block_d": 16,
+    "dense_group_dynamic_shared_bytes": 2176,
+    "dense_group_threads": 256,
+    "group_block": 64,
+    "selected_block": 256,
+    "selected_tiles_for_dense_group": 1,
+    "seq_chunk": 32,
+    "tile_segment_threads": 256
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 4128768,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 4128768
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 1032192,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 1032192
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "prefix_compressed_same_topk": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 32,
+    "valid_selected_per_query": {
+      "gini": 0.3386656746031746,
+      "max": 32,
+      "mean_all_rows": 15.75,
+      "mean_nonzero_rows": 16.128,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 125,
+      "p50_all_rows": 16.0,
+      "p50_nonzero_rows": 16.0,
+      "p90_all_rows": 28.299999999999997,
+      "p90_nonzero_rows": 28.60000000000001,
+      "p99_all_rows": 31.0,
+      "p99_nonzero_rows": 31.0,
+      "rows": 128,
+      "top16_share": 0.2361111111111111,
+      "top1_share": 0.015873015873015872,
+      "top64_share": 0.753968253968254,
+      "top8_share": 0.12202380952380952,
+      "total_selections": 2016,
+      "zero_rows": 3
+    }
+  },
+  "build_seconds": 39.39063724200241,
+  "contract_rung": {
+    "block_d": 16,
+    "expected_write_reduction_x": 12.338365924856399,
+    "group_block": 64,
+    "name": "32x256_d16_smoke",
+    "p99_combined_scratch_kib": 115.3870703125,
+    "read": "Lower-pressure compile/parity/perf rung from compressed_dkv_mfma_segmented_reducer_next_contract_20260602. It is the first S4096 timing gate before widening to the full selected span.",
+    "selected_block": 256,
+    "seq_chunk": 32
+  },
+  "correctness": null,
+  "dense_group_tile_correctness": null,
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "extension_dir": "/tmp/dsv4_compressed_dkv_hip_accumulator",
+  "included_headers": [
+    "rocprim/device/device_reduce_by_key.hpp",
+    "rocprim/device/device_segmented_reduce.hpp",
+    "hipcub/device/device_segmented_reduce.hpp",
+    "ck_tile/core.hpp"
+  ],
+  "layer_id": 2,
+  "materialized_workspace": {
+    "grad_logits_bytes": 1048576,
+    "probs_bytes": 1048576,
+    "safe_groups_bytes": 32768,
+    "valid_bytes": 4096
+  },
+  "modeled_write_reduction": {
+    "coalesced_active_list_atomic_elements": 40960,
+    "coalesced_active_list_reduction_x": 25.2,
+    "dense_group_tile_global_atomic_elements": 40960,
+    "dense_group_tile_reduction_x": 25.2,
+    "dense_group_tile_vs_active_list_global_atomic_x": 1.0,
+    "dense_tile_partial_slab_elements": 65536,
+    "dense_tile_partial_slab_over_active_coalesced_x": 1.6,
+    "query_major_raw_atomic_elements": 1032192,
+    "tile_segment_global_atomic_elements": 40960,
+    "tile_segment_reduction_x": 25.2,
+    "tile_segment_vs_active_list_global_atomic_x": 1.0
+  },
+  "perf_reporting_context": {
+    "multi_gpu_targets": {
+      "eight_mi350": {
+        "global_batch_size": 128,
+        "sequence_length": 4096,
+        "target_step_time_s": [
+          27,
+          30
+        ],
+        "target_tok_per_gpu_s": [
+          2200,
+          2400
+        ],
+        "tokens_per_step": 524288
+      },
+      "four_mi350": {
+        "global_batch_size": 64,
+        "sequence_length": 4096,
+        "target_step_time_s": [
+          27,
+          30
+        ],
+        "target_tok_per_gpu_s": [
+          2200,
+          2400
+        ],
+        "tokens_per_step": 262144
+      },
+      "read": "Final reporting must include end-to-end tok/GPU/s and TFLOPs, not just this standalone accumulator timing."
+    },
+    "reducer_slice_gates_ms": {
+      "s4096_mfma_bf16_floor_context": 4.727312088012695,
+      "s4096_mfma_mixed_floor_context": 7.052491188049316,
+      "s4096_must_beat_sparse_atomic_wall": 8.80629825592041,
+      "s512_must_beat_rejected_scalar_local_branches": 3.081876039505005,
+      "s512_reference_materialized_pytorch_context": 1.575103998184204
+    },
+    "single_layer": {
+      "current_best_full_layer_ms": 68.2089,
+      "read": "Reducer timings are accumulator-slice timings, not full-layer latency. Use this context to decide whether the slice improvement is large enough to matter for the single-layer 24.9 ms target.",
+      "required_layer_reduction_ms": 43.3089,
+      "target_full_layer_ms": 24.9
+    }
+  },
+  "read": "First HIP extension accumulator for actual-LI compressed dKV. It consumes materialized probs/grad_logits and active-group lists, so it is an accumulator-path smoke only. The body is scalar and serves as the binding/correctness rung before a CK-Tile/MFMA schedule. The optional tile-partial mode removes final global atomics by writing one partial row per seq-tile/group/D and then reducing those rows. The optional dense-group-tile mode keeps a dense local compressed-group table in LDS per seq/selected/D16 tile, then emits sparse global atomics only for touched groups. It is a runtime diagnostic for the coalesced-write budget, not the final CK-Tile/MFMA body. The optional tile-segment mode consumes prepacked tile-local group segments and emits one full-D row per segment; it mirrors the intended Scatter stage contract but still uses scalar math.",
+  "reducer_promotion_gate": {
+    "candidate_event_median_ms": 1.394292950630188,
+    "candidate_label": "hip_tile_segment_full_d_scalar_accumulator",
+    "reason": "promotion gates are currently defined for S512 and S4096",
+    "scope": "isolated compressed-dKV accumulator slice; not full-layer or multi-GPU end-to-end throughput",
+    "status": "context_only"
+  },
+  "scope": "compressed_dkv_segmented_hip_accumulator_smoke",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_pairs": 2016
+  },
+  "skip_correctness": false,
+  "status": "ok",
+  "tile_partial_correctness": null,
+  "tile_segment_correctness": {
+    "candidate_norm": 595.8150024414062,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 4.291534423828125e-05,
+    "mean_abs_diff": 4.530611477093771e-07,
+    "passed": true,
+    "reference_norm": 595.8150024414062
+  },
+  "tile_segment_density": {
+    "pairs": 2016,
+    "pairs_per_segment_mean": 25.2,
+    "read": "Each segment is one compressed group inside one token-block x selected-block tile. The scalar reducer emits one full-D atomic row per segment, so this is the current coalesced ScatterAdd contract before MFMA math.",
+    "segments": 80,
+    "selected_block": 256,
+    "tile_local_write_reduction_x": 25.2,
+    "token_block": 32
+  },
+  "tile_segment_workspace": {
+    "pair_pos_sorted_bytes": 16128,
+    "segment_keys_bytes": 16128,
+    "segment_starts_bytes": 648
+  },
+  "timing": {
+    "hip_tile_segment_full_d_scalar_accumulator": {
+      "checksum_norm": 595.8150024414062,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.3960130214691162,
+        "mean_ms": 1.3921463092168171,
+        "median_ms": 1.394292950630188,
+        "min_ms": 1.3861329555511475,
+        "samples_ms": [
+          1.3960130214691162,
+          1.3861329555511475,
+          1.394292950630188
+        ],
+        "stdev_ms": 0.005278255171365889
+      },
+      "label": "hip_tile_segment_full_d_scalar_accumulator",
+      "peak_memory_allocated_bytes": 518895616,
+      "peak_memory_allocated_gib": 0.4832592010498047,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.4744959771633148,
+        "mean_ms": 1.4483089714000623,
+        "median_ms": 1.4567859470844269,
+        "min_ms": 1.413644989952445,
+        "samples_ms": [
+          1.4567859470844269,
+          1.4744959771633148,
+          1.413644989952445
+        ],
+        "stdev_ms": 0.03129864212229249
+      }
+    }
+  }
+}

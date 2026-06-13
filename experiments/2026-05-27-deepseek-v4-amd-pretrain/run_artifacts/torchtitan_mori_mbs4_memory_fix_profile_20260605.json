@@ -1,0 +1,268 @@
+{
+  "artifact": "torchtitan_mori_mbs4_memory_fix_profile_20260605",
+  "created_at": "2026-06-05",
+  "status": "mori_mbs4_memory_fix_survives_and_profiled_remaining_vjp_skew",
+  "node": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 4,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "micro_batch_size": 4,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 8,
+    "sequence_length": 4096,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "chunked_ce_num_chunks": 8
+  },
+  "memory_fix": {
+    "retained_artifact": "run_artifacts/torchtitan_mori_mbs4_memory_fix_20260605.json",
+    "retained_run_id": "torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605",
+    "retained_remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605/docker-run.log",
+    "result": "passed_6_steps",
+    "mean_tflops_steps_2_to_6": 158.15,
+    "mean_tflops_steps_4_to_6": 147.04,
+    "peak_logged_memory_gib": 246.03,
+    "nan_grad_norm_seen": false,
+    "read": "The original MBS4 no-AC OOM in torch.bmm(dgate, w1_local) is fixed by avoiding full padded dX/dTopk/dgate/dup materialization and by raising MORI SHMEM heap to 32G."
+  },
+  "profile_run": {
+    "run_id": "torchtitan_dsv4_mori_streamed_swiglu_heap32g_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_streamed_swiglu_heap32g_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605/docker-run.log",
+    "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_streamed_swiglu_heap32g_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605",
+    "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/timing/torchtitan_dsv4_mori_streamed_swiglu_heap32g_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605/mori",
+    "result": "passed_4_steps",
+    "timing_note": "MORI timing records use CUDA events and synchronize at flush, so this run is for attribution. Throughput is directionally comparable but not a promotion gate.",
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.15266,
+        "grad_norm": 9.25,
+        "tflops_per_gpu": 98.6,
+        "peak_logged_memory_gib": 97.21
+      },
+      {
+        "step": 2,
+        "loss": 9.4895,
+        "grad_norm": 50.5,
+        "tflops_per_gpu": 168.53,
+        "peak_logged_memory_gib": 202.45
+      },
+      {
+        "step": 3,
+        "loss": 14.82286,
+        "grad_norm": 26.125,
+        "tflops_per_gpu": 161.64,
+        "peak_logged_memory_gib": 224.74
+      },
+      {
+        "step": 4,
+        "loss": 11.68744,
+        "grad_norm": 34.0,
+        "tflops_per_gpu": 141.84,
+        "peak_logged_memory_gib": 243.84
+      }
+    ],
+    "mori_timing_records": {
+      "rank_files": 4,
+      "records_total": 512,
+      "records_per_rank": 128,
+      "calls_per_optimizer_step_per_rank": 32,
+      "call_shape": "4 DSv4 Flash layers x GA8"
+    }
+  },
+  "mori_high_level_timing": {
+    "all_calls_ms": {
+      "count": 512,
+      "mean": 213.01,
+      "median": 209.112,
+      "p90": 303.002,
+      "p95": 313.12,
+      "max": 1752.724
+    },
+    "step_rank_sum_seconds": {
+      "step_1": {
+        "rank_0": 4.453,
+        "rank_1": 4.412,
+        "rank_2": 4.39,
+        "rank_3": 4.37,
+        "max_rank": 4.453
+      },
+      "step_2": {
+        "rank_0": 6.437,
+        "rank_1": 6.459,
+        "rank_2": 6.453,
+        "rank_3": 6.436,
+        "max_rank": 6.459
+      },
+      "step_3": {
+        "rank_0": 7.144,
+        "rank_1": 7.139,
+        "rank_2": 7.151,
+        "rank_3": 7.135,
+        "max_rank": 7.151
+      },
+      "step_4": {
+        "rank_0": 9.273,
+        "rank_1": 9.274,
+        "rank_2": 9.278,
+        "rank_3": 9.256,
+        "max_rank": 9.278
+      }
+    },
+    "top_high_level_stages_all_calls_ms": [
+      {
+        "stage": "backward.local_vjp.padded",
+        "mean": 144.011,
+        "median": 116.389,
+        "p90": 227.36,
+        "p95": 272.491,
+        "max": 1742.49
+      },
+      {
+        "stage": "backward.combine_dx.call",
+        "mean": 58.146,
+        "median": 29.108,
+        "p90": 147.028,
+        "p95": 196.241,
+        "max": 506.798
+      },
+      {
+        "stage": "backward.dispatch_x.call",
+        "mean": 5.026,
+        "median": 5.229,
+        "p90": 6.363,
+        "p95": 6.673,
+        "max": 78.508
+      },
+      {
+        "stage": "backward.dispatch_grad_output.call",
+        "mean": 3.871,
+        "median": 4.158,
+        "p90": 4.672,
+        "p95": 5.059,
+        "max": 5.669
+      }
+    ],
+    "step_4_rank_component_sums_seconds": {
+      "rank_0": {
+        "local_vjp": 5.552,
+        "combine_dx": 3.375,
+        "dispatch_x": 0.161,
+        "dispatch_grad_output": 0.123,
+        "combine_dtopk": 0.008
+      },
+      "rank_1": {
+        "local_vjp": 6.886,
+        "combine_dx": 2.04,
+        "dispatch_x": 0.163,
+        "dispatch_grad_output": 0.122,
+        "combine_dtopk": 0.008
+      },
+      "rank_2": {
+        "local_vjp": 7.513,
+        "combine_dx": 1.413,
+        "dispatch_x": 0.166,
+        "dispatch_grad_output": 0.121,
+        "combine_dtopk": 0.008
+      },
+      "rank_3": {
+        "local_vjp": 4.179,
+        "combine_dx": 4.749,
+        "dispatch_x": 0.144,
+        "dispatch_grad_output": 0.123,
+        "combine_dtopk": 0.008
+      }
+    }
+  },
+  "local_vjp_inner_timing": {
+    "step_4_inner_stage_ms": [
+      {
+        "stage": "local_padded_vjp.w13_forward_gemm",
+        "mean": 60.449,
+        "median": 53.641,
+        "p90": 93.317,
+        "max": 104.615
+      },
+      {
+        "stage": "local_padded_vjp.w2_dgrad_gemm",
+        "mean": 33.283,
+        "median": 30.446,
+        "p90": 49.96,
+        "max": 55.407
+      },
+      {
+        "stage": "local_padded_vjp.w2_forward_gemm",
+        "mean": 32.987,
+        "median": 26.629,
+        "p90": 46.463,
+        "max": 246.619
+      },
+      {
+        "stage": "local_padded_vjp.w2_wgrad_gemm",
+        "mean": 27.242,
+        "median": 24.79,
+        "p90": 42.273,
+        "max": 45.675
+      },
+      {
+        "stage": "local_padded_vjp.streamed_swiglu_w13",
+        "mean": 12.318,
+        "median": 12.174,
+        "p90": 15.911,
+        "max": 19.787
+      },
+      {
+        "stage": "local_padded_vjp.gather_scale_scatter",
+        "mean": 10.65,
+        "median": 10.864,
+        "p90": 15.01,
+        "max": 16.928
+      },
+      {
+        "stage": "local_padded_vjp.swiglu_forward",
+        "mean": 6.484,
+        "median": 5.387,
+        "p90": 9.181,
+        "max": 50.683
+      },
+      {
+        "stage": "local_padded_vjp.dtopk_weight",
+        "mean": 4.279,
+        "median": 4.525,
+        "p90": 5.768,
+        "max": 6.769
+      },
+      {
+        "stage": "local_padded_vjp.sort_counts",
+        "mean": 0.569,
+        "median": 0.563,
+        "p90": 0.658,
+        "max": 0.925
+      },
+      {
+        "stage": "local_padded_vjp.route_pack",
+        "mean": 0.145,
+        "median": 0.142,
+        "p90": 0.164,
+        "max": 0.208
+      }
+    ]
+  },
+  "read": {
+    "answered_user_question": "Yes, MORI can be fixed for the MBS4 no-AC memory failure on MI350. The failure was not because 287 GiB is intrinsically too small; it came from several giant padded temporary allocations plus allocator fragmentation/heap pressure. The compact/streamed path survives with 243.84-246.03 GiB peak logged memory.",
+    "remaining_wall": "After the memory fix, the main MORI/MoE wall is not dTopk combine or dispatch. It is owner-rank local VJP math plus dX return wait. In step 4, the slowest rank spends 7.513s in local VJP while another spends 4.749s in combine_dx waiting/returning, making the rank totals align around 9.27s.",
+    "next_optimization_target": "Replace or fuse the padded owner-rank VJP math. The largest late-step inner stages are W13 forward recompute, W2 dgrad/wgrad, W2 forward recompute, and W13/SwiGLU backward. The streamed path fixed memory but remains a PyTorch/GEMM-family training VJP, so the next materializable speed path is an AITER/CK training backward that exposes/saves usable forward intermediates without slowing AITER fused forward, or a fused owner VJP that avoids repeated padded forward recompute."
+  },
+  "validation": {
+    "local_py_compile": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "launcher_bash_n": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "remote_gpu_idle_after_run": true,
+    "json_validation": "jq empty run_artifacts/torchtitan_mori_mbs4_memory_fix_profile_20260605.json"
+  }
+}

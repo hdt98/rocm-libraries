@@ -1,0 +1,142 @@
+{
+  "status": "passed_three_steps_checkpoint_free_direct_torchtitan_guarded_wip",
+  "date": "2026-06-01",
+  "experiment": "2026-05-27-deepseek-v4-amd-pretrain",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "run_id": "torchtitan_direct_dsv4_s4096_guarded_8xmi350_ckptfree_20260601T000000",
+  "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+  "visible_devices": "0,1,2,3,4,5,6,7",
+  "activation_checkpoint_mode": "full",
+  "checkpoint_enable": false,
+  "checkpoint_directory_created": false,
+  "remote_output_size": "2.7M",
+  "remote_log_size": "40K",
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s4096_guarded_8xmi350_ckptfree_20260601T000000/docker-run.log",
+  "config_check": {
+    "run_id": "torchtitan_direct_dsv4_s4096_guarded_8xmi350_checkconfig_20260601T000000",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "shape": "1 128 4096 3",
+    "parallelism": "-1 8",
+    "router_score_func": "sqrtsoftplus",
+    "attention_compress_ratio_by_layer": [
+      0,
+      0,
+      4,
+      128
+    ],
+    "attention_sparse_threshold_by_layer": [
+      512,
+      512,
+      512,
+      512
+    ],
+    "attention_sparse_selected_state_threshold_by_layer": [
+      4000000000,
+      4000000000,
+      4000000000,
+      4000000000
+    ],
+    "attention_indexer_loss_coeff_by_layer": [
+      0.001,
+      0.001,
+      0.001,
+      0.001
+    ]
+  },
+  "steps": {
+    "1": {
+      "loss": 12.24032,
+      "grad_norm": 11.1875,
+      "memory_gib_range": [
+        41.58,
+        41.96
+      ],
+      "tokens_per_gpu_s_range": [
+        2436,
+        2442
+      ],
+      "tflops_per_gpu_range": [
+        46.09,
+        46.22
+      ],
+      "torchtitan_reported_mfu_pct_range_a100_fallback": [
+        14.77,
+        14.81
+      ],
+      "mi350x_peak_normalized_mfu_pct_range": [
+        2.00,
+        2.00
+      ],
+      "read": "warmup step"
+    },
+    "2": {
+      "loss": 9.48662,
+      "grad_norm": 22.75,
+      "memory_gib_range": [
+        51.51,
+        51.88
+      ],
+      "tokens_per_gpu_s": 10907,
+      "node_tokens_per_s": 87256,
+      "implied_step_time_s_at_gbs128": 6.01,
+      "tflops_per_gpu_range": [
+        206.38,
+        206.39
+      ],
+      "torchtitan_reported_mfu_pct_a100_fallback": 66.15,
+      "mi350x_peak_normalized_mfu_pct_range": [
+        8.94,
+        8.94
+      ]
+    },
+    "3": {
+      "loss": 13.43889,
+      "grad_norm": 39.75,
+      "memory_gib_range": [
+        51.51,
+        51.88
+      ],
+      "tokens_per_gpu_s": 10747,
+      "node_tokens_per_s": 85976,
+      "implied_step_time_s_at_gbs128": 6.10,
+      "tflops_per_gpu": 203.35,
+      "torchtitan_reported_mfu_pct_a100_fallback": 65.18,
+      "mi350x_peak_normalized_mfu_pct": 8.80
+    }
+  },
+  "clean_steps": {
+    "steps": [
+      2,
+      3
+    ],
+    "average_tokens_per_gpu_s": 10827,
+    "average_node_tokens_per_s": 86616,
+    "average_implied_step_time_s_at_gbs128": 6.05,
+    "average_tflops_per_gpu": 204.865,
+    "average_torchtitan_reported_mfu_pct_a100_fallback": 65.665,
+    "average_mi350x_peak_normalized_mfu_pct": 8.87
+  },
+  "mfu_note": "TorchTitan reported MFU used get_peak_flops() fallback to A100 peak 312e12 because the MI350-class device name was not matched. The MI350X-normalized MFU fields use 2309.6e12 dense BF16 peak from AMD Instinct MI350X product brief.",
+  "target_comparison": {
+    "target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "target_node_tokens_per_s_range": [
+      17600,
+      19200
+    ],
+    "target_step_time_s_at_gbs128_range": [
+      27.3,
+      29.8
+    ],
+    "clean_average_tokens_per_gpu_ratio_to_target_range": [
+      4.51,
+      4.92
+    ],
+    "caveat": "This is still the 4-layer guarded dense-fallback systems baseline, not final 43-layer sparse-MLA/MORI-overlap DeepSeek-V4-Flash performance."
+  },
+  "read": "The current guarded direct TorchTitan WIP still passes the canonical 8xMI350 S4096 checkpoint-free canary after the S512 selected-state guard. Long-sequence compressed layers fall back because S4096 exceeds the temporary PyTorch sparse MLA threshold; the remaining aligned work is fused sparse MLA/LightningIndexer and training-safe MORI EP overlap."
+}

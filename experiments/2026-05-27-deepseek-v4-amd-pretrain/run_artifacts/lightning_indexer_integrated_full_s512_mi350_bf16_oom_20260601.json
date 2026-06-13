@@ -1,0 +1,15 @@
+{
+  "artifact": "lightning_indexer_integrated_full_s512_mi350_bf16_oom_20260601",
+  "command_shape": "run_microbench.py --device cuda --dtype bfloat16 --preset full --batch 1 --seqlen 512 --attention-impl sparse-gather-lightning-indexer --moe-impl grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad --shared-expert-impl fused-w13 --profile-blocks --warmup 0 --iters 1",
+  "failure": {
+    "exception": "torch.OutOfMemoryError",
+    "free_gib": 111.46,
+    "message": "HIP out of memory. Tried to allocate 126.00 GiB.",
+    "pytorch_allocated_gib": 174.71
+  },
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "interpretation": "Full BF16/reference dynamic MoE did not use the compact packed-sim path; it fell back to token-sum/index-select materialization and OOMed. The LightningIndexer path had already executed earlier in the forward path, so this is a MoE reference fallback limitation.",
+  "next_action": "Use the fp4-packed-sim compact MoE path for full-shape integrated LightningIndexer probes, or implement a BF16 compact-native grouped MoE path that avoids materialized expert weight selection.",
+  "result": "failed_oom"
+}

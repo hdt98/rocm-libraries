@@ -1,0 +1,687 @@
+{
+  "args": {
+    "atol": 2e-05,
+    "backend": "gloo",
+    "device": "cpu",
+    "experts_per_rank": 4,
+    "hidden": 32,
+    "hot_experts": 2,
+    "intermediate": 16,
+    "output": "outputs/standard_ep_hot_expert_split_execution_contract_8r_cpu_20260606.json",
+    "rtol": 2e-05,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 8,
+    "topk": 2
+  },
+  "artifact": "standard_ep_hot_expert_split_execution_contract",
+  "next_gate": "Move this split into TorchTitan GroupedExperts standard EP: planner emits hot ids, dispatcher masks remote-hot rows from normal owner all-to-all, and GroupedExperts adds remote-hot source-local outputs before standard combine output.",
+  "passed": true,
+  "rank_results": [
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 0,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 1,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 2,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 3,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 4,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 5,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 8,
+      "passed": true,
+      "rank": 6,
+      "remote_hot_rows": 8,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.821210263296962e-13,
+          "mean_abs": 4.19076665730822e-14,
+          "rel_l2": 1.1030718718097608e-07,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.821210263296962e-13,
+          "mean_abs": 4.746680479228438e-14,
+          "rel_l2": 1.1526118876925934e-07,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local_plus_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.094947017729282e-13,
+          "mean_abs": 4.5633852599480385e-14,
+          "rel_l2": 1.1763563714770731e-07,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "owner_rows": 16,
+      "passed": true,
+      "rank": 7,
+      "remote_hot_rows": 0,
+      "world": 8
+    }
+  ],
+  "scope": "Distributed autograd probe for standard EP split execution: cold/local-hot owner path plus source-local remote-hot path with differentiable hot-weight all-reduce."
+}

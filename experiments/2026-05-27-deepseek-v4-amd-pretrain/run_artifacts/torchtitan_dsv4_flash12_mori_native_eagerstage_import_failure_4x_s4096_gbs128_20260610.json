@@ -1,0 +1,41 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_eagerstage_import_failure_4x_s4096_gbs128_20260610",
+  "created_at": "2026-06-10",
+  "status": "invalid_source_failure",
+  "host": "do-sonle5-mi350-gpu",
+  "host_addr": "165.245.166.41",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_eagerstage_chunk32_smoke2_4x_s4096_gbs128_20260610/docker-run.log",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_eagerstage_chunk32_smoke2_4x_s4096_gbs128_20260610",
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "2,3,4,5",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4
+  },
+  "env_highlights": {
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8"
+  },
+  "failure": {
+    "phase": "first_forward_native_mori_compact_dispatch_init",
+    "exception": "NameError",
+    "message": "name 'EpDispatchCombineConfig' is not defined",
+    "root_cause": "local source cleanup accidentally removed the MORI dispatch/combine constructor imports from the dispatch path while moving lazy combine construction out of combine"
+  },
+  "read": "This is source-regression evidence only, not throughput or stability evidence. The 4x smoke confirmed the corrected chunked sparse-sink launch shape reached the native MORI path, then failed before performance-relevant work because the dispatch helper could not resolve EpDispatchCombineConfig.",
+  "fix": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "change": "restore mori.ops.dispatch_combine constructor imports in dispatch eager-stage initialization; keep combine on cached-handle reuse only"
+  }
+}

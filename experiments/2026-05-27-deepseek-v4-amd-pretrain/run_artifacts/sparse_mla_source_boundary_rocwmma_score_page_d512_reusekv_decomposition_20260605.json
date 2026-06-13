@@ -1,0 +1,54 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_decomposition",
+  "date": "2026-06-05",
+  "status": "producer_reuse_improves_bringup_not_promoted",
+  "scope": "S4096 layer-2 source-boundary rocWMMA D512 score-page dKV producer with SCORE_PAGE_REUSE_KV_D=1",
+  "source_file": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+  "harness": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 16,
+    "selected_block": 64,
+    "block_d": 512,
+    "threads": 64,
+    "k_tile": 16,
+    "h_tile": 16
+  },
+  "mechanism": {
+    "old_score_loop": "h0 -> d0, so each selected-KV D16 tile was loaded once per H16 head block",
+    "new_score_loop": "d0 -> h0, so each selected-KV D16 tile is loaded once and reused across all four H16 head blocks",
+    "compile_defines": [
+      "SCORE_PAGE_REUSE_KV_D=1"
+    ]
+  },
+  "artifacts": {
+    "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode0_scoreonly_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json",
+    "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode1_contribsink_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json",
+    "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode2_full_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json"
+  },
+  "timing_ms": {
+    "score_page_only": 17.300220489501953,
+    "score_plus_contrib_sink": 51.82865905761719,
+    "full_dkv_atomic": 59.252864837646484,
+    "contribution_sweep_delta": 34.528438568115234,
+    "dkv_global_write_atomic_delta": 7.424205780029297
+  },
+  "comparison": {
+    "previous_best_simple_tile_event_ms": 66.47088623046875,
+    "improvement_x_vs_previous_best_simple_tile": 1.1218172558002002,
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "full_vs_triton_boundary_x": 5.323707532582793,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041
+  },
+  "read": "Reusing selected-KV D16 tiles across head blocks is a real producer-side win: the full source-boundary dKV path improves from 66.47 ms to 59.25 ms at the retained 16x64 tile. The same-kernel dKV write/atomic delta is now only 7.42 ms, close to the known sparse-atomic wall, while score+contribution remains 51.83 ms. This confirms the next major work is a better CK/MFMA producer/contribution schedule, not another final-write-only tweak."
+}

@@ -1,0 +1,151 @@
+{
+  "artifact": "parallel_sparse_mla_mori_focus_refresh_20260604",
+  "created_at": "2026-06-04",
+  "status": "kept_two_tracks_active_no_new_promotion",
+  "goal_alignment": {
+    "sparse_mla_single_gpu": "Port/fuse the whole sparse-MLA backward boundary so the optimized body consumes q, dO, compressed/shared KV, LI indices, output, lse/sink directly instead of acting as a late dKV drop-in.",
+    "moe_mori_multi_gpu": "Optimize MORI EP/MoE at 4x/8x MI350 and promote only sustained e2e TFLOPs plus memory, not isolated kernels or step-2 bursts.",
+    "retained_8x_anchor": {
+      "artifact": "torchtitan_8x_step_burst_diagnosis_20260604.json",
+      "run_id": "torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+      "mean_steps4_to6_tflops_per_gpu": 64.91,
+      "target_tflops_per_gpu": 277.0,
+      "speedup_needed_to_target": 4.27
+    }
+  },
+  "sparse_mla_track": {
+    "evidence_reviewed": [
+      "torchtitan_tilelang_whole_backward_boundary_decision_20260604.json",
+      "torchtitan_tilelang_nohsk_boundary_branches_20260604.json",
+      "tile_segment_dblock_headsplit_reducer_decision_20260604.json",
+      "sparse_dkv_tilelang_actual_li_selected_limit_decision_20260604.json"
+    ],
+    "current_best_isolated_dkv_slice": {
+      "candidate": "TileLang actual-LI selected-limit query-major MFMA body",
+      "s4096_layer2_median_ms": 6.913,
+      "read": "This beats the older 8.0-8.8 ms sparse-atomic compressed-dKV wall, but it is not materialized into e2e TFLOPs because the integrated path still pays source/HSK/probability bridge costs."
+    },
+    "rejected_whole_boundary_shapes": [
+      {
+        "candidate": "tilelang_atomic_dkv",
+        "s4096_whole_boundary_ms": 42.539,
+        "reason": "Consumes source tensors but uses raw per-selected dKV atomics; not enough write reduction and unstable e2e."
+      },
+      {
+        "candidate": "tilelang_source_hsk_dkv_no_merge",
+        "s4096_whole_boundary_ms": 58.799,
+        "reason": "Still writes BF16 HSK probability/scaled-dP slabs through HBM and had non-clean correctness/e2e durability."
+      },
+      {
+        "candidate": "tilelang_source_direct_dkv",
+        "s4096_whole_boundary_ms": 732.5,
+        "reason": "No-HSK, but group-owned contribution production destroys query-major q/dO reuse."
+      },
+      {
+        "candidate": "hip_tile_segment_dblock_headsplit_accumulator",
+        "s4096_layer2_median_ms": 117.53,
+        "reason": "Reduced writes but segment-owned scalar recompute loses MFMA/query-major reuse."
+      }
+    ],
+    "next_implementation_gate": {
+      "name": "query_major_no_hsk_segmented_dkv_producer",
+      "contract": [
+        "Keep query-major row recompute for QK, probabilities, scaled dP, dQ, and dKV contribution math.",
+        "Do not write probs_hsk or grad_logits_scaled_hsk slabs to HBM.",
+        "Do not make compressed group the outer owner if that reloads/recomputes Q/dO across groups.",
+        "Inside the query-major producer, add a small keyed/segmented reducer for compressed group within the token/panel tile.",
+        "Emit reduced compact partial rows or reduced atomics, then use the already-cheap final fold/reduce."
+      ],
+      "first_perf_gate": "Beat 42.5 ms source-boundary atomic-dKV at S4096, then beat 8.0-8.8 ms for the compressed-dKV slice without HSK slabs.",
+      "promotion_gate": "Only run an e2e TFLOPs A/B after the whole-boundary S4096 path is faster than the current retained explicit/bridge path."
+    }
+  },
+  "moe_mori_track": {
+    "new_evidence": [
+      {
+        "artifact": "torchtitan_noac_alloc_expand_profile8x_substage_refresh_20260604.json",
+        "source_run": "torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b",
+        "remote_profile_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling",
+        "steady_after_call_id": 65
+      },
+      {
+        "artifact": "torchtitan_noac_alloc_expand_mori_skew_refresh_20260604.json",
+        "source_run": "torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b",
+        "steady_after_call_id": 65
+      }
+    ],
+    "refreshed_rank_total_medians_ms": {
+      "combine_dx": 14380.981,
+      "local_vjp_recompute_forward": 5982.306,
+      "local_vjp_wgrad": 4910.066,
+      "local_vjp_xgrad_reduce": 4354.823,
+      "local_vjp_w2_dgrad_swiglu": 2564.478,
+      "local_vjp_pack_scatter": 1025.166,
+      "dispatch_grad_inputs": 1021.943,
+      "loss_chunked_ce_total": 6219.637
+    },
+    "refreshed_rank_median_per_call_ms": {
+      "combine_dx": 26.735,
+      "local_vjp_recompute_forward": 13.962,
+      "local_vjp_wgrad": 10.72,
+      "local_vjp_xgrad_reduce": 9.093,
+      "local_vjp_w2_dgrad_swiglu": 5.784,
+      "local_vjp_pack_scatter": 2.807,
+      "dispatch_grad_inputs": 3.03,
+      "loss_lm_head_forward": 7.136,
+      "loss_chunk_backward": 19.364
+    },
+    "skew_read": {
+      "top_call_id": 193,
+      "local_vjp_max_ms": 245.164,
+      "local_vjp_max_rank": 1,
+      "local_vjp_max_rank_recv_count": 32768,
+      "combine_dx_max_ms": 241.222,
+      "combine_dx_max_rank": 4,
+      "combine_dx_max_rank_recv_count": 876,
+      "interpretation": "The largest combine_dx waits are on ranks with tiny local VJP work, while the owner-rank VJP tail is on different ranks with large recv counts. That keeps the target as owner VJP tail reduction and earlier dX overlap, not raw MORI combine kernel tuning."
+    },
+    "rejected_or_non_promoted_branches": [
+      {
+        "candidate": "MORI guide tuple block80/rdma0/warp8",
+        "four_gpu_late_steps4_to6_tflops_per_gpu": 74.96,
+        "eight_gpu_late_steps4_to6_tflops_per_gpu": 54.21,
+        "decision": "Do not promote for EP8; regresses below the retained 64.91 TFLOPs/GPU 8x anchor."
+      },
+      {
+        "candidate": "sync_dx_first",
+        "four_gpu_observation": "Step 2 81.64 TFLOPs/GPU, step 3 65.44 TFLOPs/GPU",
+        "decision": "Correctness viable but not a durable promotion."
+      },
+      {
+        "candidate": "asyncll_flattened",
+        "decision": "Route identity is validated, but it needs much larger MORI heap at long sequence and is slower than sync in diagnostic shapes."
+      },
+      {
+        "candidate": "padded_saved forward",
+        "decision": "Avoids VJP recompute but replaces the AITER fused forward with a slow padded forward, so it loses e2e."
+      }
+    ],
+    "next_implementation_gate": {
+      "name": "aiter_forward_exposes_training_intermediates_or_fused_owner_vjp",
+      "contract": [
+        "Keep AITER fused forward as the forward floor; do not replace it with padded_saved PyTorch-like forward.",
+        "Expose or recompute inside an AITER/CK/TileLang training backward the useful intermediates: gate, up, hidden, and compact expert output.",
+        "Reduce owner VJP tail first: recompute_forward, wgrad, xgrad_reduce, and w2_dgrad_swiglu are the largest local pieces.",
+        "Only revisit AsyncLL/split combine after dX is produced early enough to overlap with wgrad without duplicating route-expanded buffers."
+      ],
+      "first_perf_gate": "Beat the EP8 owner-rank padded VJP baseline and the ideal saved-intermediate envelope of about 4.96-5.50 ms locally without slowing forward.",
+      "promotion_gate": "Run 4x S4096 GBS64 for at least 6 steps, then 8x S4096 GBS128 for at least 6 steps; promote by late steps 4-6 TFLOPs/GPU and peak memory only."
+    }
+  },
+  "commands_run": [
+    "git status --short",
+    "sed -n on experiment README.md and recipe.yaml",
+    "ssh do-sonle5-mi350-gpu ls/find profile sidecars under /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling",
+    "ssh do-sonle5-mi350-gpu 'python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run noac8x=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling --steady-after-call-id 65 --pretty > /scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/torchtitan_noac_alloc_expand_profile8x_substage_refresh_20260604.json'",
+    "ssh do-sonle5-mi350-gpu 'python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run noac8x=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling --steady-after-call-id 65 --pretty > /scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/torchtitan_noac_alloc_expand_mori_skew_refresh_20260604.json'",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/torchtitan_noac_alloc_expand_profile8x_substage_refresh_20260604.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/torchtitan_noac_alloc_expand_mori_skew_refresh_20260604.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  ],
+  "dependency_pin_changes": []
+}

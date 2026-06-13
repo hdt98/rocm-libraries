@@ -1,0 +1,277 @@
+{
+  "status": "ok",
+  "scope": "tilelang_selected_limit_dkv_adapter",
+  "read": "Reusable adapter around the promoted TileLang selected-limit compressed-dKV producer. Kernel-only timing should match the CLI mfma_panel_atomic_final_limited result; pack+kernel timing shows the cost of feeding materialized per-head probs and scaled grad logits through a Python/Torch packing bridge. This is a semantic integration gate, not final fused sparse-MLA backward.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 128,
+    "compressed_groups": 32,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 32,
+    "actual_li_valid_pairs": 2016,
+    "actual_li_compress_ratio": 4,
+    "group_panel_size": 32,
+    "panel_capacity": 32,
+    "packed_topk": 32,
+    "token_block": 16,
+    "block_k": 32,
+    "block_d": 64,
+    "d_blocks_per_kernel": 1,
+    "threads": 256,
+    "input_layout": "bshd",
+    "plan_on_device": true,
+    "direct_plan_env": "1"
+  },
+  "input_contract": {
+    "q_checksum": -110.0670166015625,
+    "grad_output_checksum": 1475.025634765625,
+    "probs_checksum": 7229.30078125,
+    "grad_logits_scaled_checksum": -1.5808497667312622,
+    "materialized_workspace": {
+      "q_bytes": 8388608,
+      "grad_output_bytes": 8388608,
+      "output_bytes": 8388608,
+      "lse_bytes": 32768,
+      "compressed_kv_bytes": 32768,
+      "probs_bytes": 1048576,
+      "grad_logits_bytes": 1048576,
+      "valid_bytes": 4096,
+      "safe_groups_bytes": 32768,
+      "materialized_probs_grad_logits": true,
+      "read": "boundary input source captures real q/dO/output/lse/compressed KV tensors. Materialized per-head probs and grad_logits are created only for materialized-input producer modes or when correctness checking needs the reference."
+    }
+  },
+  "plan": {
+    "seq_len": 128,
+    "original_topk": 32,
+    "packed_topk": 32,
+    "group_count": 32,
+    "group_panel_size": 32,
+    "panel_capacity": 32,
+    "panel_count": 1,
+    "token_block": 16,
+    "block_k": 32,
+    "block_d": 64,
+    "d_blocks_per_kernel": 1,
+    "threads": 256,
+    "input_layout": "bshd",
+    "active_rows": 144,
+    "max_active_groups": 32,
+    "valid_pairs": 2016,
+    "overflow_pairs": 0,
+    "overflow_fraction": 0.0,
+    "write_reduction_x": 14.0,
+    "route_limit_modeled_chunk_fraction": 1.0,
+    "selected_limit_contract": "packed actual-LI groups -> route selected limits -> TileLang in-CTA active-group reduction -> final [groups,D] dKV",
+    "static_plan_wall_ms": 201.05605199933052,
+    "warmed_plan_timing": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.8744900226593018,
+          0.8204900026321411,
+          0.8247699737548828
+        ],
+        "mean_ms": 0.8399166663487753,
+        "median_ms": 0.8247699737548828,
+        "min_ms": 0.8204900026321411,
+        "max_ms": 0.8744900226593018,
+        "stdev_ms": 0.03001778244863941
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.9505960624665022,
+          0.8662058971822262,
+          0.8719058241695166
+        ],
+        "mean_ms": 0.896235927939415,
+        "median_ms": 0.8719058241695166,
+        "min_ms": 0.8662058971822262,
+        "max_ms": 0.9505960624665022,
+        "stdev_ms": 0.04716344412007434
+      },
+      "median_ms": 0.8247699737548828,
+      "min_ms": 0.8204900026321411,
+      "max_ms": 0.8744900226593018,
+      "mean_ms": 0.8399166663487753,
+      "peak_memory_allocated_bytes": 106530816,
+      "peak_memory_allocated_gib": 0.09921455383300781,
+      "checksum": 480.0
+    },
+    "final_dkv_mib": 0.0625,
+    "packed_probs_mib": 0.5,
+    "packed_grad_logits_mib": 0.5
+  },
+  "correctness": {
+    "enabled": true,
+    "max_abs_diff": 7.62939453125e-06,
+    "mean_abs_diff": 3.465812596914475e-07,
+    "source_indexed_max_abs_diff": 7.62939453125e-06,
+    "source_indexed_mean_abs_diff": 3.465812596914475e-07,
+    "source_vs_packed_max_abs_diff": 0.0,
+    "source_vs_packed_mean_abs_diff": 0.0,
+    "group_filter_max_abs_diff": 0.0,
+    "group_filter_mean_abs_diff": 0.0,
+    "group_filter_vs_packed_max_abs_diff": 0.0,
+    "group_filter_vs_packed_mean_abs_diff": 0.0,
+    "candidate_checksum": 1258.57568359375,
+    "source_indexed_checksum": 1258.57568359375,
+    "group_filter_checksum": null,
+    "reference_checksum": 1258.57568359375
+  },
+  "timing": {
+    "pack_only": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.16512200236320496,
+          0.12460099905729294,
+          0.14896099269390106
+        ],
+        "mean_ms": 0.146227998038133,
+        "median_ms": 0.14896099269390106,
+        "min_ms": 0.12460099905729294,
+        "max_ms": 0.16512200236320496,
+        "stdev_ms": 0.020398281105788688
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.4256439860910177,
+          0.1592012122273445,
+          0.18472201190888882
+        ],
+        "mean_ms": 0.25652240340908367,
+        "median_ms": 0.18472201190888882,
+        "min_ms": 0.1592012122273445,
+        "max_ms": 0.4256439860910177,
+        "stdev_ms": 0.14701840055152302
+      },
+      "median_ms": 0.14896099269390106,
+      "min_ms": 0.12460099905729294,
+      "max_ms": 0.16512200236320496,
+      "mean_ms": 0.146227998038133,
+      "peak_memory_allocated_bytes": 109104640,
+      "peak_memory_allocated_gib": 0.10161161422729492,
+      "checksum": 7229.30078125
+    },
+    "kernel_only": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.08112099766731262,
+          0.0788009986281395,
+          0.07475999742746353
+        ],
+        "mean_ms": 0.07822733124097188,
+        "median_ms": 0.0788009986281395,
+        "min_ms": 0.07475999742746353,
+        "max_ms": 0.08112099766731262,
+        "stdev_ms": 0.0032190684547186684
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.10144989937543869,
+          0.09328010492026806,
+          0.0944710336625576
+        ],
+        "mean_ms": 0.09640034598608811,
+        "median_ms": 0.0944710336625576,
+        "min_ms": 0.09328010492026806,
+        "max_ms": 0.10144989937543869,
+        "stdev_ms": 0.004413396638783923
+      },
+      "median_ms": 0.0788009986281395,
+      "min_ms": 0.07475999742746353,
+      "max_ms": 0.08112099766731262,
+      "mean_ms": 0.07822733124097188,
+      "peak_memory_allocated_bytes": 107530752,
+      "peak_memory_allocated_gib": 0.10014581680297852,
+      "checksum": 1258.575439453125
+    },
+    "pack_plus_kernel": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.2000419944524765,
+          0.19144199788570404,
+          0.2072030007839203
+        ],
+        "mean_ms": 0.19956233104070029,
+        "median_ms": 0.2000419944524765,
+        "min_ms": 0.19144199788570404,
+        "max_ms": 0.2072030007839203,
+        "stdev_ms": 0.007891442252899202
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.22579100914299488,
+          0.22013112902641296,
+          0.23779086768627167
+        ],
+        "mean_ms": 0.2279043352852265,
+        "median_ms": 0.22579100914299488,
+        "min_ms": 0.22013112902641296,
+        "max_ms": 0.23779086768627167,
+        "stdev_ms": 0.009017549718255326
+      },
+      "median_ms": 0.2000419944524765,
+      "min_ms": 0.19144199788570404,
+      "max_ms": 0.2072030007839203,
+      "mean_ms": 0.19956233104070029,
+      "peak_memory_allocated_bytes": 108889600,
+      "peak_memory_allocated_gib": 0.10141134262084961,
+      "checksum": 1258.5755615234375
+    },
+    "source_indexed_kernel": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.07008100301027298,
+          0.0724010020494461,
+          0.07044100016355515
+        ],
+        "mean_ms": 0.07097433507442474,
+        "median_ms": 0.07044100016355515,
+        "min_ms": 0.07008100301027298,
+        "max_ms": 0.0724010020494461,
+        "stdev_ms": 0.0012485725773078908
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.08979206904768944,
+          0.08789985440671444,
+          0.0864500179886818
+        ],
+        "mean_ms": 0.08804731381436189,
+        "median_ms": 0.08789985440671444,
+        "min_ms": 0.0864500179886818,
+        "max_ms": 0.08979206904768944,
+        "stdev_ms": 0.0016758981257616265
+      },
+      "median_ms": 0.07044100016355515,
+      "min_ms": 0.07008100301027298,
+      "max_ms": 0.0724010020494461,
+      "mean_ms": 0.07097433507442474,
+      "peak_memory_allocated_bytes": 107530752,
+      "peak_memory_allocated_gib": 0.10014581680297852,
+      "checksum": 1258.5755615234375
+    },
+    "group_filter_kernel": null
+  },
+  "decision_hint": {
+    "promote_adapter": true,
+    "source_indexed_beats_pack_plus_kernel": true,
+    "group_filter_avoids_route_plan": true,
+    "group_filter_beats_cpu_plan_plus_source_kernel": false,
+    "pack_is_production_ready": false,
+    "next": "Use group-filter when route-plan wall dominates bridge timing; return to selected-limit only when LI route metadata is already available on device, then fuse probability and LI-derivative production so materialized selected-state tensors disappear."
+  }
+}

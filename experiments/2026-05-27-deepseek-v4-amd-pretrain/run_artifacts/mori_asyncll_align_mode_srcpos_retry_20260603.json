@@ -1,0 +1,97 @@
+{
+  "artifact": "mori_asyncll_align_mode_srcpos_retry_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Runtime gate for source-position alignment in the TorchTitan MORI AsyncLL staged dX path.",
+  "code_changes": {
+    "torchtitan_mori_aiter_moe": {
+      "path": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "change": "Added TORCHTITAN_MORI_AITER_ASYNCLL_ALIGN_MODE with src_pos and route_key modes. The staged AsyncLL path can now align x/grad/top-k rows by source-position only or by strict route key."
+    },
+    "launcher": {
+      "path": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "change": "Forwarded CANARY_MORI_AITER_ASYNCLL_ALIGN_MODE through check-config, run, print-command, and the run header."
+    }
+  },
+  "validation": {
+    "local": {
+      "bash_n_launcher": "pass",
+      "py_compile_mori_aiter_moe": "pass",
+      "print_command_shows_align_mode": true
+    },
+    "remote": {
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+    }
+  },
+  "runs": {
+    "s128_staged_asyncll": {
+      "run_id": "torchtitan_dsv4_asyncll_staged_dx_4x_s128_smoke_20260603",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+      "activation_checkpointing": "none",
+      "dx_return_mode": "asyncll_staged",
+      "align_mode": "implicit_src_pos_default",
+      "status": "pass",
+      "result": {
+        "loss": 12.25415,
+        "grad_norm": 12.25,
+        "memory_gib": 73.79,
+        "clean_process_group_teardown": true
+      },
+      "timing_median_ms": {
+        "dispatch_x_send": 20.4611,
+        "dispatch_grad_output_send": 16.8253,
+        "align_grad_output": 0.9284,
+        "local_vjp_dx_first": 2.8643,
+        "combine_dx_asyncll_send": 16.7402,
+        "combine_dx_asyncll_recv": 2.0917,
+        "wgrad_after_dx_send": 1.664
+      },
+      "read": "Short-sequence integrated training can complete with staged AsyncLL."
+    },
+    "s4096_route_key_repro": {
+      "run_id": "torchtitan_dsv4_asyncll_staged_dx_4x_s4096_gbs4_smoke_20260603",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+      "activation_checkpointing": "full",
+      "dx_return_mode": "asyncll_staged",
+      "align_mode": "route_key",
+      "status": "fail",
+      "failure": {
+        "type": "RuntimeError",
+        "message": "grad_output MORI route-key set mismatch",
+        "first_failing_stage": "backward.align_grad_output"
+      },
+      "read": "Strict route-key alignment is too strong for independent AsyncLL handles at S4096 with real TorchTitan router output."
+    },
+    "s4096_src_pos_retry": {
+      "run_id": "torchtitan_dsv4_asyncll_srcpos_dx_4x_s4096_gbs4_smoke_20260603",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+      "activation_checkpointing": "full",
+      "dx_return_mode": "asyncll_staged",
+      "align_mode": "src_pos",
+      "status": "fail",
+      "failure": {
+        "type": "RuntimeError",
+        "message": "grad_output MORI source-position set mismatch",
+        "first_failing_stage": "backward.align_grad_output",
+        "rank": 3
+      },
+      "timing_median_ms_before_failure": {
+        "dispatch_x_send": 547.1594,
+        "dispatch_x_recv": 36.4991,
+        "dispatch_grad_output_send": 546.2785,
+        "dispatch_grad_output_recv": 32.41,
+        "align_grad_output": 204.1801,
+        "local_vjp_dx_first": 420.7317,
+        "combine_dx_asyncll_send": 523.2584,
+        "combine_dx_asyncll_recv": 43.8776,
+        "wgrad_after_dx_send": 10.1766
+      },
+      "read": "Source-position-only alignment also fails at S4096. The timing sidecar has partial records because some ranks progressed farther before rank 3 tripped the source-position guard."
+    }
+  },
+  "conclusion": {
+    "status": "current_independent_handle_asyncll_alignment_rejected",
+    "read": "Neither route-key nor source-position alignment is a valid production contract for the current independent x/grad/top-k AsyncLL handles at S4096. Keep the retained path on sync registered combine. The next viable overlap branch must reuse/share MORI route-order metadata or carry explicit per-dispatched-row route identity, then rerun the seeded S4096 parity gate before any no-profile throughput A/B."
+  }
+}

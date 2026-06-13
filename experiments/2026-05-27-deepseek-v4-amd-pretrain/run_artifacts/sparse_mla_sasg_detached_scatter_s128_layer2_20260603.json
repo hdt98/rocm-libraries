@@ -1,0 +1,263 @@
+{
+  "artifact": "sparse_mla_sharedkv_sasg_overlap_probe",
+  "correctness": {
+    "chunked_detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "chunked_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.0413714335300028e-07
+    },
+    "detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "passed": true,
+    "pingpong_detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "pingpong_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.0413714335300028e-07
+    }
+  },
+  "derived": {
+    "chunked_detached_scatter_vs_chunked_pytorch_reduce_speedup_x": 1.1168074102289494,
+    "chunked_pingpong_stream_detached_scatter_ms": 1.211737036705017,
+    "chunked_pingpong_stream_overlap_ms": 1.3270989656448364,
+    "chunked_sequential_emit_detached_scatter_ms": 0.14040200412273407,
+    "chunked_sequential_emit_reduce_ms": 0.1568019986152649,
+    "detached_scatter_vs_pytorch_reduce_speedup_x": 1.4567840617298133,
+    "pingpong_detached_scatter_vs_chunked_detached_scatter_speedup_x": 0.11586837727145684,
+    "pingpong_detached_scatter_vs_single_detached_scatter_speedup_x": 0.061499314988105507,
+    "pingpong_vs_chunked_sequential_speedup_x": 0.11815396038612307,
+    "pingpong_vs_single_full_speedup_x": 0.08180324491873488,
+    "single_full_emit_detached_scatter_ms": 0.07452099770307541,
+    "single_full_emit_reduce_ms": 0.10856100171804428
+  },
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "read": "Benchmark-only SASG overlap probe. It uses materialized actual-LI probs/grad_logits and the existing dot-K partial-store producer, then compares PyTorch partial reduction with a detached Triton ScatterAdd/reduce kernel and host-level ping-pong producer/scatter overlap. A positive signal here would justify moving the same contract into a persistent HIP/CK segmented/MFMA accumulator; a negative signal means detaching ScatterAdd as a wrapper-level kernel is not the lever.",
+  "scope": "actual_li_compressed_dkv_sasg_style_producer_detached_scatteradd_overlap",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 32,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "layer_id": 2,
+    "num_pipeline_chunks": 2,
+    "pipeline_chunk_tokens": 64,
+    "scatter_block_seq_tiles": 0,
+    "seq_chunk": 16,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "chunked_pingpong_stream_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.217818021774292,
+        "mean_ms": 1.2119240363438923,
+        "median_ms": 1.211737036705017,
+        "min_ms": 1.2062170505523682,
+        "samples_ms": [
+          1.2062170505523682,
+          1.217818021774292,
+          1.211737036705017
+        ],
+        "stdev_ms": 0.00580274589928603
+      },
+      "label": "chunked_pingpong_stream_detached_scatter",
+      "peak_memory_allocated_bytes": 466361344,
+      "peak_memory_allocated_gib": 0.43433284759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.233499962836504,
+        "mean_ms": 1.2288667106380065,
+        "median_ms": 1.2268500868231058,
+        "min_ms": 1.2262500822544098,
+        "samples_ms": [
+          1.2262500822544098,
+          1.233499962836504,
+          1.2268500868231058
+        ],
+        "stdev_ms": 0.004023713561099391
+      }
+    },
+    "chunked_pingpong_stream_overlap": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.3276989459991455,
+        "mean_ms": 1.3077919880549114,
+        "median_ms": 1.3270989656448364,
+        "min_ms": 1.268578052520752,
+        "samples_ms": [
+          1.3276989459991455,
+          1.3270989656448364,
+          1.268578052520752
+        ],
+        "stdev_ms": 0.033961589320352675
+      },
+      "label": "chunked_pingpong_stream_overlap",
+      "peak_memory_allocated_bytes": 466426880,
+      "peak_memory_allocated_gib": 0.43439388275146484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.3457720633596182,
+        "mean_ms": 1.3240612267206113,
+        "median_ms": 1.342710806056857,
+        "min_ms": 1.2837008107453585,
+        "samples_ms": [
+          1.3457720633596182,
+          1.342710806056857,
+          1.2837008107453585
+        ],
+        "stdev_ms": 0.03498664327053979
+      }
+    },
+    "chunked_sequential_emit_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.14212200045585632,
+        "mean_ms": 0.140735333164533,
+        "median_ms": 0.14040200412273407,
+        "min_ms": 0.13968199491500854,
+        "samples_ms": [
+          0.14040200412273407,
+          0.14212200045585632,
+          0.13968199491500854
+        ],
+        "stdev_ms": 0.0012536897333159825
+      },
+      "label": "chunked_sequential_emit_detached_scatter",
+      "peak_memory_allocated_bytes": 466361344,
+      "peak_memory_allocated_gib": 0.43433284759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.160672003403306,
+        "mean_ms": 0.1595350137601296,
+        "median_ms": 0.16011204570531845,
+        "min_ms": 0.15782099217176437,
+        "samples_ms": [
+          0.16011204570531845,
+          0.160672003403306,
+          0.15782099217176437
+        ],
+        "stdev_ms": 0.0015105597174294198
+      }
+    },
+    "chunked_sequential_emit_reduce": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.2101230025291443,
+        "mean_ms": 0.1701089988152186,
+        "median_ms": 0.1568019986152649,
+        "min_ms": 0.14340199530124664,
+        "samples_ms": [
+          0.2101230025291443,
+          0.14340199530124664,
+          0.1568019986152649
+        ],
+        "stdev_ms": 0.03529490603638815
+      },
+      "label": "chunked_sequential_emit_reduce",
+      "peak_memory_allocated_bytes": 466361344,
+      "peak_memory_allocated_gib": 0.43433284759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.22903201170265675,
+        "mean_ms": 0.18905475735664368,
+        "median_ms": 0.17598108388483524,
+        "min_ms": 0.16215117648243904,
+        "samples_ms": [
+          0.22903201170265675,
+          0.16215117648243904,
+          0.17598108388483524
+        ],
+        "stdev_ms": 0.03530513041293119
+      }
+    },
+    "single_full_emit_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.07664100080728531,
+        "mean_ms": 0.07442766676346461,
+        "median_ms": 0.07452099770307541,
+        "min_ms": 0.07212100178003311,
+        "samples_ms": [
+          0.07664100080728531,
+          0.07452099770307541,
+          0.07212100178003311
+        ],
+        "stdev_ms": 0.0022614444056413764
+      },
+      "label": "single_full_emit_detached_scatter",
+      "peak_memory_allocated_bytes": 466361344,
+      "peak_memory_allocated_gib": 0.43433284759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.09004096500575542,
+        "mean_ms": 0.08736768116553624,
+        "median_ms": 0.08742092177271843,
+        "min_ms": 0.08464115671813488,
+        "samples_ms": [
+          0.09004096500575542,
+          0.08742092177271843,
+          0.08464115671813488
+        ],
+        "stdev_ms": 0.0027002978182885167
+      }
+    },
+    "single_full_emit_reduce": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.3732050061225891,
+        "mean_ms": 0.19101566821336746,
+        "median_ms": 0.10856100171804428,
+        "min_ms": 0.091280996799469,
+        "samples_ms": [
+          0.10856100171804428,
+          0.3732050061225891,
+          0.091280996799469
+        ],
+        "stdev_ms": 0.15801697939888265
+      },
+      "label": "single_full_emit_reduce",
+      "peak_memory_allocated_bytes": 466361344,
+      "peak_memory_allocated_gib": 0.43433284759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.4657129757106304,
+        "mean_ms": 0.23359494904677072,
+        "median_ms": 0.13044103980064392,
+        "min_ms": 0.10463083162903786,
+        "samples_ms": [
+          0.13044103980064392,
+          0.4657129757106304,
+          0.10463083162903786
+        ],
+        "stdev_ms": 0.201433923255763
+      }
+    }
+  },
+  "workspace": {
+    "grad_logits_gib": 0.0009765625,
+    "probs_gib": 0.0009765625,
+    "safe_groups_gib": 3.0517578125e-05,
+    "valid_gib": 3.814697265625e-06
+  }
+}

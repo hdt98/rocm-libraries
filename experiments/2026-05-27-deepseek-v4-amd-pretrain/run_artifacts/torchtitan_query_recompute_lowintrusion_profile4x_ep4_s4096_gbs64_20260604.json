@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "question_answered": "Does no activation checkpointing make memory much higher, and does sparse query-recompute no-AC raise memory further?",
+  "short_answer": "No activation checkpointing is memory-expensive. In the aligned 4xMI350 FSDP4/EP4 S4096 run, sparse query-recompute no-AC peaked at 146.99 GiB/GPU. Query-recompute can remove selected sparse-attention saved-state slabs, so it is not automatically higher than a comparable no-AC baseline, but this EP4 target slice is materially higher memory than the earlier 8x FSDP8/EP8 no-AC evidence.",
+  "run": {
+    "run_id": "torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604",
+    "host": "do-sonle5-mi350-gpu",
+    "visible_devices": "4,5,6,7",
+    "external_workload_note": "GPUs 0-3 were occupied by a separate Qwen FT torchrun job, so this aligned EP4 profile used the free 4-GPU slice.",
+    "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604",
+    "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604",
+    "raw_output_size": "9.7M",
+    "raw_log_size": "40K",
+    "status": "completed_6_steps_clean_teardown"
+  },
+  "shape": {
+    "hardware": "4xMI350",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "tokens_per_step": 262144,
+    "tokens_per_gpu_per_step": 65536,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "moe_forward_mode": "aiter",
+    "moe_backward_mode": "routed",
+    "moe_local_vjp_mode": "padded",
+    "moe_dx_return_mode": "sync",
+    "ce_chunks": 8
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.12179,
+      "tflops_per_gpu": [25.45, 25.51, 25.49, 25.50],
+      "tps_per_gpu": [1345, 1348, 1347, 1348],
+      "memory_gib": [72.80, 74.86, 77.43, 74.00]
+    },
+    {
+      "step": 2,
+      "loss": 8.52362,
+      "tflops_per_gpu": [45.33, 45.33, 45.33, 45.33],
+      "tps_per_gpu": [2396, 2396, 2396, 2396],
+      "memory_gib": [108.47, 119.72, 105.05, 112.46]
+    },
+    {
+      "step": 3,
+      "loss": 21.13358,
+      "tflops_per_gpu": [73.41, 73.41, 73.41, 73.41],
+      "tps_per_gpu": [3880, 3880, 3880, 3879],
+      "memory_gib": [136.35, 144.98, 122.91, 137.13]
+    },
+    {
+      "step": 4,
+      "loss": 15.20250,
+      "tflops_per_gpu": [71.05, 71.05, 71.05, 71.05],
+      "tps_per_gpu": [3755, 3755, 3755, 3755],
+      "memory_gib": [146.72, 145.12, 146.68, 144.24]
+    },
+    {
+      "step": 5,
+      "loss": 12.68711,
+      "tflops_per_gpu": [70.61, 70.61, 70.61, 70.61],
+      "tps_per_gpu": [3732, 3732, 3732, 3732],
+      "memory_gib": [146.72, 146.99, 146.23, 146.70]
+    },
+    {
+      "step": 6,
+      "loss": 10.66121,
+      "tflops_per_gpu": [70.91, 70.91, 70.91, 70.91],
+      "tps_per_gpu": [3748, 3748, 3748, 3748],
+      "memory_gib": [146.99, 146.23, 146.70, 146.72]
+    }
+  ],
+  "late_step_summary": {
+    "steps": [4, 5, 6],
+    "mean_tflops_per_gpu": 70.8567,
+    "mean_tps_per_gpu": 3745.0,
+    "implied_step_time_s": 17.50,
+    "peak_memory_gib": 146.99,
+    "target_tflops_per_gpu": 277.0,
+    "ratio_to_target": 0.2558,
+    "speedup_needed_to_target": 3.91
+  },
+  "comparison": {
+    "not_apples_to_apples_warning": "The earlier no-AC expandable baseline was 8x FSDP8/EP8 GBS128; this run is the corrected aligned 4x FSDP4/EP4 GBS64 slice because only GPUs 4-7 were free.",
+    "earlier_8x_noac_expandable_late_mean_tflops_per_gpu": 64.91,
+    "earlier_8x_noac_expandable_memory_gib_range_step6": [102.63, 107.22],
+    "this_4x_ep4_query_recompute_late_mean_tflops_per_gpu": 70.8567,
+    "this_4x_ep4_query_recompute_peak_memory_gib": 146.99,
+    "read": "Query-recompute gives a modest materialized throughput lift in this aligned EP4 profile, but with high no-AC memory. A same-shape EP4 no-AC non-query-recompute control is needed to prove whether query-recompute itself increases or decreases peak memory at EP4."
+  },
+  "profile_summary": {
+    "profile_artifact": "run_artifacts/torchtitan_query_recompute_profile4x_ep4_s4096_gbs64_20260604.json",
+    "mori_skew_artifact": "run_artifacts/torchtitan_query_recompute_mori_skew4x_ep4_s4096_gbs64_20260604.json",
+    "sharedkv_query_recompute_stage_median_ms": 55.1125,
+    "sharedkv_query_recompute_rank_total_ms_median": 8163.0773,
+    "sharedkv_grad_attn_sink_stage_median_ms": 0.6950,
+    "loss_chunked_ce_rank_total_ms_median": 15768.0844,
+    "loss_lm_head_forward_rank_total_ms_median": 1374.7716,
+    "loss_cross_entropy_forward_rank_total_ms_median": 273.8826,
+    "loss_chunk_backward_rank_total_ms_median": 14133.7402,
+    "mori_record_medians_ms": {
+      "local_vjp": 81.3918,
+      "combine_dx": 9.3525,
+      "dispatch_x": 1.9831
+    },
+    "mori_call_medians_ms": {
+      "local_vjp_max": 119.4897,
+      "local_vjp_spread": 45.6594,
+      "combine_dx_max": 46.6975,
+      "combine_dx_spread": 46.0324
+    },
+    "mori_local_vjp_part_record_medians_ms": {
+      "recompute_forward": 25.6328,
+      "wgrad": 21.1333,
+      "xgrad_reduce": 18.6441,
+      "w2_dgrad_swiglu": 11.5748,
+      "pack_scatter": 3.6521,
+      "dtopk_weight": 0.5369
+    },
+    "read": "The aligned EP4 profile still points at two active tracks: sparse shared-KV query-recompute backward is visible, and MORI routed owner-rank VJP plus dX return skew remains a major multi-GPU bottleneck. The no-AC memory cost is real; it should be compared against a same-shape EP4 control before promotion."
+  },
+  "commands": {
+    "launch_summary": "docker torchrun via launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh with CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=true CANARY_MORI_AITER_TIMING_PATH and CANARY_DSV4_PROFILE_TIMING_PATH under /scratch",
+    "profile_summary_commands": [
+      "python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run ep4=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604/profiling --steady-after-call-id 0 --dsv4-steady-after-call-id 0 --pretty",
+      "python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run ep4=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604/profiling --steady-after-call-id 0 --pretty"
+    ]
+  },
+  "next_actions": [
+    "Run a same-shape 4x FSDP4/EP4 no-AC control without sparse query-recompute if the code path still exists, to isolate query-recompute memory delta.",
+    "Run the preferred 8x target with EP4 once GPUs 0-3 are free, because the user requested EP4 even on 8 GPUs.",
+    "Continue sparse track by reducing shared-KV query-recompute backward boundary and avoiding selected-state/prob/grad-logit materialization.",
+    "Continue MoE track by reducing owner-rank VJP tail and dX return skew rather than only tuning MORI combine."
+  ],
+  "dependency_pin_changes": []
+}

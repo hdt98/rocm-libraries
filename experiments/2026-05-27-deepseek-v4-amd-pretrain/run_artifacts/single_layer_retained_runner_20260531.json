@@ -1,0 +1,45 @@
+{
+  "status": "runner_added_cpu_checked_gpu_blocked",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle-kernel",
+  "runner": "tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+  "default_remote_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531",
+  "container_default": "b9d33e6e8227",
+  "retained_full_layer_contract": {
+    "shape": "[B=1, S={2048,4096}, H=7168] -> [B=1, S, H]",
+    "dtype": "bfloat16",
+    "impl": "fp4-packed-sim",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "rmsnorm_save_policy": "saved-accum"
+  },
+  "validated_commands": [
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+    "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh status",
+    "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-cpu"
+  ],
+  "check_cpu_result": {
+    "status": "passed",
+    "check": "moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_learned_router_match",
+    "device": "cpu",
+    "dtype": "float64",
+    "batch": 1,
+    "seqlen": 4,
+    "output_rel_l2": 0.0,
+    "max_grad_rel_l2": 4.767825220877897e-16
+  },
+  "gpu_blocker": {
+    "status_action": "non_destructive_inspection_only",
+    "node": "do-sonle-kernel",
+    "pid": 3088197,
+    "container": "charming_hypatia",
+    "vram_used_bytes": 60932452352,
+    "command_prefix": "/opt/venv/bin/python3 /exp/tools/dsv4_coda_attention_layer_gate.py",
+    "reason_not_run": "canonical single-GPU MI350 timing would share the only GPU with an active external workload"
+  },
+  "next_cuda_actions_when_clear": [
+    "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-cuda",
+    "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench",
+    "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-ops-4096"
+  ]
+}

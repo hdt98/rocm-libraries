@@ -1,0 +1,131 @@
+{
+  "artifact": "torchtitan_full_run_profile_ep4_ep8_s4096_mbs1_breakdown_20260602",
+  "source_profile_artifact": "run_artifacts/torchtitan_full_run_profile_ep4_ep8_s4096_mbs1_sharedkv_mori_20260602.json",
+  "created": "2026-06-02",
+  "method": {
+    "runtime": "direct TorchTitan DeepSeek-V4-Flash 4-layer BF16 full training run",
+    "profiled_step": "iteration_2 after one warmup step",
+    "environment": "shared-KV sparse MLA, LI triton_tl_dot, MORI+AITER routed padded MoE backward, Triton SwiGLU owner-rank VJP, full activation checkpointing, checkpoint disabled",
+    "read": "User-scope durations are CPU/launch-region wall durations summed across 16 gradient-accumulation microsteps and checkpoint recomputes. CPU op durations can overlap/nest. Kernel-name-class durations are summed GPU kernel dispatch durations by kernel name, not wall-clock critical path. Rank max is the gating rank view."
+  },
+  "runs": {
+    "ep4_fsdp4": {
+      "shape": {
+        "world_size": 4,
+        "tp": 1,
+        "pp": 1,
+        "cp": 1,
+        "ep": 4,
+        "fsdp": 4,
+        "mbs": 1,
+        "gbs": 64,
+        "seq_len": 4096,
+        "grad_accum_microsteps_per_rank": 16,
+        "layer_microsteps_for_4_layers": 64
+      },
+      "trace_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2",
+      "profiled_step_from_log": {
+        "tok_per_gpu_s": 3460.0,
+        "implied_step_s": 18.941,
+        "loss": 8.44258,
+        "max_memory_gib": 143.39
+      },
+      "rank_max_user_scope_ms": {
+        "attention_forward_recompute": 692.632,
+        "attention_sparse_mla_shared_kv_forward_recompute": 381.431,
+        "moe_forward_recompute": 4762.511,
+        "moe_router": 130.056,
+        "moe_routed_experts": 4572.683,
+        "mori_aiter_forward_dispatch": 18.235,
+        "mori_aiter_forward_fused_moe": 51.671,
+        "mori_aiter_forward_combine": 11.721,
+        "mori_aiter_backward_routed_vjp": 6531.982,
+        "optimizer_step": 23.155
+      },
+      "rank_max_cpu_autograd_op_ms": {
+        "dense_mm_backward_bucket_MmBackward0": 6014.689,
+        "sparse_mla_backward": 143.18,
+        "li_kl_backward": 107.744,
+        "mori_aiter_backward": 6535.043
+      },
+      "rank_max_kernel_name_class_ms": {
+        "collective_kernel": 1494.525,
+        "copy_kernel": 1829.9,
+        "gemm_bmm_kernel": 361.462,
+        "pointwise_reduction_index_kernel": 1701.893,
+        "sparse_attention_or_triton_kernel": 250.299,
+        "other_kernel": 6504.664
+      },
+      "rough_per_layer_microstep_ms": {
+        "attention_forward_recompute": 10.822,
+        "moe_forward_recompute": 74.414,
+        "moe_backward_routed_vjp": 102.062,
+        "dense_mm_backward_bucket": 93.98
+      }
+    },
+    "ep8_fsdp8": {
+      "shape": {
+        "world_size": 8,
+        "tp": 1,
+        "pp": 1,
+        "cp": 1,
+        "ep": 8,
+        "fsdp": 8,
+        "mbs": 1,
+        "gbs": 128,
+        "seq_len": 4096,
+        "grad_accum_microsteps_per_rank": 16,
+        "layer_microsteps_for_4_layers": 64
+      },
+      "trace_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2",
+      "profiled_step_from_log": {
+        "tok_per_gpu_s": 2687.0,
+        "implied_step_s": 24.39,
+        "loss": 8.67513,
+        "max_memory_gib": 86.37
+      },
+      "rank_max_user_scope_ms": {
+        "attention_forward_recompute": 681.819,
+        "attention_sparse_mla_shared_kv_forward_recompute": 377.274,
+        "moe_forward_recompute": 4864.195,
+        "moe_router": 107.686,
+        "moe_routed_experts": 4700.813,
+        "mori_aiter_forward_dispatch": 17.898,
+        "mori_aiter_forward_fused_moe": 55.39,
+        "mori_aiter_forward_combine": 11.629,
+        "mori_aiter_backward_routed_vjp": 6723.477,
+        "optimizer_step": 13.2
+      },
+      "rank_max_cpu_autograd_op_ms": {
+        "dense_mm_backward_bucket_MmBackward0": 8817.048,
+        "sparse_mla_backward": 149.593,
+        "li_kl_backward": 109.037,
+        "mori_aiter_backward": 6726.545
+      },
+      "rank_max_kernel_name_class_ms": {
+        "collective_kernel": 1062.506,
+        "copy_kernel": 1326.536,
+        "gemm_bmm_kernel": 353.199,
+        "pointwise_reduction_index_kernel": 1364.988,
+        "sparse_attention_or_triton_kernel": 209.492,
+        "other_kernel": 6533.415
+      },
+      "rough_per_layer_microstep_ms": {
+        "attention_forward_recompute": 10.653,
+        "moe_forward_recompute": 76.003,
+        "moe_backward_routed_vjp": 105.054,
+        "dense_mm_backward_bucket": 137.766
+      }
+    }
+  },
+  "interpretation": [
+    "At full-run EP4/EP8 target shape, the dominant measured buckets are MoE forward/recompute, MORI+AITER routed MoE VJP backward, and generic dense MmBackward0. Sparse MLA backward and LI KL backward are visible but are not the dominant step-level wall in this composed canary.",
+    "MORI dispatch/combine user scopes are small in the forward pass relative to routed expert/MoE bridge scope. The current MoE gap is therefore still local owner-rank expert math/backward and checkpoint recompute integration, not just dispatch/combine glue.",
+    "Dense MmBackward0 remains too coarse: it includes attention projections, MoE/shared-expert dense linears, possibly output/loss dense work, and checkpointed recompute interactions. A follow-up pass needs module-owned backward scopes or custom wrappers to split this bucket by owner."
+  ],
+  "next_profile_ladder": [
+    "Add exact MoE backward subscopes inside the routed VJP: grad dispatch, activation recompute, w2 dgrad plus SwiGLU, w1/w3 wgrad, w2 wgrad, xgrad plus reduce, dTopkWeight, and any all-reduce or MORI receive/send waits.",
+    "Add owner tags for dense MmBackward0 by wrapping q/wkv/wo/shared-expert/output projection linears or by inserting autograd-safe record_function scopes around their backward calls.",
+    "Keep sparse-attention backward profiling active, but do not prioritize it over MoE VJP and dense MmBackward0 until these rank-max buckets are split and reduced."
+  ]
+}

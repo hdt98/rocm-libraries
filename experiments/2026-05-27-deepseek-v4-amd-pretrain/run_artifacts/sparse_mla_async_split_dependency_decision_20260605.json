@@ -1,0 +1,49 @@
+{
+  "artifact": "sparse_mla_async_split_dependency_decision",
+  "date": "2026-06-05",
+  "hardware": "1xMI350",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "compressed_topk": 512,
+    "local_window": 128
+  },
+  "question": "Can split sparse-attention backward avoid a final sync by letting later kernels consume separate dQ and dKV outputs?",
+  "answer": {
+    "production_sync_policy": "No host-wide or device-wide sync is required if downstream consumers remain event-chained on the producing streams.",
+    "required_dependency": "Each consumer must wait on the event for the specific tensor it reads. If the custom backward returns tensors to vanilla PyTorch autograd, the current stream must still be made dependent on the side-stream writes or consumers can race incomplete outputs.",
+    "separate_outputs": "Keeping grad_q, local_grad_kv, and compressed_grad_kv separate is semantically acceptable for a custom fused backward branch; they only need to join at the first shared upstream gradient dependency."
+  },
+  "compressed_only_split": {
+    "artifact": "sparse_mla_query_major_selected_dq_union_dkv_parallel_branch_events_t4k512_u256_s4096_layer2_20260605.json",
+    "retained_gate_ms": 11.1347,
+    "serialized_split_ms": 10.740432739257812,
+    "wrapper_parallel_ms": 17.11151885986328,
+    "explicit_event_makespan_ms": 9.793586730957031,
+    "dq_branch_ms": 9.758307456970215,
+    "compressed_dkv_branch_ms": 9.441624641418457,
+    "read": "The old Python wrapper-style parallel timing was polluted by stream creation/wait handling. Explicit event chaining shows the compressed-only split can beat the retained gate."
+  },
+  "full_sharedkv_split": {
+    "artifact": "sparse_mla_full_sharedkv_split_union_compressed_pair_schedules_s4096_layer2_t4_u256_20260605.json",
+    "retained_gate_ms": 11.1347,
+    "serialized_split_ms": 13.28424072265625,
+    "all_three_event_makespan_ms": 11.853266716003418,
+    "all_three_dq_branch_ms": 11.661825180053711,
+    "all_three_local_dkv_branch_ms": 11.70594596862793,
+    "all_three_compressed_dkv_branch_ms": 10.311332702636719,
+    "best_pair_schedule": "dq_compressed_then_local",
+    "best_pair_schedule_ms": 12.713193893432617,
+    "read": "Explicit event chaining improves the full shared-KV split but does not beat the retained 11.13 ms gate. Launching all three branches concurrently inflates the local/full-index branches; pair scheduling is worse than all-three overlap."
+  },
+  "decision": {
+    "compressed_only_async_split": "promising_diagnostic",
+    "full_sharedkv_async_split": "rejected_for_promotion",
+    "next_kernel_direction": "Keep event-chained separate outputs as the runtime contract, but remove the duplicated source-boundary replay by moving local-window dKV and compressed-union dKV into a shared producer or by fusing the downstream branch consumers before returning to PyTorch autograd.",
+    "do_not_promote_to_e2e": true
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_current_source_mtp1_standard_vs_native_4x_20260611",
+  "date": "2026-06-11",
+  "purpose": "Record the container rebuild fix and the first corrected-topology MTP1 4xMI350 A/B between standard EP and MORI native compact on the current source tree.",
+  "container_fix": {
+    "question": "Can we fix the missing RDMA/libpci headers and runtime libraries inside the containers for both MI350 nodes?",
+    "answer": "Yes. A derived dev-deps image was built on both nodes and used for the MORI rebuild and run gates.",
+    "base_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "derived_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "nodes_built": [
+      "do-sonle5-mi350-gpu",
+      "do-vunguyen-mi350-gpu"
+    ],
+    "installed_packages": [
+      "libibverbs1",
+      "libibverbs-dev",
+      "librdmacm1",
+      "librdmacm-dev",
+      "rdma-core",
+      "libpci-dev",
+      "pciutils"
+    ],
+    "verified_files": [
+      "/usr/include/infiniband/verbs.h",
+      "/usr/include/x86_64-linux-gnu/pci/pci.h",
+      "/lib/x86_64-linux-gnu/libibverbs.so.1",
+      "/lib/x86_64-linux-gnu/librdmacm.so.1"
+    ],
+    "rebuild_result": "MORI remote rebuild passed on do-sonle5-mi350-gpu; output included has_compact_combine True.",
+    "small_smoke_result": "S128 4-GPU native compact smoke passed one training step with finite loss and clean process-group teardown."
+  },
+  "source_change_under_test": {
+    "summary": "When MORI native count metadata is available, avoid building/saving the full expert-major to rank-major permutation sidecar. Native combine can consume count metadata directly; the fallback permutation tensor remains required when count metadata is absent.",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "sources/references/mori/python/mori/ops/dispatch_combine.py"
+    ]
+  },
+  "common_shape": {
+    "host": "do-sonle5-mi350-gpu",
+    "visible_devices": "4,5,6,7",
+    "gpus": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 8,
+    "fsdp": 4,
+    "ep": 4,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "mtp_modules": 1,
+    "mtp_loss_weight": 0.3,
+    "hyper_connections": false,
+    "weighted_scatter_bwd_score_mode": "torch",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_current_source_standard_ep_mtp1_mbs4_attention_ac_4x_s4096_gbs128_steps6_20260611",
+      "backend": "standard_ep",
+      "weighted_scatter_bwd_score_mode": "triton_default",
+      "result": "failed_before_metrics",
+      "failure": "HSA memory access fault in backward, matching the known current-source Triton weighted-scatter score-gradient issue at this production shape.",
+      "interpretation": "Invalid as a throughput control; use the scoretorch-safe control below for this source tuple."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_current_source_standard_ep_mtp1_scoretorch_mbs4_attention_ac_4x_s4096_gbs128_steps6_20260611",
+      "backend": "standard_ep",
+      "result": "completed_6_steps",
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 16.05291,
+          "grad_norm": 17.0,
+          "memory_gib": 198.99,
+          "tokens_per_gpu_s": 3421,
+          "tflops_per_gpu": 169.34
+        },
+        {
+          "step": 2,
+          "loss": 10.62953,
+          "grad_norm": 38.0,
+          "memory_gib": 279.99,
+          "tokens_per_gpu_s": 5986,
+          "tflops_per_gpu": 296.32
+        },
+        {
+          "step": 3,
+          "loss": 17.23518,
+          "grad_norm": 62.5,
+          "memory_gib": 279.99,
+          "tokens_per_gpu_s": 6427,
+          "tflops_per_gpu": 318.18
+        },
+        {
+          "step": 4,
+          "loss": 15.89781,
+          "grad_norm": 52.25,
+          "memory_gib": 279.99,
+          "tokens_per_gpu_s": 6414,
+          "tflops_per_gpu": 317.55
+        },
+        {
+          "step": 5,
+          "loss": 13.07786,
+          "grad_norm": 43.0,
+          "memory_gib": 279.99,
+          "tokens_per_gpu_s": 6446,
+          "tflops_per_gpu": 319.11
+        },
+        {
+          "step": 6,
+          "loss": 10.91478,
+          "grad_norm": 33.25,
+          "memory_gib": 279.99,
+          "tokens_per_gpu_s": 6479,
+          "tflops_per_gpu": 320.77
+        }
+      ],
+      "steps_2_to_6": {
+        "tokens_per_gpu_s_mean": 6350.4,
+        "tflops_per_gpu_mean": 314.386
+      },
+      "steps_4_to_6": {
+        "tokens_per_gpu_s_mean": 6446.333,
+        "tflops_per_gpu_mean": 319.143
+      },
+      "peak_logged_memory_gib": 279.99,
+      "interpretation": "Fair current-source corrected-topology 4x standard EP control. It is very close to the MI350 memory ceiling at this MTP1 MBS4 attention-only checkpointing shape."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_current_source_mori_native_mtp1_scoretorch_mbs4_attention_ac_4x_s4096_gbs128_steps6_20260611",
+      "backend": "mori_native_compact",
+      "mori_shmem_heap_size": "32G",
+      "result": "failed_after_step_1",
+      "step_1": {
+        "loss": 15.85932,
+        "grad_norm": 16.625,
+        "memory_gib": 200.64,
+        "tokens_per_gpu_s": 3147,
+        "tflops_per_gpu": 155.81
+      },
+      "failure": {
+        "phase": "next forward dispatch",
+        "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem_mb": 116,
+        "stack_hint": "token_dispatcher.py dispatch"
+      },
+      "interpretation": "Not a throughput candidate. The low logged Torch memory at step 1 does not capture enough hidden HSA/MORI heap/workspace residency to explain the step-2 dispatch OOR."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_current_source_mori_native_mtp1_scoretorch_heap16_mbs4_attention_ac_4x_s4096_gbs128_steps6_20260611",
+      "backend": "mori_native_compact",
+      "mori_shmem_heap_size": "16G",
+      "result": "failed_after_step_1",
+      "step_1": {
+        "loss": 15.8226,
+        "grad_norm": 17.625,
+        "memory_gib_rank_range": [
+          194.21,
+          199.99
+        ],
+        "tokens_per_gpu_s_range": [
+          3153,
+          3156
+        ],
+        "tflops_per_gpu_range": [
+          156.11,
+          156.23
+        ]
+      },
+      "failure": {
+        "phase": "next step loss/forward-backward boundary",
+        "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem_mb": 60,
+        "stack_hint": "cross_entropy/loss while entering the next train step"
+      },
+      "interpretation": "Heap16 does not solve the corrected-topology fit issue. It shifts the failure location but still leaves only tens of MB free after one step."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_current_source_mori_native_releasehandles_mtp1_scoretorch_kernel_mbs4_attention_ac_4x_s4096_gbs128_steps6_20260611",
+      "backend": "mori_native_compact",
+      "mori_shmem_heap_size": "32G",
+      "keep_released_handles": false,
+      "gc_on_release": true,
+      "result": "failed_after_step_1",
+      "step_1": {
+        "loss": 15.83692,
+        "grad_norm": 17.0,
+        "memory_gib_rank_range": [
+          194.45,
+          200.21
+        ],
+        "tokens_per_gpu_s_range": [
+          2549,
+          2552
+        ],
+        "tflops_per_gpu_range": [
+          126.21,
+          126.34
+        ]
+      },
+      "failure": {
+        "phase": "next forward dispatch",
+        "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem_mb": 222,
+        "stack_hint": "token_dispatcher.py dispatch"
+      },
+      "interpretation": "Disabling retained released handles and forcing release-time GC did not fix the corrected MTP1 native fit issue. The blocker is not stale cross-step handle cache alone; the live native compact staging/heap/layout residency is already too large at this surface."
+    }
+  ],
+  "read": {
+    "container": "The container build failure is fixed by the derived dev-deps image on both nodes. The previous missing-header failure is no longer the blocker.",
+    "current_baseline": "The corrected MTP1 4x current-source control is standard EP with scoretorch-safe weighted-scatter score gradients: 6350.4 tok/GPU/s and 314.386 TFLOPs/GPU over steps 2-6, peak logged memory 279.99 GiB.",
+    "native_mori": "MORI native compact is graph-connected and S128-smoked, but it does not currently fit the corrected MTP1 MBS4 S4096 surface for six steps. Heap32, heap16, and release-time handle GC all fail after one finite step with HSA out-of-resources.",
+    "root_cause_direction": "This is now a native compact live-residency/layout problem, not a missing container dependency or stale released-handle cache. The next source target is reducing MORI native hidden workspace and collapsing final expert-major/compact-return layouts, rather than more heap-size tuning, release-cache toggles, or route-mask knobs."
+  },
+  "next_steps": [
+    "Run the native compact path under low-intrusion stage timing or MORI stage profiler on a smaller fit surface to isolate hidden HSA/MORI residency.",
+    "Keep the standard EP scoretorch-safe run as the fair corrected current-source 4x control until the integrated Triton score-gradient fault is fixed.",
+    "Do not promote native MORI from one-step or three-step bursts; require at least a six-step gate at the matched shape, then a longer stability run when it beats the control.",
+    "On a clean full 8x surface, repeat only after the 4x native compact memory issue is closed."
+  ]
+}

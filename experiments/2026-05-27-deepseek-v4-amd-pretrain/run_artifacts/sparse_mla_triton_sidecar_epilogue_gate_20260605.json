@@ -1,0 +1,58 @@
+{
+  "scope": "sparse_mla_shared_latent_kv_actual_li_triton_sidecar_epilogue_gate",
+  "status": "sidecar_surface_confirmed_valid_dkv_epilogue_still_missing",
+  "date": "2026-06-05",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "heads": 64,
+    "dim": 512,
+    "seq_chunk": 32,
+    "selected_block": 512,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64
+  },
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "gpu": "HIP_VISIBLE_DEVICES=0"
+  },
+  "artifacts": {
+    "dot_k_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "dot_k_compact_micro_sink": "run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "dot_k_compact_micro_partial_store": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json"
+  },
+  "timing_ms": {
+    "dot_k_atomic_valid_dkv_median": 8.144311904907227,
+    "dot_k_compact_micro_sink_checksum_floor_median": 7.047167062759399,
+    "dot_k_compact_micro_partial_store_valid_dkv_median": 8.824965953826904,
+    "dot_k_compact_micro_partial_store_emit_only_median": 8.507503986358643
+  },
+  "write_model": {
+    "raw_selected_dkv_scalar_updates": 805044224,
+    "coalesced_active_list_scalar_updates_target": 33806848,
+    "coalesced_write_reduction_target_x": 23.813051840857806,
+    "route_slots_workspace_bytes": 16777216,
+    "active_groups_total": 66029,
+    "unique_groups_mean_per_seq_tile": 515.8515625,
+    "dense_slot_overhead_x": 1.3438008791924454
+  },
+  "read": [
+    "The sidecar idea should be implemented in Triton, not by moving the producer to the slower HIP/TileLang route-owned schedules.",
+    "The existing dot_k_compact_micro_sink result shows that a selected_block=512 sidecar does not by itself destroy the fast query-major Triton loop: the checksum floor is about 7.05 ms.",
+    "The valid dot_k_compact_micro_partial_store path is still about 8.82 ms because it only redirects per-contribution updates into compact partial rows. It does not perform the desired in-CTA segmented reduction before global memory.",
+    "The next kernel should preserve dot_k_atomic's token/head/query-major tl.dot loop, load route_slots as a sidecar, perform bounded local reduction for hot/touched compressed groups inside the producer epilogue, and issue reduced atomics plus a fallback path for overflow groups."
+  ],
+  "commands": [
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4 tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_compact_micro_sink --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 512 --block-d 16 --block-h 64 --block-k 64 --num-warps 8 --warmup-iters 2 --timed-iters 10 --skip-correctness --skip-reference-timing --allow-large-materialization --summary-path run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json --json",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4 tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_compact_micro_partial_store --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 512 --block-d 16 --block-h 64 --block-k 64 --num-warps 8 --warmup-iters 2 --timed-iters 10 --skip-correctness --skip-reference-timing --allow-large-materialization --summary-path run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json --json",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4 tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_atomic --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 512 --block-d 16 --block-h 64 --block-k 64 --num-warps 8 --warmup-iters 2 --timed-iters 10 --skip-correctness --skip-reference-timing --allow-large-materialization --summary-path run_artifacts/actual_li_active_list_dotk_atomic_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json --json"
+  ]
+}

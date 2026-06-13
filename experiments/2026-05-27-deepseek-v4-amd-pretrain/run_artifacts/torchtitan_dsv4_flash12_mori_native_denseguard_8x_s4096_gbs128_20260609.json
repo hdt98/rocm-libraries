@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "artifact_type": "native_mori_compact_stability_isolation",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_denseguard_mbs8_steps6_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_six_steps_diagnostic_only",
+  "promotion_status": "not_promoted_attention_surface_changed",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_denseguard_mbs8_steps6_20260609/docker-run.log",
+  "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_denseguard_mbs8_steps6_20260609",
+  "launch_note": "Direct remote scratch Docker harness was used because local macOS process pressure made the canonical launcher fail before reaching the node. The staged TorchTitan source, config, caches, and native compact env were preserved.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12,
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "environment": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "65536",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_BLOCKS": "64",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WARPS": "8",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "false",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_DEBUG_CACHE": "true",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "512",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_SCATTER_MODE": "triton_bwd",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "48G"
+  },
+  "metrics": {
+    "step_1": {
+      "loss": 12.23495,
+      "grad_norm": 9.25,
+      "tokens_per_gpu_s_range": [1104, 1105],
+      "tflops_per_gpu_range": [55.88, 55.93],
+      "rank_max_memory_gib": 166.55
+    },
+    "step_2": {
+      "loss": 9.25973,
+      "grad_norm": 54.0,
+      "tokens_per_gpu_s_range": [6614, 6615],
+      "tflops_per_gpu_range": [334.89, 334.90],
+      "rank_max_memory_gib": 210.15
+    },
+    "step_3": {
+      "loss": 19.7631,
+      "grad_norm": 105.5,
+      "tokens_per_gpu_s": 6541,
+      "tflops_per_gpu_range": [331.16, 331.17],
+      "rank_max_memory_gib": 214.33
+    },
+    "step_4": {
+      "loss": 15.01371,
+      "grad_norm": 23.625,
+      "tokens_per_gpu_s": 6944,
+      "tflops_per_gpu_range": [351.56, 351.57],
+      "rank_max_memory_gib": 222.08
+    },
+    "step_5": {
+      "loss": 10.83376,
+      "grad_norm": 38.25,
+      "tokens_per_gpu_s": 7016,
+      "tflops_per_gpu_range": [355.23, 355.24],
+      "rank_max_memory_gib": 225.67
+    },
+    "step_6": {
+      "loss": 9.35473,
+      "grad_norm": 31.0,
+      "tokens_per_gpu_s": 5977,
+      "tflops_per_gpu_range": [302.60, 302.63],
+      "rank_max_memory_gib": 226.42
+    },
+    "steps_2_to_6_mean": {
+      "tokens_per_gpu_s": 6618.3,
+      "tflops_per_gpu": 336.70
+    },
+    "steps_4_to_6_mean": {
+      "tokens_per_gpu_s": 6645.67,
+      "tflops_per_gpu": 337.15
+    }
+  },
+  "native_compact_cache_read": {
+    "observed_capacity_buckets": [65536, 131072],
+    "compatible_larger_handle_reuse": true,
+    "max_observed_capacity_peer_rows": 131072,
+    "mori_jit_profiler": false
+  },
+  "diagnosis": {
+    "question": "Does native MORI compact fail independently of sparse SharedKV backward?",
+    "answer": "No failure in the six-step dense-guard isolation. Native compact survives past the previous no-prereset step-4 sparse sink-gradient failure point when compressed sparse MLA is guarded off.",
+    "read": "The remaining native compact instability is likely an interaction with sparse MLA SharedKV/sink-gradient backward, a dependency/order issue exposed by that path, or upstream memory corruption that only manifests there. It is not explained by stale MORI pre-reset state and is not a universal native compact crash."
+  }
+}

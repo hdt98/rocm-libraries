@@ -1,0 +1,174 @@
+{
+  "status": "ok",
+  "scope": "tilelang_dsv4_sparse_mqa_reference_backward_atomic_gate",
+  "read": "Straight vendored TileLang DSv4 sparse-MQA backward timing. This uses TileLang GEMMs for QK/PV and dKV contribution math, then T.atomic_addx4 into dKV for every selected index. It is a baseline for whether a direct TileLang port is competitive before adding segmented in-producer dKV reduction.",
+  "reference_kernel_dir": "sources/references/miles-deepseek-v4-pr1045/miles_plugins/models/deepseek_v4/ops/kernel",
+  "diagnostic_kernel_path": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+  "bwd_variant": "dkv_compute_nowrite_directdq",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "dtype": "bfloat16",
+  "seed": 20260604,
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "kv_len": 1024,
+    "compress_ratio": 4,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "sm_scale": 0.04419417382415922,
+    "forward_state": "synthetic",
+    "head_split": 0,
+    "kernel_heads": 64
+  },
+  "blocks": {
+    "fwd_block_i": 64,
+    "fwd_threads": 256,
+    "bwd_block_size": 16,
+    "bwd_threads": 256
+  },
+  "route_stats": {
+    "assignments": 2097152,
+    "kv_len": 1024,
+    "touched_kv_rows": 1024,
+    "mean_assignments_per_touched_row": 2048.0,
+    "max_assignments_per_row": 2196,
+    "p50_assignments_per_touched_row": 2047.0,
+    "p99_assignments_per_touched_row": 2148.31005859375
+  },
+  "atomic_write_model": {
+    "selected_rows": 2097152,
+    "scalar_dkv_atomic_add_elements": 1073741824,
+    "atomic_addx4_calls_modeled": 268435456
+  },
+  "timing": {
+    "tilelang_preprocess_delta": {
+      "label": "tilelang_preprocess_delta",
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.16868099570274353,
+          0.20740100741386414,
+          0.12172099947929382,
+          0.11880099773406982,
+          0.11760099977254868
+        ],
+        "mean_ms": 0.146841000020504,
+        "median_ms": 0.12172099947929382,
+        "min_ms": 0.11760099977254868,
+        "max_ms": 0.20740100741386414,
+        "stdev_ms": 0.040052258602974365
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.24756905622780323,
+          0.2463189885020256,
+          0.1373490085825324,
+          0.1333099789917469,
+          0.13152998872101307
+        ],
+        "mean_ms": 0.17921540420502424,
+        "median_ms": 0.1373490085825324,
+        "min_ms": 0.13152998872101307,
+        "max_ms": 0.24756905622780323,
+        "stdev_ms": 0.06186500377165894
+      },
+      "median_ms": 0.12172099947929382,
+      "min_ms": 0.11760099977254868,
+      "max_ms": 0.20740100741386414,
+      "mean_ms": 0.146841000020504,
+      "peak_memory_allocated_bytes": 819988992,
+      "peak_memory_allocated_gib": 0.763674259185791,
+      "checksum": -3026.898681640625
+    },
+    "tilelang_core_backward_kernel": {
+      "label": "tilelang_core_backward_kernel",
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          2.3376989364624023,
+          2.4937798976898193,
+          2.327219009399414,
+          2.292057991027832,
+          2.2586190700531006
+        ],
+        "mean_ms": 2.3418749809265136,
+        "median_ms": 2.327219009399414,
+        "min_ms": 2.2586190700531006,
+        "max_ms": 2.4937798976898193,
+        "stdev_ms": 0.09044420899588218
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          2.3655809927731752,
+          2.5327110197395086,
+          2.343122032471001,
+          2.3074810160323977,
+          2.2740920539945364
+        ],
+        "mean_ms": 2.364597423002124,
+        "median_ms": 2.343122032471001,
+        "min_ms": 2.2740920539945364,
+        "max_ms": 2.5327110197395086,
+        "stdev_ms": 0.10022206216730643
+      },
+      "median_ms": 2.327219009399414,
+      "min_ms": 2.2586190700531006,
+      "max_ms": 2.4937798976898193,
+      "mean_ms": 2.3418749809265136,
+      "peak_memory_allocated_bytes": 1624247296,
+      "peak_memory_allocated_gib": 1.5126981735229492,
+      "checksum": 9.766144752502441
+    },
+    "tilelang_postprocess_dkv_cast": {
+      "label": "tilelang_postprocess_dkv_cast",
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.08016099780797958,
+          0.03136099874973297,
+          0.029200000688433647,
+          0.028359999880194664,
+          0.02868100069463253
+        ],
+        "mean_ms": 0.03955259956419468,
+        "median_ms": 0.029200000688433647,
+        "min_ms": 0.028359999880194664,
+        "max_ms": 0.08016099780797958,
+        "stdev_ms": 0.02273096228153723
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.10734004899859428,
+          0.04580896347761154,
+          0.04273001104593277,
+          0.04157004877924919,
+          0.041989958845078945
+        ],
+        "mean_ms": 0.055887806229293346,
+        "median_ms": 0.04273001104593277,
+        "min_ms": 0.04157004877924919,
+        "max_ms": 0.10734004899859428,
+        "stdev_ms": 0.028810554800301428
+      },
+      "median_ms": 0.029200000688433647,
+      "min_ms": 0.028359999880194664,
+      "max_ms": 0.08016099780797958,
+      "mean_ms": 0.03955259956419468,
+      "peak_memory_allocated_bytes": 822086144,
+      "peak_memory_allocated_gib": 0.765627384185791,
+      "checksum": 0.0
+    }
+  }
+}

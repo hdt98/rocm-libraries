@@ -1,0 +1,108 @@
+{
+  "artifact": "standard_ep_source_position_scatter_flat_triton_probe_20260611",
+  "created_utc": "2026-06-11",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "purpose": "Validate an opt-in native-MORI source-position weighted-scatter path that consumes flat route positions directly, while keeping the unset default behavior materialized and conservative.",
+  "source_files": [
+    "sources/wip/torchtitan/torchtitan/ops/scatter_add.py",
+    "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  ],
+  "source_change_summary": [
+    "Add weighted_scatter_add_from_flat_positions(out, flat_positions, src, top_scores_flat, top_k, flat_position_offset).",
+    "The default backend is materialize, which reconstructs token_indices = (flat_positions - offset) // top_k and scores = top_scores_flat[flat_positions - offset], then calls the existing weighted_scatter_add path.",
+    "The opt-in backend triton_flat avoids materializing token_indices and score rows and computes token row and score lookup inside the Triton weighted-scatter kernels.",
+    "Native MORI source-position combine now calls the flat-position helper when source flat positions are available and records native_source_scatter_backend in timing metadata.",
+    "The direct TorchTitan launcher now passes CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND through to TORCHTITAN_STANDARD_EP_SOURCE_SCATTER_BACKEND and prints the selected backend in the run header."
+  ],
+  "environment_knobs": {
+    "safe_default": "unset TORCHTITAN_STANDARD_EP_SOURCE_SCATTER_BACKEND and unset CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND -> materialize",
+    "opt_in_fast_path": "TORCHTITAN_STANDARD_EP_SOURCE_SCATTER_BACKEND=triton_flat or CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND=triton_flat",
+    "retained_weighted_scatter_env_for_timing": "TORCHTITAN_STANDARD_EP_WEIGHTED_SCATTER_BACKEND=triton_bwd"
+  },
+  "validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/ops/scatter_add.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "status": "passed"
+    },
+    "remote_gpu_smoke": {
+      "shape": {
+        "tokens": 16,
+        "top_k": 6,
+        "rows": 64,
+        "hidden_dim": 128,
+        "dtype": "bf16"
+      },
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "hip": "7.2.53211",
+      "default_backend_env": "materialize",
+      "forward_default_vs_materialize_max_diff": 0.0,
+      "grad_out_default_vs_materialize_max_diff": 0.0,
+      "grad_src_default_vs_materialize_max_diff": 0.0,
+      "grad_scores_default_vs_materialize_max_diff": 0.0,
+      "forward_flat_vs_materialize_max_diff": 0.125,
+      "grad_out_flat_vs_materialize_max_diff": 0.0,
+      "grad_src_flat_vs_materialize_max_diff": 0.0,
+      "grad_scores_flat_vs_materialize_max_diff": 0.0,
+      "read": "The unset backend exactly preserves materialized behavior. The opt-in Triton-flat path has the expected BF16 forward atomic-order difference when duplicate token rows are present, while gradients match this smoke."
+    }
+  },
+  "timing_probe": {
+    "scope": "single-GPU production-shaped weighted scatter slice only; not an end-to-end training gate",
+    "shape": {
+      "tokens": 16384,
+      "top_k": 6,
+      "rows": 81920,
+      "hidden_dim": 4096,
+      "dtype": "bf16"
+    },
+    "materialize_backend": {
+      "weighted_scatter_backend_env": "triton_bwd",
+      "median_ms": 2.4329710006713867,
+      "min_ms": 2.393270969390869,
+      "max_ms": 2.4722321033477783,
+      "samples_ms": [
+        2.47127103805542,
+        2.4722321033477783,
+        2.433670997619629,
+        2.4350719451904297,
+        2.4239509105682373,
+        2.408231019973755,
+        2.4322710037231445,
+        2.4029901027679443,
+        2.4506309032440186,
+        2.393270969390869,
+        2.442790985107422,
+        2.3992700576782227
+      ]
+    },
+    "triton_flat_backend": {
+      "median_ms": 2.2532060146331787,
+      "min_ms": 2.246267080307007,
+      "max_ms": 2.260507106781006,
+      "samples_ms": [
+        2.246267080307007,
+        2.2600669860839844,
+        2.255547046661377,
+        2.251146078109741,
+        2.251065969467163,
+        2.2501869201660156,
+        2.260507106781006,
+        2.2515869140625,
+        2.2546260356903076,
+        2.25502610206604,
+        2.25178599357605,
+        2.2548670768737793
+      ]
+    },
+    "flat_vs_materialize_median_delta_ms": -0.179764986038208,
+    "flat_vs_materialize_speedup_pct": 7.39
+  },
+  "materialization_followup": {
+    "artifact": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_failure_20260611.json",
+    "result": "failed_before_metric_step",
+    "read": "The shortest 8xMI350 native-MORI e2e gate with CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND=triton_flat failed upstream in native compact dispatch staging-stride/capacity handling before source-position scatter could be measured."
+  },
+  "decision": "Keep triton_flat opt-in only. The slice win is real but small, and this is not a promoted 8xMI350 throughput candidate. The larger native-MORI target remains final receive-layout collapse and compact helper VJP/return, because this patch only removes a source-position adapter edge."
+}

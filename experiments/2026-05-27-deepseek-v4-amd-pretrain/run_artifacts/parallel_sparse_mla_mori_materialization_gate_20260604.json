@@ -1,0 +1,74 @@
+{
+  "artifact": "parallel_sparse_mla_mori_materialization_gate_20260604",
+  "date": "2026-06-04",
+  "goal_alignment": {
+    "sparse_mla_single_gpu": "Materialize TileLang sparse-MLA backward by fusing the whole boundary: q, dO, shared/compressed KV, LI indices, output/lse/sink, no selected-KV/probability HBM slabs.",
+    "moe_mori_multi_gpu": "Materialize MORI/AITER MoE gains in sustained 4x/8x MI350 TFLOPs by reducing owner-rank VJP tail and dX return skew without replacing the AITER fused forward floor."
+  },
+  "aiter_live_source_inspection": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "source_path": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/fused_moe.py",
+    "cpu_only_import_attempt": {
+      "status": "failed_after_module_aiter_core_build",
+      "reason": "ROCm/HIP JIT runtime was not available in the CPU-only docker run; aiter.fmoe was not registered. Treat source inspection as authoritative for API contract, not as GPU runtime validation."
+    },
+    "public_fused_moe_contract": {
+      "returns": "single final moe output tensor",
+      "source_evidence": [
+        "fused_moe(...) calls fused_moe_(...) and returns its value.",
+        "fused_moe_(...) either returns metadata.stage1(...) for one-stage paths or fused_moe_2stages(...).",
+        "fused_moe_2stages(...) allocates a2, calls metadata.stage1(...), calls metadata.stage2(...), then returns moe_out."
+      ],
+      "forward_intermediates_exposed_to_torchtitan_today": [],
+      "internal_intermediates": {
+        "sorted_ids": "created by moe_sorting inside fused_moe_, not returned",
+        "sorted_weights": "created by moe_sorting inside fused_moe_, not returned",
+        "sorted_expert_ids": "created by moe_sorting inside fused_moe_, not returned",
+        "num_valid_ids": "created by moe_sorting inside fused_moe_, not returned",
+        "moe_buf": "created by moe_sorting and used as final moe output buffer",
+        "a2": "post-stage1 hidden, generally silu(gate) * up for the BF16 separated SwiGLU/Silu-style path; allocated and consumed inside fused_moe_2stages, not returned"
+      },
+      "missing_for_training_backward": [
+        "gate pre-activation for SwiGLU/Silu derivative",
+        "up branch for SwiGLU/Silu derivative",
+        "unweighted per-route compact expert output for dTopkWeight",
+        "stable returned route metadata needed to avoid a second sort/pack in backward"
+      ]
+    },
+    "decision": {
+      "demoted_path": "TORCHTITAN_MORI_AITER_FORWARD_MODE=padded_saved remains demoted because it saves gate/up/hidden/compact_out only by replacing AITER fused forward with a slower padded PyTorch-style forward.",
+      "promoted_contract": "Keep AITER fused forward as the floor. Add or port an AITER-compatible training contract: either fused_moe_training_forward returns route metadata plus a2/gate/up/compact_out with negligible forward overhead, or a fused owner VJP recomputes gate/up/compact_out internally using the same AITER/CK grouped schedule.",
+      "why_a2_only_is_not_enough": "A2 can help W2 wgrad, but backward still needs gate/up for SwiGLU derivative and compact_out for dTopkWeight; the previous stage1-hidden-only probe was effectively neutral."
+    },
+    "next_moe_gate": {
+      "local_latency_gate": "Beat the EP8 owner-rank padded VJP envelope without slowing AITER forward: retained padded/Triton-SwiGLU VJP ~6.4 ms, ideal saved gate/up/hidden+compact_out ~4.77-4.96 ms.",
+      "e2e_promotion_gate": "Promote only after >=6-step 4x S4096 GBS64 and then 8x S4096 GBS128 runs improve late-step TFLOPs/GPU and peak memory versus the current no-AC + expandable allocator sustained 8x anchor of 64.91 TFLOPs/GPU."
+    }
+  },
+  "sparse_mla_tilelang_boundary": {
+    "current_whole_boundary_state": {
+      "source_hsk_bridge": "Correct but slow: exports BF16 probs/grad_logits_scaled HSK slabs, then selected-limit dKV consumes them. S4096 median was 58.799 ms; export kernel alone was about 34.8 ms.",
+      "source_direct_atomic": "Closest no-HSK source-boundary scaffold: consumes q/dO/kv/indices/output/lse directly, but still does per-selected-row dKV atomics. S4096 median was 42.540 ms.",
+      "source_direct_group_owned": "Rejected: avoids HSK slabs and reduces before global atomics, but group-owned CTAs recompute/reload full-D QK/PV too many times and destroy query-major reuse."
+    },
+    "promoted_contract": [
+      "Start from the no-HSK direct-source boundary, not from materialized probs/grad_logits.",
+      "Keep query-major row ownership for QK, probabilities, scaled dP, dQ, and dKV contribution math.",
+      "Inside that query-major producer, add group-aware segmented/tile-local dKV accumulation keyed by compressed group.",
+      "Write compact reduced partial rows or reduced atomics, then use the already-cheap final fold/reduce.",
+      "Do not materialize selected-KV, probs, or grad_logits HBM slabs."
+    ],
+    "first_sparse_gate": {
+      "single_gpu_shape": "1xMI350, S=4096, H=64, D=512, compressed groups=1024, compressed topk=512",
+      "latency_gate_1": "Beat the 42.5 ms no-HSK direct atomic whole-boundary path.",
+      "latency_gate_2": "Then beat the older 8.0-8.8 ms compressed dKV sparse-atomic slice without HSK slabs.",
+      "promotion_gate": "Only after whole-boundary latency improves should TorchTitan e2e TFLOPs/memory A/B be run."
+    }
+  },
+  "next_actions": [
+    "MoE/MORI: add an AITER-side training-forward/backward contract or a local probe that calls AITER moe_sorting + stage1/stage2 directly and exposes a2/route metadata without replacing fused forward; reject if it slows forward before owner VJP improves.",
+    "Sparse MLA: implement the query-major no-HSK segmented dKV producer in TileLang/HIP using the source_direct path as correctness scaffold and the selected-limit route plan for group-aware epilogue reduction.",
+    "For either track, do not promote an isolated kernel win until sustained 4x/8x TFLOPs/GPU and peak memory improve over the current retained baseline."
+  ]
+}

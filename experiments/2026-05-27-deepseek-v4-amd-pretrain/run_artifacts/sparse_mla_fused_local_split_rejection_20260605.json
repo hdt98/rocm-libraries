@@ -1,0 +1,40 @@
+{
+  "artifact": "sparse_mla_fused_local_split_rejection",
+  "date": "2026-06-05",
+  "hardware": "1xMI350",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "selected_keys_full": 640,
+    "local_window": 128,
+    "compressed_topk": 512,
+    "compressed_groups": 1024
+  },
+  "candidate": {
+    "name": "fused_full_dq_local_dkv_plus_compressed_union_dkv",
+    "code_artifact": "benchmark_sparse_mla_full_sharedkv_split_union_compressed.py",
+    "timing_artifact": "sparse_mla_full_sharedkv_fused_local_split_union_s4096_layer2_t4_u256_timing_20260605.json",
+    "contract": "One query-major branch computes dQ over all local+compressed selected keys and emits dKV only for the local window; a second branch computes compressed-union dKV."
+  },
+  "measurements_ms": {
+    "retained_sparse_attention_backward_gate": 11.1347,
+    "full_dq_no_dkv": 4.186152935028076,
+    "local_dkv_only_full": 2.069056987762451,
+    "compressed_union_dkv_only_full": 7.511539936065674,
+    "fused_full_dq_local_dkv": 5.908047199249268,
+    "serialized_fused_local_plus_compressed": 13.220584869384766,
+    "event_overlap_fused_local_plus_compressed": 12.27757740020752,
+    "event_overlap_fused_branch": 12.238536834716797,
+    "event_overlap_compressed_branch": 11.427651405334473
+  },
+  "decision": {
+    "status": "rejected_for_promotion",
+    "beats_retained_gate": false,
+    "no_e2e_tflops_run": true,
+    "reason": "Fusing local-window dKV into the full-index dQ branch removes a launch but does not remove enough source-boundary work. Under event overlap, both branches still inflate and the measured makespan remains 12.28 ms versus the 11.13 ms gate.",
+    "next_kernel_direction": "Move beyond split launches: build a shared producer/cooperative owner where QK, dO.V, softmax terms, dQ, local dKV, and compressed-union dKV consume the same on-chip score/prob/dP tile before returning to PyTorch autograd."
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_aiter_compact_ptgmm_expert_recompute_profile",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_aiter_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+  "raw_timing_logs": {
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/additive_timing.jsonl",
+    "mori_aiter_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/mori_aiter_timing.jsonl",
+    "local_parse_copy": "/tmp/dsv4_ptgmm_expertrecompute_profile"
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "runtime": {
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "save_forward_dispatch": true,
+    "local_vjp_mode": "aiter_compact",
+    "local_vjp_swiglu_backend": "triton",
+    "local_vjp_aiter_wgrad_op": "ptgmm",
+    "compact_recompute_mode": "expert_loop",
+    "xgrad_mode": "full",
+    "transpose_cache_size": 0,
+    "op_cache_mode": "backward",
+    "backward_combine_input_mode": "registered",
+    "dx_return_mode": "sync",
+    "mori_ep_launch_config_mode": "MANUAL",
+    "mori_aiter_block_num": 64,
+    "mori_aiter_rdma_block_num": 32,
+    "mori_aiter_warp_num_per_block": 8,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "dsv4_profile_sharedkv_backward": false,
+    "mori_aiter_timing_granularity": "owner_vjp_detail"
+  },
+  "code_change": {
+    "torch_titan_file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "launcher_file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "new_env": "TORCHTITAN_MORI_AITER_COMPACT_RECOMPUTE_MODE",
+    "modes": ["gmm", "expert_loop"],
+    "read": "The opt-in expert_loop compact recompute path skips the grouped-GMM transpose-prepare contract for forward recompute and uses per-expert compact matmuls while retaining compact ptgmm expert wgrads, grouped dgrad, and grouped xgrad."
+  },
+  "logged_steps": [
+    {
+      "step": 1,
+      "loss": 12.36575,
+      "grad_norm": 13.875,
+      "tokens_per_gpu_s_values": [2603, 2603, 2604, 2603],
+      "tokens_per_gpu_s_mean": 2603.25,
+      "node_tokens_s_mean": 10413.0,
+      "tflops_per_gpu_values": [131.80, 131.79, 131.84, 131.77],
+      "tflops_per_gpu_mean": 131.8025,
+      "memory_gib_values": [171.91, 172.63, 173.75, 171.60],
+      "memory_gib_max": 173.75,
+      "mfu_percent": 5.71
+    },
+    {
+      "step": 2,
+      "loss": 9.17299,
+      "grad_norm": 94.0,
+      "tokens_per_gpu_s_values": [3903, 3903, 3903, 3903],
+      "tokens_per_gpu_s_mean": 3903.0,
+      "node_tokens_s_mean": 15612.0,
+      "tflops_per_gpu_values": [197.60, 197.60, 197.60, 197.60],
+      "tflops_per_gpu_mean": 197.60,
+      "memory_gib_values": [217.88, 218.00, 217.69, 218.41],
+      "memory_gib_max": 218.41,
+      "mfu_percent": 8.56,
+      "target_tokens_per_gpu_s": 12200,
+      "target_ratio_tokens_per_gpu": 0.3199
+    }
+  ],
+  "additive_rankmax": {
+    "note": "The sidecar file was appended in the remote TorchTitan workdir; this artifact uses the final matching step-2 aggregate for the current run.",
+    "step2": {
+      "step_train_step_s": 33.5663,
+      "microbatch_forward_backward_s": 32.9925,
+      "forward_s": 7.7806,
+      "loss_s": 0.9822,
+      "backward_s": 19.1857,
+      "microbatch_wrapper_residual_s": 5.0441,
+      "grad_clip_s": 0.0572,
+      "optimizer_step_s": 0.0875,
+      "accumulated_loss_reduce_s": 0.3560
+    }
+  },
+  "mori_aiter_current_run_profile_call_id_ge_385": {
+    "note": "Parsed from call_id >= 385, which corresponds to the current appended run's post-warm window. Useful for owner-VJP attribution, not a strict additive decomposition of the whole train-step wall.",
+    "records": 3072,
+    "call_count": 384,
+    "rank_total_max_s": {
+      "owner_local_vjp_aiter_compact": 10.3146,
+      "combine_dx": 3.2525,
+      "dispatch_grad_output": 1.5610
+    },
+    "record_ms": {
+      "local_vjp_median": 25.0112,
+      "local_vjp_p90": 32.6755,
+      "combine_dx_median": 6.1361,
+      "combine_dx_p90": 15.1627,
+      "recv_count_median": 28274.0
+    },
+    "local_vjp_part_medians_ms": {
+      "prepare_ops": 3.7019,
+      "recompute_forward": 6.1605,
+      "wgrad": 6.2778,
+      "xgrad_reduce": 4.0696,
+      "w2_dgrad_swiglu": 1.7666,
+      "dtopk_weight": 1.0672,
+      "gather": 1.0251,
+      "sort_counts": 0.6228,
+      "route_pack": 0.1500
+    },
+    "local_vjp_part_rank_total_max_s": {
+      "prepare_ops": 1.5025,
+      "recompute_forward": 2.4338,
+      "wgrad": 2.7687,
+      "xgrad_reduce": 1.6828,
+      "w2_dgrad_swiglu": 0.7155,
+      "dtopk_weight": 0.4503,
+      "gather": 0.4251,
+      "sort_counts": 0.2564,
+      "route_pack": 0.0596
+    }
+  },
+  "mori_aiter_current_run_final_half_call_id_ge_577": {
+    "note": "Final-half current-run window. This is the closest sidecar slice to the logged step-2 owner-VJP timing.",
+    "records": 1536,
+    "call_count": 192,
+    "rank_total_max_s": {
+      "owner_local_vjp_aiter_compact": 5.1280,
+      "combine_dx": 1.6195,
+      "dispatch_grad_output": 0.7441
+    },
+    "record_ms": {
+      "local_vjp_median": 24.9490,
+      "local_vjp_p90": 32.4576,
+      "combine_dx_median": 6.1361,
+      "combine_dx_p90": 15.1712,
+      "recv_count_median": 28327.0
+    },
+    "local_vjp_part_medians_ms": {
+      "prepare_ops": 3.7019,
+      "recompute_forward": 6.1792,
+      "wgrad": 6.2755,
+      "xgrad_reduce": 4.0944,
+      "w2_dgrad_swiglu": 1.7717,
+      "dtopk_weight": 1.0661,
+      "gather": 1.0231,
+      "sort_counts": 0.6197,
+      "route_pack": 0.1497
+    },
+    "local_vjp_part_rank_total_max_s": {
+      "prepare_ops": 0.7514,
+      "recompute_forward": 1.2200,
+      "wgrad": 1.3518,
+      "xgrad_reduce": 0.8417,
+      "w2_dgrad_swiglu": 0.3579,
+      "dtopk_weight": 0.2243,
+      "gather": 0.2126,
+      "sort_counts": 0.1254,
+      "route_pack": 0.0298
+    }
+  },
+  "comparison": {
+    "previous_compact_ptgmm_profile_artifact": "run_artifacts/torchtitan_dsv4_flash12_aiter_compact_ptgmm_profile_4x_s4096_gbs128_mbs2_20260606.json",
+    "retained_c128_sparse_expert_loop_artifact": "run_artifacts/torchtitan_dsv4_flash12_c128_sparse_likltriton_4x_s4096_gbs128_mbs2_20260606.json",
+    "previous_compact_ptgmm_step2_tokens_per_gpu_s": 3710.0,
+    "previous_compact_ptgmm_step2_tflops_per_gpu": 187.83,
+    "previous_compact_ptgmm_step2_peak_memory_gib": 222.20,
+    "previous_compact_ptgmm_step2_wall_s": 35.3125,
+    "previous_compact_ptgmm_step2_backward_s": 20.4991,
+    "expert_recompute_step2_tokens_delta_vs_previous_compact_profile_pct": 5.20,
+    "expert_recompute_step2_tflops_delta_vs_previous_compact_profile_pct": 5.16,
+    "expert_recompute_step2_peak_memory_delta_vs_previous_compact_profile_gib": -3.79,
+    "expert_recompute_step2_wall_delta_vs_previous_compact_profile_s": -1.7462,
+    "expert_recompute_step2_backward_delta_vs_previous_compact_profile_s": -1.3134,
+    "retained_c128_sparse_expert_loop_step2_tokens_per_gpu_s": 3792.0,
+    "retained_c128_sparse_expert_loop_step2_tflops_per_gpu": 191.99,
+    "retained_c128_sparse_expert_loop_step2_peak_memory_gib": 217.52,
+    "retained_c128_sparse_expert_loop_steps_2_to_4_tokens_per_gpu_s": 3867.67,
+    "retained_c128_sparse_expert_loop_steps_2_to_4_tflops_per_gpu": 195.84,
+    "retained_c128_sparse_expert_loop_peak_logged_memory_gib": 218.42,
+    "expert_recompute_step2_tokens_delta_vs_retained_c128_step2_pct": 2.93,
+    "expert_recompute_step2_tflops_delta_vs_retained_c128_step2_pct": 2.92,
+    "expert_recompute_step2_peak_memory_delta_vs_retained_c128_step2_gib": 0.89,
+    "expert_recompute_step2_tokens_delta_vs_retained_c128_late_avg_pct": 0.91,
+    "expert_recompute_step2_tflops_delta_vs_retained_c128_late_avg_pct": 0.90
+  },
+  "decision": {
+    "promote_as_throughput_candidate": false,
+    "read": "Opt-in compact expert-loop recompute is a positive diagnostic: the profiled step 2 improves over the previous compact ptgmm profile by about 5.2% tok/s and 1.75s wall time while lowering peak logged memory by 3.79 GiB. However, it is still a two-step timing-sidecar run with appended timing files, not a clean non-profile sustained materialization. The retained 12-layer candidate remains the C128 sparse expert_loop run until a clean 4-step or longer no-profile run proves late-step uplift.",
+    "caveats": [
+      "The prepare_ops stage did not shrink cleanly in the sidecar attribution, so do not claim that transpose avoidance alone is the measured root cause.",
+      "The sidecar paths were reused in the remote workdir and appended across runs; future decisive profiles should set unique CANARY_DSV4_ADDITIVE_TIMING_PATH and CANARY_MORI_AITER_TIMING_PATH under the run log directory.",
+      "This remains a Python adapter path, not the fused compact grouped owner-rank training backward we ultimately need."
+    ],
+    "next_actions": [
+      "Run a clean no-profile 4-step or 6-step materialization with CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE=expert_loop to decide whether this promotes beyond retained C128 sparse expert_loop.",
+      "If the no-profile run sustains, update the retained 12-layer candidate; if it decays, keep it as a diagnostic and continue the fused grouped owner-backward path.",
+      "Use unique timing sidecar paths for the next profile A/B."
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "status": "promoted_as_current_tilelang_sparse_dkv_speed_branch",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_compact_producer",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "retained_shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "topk_workspace": 640,
+    "route_pattern": "panel_capacity_random",
+    "token_block": 64,
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "panel_count": 2,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "math_mode": "mfma_reduced",
+    "fold_final_dkv": true
+  },
+  "retained_result": {
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.203559875488281,
+    "s4096_producer_only_estimated_ms": 8.084138873964548,
+    "s4096_fold_only_median_ms": 0.11942100152373314,
+    "s4096_active_partial_rows": 65536,
+    "s4096_write_reduction_x": 32.0,
+    "s4096_compact_partial_stream_mib": 128.0,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+  },
+  "baseline_comparison": {
+    "previous_retained_full_output_median_ms": 10.956138610839844,
+    "previous_retained_shape": "tb32/gps256/cap160/k32/d64/threads256/fold_final",
+    "previous_retained_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json",
+    "speedup_vs_previous_retained_x": 1.3355435672676255,
+    "delta_ms_vs_previous_retained": -2.7525787353515625,
+    "raw_selected_overwrite_median_ms": 9.259,
+    "straight_tilelang_atomic_reference_median_ms": 28.086,
+    "retained_triton_sparse_atomic_wall_ms_range": "8.0-8.8"
+  },
+  "shape_sweep": [
+    {
+      "shape": "tb32/gps512/cap320/k32/d64/threads256",
+      "s128_correct": true,
+      "s4096_full_output_median_ms": 9.727211952209473,
+      "s4096_fold_only_median_ms": 0.2270819991827011,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb32_gps512_cap320_k32d64_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb32_gps512_cap320_k32d64_timing10_20260604.json"
+    },
+    {
+      "shape": "tb64/gps512/cap320/k32/d64/threads256",
+      "s128_correct": true,
+      "s4096_full_output_median_ms": 9.590683460235596,
+      "s4096_fold_only_median_ms": 0.11982100084424019,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k32d64_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k32d64_timing10_20260604.json"
+    },
+    {
+      "shape": "tb64/gps512/cap320/k32/d32/threads256",
+      "s128_correct": true,
+      "s4096_full_output_median_ms": 11.230338096618652,
+      "s4096_fold_only_median_ms": 0.1197809986770153,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k32d32_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k32d32_timing10_20260604.json"
+    },
+    {
+      "shape": "tb64/gps512/cap320/k64/d64/threads256",
+      "s128_correct": true,
+      "s4096_full_output_median_ms": 9.245867729187012,
+      "s4096_fold_only_median_ms": 0.11986050009727478,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k64d64_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k64d64_timing10_20260604.json"
+    },
+    {
+      "shape": "tb64/gps512/cap320/k64/d64/threads512",
+      "s128_correct": true,
+      "s4096_full_output_median_ms": 8.203559875488281,
+      "s4096_fold_only_median_ms": 0.11942100152373314,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k64d64_thr512_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+    },
+    {
+      "shape": "tb64/gps512/cap384/k128/d64/threads256",
+      "status": "compile_rejected",
+      "failure": "Requested dynamic shared memory 180224 exceeds device limit 163840"
+    }
+  ],
+  "read": "The concrete TileLang dKV branch now has a real speed promotion: widening the route panel to two 512-group panels, increasing token_block to 64, using block_k=64/block_d=64, and launching with 512 threads moves full final-dKV output from 10.956 ms to 8.204 ms at S4096 while preserving S128 final-dKV parity. This is no longer just a memory-contract probe; it reaches the same latency band as the retained Triton sparse-atomic wall while keeping a reduced-row final-output contract. It still depends on diagnostic materialized probs/grad_logits and a PyTorch final fold, so the next integration step is to replace the fold with a small TileLang/rocPRIM reducer or direct compressor-dKV consumer, then fuse LI/probability production for memory/correctness rather than expecting that fusion alone to provide the speedup."
+}

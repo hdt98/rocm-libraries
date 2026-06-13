@@ -1,0 +1,167 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "result": "completed_two_steps_timing_only_not_promoted",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": 1,
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_stage1_recompute",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": 1,
+    "CANARY_MORI_AITER_REUSE_FORWARD_ROUTE_METADATA": 1,
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": 1,
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_STAGE1_SHUFFLE_CACHE_SIZE": 12,
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": 0,
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "route_mask",
+    "CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS": 512,
+    "CANARY_MORI_AITER_HOT_SPLIT_W13": 1,
+    "CANARY_MORI_AITER_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_MORI_AITER_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_MORI_AITER_HOT_WEIGHT_BACKWARD_TIMING_LIMIT": 8,
+    "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607/mori_timing.jsonl",
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "1": {
+      "tokens_per_gpu_s_range": [1432.0, 1436.0],
+      "tflops_per_gpu_range": [72.50, 72.73],
+      "loss": 12.21905,
+      "grad_norm": 17.625,
+      "peak_logged_memory_gib": 115.22
+    },
+    "2": {
+      "tokens_per_gpu_s": 4306.0,
+      "node_tokens_s": 34448.0,
+      "tflops_per_gpu": 218.02,
+      "loss": 10.88700,
+      "grad_norm": 92.0,
+      "peak_logged_memory_gib": 158.76
+    }
+  },
+  "timing_jsonl": {
+    "remote_raw_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607/mori_timing.jsonl",
+    "remote_raw_size": "21 MiB",
+    "records": 4672,
+    "hot_execute_records": 1536,
+    "broad_mori_records": 1536,
+    "hot_weight_backward_records": 64,
+    "local_temp_parse_path": "/tmp/mori_timing_top8_sdma_20260607.jsonl"
+  },
+  "hot_execute_steady_step2_proxy": {
+    "records_per_rank": 96,
+    "remote_rows_local": {
+      "mean": 22676.527,
+      "median": 22075.5,
+      "p95": 33672.0,
+      "max": 38757
+    },
+    "modeled_load_balance": {
+      "owner_load_before_max_over_mean_median": 1.969,
+      "exec_load_after_max_over_mean_median": 1.182,
+      "modeled_load_reduction_pct_median": 39.896
+    },
+    "rankmax_stage_gpu_ms": {
+      "forward.balanced_moe.execute.plan": 117.170,
+      "forward.balanced_moe.execute.remote_mask": 61.788,
+      "forward.balanced_moe.execute.hot_split.broadcast_w13": 135.633,
+      "forward.balanced_moe.execute.hot_split.broadcast_w2": 92.465,
+      "forward.balanced_moe.execute.hot_split.gather_remote": 7.582,
+      "forward.balanced_moe.execute.hot_split.sort_counts": 28.152,
+      "forward.balanced_moe.execute.hot_split.grouped_rows": 243.283,
+      "forward.balanced_moe.execute.hot_split.scatter_tokens": 49.571
+    },
+    "rankmax_total_listed_helper_ms": 727.651
+  },
+  "broad_mori_steady_step2_proxy": {
+    "records_per_rank": 96,
+    "rankmax_stage_gpu_ms": {
+      "backward.local_vjp.aiter_stage1_recompute": 2128.414,
+      "backward.combine_dx.call": 736.838,
+      "backward.dispatch_grad_output.call": 233.746,
+      "local_aiter_stage1_recompute_vjp.stage1_forward": 367.528,
+      "local_aiter_stage1_saved_vjp.prepare_ops": 354.614,
+      "local_aiter_stage1_saved_vjp.wgrad": 373.727,
+      "local_aiter_stage1_saved_vjp.xgrad": 239.251,
+      "local_aiter_stage1_saved_vjp.gate_up_recompute": 186.963,
+      "local_aiter_stage1_saved_vjp.dtopk_weight": 150.599,
+      "local_aiter_stage1_saved_vjp.dgrad_swiglu": 105.615
+    },
+    "local_vjp_meta_tail": {
+      "padding_multiplier_median": 11.872,
+      "padding_multiplier_p95": 20.894,
+      "local_vjp_assignments_median": 27038.5,
+      "balanced_topk_remote_share_median": 0.771,
+      "hot_expert_topk_share_median": 0.992
+    }
+  },
+  "hot_weight_backward_sample": {
+    "w13": {
+      "records_per_rank": 4,
+      "payload_mib": 256.0,
+      "rankmax_all_reduce_grad_hot_weight_ms": 10.678,
+      "rankmax_scatter_owner_grad_ms": 0.804,
+      "median_all_reduce_call_ms": 1.9772,
+      "max_all_reduce_call_ms": 4.0381
+    },
+    "w2": {
+      "records_per_rank": 4,
+      "payload_mib": 128.0,
+      "rankmax_all_reduce_grad_hot_weight_ms": 3.168,
+      "rankmax_scatter_owner_grad_ms": 0.377,
+      "median_all_reduce_call_ms": 0.7674,
+      "max_all_reduce_call_ms": 0.8444
+    }
+  },
+  "comparison": {
+    "previous_top2_route_mask_minhelper_timing_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_aiter_hot_helper_timing_8x_s4096_gbs128_mbs2_20260607.json",
+    "top2_steady_helper_rankmax_ms": {
+      "plan": 123.8,
+      "grouped_rows": 91.0,
+      "broadcasts_total": 64.1,
+      "remote_mask": 38.8,
+      "sort_counts": 21.1,
+      "scatter_tokens": 15.2
+    },
+    "read": "Top-8 improves modeled owner-load balance, and the broad local_vjp/combine stages are lower than the earlier top-2 timing family. But the helper sidecar grows substantially: grouped helper rows and hot-weight movement become much larger, and the owner VJP path is still padded/imbalanced. SDMA hot dW reduction is present and owner scatter is tiny; the remaining gap is the sidecar graph shape and owner VJP, not a missing dW partial reduction."
+  },
+  "source_artifacts": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607/docker-run.log",
+    "structured_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607/structured_logs"
+  },
+  "read": "This timing run confirms the MORI/AITER route-mask branch is using the forward hot-helper idea, but it remains a sidecar. Forward helper execution still pays repeated hot planning, remote-mask construction, hot-weight movement, helper grouping, and scatter per layer/microbatch. Backward reuses forward dispatch metadata for the owner path, but owner VJP is still the largest broad stage and combine_dx remains visible. The next materializable target is a first-class MORI/AITER balanced dispatcher/overlap contract: persist exact hot/cold row partitions from forward, batch helper rows, cache or stream hot weights safely, and overlap hot dW reduce with the owner/helper VJP rather than adding more route-mask knobs."
+}

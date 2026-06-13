@@ -1,0 +1,54 @@
+{
+  "status": "passed_dry_run_real_resume_pending",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "run_id": "torchtitan_mixed_muon_resume_loadstep1_dryrun_20260531",
+  "resume_source_run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "mode": "mixed-muon-adamw",
+  "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_resume_loadstep1_dryrun_20260531",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "command": "env CANARY_OPTIMIZER_MODE=mixed-muon-adamw RUN_ID=torchtitan_mixed_muon_resume_loadstep1_dryrun_20260531 DUMP_FOLDER=/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531 LOG_DIR=/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_resume_loadstep1_dryrun_20260531 CANARY_STEPS=2 CANARY_GBS=8 CANARY_CHECKPOINT_ENABLE=true CANARY_CHECKPOINT_INTERVAL=1 CANARY_CHECKPOINT_LOAD_STEP=1 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh dry-run",
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 8,
+    "seq_len": 4096
+  },
+  "resume_contract": {
+    "checkpoint_load_step": 1,
+    "training_steps": 2,
+    "dump_folder": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+    "checkpoint_path": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+    "expected_real_run": "resume from step-1 and train through step 2 with the mixed Muon/AdamW optimizer overlay active"
+  },
+  "dry_run_result": {
+    "optimizer_overlay_confirmed": "optimizer_overlay=/workspace/Primus/third_party/torchtitan/torchtitan/components/optimizer.py has_muon=True",
+    "command_includes": [
+      "--checkpoint.load_step 1",
+      "--training.steps 2",
+      "--parallelism.expert_parallel_degree 8",
+      "--parallelism.data_parallel_shard_degree -1",
+      "--job.dump_folder /local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531"
+    ],
+    "latest_run_id_after_dry_run": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531"
+  },
+  "node_state": {
+    "real_resume_not_launched": true,
+    "reason": "GPU 0 and GPU 1 were occupied by an external TorchTitan Llama3.1 8B fault-tolerance run under /home/tanth/Primus.",
+    "blocking_processes": [
+      "3335962 /opt/venv/bin/torchrun --nproc_per_node 2 ... examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml ... --training.steps=20000",
+      "3336399 python -u primus/cli/main.py train pretrain ... llama3.1_8B-BF16-TP2-pretrain.yaml",
+      "3336400 python -u primus/cli/main.py train pretrain ... llama3.1_8B-BF16-TP2-pretrain.yaml"
+    ]
+  },
+  "caveats": [
+    "This proves the explicit resume command shape only; it does not prove mixed Muon/AdamW optimizer state restore.",
+    "Run the real resume when all 8 MI350 GPUs are free."
+  ]
+}

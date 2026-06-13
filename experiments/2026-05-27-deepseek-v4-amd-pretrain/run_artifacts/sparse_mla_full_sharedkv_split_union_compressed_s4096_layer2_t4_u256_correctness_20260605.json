@@ -1,0 +1,211 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 1288.9986572265625,
+    "checked": true,
+    "dkv_atol": 1.0,
+    "dkv_max_abs_diff": 0.05084228515625,
+    "dkv_mean_abs_diff": 0.0005399278597906232,
+    "dq_max_abs_diff": 0.0077648162841796875,
+    "dq_mean_abs_diff": 4.22858793172054e-05,
+    "max_abs_diff": 0.05084228515625,
+    "mean_abs_diff": 0.0005399278597906232,
+    "passed": true,
+    "reference_norm": 1288.9947509765625
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": false,
+    "compressed_union_dkv_only_full_ms": 7.579030990600586,
+    "full_dq_no_dkv_ms": 4.7142438888549805,
+    "full_split_boundary_ms": 13.753687858581543,
+    "full_split_vs_retained_speedup_x": 0.8095792280942715,
+    "local_dkv_only_full_ms": 2.1435399055480957,
+    "retained_sparse_attention_backward_gate_ms": 11.1347
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "contract": "dQ/no-dKV uses full local+compressed indices; local dKV uses the old selected-slot query-major path; compressed dKV uses the token4 compressed-group union path.",
+    "route_model_selected_block": 512,
+    "token_block": 4
+  },
+  "read": "This is the first materialization check for the compressed-only union split against the actual full shared-KV attention index contract. It is still a multi-launch diagnostic path and includes an extra local+compressed dKV tensor add, so it is not a final production fused owner.",
+  "route_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "scope": "sparse_mla_actual_full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "selected_keys_full": 640,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_compressed_pairs": 1572352,
+    "window": 128
+  },
+  "status": "passed",
+  "timing": {
+    "compressed_union_dkv_only_full": {
+      "checksum_norm": 463.215087890625,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.579030990600586,
+        "mean_ms": 7.579030990600586,
+        "median_ms": 7.579030990600586,
+        "min_ms": 7.579030990600586,
+        "samples_ms": [
+          7.579030990600586
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "full_sharedkv_compressed_union_dkv_only_full",
+      "peak_memory_allocated_bytes": 1719891968,
+      "peak_memory_allocated_gib": 1.6017742156982422,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.608945947140455,
+        "mean_ms": 7.608945947140455,
+        "median_ms": 7.608945947140455,
+        "min_ms": 7.608945947140455,
+        "samples_ms": [
+          7.608945947140455
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "full_dq_no_dkv": {
+      "checksum_norm": 541.3256225585938,
+      "event": {
+        "enabled": true,
+        "max_ms": 4.7142438888549805,
+        "mean_ms": 4.7142438888549805,
+        "median_ms": 4.7142438888549805,
+        "min_ms": 4.7142438888549805,
+        "samples_ms": [
+          4.7142438888549805
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "full_sharedkv_selected_dq_no_dkv",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.782635951414704,
+        "mean_ms": 4.782635951414704,
+        "median_ms": 4.782635951414704,
+        "min_ms": 4.782635951414704,
+        "samples_ms": [
+          4.782635951414704
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "full_split_boundary": {
+      "checksum_norm": 1288.9986572265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 13.753687858581543,
+        "mean_ms": 13.753687858581543,
+        "median_ms": 13.753687858581543,
+        "min_ms": 13.753687858581543,
+        "samples_ms": [
+          13.753687858581543
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+      "peak_memory_allocated_bytes": 2804117504,
+      "peak_memory_allocated_gib": 2.6115379333496094,
+      "wall": {
+        "enabled": true,
+        "max_ms": 13.778188964352012,
+        "mean_ms": 13.778188964352012,
+        "median_ms": 13.778188964352012,
+        "min_ms": 13.778188964352012,
+        "samples_ms": [
+          13.778188964352012
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "local_dkv_only_full": {
+      "checksum_norm": 586.8958740234375,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.1435399055480957,
+        "mean_ms": 2.1435399055480957,
+        "median_ms": 2.1435399055480957,
+        "min_ms": 2.1435399055480957,
+        "samples_ms": [
+          2.1435399055480957
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "full_sharedkv_local_window_dkv_only_full",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.1718740463256836,
+        "mean_ms": 2.1718740463256836,
+        "median_ms": 2.1718740463256836,
+        "min_ms": 2.1718740463256836,
+        "samples_ms": [
+          2.1718740463256836
+        ],
+        "stdev_ms": 0.0
+      }
+    }
+  },
+  "union_route_stats": {
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "max_members_per_group": 4,
+    "members_per_group_hist": {
+      "1": 48504,
+      "2": 107203,
+      "3": 130890,
+      "4": 229193
+    },
+    "nonempty_union_memberships": 515790,
+    "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness.",
+    "workspace_bytes": 31883264,
+    "workspace_mib": 30.40625
+  }
+}

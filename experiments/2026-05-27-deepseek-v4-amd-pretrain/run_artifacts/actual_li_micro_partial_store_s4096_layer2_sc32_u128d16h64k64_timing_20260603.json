@@ -1,0 +1,205 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "active_blocks": 8,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64,
+    "block_u": 128,
+    "micro_active_shape": [
+      1,
+      128,
+      8,
+      908
+    ],
+    "num_warps": 8,
+    "selected_tiles": 8,
+    "seq_chunk": 32,
+    "seq_tiles": 128
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": null,
+    "dkv_atol": 0.1,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "micro_density": {
+    "max_active": 908,
+    "micro_rows": 458649,
+    "micro_rows_per_microtile": {
+      "count": 1024,
+      "max": 908.0,
+      "mean": 447.8994140625,
+      "p50": 506.5,
+      "p90": 830.0,
+      "p99": 887.5400390625
+    },
+    "micro_rows_per_nonempty_microtile": {
+      "count": 800,
+      "max": 908.0,
+      "mean": 573.311279296875,
+      "p50": 605.5,
+      "p90": 841.0999755859375,
+      "p99": 892.02001953125
+    },
+    "microtiles": 1024,
+    "nonempty_microtiles": 800
+  },
+  "modeled_write_reduction": {
+    "micro_partial_elements": 234828288,
+    "micro_partial_stream_mib_fp32": 895.798828125,
+    "raw_selected_dkv_elements": 805044224,
+    "raw_stream_mib_fp32": 3071.0,
+    "raw_to_micro_reduction_x": 3.428225069715621,
+    "read": "This is only the first level of reduction. The remaining micro-to-selected-tile merge and final compressed-group reduce must be timed separately."
+  },
+  "read": "Diagnostic K-microtile query-major dKV producer. It stores compact micro partial rows keyed by active compressed group instead of direct dKV atomics. It still consumes materialized probs/grad_logits; production must fuse score/prob/grad-logit recompute.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_micro_partial_dkv_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "ok",
+  "timing": {
+    "micro_partial_emit_only": {
+      "checksum_norm": 957.8017578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 107.01763916015625,
+        "mean_ms": 106.69821421305339,
+        "median_ms": 106.8537368774414,
+        "min_ms": 106.2232666015625,
+        "samples_ms": [
+          107.01763916015625,
+          106.8537368774414,
+          106.2232666015625
+        ],
+        "stdev_ms": 0.41940125752727175
+      },
+      "label": "micro_partial_emit_only",
+      "peak_memory_allocated_bytes": 3690012160,
+      "peak_memory_allocated_gib": 3.436591625213623,
+      "wall": {
+        "enabled": true,
+        "max_ms": 107.14512504637241,
+        "mean_ms": 106.81817339112361,
+        "median_ms": 106.98868404142559,
+        "min_ms": 106.32071108557284,
+        "samples_ms": [
+          107.14512504637241,
+          106.98868404142559,
+          106.32071108557284
+        ],
+        "stdev_ms": 0.43785843156220255
+      }
+    }
+  },
+  "workspace": {
+    "flat_groups_bytes": 3669192,
+    "grad_logits_bytes": 536870912,
+    "micro_active_counts_bytes": 4096,
+    "micro_active_groups_bytes": 3719168,
+    "micro_offsets_bytes": 8192,
+    "probs_bytes": 536870912,
+    "safe_groups_bytes": 16777216,
+    "valid_bytes": 2097152
+  }
+}

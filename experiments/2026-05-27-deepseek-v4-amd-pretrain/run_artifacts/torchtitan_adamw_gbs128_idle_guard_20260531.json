@@ -1,0 +1,102 @@
+{
+  "artifact": "torchtitan_adamw_gbs128_idle_guard_20260531",
+  "created": "2026-05-31",
+  "last_checked": "2026-05-31T16:27:19Z",
+  "status": "blocked_by_active_gpu_processes",
+  "scope": "Attempt gate for the next checkpoint-free AdamW GBS128 8xMI350 perf smoke.",
+  "node": {
+    "host": "do-sonle5-mi350-gpu",
+    "hostname": "son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1",
+    "gpu_count": 8,
+    "gpu": "AMD Instinct MI350X VF",
+    "gfx": "gfx950",
+    "df_local_data": {
+      "filesystem": "/dev/vda1",
+      "size": "2.0T",
+      "used": "1.6T",
+      "available": "345G",
+      "use_percent": 83,
+      "mount": "/"
+    }
+  },
+  "guard": {
+    "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+    "exit_code": 1,
+    "read": "The canonical launcher refused to start because active KFD processes were found. No training was launched and no process was killed."
+  },
+  "latest_check": {
+    "timestamp_utc": "2026-05-31T16:27:19Z",
+    "exit_code": 1,
+    "active_gpu_processes": [
+      {
+        "pid": 3336400,
+        "process": "python",
+        "gpu": 1,
+        "vram_used_bytes": 167383355392
+      },
+      {
+        "pid": 3336399,
+        "process": "python",
+        "gpu": 1,
+        "vram_used_bytes": 167383355392
+      },
+      {
+        "pid": 3335962,
+        "process": "pt_elastic",
+        "gpu": 0,
+        "vram_used_bytes": 0
+      }
+    ],
+    "read": "The same Primus/TorchTitan-style workload is still occupying the 8xMI350 node, so a fresh canary was not launched."
+  },
+  "active_processes": [
+    {
+      "pid": 3335962,
+      "process": "pt_elastic",
+      "gpu": 0,
+      "vram_used_bytes": 0,
+      "cmd": "/opt/venv/bin/python /opt/venv/bin/torchrun --nproc_per_node 2 --nnodes 1 --node_rank 0 --master_addr 10.130.0.2 --master_port 29551 --local-ranks-filter 0 primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    },
+    {
+      "pid": 3336399,
+      "process": "python",
+      "gpu": 1,
+      "vram_used_bytes": 167383355392,
+      "cmd": "/opt/venv/bin/python -u primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    },
+    {
+      "pid": 3336400,
+      "process": "python",
+      "gpu": 1,
+      "vram_used_bytes": 167383355392,
+      "cmd": "/opt/venv/bin/python -u primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    }
+  ],
+  "active_containers": [
+    {
+      "id": "173afde932e2",
+      "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+      "status": "Up",
+      "name": "awesome_thompson",
+      "read": "Observed by docker ps during preflight; started shortly before the check."
+    },
+    {
+      "id": "20908a91edca",
+      "image": "rocm/primus:v26.2",
+      "status": "Up 3 days",
+      "name": "dev_primus_longnguyen37"
+    },
+    {
+      "id": "4e75b03633a0",
+      "image": "rocm/primus:v26.2",
+      "status": "Up 4 days",
+      "name": "dev_primus_tanth"
+    }
+  ],
+  "decision": {
+    "run_started": false,
+    "reason": "Do not co-schedule the 8xMI350 AdamW perf smoke over another active TorchTitan/Primus workload.",
+    "next": "Retry the same launcher when check-idle passes, or intentionally set CANARY_REQUIRE_IDLE_GPUS=false only if co-scheduling is desired."
+  },
+  "dependency_pin_changes": []
+}

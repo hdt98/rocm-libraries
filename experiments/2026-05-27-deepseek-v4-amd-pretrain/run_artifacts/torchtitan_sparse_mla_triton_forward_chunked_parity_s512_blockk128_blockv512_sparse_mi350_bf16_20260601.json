@@ -1,0 +1,53 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 128,
+  "candidate_estimated_selected_state_elements": 8589934592,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": 0.00720171257853508,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 256,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": 1.4901161193847656e-08,
+  "max_output_abs_diff": 0.00390625,
+  "max_param_grad_abs_diff": 4.76837158203125e-07,
+  "nonfinite_diffs": [],
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 1.3998942449688911e-08,
+    "indexer.wk.weight": 1.7229467630386353e-08,
+    "indexer.wq.weight": 7.334165275096893e-09,
+    "kv_norm.weight": 4.76837158203125e-07,
+    "q_norm.weight": 1.4901161193847656e-08,
+    "wkv_a.weight": 4.76837158203125e-07,
+    "wkv_b.weight": 5.960464477539063e-08,
+    "wo.weight": 5.960464477539063e-08,
+    "wq_a.weight": 1.4901161193847656e-08,
+    "wq_b.weight": 1.4901161193847656e-08
+  },
+  "reference_compressed_groups": 128,
+  "reference_estimated_selected_state_elements": 8589934592,
+  "reference_kernel_module": null,
+  "reference_loss": 0.007201707921922207,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 256,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 512,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": false
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

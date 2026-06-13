@@ -1,0 +1,65 @@
+{
+  "artifact": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_normal_gbs64_li_aux_train_step_full_activation_checkpointing",
+  "purpose": "Record the first normal-GA TorchTitan DeepSeek-V4-style train-step smoke that keeps the opt-in MORI dispatch + AITER fused_moe + MORI combine bridge enabled, re-enables the default LightningIndexer auxiliary loss, and applies full activation checkpointing.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": {
+    "tag": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "base_tag": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "base_id": "sha256:48c8b82bb0c23c9c1833480a3a6c7717763220f97ce56e8d427d3f81806075a2",
+    "overlay_id": "sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012"
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000/docker-run.log",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000"
+  },
+  "shape": {
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "seq_len": 128,
+    "micro_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "steps": 1,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "full"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_DSA_INDEXER_LOSS_COEFF": "default_0.001",
+    "CANARY_DEDICATED_EP_PG": "true",
+    "CANARY_REQUIRE_IDLE_GPUS": "true",
+    "MASTER_PORT": "29567"
+  },
+  "result": {
+    "status": "pass",
+    "loss_step_1": 12.25618,
+    "grad_norm_step_1": 9.5,
+    "memory_gib_step_1": 132.27,
+    "tps_logged": 5,
+    "tflops_logged": 0.07,
+    "step_end_ms_rank0": 382258.6970719276,
+    "step_end_ms_rank_min": 382256.5367469797,
+    "step_end_ms_rank_max": 382283.0129999202,
+    "training_completed": true,
+    "process_groups_destroyed": true,
+    "checkpoint_dir_present": false
+  },
+  "structured_logs": [
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000/structured_logs/training.global_rank_0.20260601-173603-17O49O.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000/structured_logs/training.global_rank_1.20260601-173603-TRAR80.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000/structured_logs/training.global_rank_2.20260601-173603-NVLG2B.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602T000000/structured_logs/training.global_rank_3.20260601-173603-88E7R2.jsonl"
+  ],
+  "timing_read": "Not performance evidence: first-run container timing includes MORI/AITER JIT build, the attention backward is still the manual PyTorch sparse-MLA bridge, and the MORI+AITER MoE backward is still reference recompute.",
+  "limitations": [
+    "This proves full activation checkpoint replay can pass through the current MORI+AITER bridge at the normal GBS64 accumulation shape with LI aux enabled.",
+    "It does not prove throughput: tps is dominated by JIT and reference backward.",
+    "The next training-system gate is checkpoint save/resume on this bridge; the next performance gate remains fused sparse MLA/LI and fused MoE backward."
+  ]
+}

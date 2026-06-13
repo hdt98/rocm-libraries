@@ -1,0 +1,65 @@
+{
+  "contract_comparison": {
+    "direct_sglang_forward_kernel_reuse_possible": false,
+    "direct_sglang_training_kernel_reuse_possible": false,
+    "kv_shared_across_heads": false,
+    "reason": "SGLang can use tl.dot over BLOCK_H x BLOCK_N because selected K/V are head-shared. TorchTitan currently has per-head selected K/V, so a literal BLOCK_H dot would compute cross-head scores unless the ABI changes or the schedule is reimplemented for per-head K/V. Training also needs backward scatter-add into q/k/v/compressed_k/compressed_v, which the inference kernel does not provide.",
+    "requires_training_backward": true,
+    "sglang_selected_kv_layout": "[tokens, topk, dim], effectively shared across query heads",
+    "torchtitan_training_layout": "[batch, seq, heads, dim] plus [batch, groups, heads, dim]",
+    "training_adapter_or_reimplementation_required": true
+  },
+  "memory_estimates": {
+    "manual_stream_saved_output_plus_row_stats_gib": 0.251953125,
+    "materialized_head_shared_selected_k_gib": 2.5,
+    "materialized_head_shared_selected_kv_gib": 5.0,
+    "materialized_per_head_selected_k_gib": 160.0,
+    "materialized_per_head_selected_kv_gib": 320.0,
+    "note": "The final training backend must not save or globally materialize the per-head selected K/V state at S=4096. Temporary per-tile register/shared-memory staging is fine; full selected-state packing is not."
+  },
+  "mfma_reuse_estimate": {
+    "cross_head_score_waste_factor_if_per_head_kv_uses_plain_sglang_dot": 64,
+    "hypothetical_block_h": 64,
+    "read": "For per-head K/V, an SGLang-style Q[BLOCK_H,D] x K[BLOCK_H*BLOCK_N,D]^T dot computes BLOCK_H times more score entries than needed for that head tile. This is why the useful reuse is the schedule pattern, not the literal inference ABI."
+  },
+  "recommended_bridge": [
+    {
+      "action": "Port the SGLang online-softmax/MFMA schedule ideas, but keep TorchTitan's training ABI and per-head selected K/V semantics.",
+      "step": "forward_schedule"
+    },
+    {
+      "action": "Keep manual_stream-style saved row_max, row_sum, and output; do not save selected K/V or probabilities.",
+      "step": "state_contract"
+    },
+    {
+      "action": "Add a matching backward recompute kernel that emits dQ plus selected dK/dV and scatter-adds into local and compressed states.",
+      "step": "backward"
+    },
+    {
+      "action": "A temporary packed/head-shared SGLang-style forward probe is useful only if it is clearly labeled non-production and not used for S4096 training promotion.",
+      "step": "optional_forward_only_probe"
+    }
+  ],
+  "scope": "sglang_sparse_mla_forward_reuse_for_torchtitan_training",
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dtype": "bf16",
+    "dtype_bytes": 2,
+    "head_dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "selected_keys": 640,
+    "seq_len": 4096,
+    "value_dim": 512
+  },
+  "source_kernels": {
+    "sglang_forward_entry": "sources/wip/sglang/python/sglang/srt/layers/attention/debug_flash_mla_adapter.py::flash_mla_with_kvcache_entrypoint",
+    "sglang_triton_forward": "sglang.srt.layers.attention.nsa.triton_decode.triton_fp8_attention_fwd",
+    "sglang_triton_schedule": "sources/wip/sglang/python/sglang/srt/layers/attention/nsa/triton_decode/triton_mla_kernels_decode_common.py::_unified_sparse_decode_kernel",
+    "torchtitan_training_backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_triton_forward_backend.py"
+  },
+  "status": "analysis_only"
+}

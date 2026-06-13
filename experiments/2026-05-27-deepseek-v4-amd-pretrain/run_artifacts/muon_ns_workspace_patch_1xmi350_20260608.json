@@ -1,0 +1,64 @@
+{
+  "artifact": "muon_ns_workspace_patch_1xmi350_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Can a lower-temporary PyTorch Newton-Schulz polynomial workspace reduce the batched expert-Muon optimizer wall?",
+  "patch_tested": {
+    "files": [
+      "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+      "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py"
+    ],
+    "change": "Replace torch.add(gram.mul(b), gram @ gram, alpha=c) with an in-place polynomial workspace on gram @ gram, and replace (matrix / norm).to(...) with matrix.div(norm).to(...).",
+    "status": "reverted_after_negative_result"
+  },
+  "shape": {
+    "device": "1xMI350",
+    "layers": 12,
+    "expert_tensors_per_layer": 3,
+    "local_experts": 32,
+    "matrix_count": 1152,
+    "dtype": "bfloat16",
+    "chunk_matrices": 4,
+    "muon_ns_compute_dtype": "bfloat16"
+  },
+  "raw_remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/muon_ns_workspace_patch_20260608",
+  "baseline_artifacts": {
+    "ns1_chunk_sweep": "run_artifacts/muon_batched_chunk_sweep_ns1_1xmi350_20260608.json",
+    "ns5_phase_profile": "run_artifacts/muon_batched_phase_profile_1xmi350_20260608.json"
+  },
+  "results": {
+    "ns1_chunk4": {
+      "baseline_step2_gpu_ms": 212.137939453125,
+      "patched_step2_gpu_ms": 212.79039001464844,
+      "delta_ms": 0.6524505615234375,
+      "delta_pct": 0.3076,
+      "baseline_peak_allocated_gib": 54.32421922683716,
+      "patched_peak_allocated_gib": 54.32421922683716,
+      "read": "The retained-relevant NS1 path is slightly slower and does not reduce peak memory."
+    },
+    "ns5_phase": {
+      "baseline_step_gpu_ms": 657.7771606445312,
+      "patched_step_gpu_ms": 656.6154174804688,
+      "delta_ms": -1.1617431640625,
+      "delta_pct": -0.1766,
+      "baseline_ns_total_ms": 578.5910091209225,
+      "patched_ns_total_ms": 577.0231439517811,
+      "baseline_ns_poly_update_ms": 380.98025919497013,
+      "patched_ns_poly_update_ms": 380.51231206953526,
+      "baseline_peak_allocated_gib": 54.32421922683716,
+      "patched_peak_allocated_gib": 54.32421922683716,
+      "read": "The high-NS diagnostic path improves only about 0.18%, far below an e2e promotion threshold."
+    }
+  },
+  "decision": {
+    "promote_patch": false,
+    "run_8x_e2e": false,
+    "read": "This PyTorch-level workspace reduction does not move the relevant NS1 batched expert-Muon path and gives only a tiny NS5 diagnostic improvement. Keep the existing BatchedMuonExpertParams implementation, retain AdamW plus attention-only activation checkpointing as throughput-best, and focus next on MoE/EP helper VJP, weighted combine/scatter, and sparse SharedKV backward."
+  },
+  "validation": {
+    "remote_1xmi350_ns1_probe": "completed",
+    "remote_1xmi350_ns5_phase_probe": "completed",
+    "local_py_compile_after_revert": "passed"
+  }
+}

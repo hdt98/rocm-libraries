@@ -1,0 +1,68 @@
+{
+  "artifact": "actual_li_active_list_dotk_sparse_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Actual LightningIndexer compressed-dKV diagnostic that keeps dot-K selected-key batching and replaces global per-selected atomics with sparse local active-list accumulation plus coalesced global writes.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_sparse",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "status": "rejected_at_s512_for_scalar_local_sparse_accumulation",
+  "diagnostic_contract": {
+    "uses_materialized_probs": true,
+    "uses_materialized_grad_logits": true,
+    "uses_active_group_lists": true,
+    "uses_selected_key_batched_tl_dot": true,
+    "coalesces_global_dkv_writes": true,
+    "fuses_score_prob_recompute": false,
+    "production_candidate": false
+  },
+  "read": "dot_k_sparse tests the missing middle between dense-route dot_k and sparse-atomic dot_k_atomic. It keeps selected-key batched tl.dot for contrib[K,D], avoids the dense route[active_group,K] matrix, and accumulates one row per active compressed group before global writes. It proves the coalesced write count is executable at S128/S512, but the local sparse accumulation is scalar-shaped and becomes slower than all retained alternatives by S512. Therefore the next production path cannot be simple per-selected local active-list scatter in Triton; it needs a true segmented/MFMA-friendly streaming reduction or LI/compressor fusion before dKV writes.",
+  "results": [
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_sparse_triton_dkv_s128_layer2_sc16_u32d16h64k32_20260602.json",
+      "seq_len": 128,
+      "layer_id": 2,
+      "seq_chunk": 16,
+      "block_u": 32,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 32,
+      "correctness": "passed",
+      "max_abs_diff": 0.0696563720703125,
+      "accumulator_median_ms": 0.43120500445365906,
+      "pytorch_reference_median_ms": 0.5086460113525391,
+      "dot_k_atomic_ms": 0.14688199758529663,
+      "dot_k_dense_route_ms": 0.13696199655532837,
+      "actual_atomic_element_reduction_x": 14.0,
+      "actual_atomic_elements": 73728,
+      "query_major_raw_atomic_elements": 1032192,
+      "peak_memory_gib": 0.45197439193725586
+    },
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_sparse_triton_dkv_s512_layer2_sc32_u128d16h64k64_20260602.json",
+      "seq_len": 512,
+      "layer_id": 2,
+      "seq_chunk": 32,
+      "block_u": 128,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 64,
+      "correctness": "passed",
+      "max_abs_diff": 0.0716850757598877,
+      "accumulator_median_ms": 8.226095199584961,
+      "pytorch_reference_median_ms": 1.61837899684906,
+      "dot_k_atomic_ms": 0.27184200286865234,
+      "dot_k_dense_route_ms": 0.41608500480651855,
+      "scalar_active_list_best_ms": 3.1342430114746094,
+      "actual_atomic_element_reduction_x": 30.0,
+      "actual_atomic_elements": 557056,
+      "query_major_raw_atomic_elements": 16711680,
+      "peak_memory_gib": 0.5847907066345215
+    }
+  ],
+  "decision": {
+    "status": "rejected",
+    "why": "The kernel achieves active-list coalesced writes, but local sparse accumulation costs dominate before target shape: S512 is 8.226 ms versus 0.272 ms for dot_k_atomic and 0.416 ms for dense-route dot_k.",
+    "s4096_run": "skipped because S512 is already decisively negative and the S4096 active-group count is the hard case.",
+    "next_step": "Keep selected-key MFMA batching and pursue a true segmented/MFMA-friendly streaming reduction or fuse LI/compressor gradients before global dKV writes; do not pursue scalar per-selected local active-list accumulation as the production branch."
+  }
+}

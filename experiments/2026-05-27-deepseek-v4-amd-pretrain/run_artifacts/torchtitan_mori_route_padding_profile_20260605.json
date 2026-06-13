@@ -1,0 +1,186 @@
+{
+  "artifact": "torchtitan_mori_route_padding_profile_20260605",
+  "created_at": "2026-06-05",
+  "status": "profile_completed",
+  "node": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run": {
+    "run_id": "torchtitan_dsv4_mori_route_stats_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605",
+    "result": "passed_4_steps",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_route_stats_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605/docker-run.log",
+    "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_route_stats_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605",
+    "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/timing/torchtitan_dsv4_mori_route_stats_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605/mori",
+    "shape": {
+      "gpus": 4,
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "fsdp": 4,
+      "ep": 4,
+      "micro_batch_size": 4,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 8,
+      "sequence_length": 4096,
+      "activation_checkpoint_mode": "none"
+    },
+    "env": {
+      "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+      "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+      "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+      "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+      "CANARY_MORI_AITER_XGRAD_MODE": "compact",
+      "CANARY_MORI_AITER_DTOPK_CHUNK_ROWS": 1024,
+      "CANARY_MORI_AITER_SWIGLU_CHUNK_ROWS": 8192,
+      "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+      "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+    },
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.31918,
+        "grad_norm": 9.0,
+        "tflops_per_gpu": 83.55,
+        "max_logged_memory_gib": 100.26
+      },
+      {
+        "step": 2,
+        "loss": 8.60984,
+        "grad_norm": 46.75,
+        "tflops_per_gpu": 170.71,
+        "max_logged_memory_gib": 166.85
+      },
+      {
+        "step": 3,
+        "loss": 18.92752,
+        "grad_norm": 21.625,
+        "tflops_per_gpu": 178.43,
+        "max_logged_memory_gib": 193.51
+      },
+      {
+        "step": 4,
+        "loss": 11.16598,
+        "grad_norm": 26.625,
+        "tflops_per_gpu": 143.87,
+        "max_logged_memory_gib": 229.5
+      }
+    ]
+  },
+  "route_padding_profile": {
+    "records": 512,
+    "calls_per_step_per_rank": 32,
+    "step_4_all_ranks": {
+      "recv_count_mean": 52974.1,
+      "local_vjp_assignments_mean": 98304.0,
+      "local_vjp_max_count_mean": 31324.0,
+      "local_vjp_max_count_max": 58354,
+      "local_vjp_padding_multiplier_mean": 22.03,
+      "local_vjp_padding_multiplier_max": 44.204,
+      "local_vjp_gpu_ms_mean": 160.482,
+      "local_vjp_gpu_ms_median": 143.164,
+      "combine_dx_gpu_ms_mean": 92.986,
+      "combine_dx_gpu_ms_median": 83.635
+    },
+    "step_4_by_rank": [
+      {
+        "rank": 0,
+        "recv_count_mean": 56048.7,
+        "assignments_mean": 102795.7,
+        "max_count_mean": 26229.8,
+        "max_count_max": 33151,
+        "padding_multiplier_mean": 17.323,
+        "padding_multiplier_max": 23.016,
+        "local_vjp_sum_s": 4.279,
+        "combine_dx_sum_s": 3.831
+      },
+      {
+        "rank": 1,
+        "recv_count_mean": 48504.6,
+        "assignments_mean": 77177.2,
+        "max_count_mean": 28231.8,
+        "max_count_max": 54292,
+        "padding_multiplier_mean": 25.215,
+        "padding_multiplier_max": 44.204,
+        "local_vjp_sum_s": 4.571,
+        "combine_dx_sum_s": 3.54
+      },
+      {
+        "rank": 2,
+        "recv_count_mean": 53062.7,
+        "assignments_mean": 103356.4,
+        "max_count_mean": 35144.8,
+        "max_count_max": 51211,
+        "padding_multiplier_mean": 25.925,
+        "padding_multiplier_max": 38.732,
+        "local_vjp_sum_s": 5.711,
+        "combine_dx_sum_s": 2.401
+      },
+      {
+        "rank": 3,
+        "recv_count_mean": 54280.2,
+        "assignments_mean": 109886.7,
+        "max_count_mean": 35689.8,
+        "max_count_max": 58354,
+        "padding_multiplier_mean": 19.656,
+        "padding_multiplier_max": 23.739,
+        "local_vjp_sum_s": 5.981,
+        "combine_dx_sum_s": 2.13
+      }
+    ],
+    "step_4_top_stages_ms_mean": [
+      {
+        "stage": "backward.local_vjp.padded",
+        "mean": 160.482,
+        "median": 143.164,
+        "max": 621.804
+      },
+      {
+        "stage": "backward.combine_dx.call",
+        "mean": 92.986,
+        "median": 83.635,
+        "max": 534.189
+      },
+      {
+        "stage": "local_padded_vjp.w13_forward_gemm",
+        "mean": 49.274,
+        "median": 44.926,
+        "max": 176.496
+      },
+      {
+        "stage": "local_padded_vjp.w2_forward_gemm",
+        "mean": 29.114,
+        "median": 20.981,
+        "max": 248.766
+      },
+      {
+        "stage": "local_padded_vjp.w2_dgrad_gemm",
+        "mean": 26.65,
+        "median": 24.23,
+        "max": 56.857
+      },
+      {
+        "stage": "local_padded_vjp.w2_wgrad_gemm",
+        "mean": 21.862,
+        "median": 20.083,
+        "max": 42.673
+      }
+    ],
+    "reference_uniform_owner_probe": {
+      "artifact_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/owner_vjp/owned_expert_vjp_ep4_mbs4_shape_20260605.json",
+      "assignments_to_owner_rank": 98269,
+      "max_per_local_expert": 1617,
+      "padding_multiplier_local_max": 1.0531,
+      "triton_swiglu_padded_full_vjp_ms_median": 23.437
+    }
+  },
+  "read": {
+    "memory_vs_compute_bound": "The original MBS4 no-AC failure was memory-capacity/transient-materialization bound, but the surviving late-step MORI/MoE performance wall is padded-GEMM compute inflated by route imbalance. Step 4 has the same order of true assignments as the uniform owner probe, but padding multiplier rises from 1.05x to about 22x mean and 44x max.",
+    "why_gemm_bucket_explodes": "The current padded local VJP forms tensors shaped [local_experts, max_count, hidden/intermediate]. When one or a few local experts receive tens of thousands of routes, every local expert is padded to that max_count, so W13/W2/Wgrad/Dgrad GEMMs perform huge amounts of zero-padding work and allocate huge padded slabs.",
+    "what_this_means_for_mori": "MORI dispatch/combine is not the first bottleneck. combine_dx is mostly the peer-arrival wait/return partner of imbalanced owner VJP. The next speed path should remove max-count padding for imbalanced routes, not just increase VRAM or tune MORI collectives.",
+    "next_candidate": "Add an opt-in compact/expert-loop owner VJP for high-padding cases, then benchmark e2e TFLOPs and memory against the retained padded MBS4 run."
+  },
+  "validation": [
+    "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "bash -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "4xMI350 4-step route-stats timing run passed with clean process group teardown"
+  ]
+}

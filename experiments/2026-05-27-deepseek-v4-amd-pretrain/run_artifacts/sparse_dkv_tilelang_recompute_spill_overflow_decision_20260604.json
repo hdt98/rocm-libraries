@@ -1,0 +1,56 @@
+{
+  "status": "negative_but_correctness_gap_closed",
+  "scope": "TileLang recompute P/dP pipeline with correctness-preserving actual-LI panel overflow spill",
+  "updated_at": "2026-06-04",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "change": "Allow --spill-overflow for final-dKV math modes and add the existing panel-MFMA spill kernel into the recompute_pdp_store_then_dkv_limited producer path before returning final dKV.",
+    "read": "This closes the prior caveat where split-panel topk512 recompute runs silently dropped overflow pairs."
+  },
+  "artifacts": {
+    "s512_correctness": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_spill_s512_gp64_cap32_k32d64_20260604.json",
+    "s4096_timing": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_spill_s4096_topk512_gp512_cap256_k64d64_20260604.json"
+  },
+  "results": {
+    "s512": {
+      "seq_len": 512,
+      "groups": 128,
+      "topk_workspace": 64,
+      "actual_li_topk": 128,
+      "group_panel_size": 64,
+      "selected_window": 32,
+      "overflow_pairs": 12224,
+      "median_ms": 2.2159690856933594,
+      "max_abs_diff": 0.014495491981506348,
+      "mean_abs_diff": 0.0004078699857927859,
+      "read": "Correctness passes in the same BF16 recompute band as prior P/dP recompute gates while including overflow pairs."
+    },
+    "s4096": {
+      "seq_len": 4096,
+      "groups": 1024,
+      "topk_workspace": 512,
+      "actual_li_topk": 512,
+      "group_panel_size": 512,
+      "selected_window": 256,
+      "overflow_pairs": 333843,
+      "main_panel_pairs": 1238509,
+      "main_write_reduction_x": 9.417388395063606,
+      "spill_panel_active_rows": 76512,
+      "spill_panel_write_reduction_x": 4.36327634880803,
+      "full_pipeline_plus_spill_median_ms": 19.848100662231445,
+      "spill_only_median_ms": 6.9731550216674805,
+      "spill_peak_memory_gib": 3.125814437866211
+    }
+  },
+  "comparison": {
+    "previous_split_panel_without_spill_ms": 12.868367195129395,
+    "full_no_overflow_padded_panel_ms": 16.238040924072266,
+    "current_sparse_atomic_wall_ms_range": "8.0-8.8",
+    "read": "The explicit topk512 split-panel recompute pipeline is only faster when it drops 333843 overflow pairs. Making it correctness-preserving raises it to 19.85 ms, worse than both the full no-overflow padded-panel run and the sparse-atomic wall."
+  },
+  "decision": {
+    "promote": false,
+    "reason": "Capacity-limited actual-LI panels plus a separate spill kernel are not a speed path for recompute P/dP+dKV. The spill stage is too large, and the combined path remains above target.",
+    "next": "Do not chase capacity-limited split panels unless overflow is fused into the main producer or the route is prepacked into a true sparse segmented reducer. Continue toward a smaller keyed/segmented in-producer reducer or HIP/CK/rocWMMA implementation."
+  }
+}

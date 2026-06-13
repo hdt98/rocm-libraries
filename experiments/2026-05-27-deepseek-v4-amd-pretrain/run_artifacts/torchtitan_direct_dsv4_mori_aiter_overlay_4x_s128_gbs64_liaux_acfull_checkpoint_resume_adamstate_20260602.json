@@ -1,0 +1,139 @@
+{
+  "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_checkpoint_resume_adamstate_20260602",
+  "status": "pass",
+  "purpose": "Validate full-state checkpoint save/resume for the direct TorchTitan DeepSeek-V4 MORI+AITER bridge after materializing Adam optimizer state for branch-inactive trainable parameters.",
+  "date_utc": "2026-06-01",
+  "runtime": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "base_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "compat_symlink_root": "/local/data/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "mbs": 1,
+    "gbs": 64,
+    "gradient_accumulation_steps": 16,
+    "sequence_length": 128,
+    "activation_checkpoint_mode": "full",
+    "dsa_indexer_loss_coeff": 0.001,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true
+  },
+  "code_change": {
+    "summary": "OptimizersContainer.state_dict() now materializes zero Adam/AdamW step, exp_avg, and exp_avg_sq tensors for trainable parameters that did not receive gradients before checkpoint save.",
+    "reason": "The previous full checkpoint saved model and optimizer param-group entries for DeepSeekV4Attention.attn_sink, but omitted optimizer.state entries because the current sparse/dense branch did not use that parameter. DCP restore expected the missing optimizer.state.layers.0.attention.attn_sink.step key and failed before training resumed.",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+      "sources/wip/torchtitan/tests/unit_tests/test_optimizer_param_groups.py"
+    ]
+  },
+  "pre_patch_failure": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptresume_20260602T000000",
+    "failure": "RuntimeError: Missing key in checkpoint state_dict: optimizer.state.layers.0.attention.attn_sink.step.",
+    "diagnosis": "Checkpoint metadata had layers.*.attention.attn_sink model keys and optimizer.param_groups.*attn_sink entries, but no optimizer.state.*attn_sink entries."
+  },
+  "save_run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptsave_adamstate_20260602T000000",
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=64 CANARY_CHECKPOINT_ENABLE=true CANARY_CHECKPOINT_INTERVAL=1 CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "result": {
+      "loss": 12.17019,
+      "grad_norm": 9.625,
+      "memory_gib": 132.27,
+      "checkpoint_save_ms_rank0": 58230.69,
+      "step_end_ms_rank0": 456830.36,
+      "process_group_destroyed": true
+    },
+    "checkpoint": {
+      "path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptsave_adamstate_20260602T000000/checkpoint/step-1",
+      "size": "156G",
+      "files": [
+        ".metadata",
+        "__0_0.distcp",
+        "__1_0.distcp",
+        "__2_0.distcp",
+        "__3_0.distcp"
+      ],
+      "metadata_checks": [
+        "optimizer.state.layers.0.attention.attn_sink.step present",
+        "optimizer.state.layers.0.attention.attn_sink.exp_avg present",
+        "optimizer.state.layers.0.attention.attn_sink.exp_avg_sq present",
+        "optimizer.state.layers.2.attention.indexer.wq.weight.step present",
+        "optimizer.state.layers.2.attention.indexer.wk.weight.step present",
+        "optimizer.state.layers.2.attention.indexer.weights_proj.weight.step present"
+      ]
+    }
+  },
+  "resume_run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptresume_adamstate_20260602T000000",
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_STEPS=2 CANARY_MBS=1 CANARY_GBS=64 CANARY_CHECKPOINT_ENABLE=true CANARY_CHECKPOINT_INTERVAL=1 CANARY_RESUME_CHECKPOINT_PATH=/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptsave_adamstate_20260602T000000/checkpoint/step-1 CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "load": {
+      "loaded_checkpoint": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptsave_adamstate_20260602T000000/checkpoint/step-1",
+      "load_seconds_by_rank": [
+        16.67,
+        16.68,
+        16.72,
+        16.72
+      ],
+      "started_at_step": 2
+    },
+    "result": {
+      "loss": 11.86221,
+      "grad_norm": 19.375,
+      "memory_gib": 156.52,
+      "checkpoint_save_ms_rank0": 68349.12,
+      "step_end_ms_rank0": 403470.02,
+      "process_group_destroyed": true
+    },
+    "checkpoint": {
+      "path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_ckptresume_adamstate_20260602T000000/checkpoint/step-2",
+      "size": "156G",
+      "files": [
+        ".metadata",
+        "__0_0.distcp",
+        "__1_0.distcp",
+        "__2_0.distcp",
+        "__3_0.distcp"
+      ],
+      "metadata_checks": [
+        "optimizer.state.layers.0.attention.attn_sink.step present",
+        "optimizer.state.layers.0.attention.attn_sink.exp_avg present",
+        "optimizer.state.layers.0.attention.attn_sink.exp_avg_sq present"
+      ]
+    }
+  },
+  "validation": [
+    {
+      "command": "python3 -m py_compile sources/wip/torchtitan/torchtitan/components/optimizer.py sources/wip/torchtitan/tests/unit_tests/test_optimizer_param_groups.py",
+      "status": "pass"
+    },
+    {
+      "command": "python3 -m unittest tests.unit_tests.test_optimizer_param_groups.TestDCPWithParamGroups.test_unused_trainable_param_gets_checkpointable_adam_state",
+      "runtime": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "status": "pass"
+    },
+    {
+      "command": "python3 -m unittest tests.unit_tests.test_optimizer_param_groups",
+      "runtime": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "status": "pass",
+      "tests": 16
+    }
+  ],
+  "caveats": [
+    "This is a short-sequence integration checkpoint/resume gate, not final performance evidence.",
+    "MORI/AITER kernels rebuild inside each disposable container because the JIT cache is not mounted or baked into the overlay image yet.",
+    "Backward still uses the slow reference recompute path for the MORI+AITER bridge."
+  ],
+  "next_actions": [
+    "Mount or bake persistent MORI/AITER JIT caches for faster iteration.",
+    "Replace reference MoE backward with fused training backward and MORI-native backward routing.",
+    "Repeat checkpoint-free throughput on the final sparse-MLA plus MORI-overlap path."
+  ]
+}

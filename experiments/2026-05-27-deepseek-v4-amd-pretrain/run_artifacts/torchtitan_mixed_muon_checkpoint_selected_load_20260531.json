@@ -1,0 +1,69 @@
+{
+  "status": "passed_selected_cpu_load_restore_pending",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+  "tool": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/inspect_dcp_checkpoint.py",
+  "remote_tool": "/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/inspect_dcp_checkpoint.py",
+  "command": "ssh do-sonle5-mi350-gpu \"docker run --rm --network=none --volume /local/data/sonle5/dsv4_pretrain_canary_20260527:/data rocm/primus:v26.2 python3 /data/tools/inspect_dcp_checkpoint.py /data/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1\"",
+  "metadata": {
+    "type": "torch.distributed.checkpoint.metadata.Metadata",
+    "key_count": 912,
+    "optimizer_key_count": 519,
+    "non_optimizer_key_count": 393,
+    "optimizer_prefix_counts": {
+      "optimizer_0": 210,
+      "optimizer_1": 309
+    },
+    "optimizer_state_suffix_counts": {
+      "exp_avg": 57,
+      "exp_avg_sq": 57,
+      "momentum_buffer": 293,
+      "step": 57,
+      "lr": 5,
+      "weight_decay": 5,
+      "eps": 5,
+      "momentum": 2,
+      "nesterov": 2,
+      "ns_steps": 2
+    }
+  },
+  "selected_scalar_load": {
+    "train_state": {
+      "step": 1
+    },
+    "optimizer": {
+      "optimizer_0": {
+        "role": "AdamW",
+        "param_group_0": {
+          "lr": 0.00022,
+          "weight_decay": 0.1,
+          "eps": 1e-08
+        }
+      },
+      "optimizer_1": {
+        "role": "Muon",
+        "param_group_0": {
+          "lr": 0.00022,
+          "weight_decay": 0.1,
+          "momentum": 0.95,
+          "nesterov": true,
+          "ns_steps": 5,
+          "eps": 1e-07
+        }
+      }
+    }
+  },
+  "interpretation": [
+    "The checkpoint can be opened through torch.distributed.checkpoint from a CPU-only Primus container.",
+    "DCP selected load restores train_state.step from the checkpoint as 1.",
+    "DCP selected load restores AdamW and Muon param-group scalars from native inner optimizer keys.",
+    "The real training proof still requires an idle-node load_step=1 resume through step 2."
+  ],
+  "caveats": [
+    "This selected load intentionally avoids loading large model tensors or optimizer momentum tensors.",
+    "This is stronger than metadata presence but still not a full distributed optimizer restore."
+  ]
+}

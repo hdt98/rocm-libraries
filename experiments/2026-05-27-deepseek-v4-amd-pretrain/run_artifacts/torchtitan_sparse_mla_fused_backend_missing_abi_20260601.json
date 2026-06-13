@@ -1,0 +1,16 @@
+{
+  "batch": 1,
+  "device": "cpu",
+  "dtype": "float32",
+  "error": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=fused requires TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE to name an importable backend module exposing sparse_mla(...).",
+  "error_type": "RuntimeError",
+  "expect_missing": true,
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "module": null,
+  "required_abi": "sparse_mla(q, k, v, compressed_k, compressed_v, local_indices, csa_indices, invalid, scale) -> Tensor with autograd support",
+  "required_env": "TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE",
+  "required_symbol": "sparse_mla",
+  "seq_len": 16,
+  "status": "passed_missing_backend_failfast"
+}

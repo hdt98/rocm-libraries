@@ -1,0 +1,59 @@
+{
+  "schema": "dsv4_swap_optimizer_preflight.v1",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "device": "AMD Instinct MI350X VF",
+  "tool": "tools/dsv4_optimizer_preflight/benchmark_swap_optimizer.py",
+  "purpose": "Isolate CPU-swapped AdamW state movement and update latency before spending a full 4xMI350 canary run on optimizer swap knobs.",
+  "shape": {
+    "gpus": 1,
+    "parameter_numel": 64000000,
+    "parameter_dtype": "bfloat16",
+    "parameter_gib": 0.11920928955078125,
+    "steps": 4
+  },
+  "results": [
+    {
+      "state_dtype": "float32",
+      "pin_memory": "auto",
+      "chunk_mib": 32,
+      "cold_step_ms": 305.6040200171992,
+      "warm_median_ms": 19.471533014439046,
+      "peak_memory_gib": 0.4259185791015625,
+      "state_is_pinned": true
+    },
+    {
+      "state_dtype": "float32",
+      "pin_memory": "false",
+      "chunk_mib": 32,
+      "cold_step_ms": 294.07296795397997,
+      "warm_median_ms": 19.824719987809658,
+      "peak_memory_gib": 0.4259185791015625,
+      "state_is_pinned": false
+    },
+    {
+      "state_dtype": "param",
+      "pin_memory": "auto",
+      "chunk_mib": 16,
+      "cold_step_ms": 280.08080704603344,
+      "warm_median_ms": 10.938210063613951,
+      "peak_memory_gib": 0.4415435791015625,
+      "state_is_pinned": true
+    },
+    {
+      "state_dtype": "param",
+      "pin_memory": "false",
+      "chunk_mib": 16,
+      "cold_step_ms": 286.6608089534566,
+      "warm_median_ms": 11.400313000194728,
+      "peak_memory_gib": 0.4415435791015625,
+      "state_is_pinned": false
+    }
+  ],
+  "read": "Pinned CPU moment buffers work on MI350 and give a small warm-step win in this optimizer-only shape: FP32 states improve from 19.82 ms to 19.47 ms, and BF16/param states improve from 11.40 ms to 10.94 ms. BF16/param moments remain much faster because they move half the state bytes, but FP32 moments are the more faithful Ascend AdamW swap contract. The full MBS4 run remains Python-loop dominated because it visits many FSDP/EP parameter shards, so the next throughput rung is a fused/pipelined C++ or HIP swap-update path, not more Python knob tuning.",
+  "validation": [
+    "ROCm 1xMI350 benchmark smoke passed with pinned FP32 CPU states.",
+    "Targeted ROCm container unittest passed: 4 swap_opt_states_cpu tests."
+  ]
+}

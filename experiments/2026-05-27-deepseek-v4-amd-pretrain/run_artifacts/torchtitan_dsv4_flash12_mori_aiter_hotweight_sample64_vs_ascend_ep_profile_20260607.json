@@ -1,0 +1,170 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_hotweight_sample64_vs_ascend_ep_profile_20260607",
+  "date": "2026-06-07",
+  "status": "diagnostic_profile_evidence_not_throughput_baseline",
+  "amd_sampled_run": {
+    "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_w13_hotweight_bwd_sample64_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "shape": "8xMI350, S4096, GBS128, MBS2, GA8, FSDP8, EP8, no activation checkpointing",
+    "mode": "MORI/AITER route-mask helper execute, hot_experts=2, min_helper_rows=512, hot_split_w13=true",
+    "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_aiter_routemask_w13_hotweight_bwd_sample64_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "hot_weight_backward_timing_limit_per_rank": 64,
+    "mori_shmem_heap_size": "80G",
+    "outcome": "stopped_after_sidecar_evidence",
+    "reason_stopped": "sampled timing still made the run too intrusive for a useful two-step throughput metric; rank-0 structured logs showed repeated ~56s fwd/bwd microbatch spans",
+    "profile_files": 8,
+    "profile_records": {
+      "hot_execute_forward": 576,
+      "hot_weight_backward": 512
+    }
+  },
+  "amd_mori_aiter_hot_execute_tail_half_rankmax_ms": {
+    "notes": "Tail half over sampled forward hot-helper records; excludes first-use warmup outliers.",
+    "calls_per_rank": 36,
+    "plan": 52.118,
+    "remote_mask": 13.723,
+    "broadcast_w13": 43.098,
+    "broadcast_w2": 16.376,
+    "gather_remote": 0.85,
+    "sort_counts": 6.708,
+    "grouped_rows": 20.048,
+    "scatter_tokens": 2.408
+  },
+  "amd_mori_aiter_hot_weight_backward_tail_half_rankmax_ms": {
+    "notes": "Tail half by hot-weight label; each label has 16 sampled backward calls per rank.",
+    "w13": {
+      "payload_mib": 64.0,
+      "all_reduce_grad_hot_weight": 33.186,
+      "scatter_owner_grad": 2.563,
+      "median_all_reduce_call_ms": 1.221,
+      "p95_all_reduce_call_ms": 3.0396,
+      "max_all_reduce_call_ms": 8.1337
+    },
+    "w2": {
+      "payload_mib": 32.0,
+      "all_reduce_grad_hot_weight": 11.676,
+      "scatter_owner_grad": 1.268,
+      "median_all_reduce_call_ms": 0.2494,
+      "p95_all_reduce_call_ms": 2.5525,
+      "max_all_reduce_call_ms": 2.9971
+    }
+  },
+  "amd_mori_aiter_hot_execute_sample_meta": {
+    "sampled_records": 576,
+    "remote_rows_local_mean": 1959.653,
+    "remote_rows_local_median": 2067.0,
+    "remote_rows_local_p95": 2967.35,
+    "remote_rows_local_max": 3598,
+    "selected_rows_total_mean": 17933.778,
+    "selected_rows_total_median": 17810.0,
+    "modeled_load_reduction_pct_mean": 10.4002,
+    "modeled_load_reduction_pct_median": 10.4844,
+    "owner_load_before_max_over_mean_mean": 1.35079,
+    "exec_load_after_max_over_mean_mean": 1.20275
+  },
+  "amd_standard_ep_hot_weight_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hotweight_reduce_profile_8x_s4096_gbs128_mbs4_steps2_20260607.json",
+    "shape": "8xMI350, S4096, GBS128, MBS4, GA4, FSDP8, EP8, standard EP, helper execute top-8",
+    "step2_tokens_per_gpu_s": 7684,
+    "step2_tflops_per_gpu": 389.07,
+    "rankmax_over_two_steps_ms": {
+      "forward_hot_weight_all_reduce": 284.93,
+      "backward_grad_hot_weight_all_reduce": 462.53,
+      "copy_owner_rows": 3.74,
+      "scatter_owner_grad": 4.67
+    },
+    "read": "The approximately 231 ms/step backward hot-weight number is the helper partial dW all-reduce itself. The approximately 4.7 ms number is the owner-side scatter over two steps, not the rest of the hot-helper path."
+  },
+  "ascend_profile_summary_rankmax_s": {
+    "source": "Remote CSV summaries under /data2/sonle/dsv4_ascend910_fit_20260601/profiles on ascend-910-dev.",
+    "8layer_target_truecompile_gbs128": {
+      "op": {
+        "MatMulV3": 17.026,
+        "allgatherAicpuKernel": 13.025,
+        "SparseAttnSharedkvGrad": 9.023,
+        "ApplyAdamWV2": 8.956,
+        "GroupedMatmul": 8.274,
+        "reduce_scatterAicpuKernel": 6.001
+      },
+      "comm": {
+        "hcom_alltoallv_": 13.164,
+        "hcom_allGather_": 8.074,
+        "hcom_reduceScatter_": 7.985,
+        "hcom_allReduce_": 1.949
+      }
+    },
+    "8layer_forcebalance_truecompile_gbs128": {
+      "op": {
+        "MatMulV3": 17.92,
+        "allgatherAicpuKernel": 13.104,
+        "ApplyAdamWV2": 9.794,
+        "SparseAttnSharedkvGrad": 9.519,
+        "GroupedMatmul": 8.23,
+        "reduce_scatterAicpuKernel": 5.992
+      },
+      "comm": {
+        "hcom_reduceScatter_": 8.513,
+        "hcom_allGather_": 7.925,
+        "hcom_alltoallv_": 5.784,
+        "hcom_allReduce_": 4.697
+      }
+    },
+    "12layer_nomtp_target_truecompile_gbs128": {
+      "op": {
+        "MatMulV3": 21.065,
+        "SparseAttnSharedkvGrad": 16.624,
+        "GroupedMatmul": 13.703,
+        "ApplyAdamWV2": 13.421,
+        "reduce_scatterAicpuKernel": 12.551,
+        "allgatherAicpuKernel": 10.162
+      },
+      "comm": {
+        "hcom_alltoallv_": 24.168,
+        "hcom_reduceScatter_": 14.101,
+        "hcom_allGather_": 12.346,
+        "hcom_allReduce_": 9.042
+      }
+    },
+    "12layer_normal_lowbatch_truecompile_gbs16": {
+      "op": {
+        "alltoallvAicpuKernel": 53.019,
+        "ApplyAdamWV2": 9.756,
+        "allgatherAicpuKernel": 7.064,
+        "reduce_scatterAicpuKernel": 6.235,
+        "MatMulV3": 1.453,
+        "SparseAttnSharedkvGrad": 1.059,
+        "GroupedMatmul": 0.952
+      },
+      "comm": {
+        "hcom_alltoallv_": 59.363,
+        "hcom_allGather_": 20.752,
+        "hcom_reduceScatter_": 19.295,
+        "hcom_allReduce_": 3.205
+      }
+    },
+    "12layer_forcebalance_lowbatch_truecompile_gbs16": {
+      "op": {
+        "ApplyAdamWV2": 13.986,
+        "reduce_scatterAicpuKernel": 6.109,
+        "allgatherAicpuKernel": 2.709,
+        "MatMulV3": 2.27,
+        "SparseAttnSharedkvGrad": 1.72,
+        "GroupedMatmul": 1.324
+      },
+      "comm": {
+        "hcom_reduceScatter_": 30.379,
+        "hcom_alltoallv_": 23.731,
+        "hcom_allGather_": 12.262,
+        "hcom_allReduce_": 5.049
+      }
+    }
+  },
+  "read": {
+    "mori_hot_weight_reduction": "Helper partial dW reduction is implemented. On the MORI/AITER sampled W13 path, tail-half hot-weight all-reduce is about 33.2 ms for 16 W13 calls and 11.7 ms for 16 W2 calls per rank; owner scatter is about 2.6 ms and 1.3 ms respectively. The larger remaining MORI/AITER wall is not missing partial reduction, but repeated hot-helper plan/mask/broadcast/sort plus unfused owner local VJP and combine waiting.",
+    "ascend_moe_ep": "Ascend target-batch profiles still show EP alltoallv as a leading communication bucket. Debug force-balance materially reduces alltoallv in the matching 8-layer target-batch profile and in the 12-layer low-batch true-compile profile, but it is not valid learned routing. Its remaining leading buckets shift toward FSDP reduce-scatter, all-gather, AdamW, MatMulV3, SparseAttnSharedkvGrad, and GroupedMatmul.",
+    "sdpa": "PyTorch SDPA means PyTorch scaled_dot_product_attention dispatching to PyTorch ROCm kernels. For the active dense MLA D512 contract, measured PyTorch SDPA fwd+bwd remains faster than the available AITER path; AITER helps D128 controls but not D512, and AITER CK rejects head_dim >256.",
+    "hipkittens": "Current HipKittens evidence means the D512 row-term/recompute producer is already slower than the Triton C4 source-boundary gate before production dQ, dOriKV, route-aware dCmpKV, or dSinks are added. HipKittens remains useful as a schedule/template, but the current branch has not beaten Triton on the replay/recompute part of the full D512 boundary."
+  }
+}

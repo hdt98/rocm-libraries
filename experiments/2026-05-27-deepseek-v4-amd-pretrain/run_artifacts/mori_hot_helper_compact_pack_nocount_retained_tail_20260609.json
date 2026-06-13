@@ -1,0 +1,314 @@
+{
+  "cases": [
+    {
+      "checksums": {
+        "mori_compact_pack_nocount": -1.988981008529663,
+        "mori_compact_pack_prealloc": 69633.01101899147,
+        "mori_pack_alloc": 69633.58565211296,
+        "mori_pack_prealloc": 69635.9445566982,
+        "torch_presorted_materialize": 69632.6035861969,
+        "torch_sort_materialize": 69632.6035861969
+      },
+      "counts_match": true,
+      "expected_counts": [
+        15905,
+        11250,
+        9144,
+        7974,
+        7235,
+        6500,
+        6027,
+        5600
+      ],
+      "hidden_dim": 4096,
+      "max_rows_per_slot": 15905,
+      "num_hot_slots": 8,
+      "observed_mori_compact_counts": [
+        15905,
+        11250,
+        9144,
+        7974,
+        7235,
+        6500,
+        6027,
+        5600
+      ],
+      "observed_mori_counts": [
+        15905,
+        11250,
+        9144,
+        7974,
+        7235,
+        6500,
+        6027,
+        5600
+      ],
+      "pack_block_num": 512,
+      "pack_warp_per_block": 4,
+      "route_rows": 69635,
+      "score_before_experts": false,
+      "slot_skew": 0.5,
+      "timings": {
+        "mori_compact_pack_nocount": {
+          "iters": 10.0,
+          "max_ms": 0.2454420030117035,
+          "median_ms": 0.23512199521064758,
+          "min_ms": 0.2311609983444214,
+          "p10_ms": 0.23368200659751892,
+          "p90_ms": 0.24016200006008148
+        },
+        "mori_compact_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 0.8764479756355286,
+          "median_ms": 0.873088002204895,
+          "min_ms": 0.8713269829750061,
+          "p10_ms": 0.8716080188751221,
+          "p90_ms": 0.8739269971847534
+        },
+        "mori_pack_alloc": {
+          "iters": 10.0,
+          "max_ms": 0.9830880165100098,
+          "median_ms": 0.8784469962120056,
+          "min_ms": 0.8765280246734619,
+          "p10_ms": 0.8779670000076294,
+          "p90_ms": 0.8818070292472839
+        },
+        "mori_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 0.8818879723548889,
+          "median_ms": 0.8743680119514465,
+          "min_ms": 0.8738080263137817,
+          "p10_ms": 0.8738080263137817,
+          "p90_ms": 0.8816080093383789
+        },
+        "torch_presorted_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.25612199306488037,
+          "median_ms": 0.25240200757980347,
+          "min_ms": 0.250122994184494,
+          "p10_ms": 0.25032299757003784,
+          "p90_ms": 0.25532200932502747
+        },
+        "torch_sort_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.46708399057388306,
+          "median_ms": 0.4541639983654022,
+          "min_ms": 0.4451639950275421,
+          "p10_ms": 0.4459240138530731,
+          "p90_ms": 0.4634439945220947
+        }
+      },
+      "tokens": 24576,
+      "topk": 8
+    },
+    {
+      "checksums": {
+        "mori_compact_pack_nocount": 0.22202172875404358,
+        "mori_compact_pack_prealloc": 128284.22202172875,
+        "mori_pack_alloc": 128285.52728065848,
+        "mori_pack_prealloc": 128283.34875655174,
+        "torch_presorted_materialize": 128285.19266474247,
+        "torch_sort_materialize": 128285.19266474247
+      },
+      "counts_match": true,
+      "expected_counts": [
+        29245,
+        20822,
+        16804,
+        14509,
+        13171,
+        12115,
+        11143,
+        10475
+      ],
+      "hidden_dim": 4096,
+      "max_rows_per_slot": 29245,
+      "num_hot_slots": 8,
+      "observed_mori_compact_counts": [
+        29245,
+        20822,
+        16804,
+        14509,
+        13171,
+        12115,
+        11143,
+        10475
+      ],
+      "observed_mori_counts": [
+        29245,
+        20822,
+        16804,
+        14509,
+        13171,
+        12115,
+        11143,
+        10475
+      ],
+      "pack_block_num": 512,
+      "pack_warp_per_block": 4,
+      "route_rows": 128284,
+      "score_before_experts": false,
+      "slot_skew": 0.5,
+      "timings": {
+        "mori_compact_pack_nocount": {
+          "iters": 10.0,
+          "max_ms": 0.39280301332473755,
+          "median_ms": 0.38596299290657043,
+          "min_ms": 0.38464298844337463,
+          "p10_ms": 0.3847639858722687,
+          "p90_ms": 0.39144301414489746
+        },
+        "mori_compact_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 1.5555740594863892,
+          "median_ms": 1.549854040145874,
+          "min_ms": 1.5486940145492554,
+          "p10_ms": 1.5488150119781494,
+          "p90_ms": 1.5524940490722656
+        },
+        "mori_pack_alloc": {
+          "iters": 10.0,
+          "max_ms": 1.64069402217865,
+          "median_ms": 1.5531740188598633,
+          "min_ms": 1.552374005317688,
+          "p10_ms": 1.5525740385055542,
+          "p90_ms": 1.5579739809036255
+        },
+        "mori_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 1.553292989730835,
+          "median_ms": 1.548812985420227,
+          "min_ms": 1.547173023223877,
+          "p10_ms": 1.5476529598236084,
+          "p90_ms": 1.5521329641342163
+        },
+        "torch_presorted_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.40656399726867676,
+          "median_ms": 0.3972429931163788,
+          "min_ms": 0.39012300968170166,
+          "p10_ms": 0.391882985830307,
+          "p90_ms": 0.40472400188446045
+        },
+        "torch_sort_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.9143679738044739,
+          "median_ms": 0.624845027923584,
+          "min_ms": 0.6116459965705872,
+          "p10_ms": 0.6132050156593323,
+          "p90_ms": 0.6406850218772888
+        }
+      },
+      "tokens": 24576,
+      "topk": 8
+    },
+    {
+      "checksums": {
+        "mori_compact_pack_nocount": -2.6456698179244995,
+        "mori_compact_pack_prealloc": 147156.35433018208,
+        "mori_pack_alloc": 147157.01632463932,
+        "mori_pack_prealloc": 147157.2421489954,
+        "torch_presorted_materialize": 147157.4942598343,
+        "torch_sort_materialize": 147157.4942598343
+      },
+      "counts_match": true,
+      "expected_counts": [
+        33738,
+        23775,
+        19550,
+        16788,
+        14906,
+        13805,
+        12599,
+        11998
+      ],
+      "hidden_dim": 4096,
+      "max_rows_per_slot": 33738,
+      "num_hot_slots": 8,
+      "observed_mori_compact_counts": [
+        33738,
+        23775,
+        19550,
+        16788,
+        14906,
+        13805,
+        12599,
+        11998
+      ],
+      "observed_mori_counts": [
+        33738,
+        23775,
+        19550,
+        16788,
+        14906,
+        13805,
+        12599,
+        11998
+      ],
+      "pack_block_num": 512,
+      "pack_warp_per_block": 4,
+      "route_rows": 147159,
+      "score_before_experts": false,
+      "slot_skew": 0.5,
+      "timings": {
+        "mori_compact_pack_nocount": {
+          "iters": 10.0,
+          "max_ms": 0.46156400442123413,
+          "median_ms": 0.4547640085220337,
+          "min_ms": 0.4534040093421936,
+          "p10_ms": 0.4536440074443817,
+          "p90_ms": 0.46148398518562317
+        },
+        "mori_compact_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 1.7742539644241333,
+          "median_ms": 1.7692949771881104,
+          "min_ms": 1.766414999961853,
+          "p10_ms": 1.767295002937317,
+          "p90_ms": 1.7726939916610718
+        },
+        "mori_pack_alloc": {
+          "iters": 10.0,
+          "max_ms": 1.7757339477539062,
+          "median_ms": 1.7700550556182861,
+          "min_ms": 1.7693740129470825,
+          "p10_ms": 1.7698149681091309,
+          "p90_ms": 1.7722549438476562
+        },
+        "mori_pack_prealloc": {
+          "iters": 10.0,
+          "max_ms": 1.7768150568008423,
+          "median_ms": 1.765373945236206,
+          "min_ms": 1.7595340013504028,
+          "p10_ms": 1.7618149518966675,
+          "p90_ms": 1.770895004272461
+        },
+        "torch_presorted_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.4682439863681793,
+          "median_ms": 0.45412400364875793,
+          "min_ms": 0.4518440067768097,
+          "p10_ms": 0.4522849917411804,
+          "p90_ms": 0.4624840021133423
+        },
+        "torch_sort_materialize": {
+          "iters": 10.0,
+          "max_ms": 0.659525990486145,
+          "median_ms": 0.6410059928894043,
+          "min_ms": 0.6353260278701782,
+          "p10_ms": 0.6372460126876831,
+          "p90_ms": 0.6502060294151306
+        }
+      },
+      "tokens": 24576,
+      "topk": 8
+    }
+  ],
+  "enable_standard_moe_adapt": "ON",
+  "mode": "timing",
+  "mori_jit_cache_dir": "/workspace/mori_jit_cache_stdmoe_compact",
+  "mori_kernel_dir": "/workspace/sources/references/mori/python/mori",
+  "passed": true,
+  "shmem_finalize_status": 0,
+  "shmem_init_status": 0
+}

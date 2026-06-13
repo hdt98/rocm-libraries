@@ -1,0 +1,149 @@
+{
+  "probe": "mori_aiter_moe_autograd_bridge",
+  "created_unix": 1780339540.9275477,
+  "world_size": 4,
+  "shape": {
+    "tokens_per_rank": 16,
+    "hidden": 128,
+    "intermediate": 64,
+    "experts": 16,
+    "num_local_experts": 4,
+    "topk": 2,
+    "topk_pattern": "random",
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.05,
+    "warmup": 0,
+    "iters": 1,
+    "backward_mode": "routed"
+  },
+  "thresholds": {
+    "output_atol": 0.0625,
+    "grad_atol": 0.0005
+  },
+  "contract": {
+    "forward": "actual MORI dispatch -> local AITER fused_moe with preshuffled w13/w2 -> MORI combine",
+    "backward": "MORI-routed PyTorch VJP; redispatch x and grad_output to expert owners, compute local owned-expert VJP only, then MORI-combine dX and dTopkWeight back to source tokens",
+    "scope": "training API semantics probe; routed mode is an intermediate contract, not the final fused MoE backward kernel"
+  },
+  "runtime": {
+    "torch": "2.13.0a0+gitccf72d7",
+    "hip": "7.2.53211",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "summary": {
+    "all_ranks_pass": false,
+    "max_forward_abs_diff_across_ranks": Infinity,
+    "max_grad_abs_diff_across_ranks": Infinity,
+    "bridge_fwd_bwd_ms_rank_median": null
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "passes_atol": false,
+      "error": {
+        "type": "RuntimeError",
+        "message": "MORI routed backward recv mismatch: x=28, grad=56",
+        "traceback_tail": [
+          "    bridge_out, bridge_grads = run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 656, in run_bridge",
+          "    loss.backward()",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/_tensor.py\", line 631, in backward",
+          "    torch.autograd.backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/__init__.py\", line 381, in backward",
+          "    _engine_run_backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/graph.py\", line 913, in _engine_run_backward",
+          "    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 325, in apply",
+          "    return user_fn(self, *args)",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 454, in backward",
+          "    dx, dw1, dw3, dw2, dtopk = compute_mori_routed_vjp(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 324, in compute_mori_routed_vjp",
+          "    raise RuntimeError(",
+          "RuntimeError: MORI routed backward recv mismatch: x=28, grad=56"
+        ]
+      }
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "passes_atol": false,
+      "error": {
+        "type": "RuntimeError",
+        "message": "MORI routed backward recv mismatch: x=28, grad=56",
+        "traceback_tail": [
+          "    bridge_out, bridge_grads = run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 656, in run_bridge",
+          "    loss.backward()",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/_tensor.py\", line 631, in backward",
+          "    torch.autograd.backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/__init__.py\", line 381, in backward",
+          "    _engine_run_backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/graph.py\", line 913, in _engine_run_backward",
+          "    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 325, in apply",
+          "    return user_fn(self, *args)",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 454, in backward",
+          "    dx, dw1, dw3, dw2, dtopk = compute_mori_routed_vjp(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 324, in compute_mori_routed_vjp",
+          "    raise RuntimeError(",
+          "RuntimeError: MORI routed backward recv mismatch: x=28, grad=56"
+        ]
+      }
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "passes_atol": false,
+      "error": {
+        "type": "RuntimeError",
+        "message": "MORI routed backward recv mismatch: x=33, grad=66",
+        "traceback_tail": [
+          "    bridge_out, bridge_grads = run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 656, in run_bridge",
+          "    loss.backward()",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/_tensor.py\", line 631, in backward",
+          "    torch.autograd.backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/__init__.py\", line 381, in backward",
+          "    _engine_run_backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/graph.py\", line 913, in _engine_run_backward",
+          "    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 325, in apply",
+          "    return user_fn(self, *args)",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 454, in backward",
+          "    dx, dw1, dw3, dw2, dtopk = compute_mori_routed_vjp(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 324, in compute_mori_routed_vjp",
+          "    raise RuntimeError(",
+          "RuntimeError: MORI routed backward recv mismatch: x=33, grad=66"
+        ]
+      }
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "passes_atol": false,
+      "error": {
+        "type": "RuntimeError",
+        "message": "MORI routed backward recv mismatch: x=29, grad=58",
+        "traceback_tail": [
+          "    bridge_out, bridge_grads = run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 656, in run_bridge",
+          "    loss.backward()",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/_tensor.py\", line 631, in backward",
+          "    torch.autograd.backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/__init__.py\", line 381, in backward",
+          "    _engine_run_backward(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/graph.py\", line 913, in _engine_run_backward",
+          "    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 325, in apply",
+          "    return user_fn(self, *args)",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 454, in backward",
+          "    dx, dw1, dw3, dw2, dtopk = compute_mori_routed_vjp(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 324, in compute_mori_routed_vjp",
+          "    raise RuntimeError(",
+          "RuntimeError: MORI routed backward recv mismatch: x=29, grad=58"
+        ]
+      }
+    }
+  ]
+}

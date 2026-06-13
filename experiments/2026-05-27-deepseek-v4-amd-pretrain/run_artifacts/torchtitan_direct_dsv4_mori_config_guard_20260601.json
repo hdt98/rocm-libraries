@@ -1,0 +1,61 @@
+{
+  "status": "passed_config_surface_checks",
+  "date": "2026-06-01",
+  "experiment": "2026-05-27-deepseek-v4-amd-pretrain",
+  "execution_path": "direct_torchtitan_check_config",
+  "primus_used": false,
+  "target_host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096_STEPS1",
+  "standard_config_check": {
+    "command": "env CANARY_MOE_COMM_BACKEND=standard GPUS_PER_NODE=4 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 RUN_ID=torchtitan_direct_dsv4_checkconfig_standard_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "model_config": "Config deepseek_v4",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold",
+    "shape": [1, 64, 4096, 1],
+    "parallelism": {
+      "data_parallel_shard_degree": -1,
+      "expert_parallel_degree": 4
+    },
+    "moe_comm_backend": "standard",
+    "moe_token_dispatcher_config": "AllToAllTokenDispatcher.Config",
+    "moe_score_before_experts": false,
+    "router_score_func": "sqrtsoftplus",
+    "attention_status_by_layer": [
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+    ],
+    "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+    "attention_sparse_threshold_by_layer": [512, 512, 512, 512],
+    "attention_sparse_selected_state_threshold_by_layer": [4000000000, 4000000000, 4000000000, 4000000000],
+    "attention_indexer_loss_coeff_by_layer": [0.001, 0.001, 0.001, 0.001]
+  },
+  "mori_config_check": {
+    "command": "env CANARY_MOE_COMM_BACKEND=mori GPUS_PER_NODE=4 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 RUN_ID=torchtitan_direct_dsv4_checkconfig_mori_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "model_config": "Config deepseek_v4",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold",
+    "shape": [1, 64, 4096, 1],
+    "parallelism": {
+      "data_parallel_shard_degree": -1,
+      "expert_parallel_degree": 4
+    },
+    "moe_comm_backend": "mori",
+    "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+    "moe_score_before_experts": false,
+    "router_score_func": "sqrtsoftplus",
+    "attention_status_by_layer": [
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+    ],
+    "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+    "attention_sparse_threshold_by_layer": [512, 512, 512, 512],
+    "attention_sparse_selected_state_threshold_by_layer": [4000000000, 4000000000, 4000000000, 4000000000],
+    "attention_indexer_loss_coeff_by_layer": [0.001, 0.001, 0.001, 0.001]
+  },
+  "read": "The direct TorchTitan DSv4 canary now defaults to the passing standard all-to-all EP path while exposing CANARY_MOE_COMM_BACKEND=mori as an explicit config switch. The mori switch selects MoriEPTokenDispatcher.Config, not AllToAllTokenDispatcher.Config. The dispatcher is intentionally guarded for EP>1 and raises until the training-safe MORI autograd dispatch/combine and score-gradient path are implemented."
+}

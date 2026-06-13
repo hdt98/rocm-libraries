@@ -1,0 +1,156 @@
+{
+  "artifact": "sparse_mla_ck_mfma_coop_kernel_next_gate",
+  "status": "ck_mfma_building_block_validated_source_boundary_kernel_pending",
+  "updated_at": "2026-06-05",
+  "scope": "single-GPU S4096 sparse-MLA backward rewrite path after TileLang/rocWMMA route-owned schedules failed the full-boundary latency gate",
+  "current_sparse_attention_backward_gate": {
+    "shape": {
+      "sequence_length": 4096,
+      "heads": 64,
+      "head_dim": 512,
+      "compressed_groups": 1024,
+      "selected_groups_per_token": 512
+    },
+    "baseline_full_source_boundary_ms": 11.13,
+    "baseline_backend": "Triton source-boundary sparse-attention backward",
+    "known_dkv_atomic_wall_ms": 8.0,
+    "known_dkv_atomic_wall_ms_upper": 8.8,
+    "promotion_rule": "A new HIP/CK/rocWMMA cooperative kernel is not a candidate unless q,dO,kv,indices,lse/sink -> dQ+dKV beats the 11.13 ms full sparse-attention backward boundary, not just a late dKV-only reducer slice."
+  },
+  "closed_branches": [
+    {
+      "branch": "TileLang late dKV-only reducer",
+      "read": "Can make detached/final dKV slices faster, but the bridge still materializes P/scaled-dP/selected state before the call, so e2e TFLOPs do not improve."
+    },
+    {
+      "branch": "TileLang route-owned full source boundary",
+      "read": "Global writes shrink, but the route-owned/D-blocked schedule recomputes QK/PV/softmax row terms too expensively and loses query-major reuse."
+    },
+    {
+      "branch": "rocWMMA score-page source-boundary bring-up",
+      "best_full_dkv_atomic_ms": 43.821,
+      "score_page_only_ms": 15.3904,
+      "score_plus_contrib_sink_ms": 33.4766,
+      "read": "Validated the same-workgroup score-page mechanism but remains far slower than the 11.13 ms Triton boundary."
+    }
+  ],
+  "new_positive_evidence": [
+    {
+      "artifact": "run_artifacts/sparse_mla_ck_tile_surface_probe_20260605.json",
+      "status": "passed",
+      "rocm_root": "/opt/rocm-7.0.2",
+      "arch": "gfx950",
+      "validated_surface": "CK Tile BF16 M16N16K32 MFMA aliases and a four-wave K16xH64xD32 block shape compile and run on the active MI350 host."
+    },
+    {
+      "artifact": "run_artifacts/compressed_dkv_ck_mfma_contrib_tile_h64_sm6_contig_20260605.json",
+      "status": "passed",
+      "runtime": {
+        "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+        "torch_hip": "7.2.26015-fc0010cf6a",
+        "device": "AMD Instinct MI350X VF"
+      },
+      "shape": {
+        "k_tile": 16,
+        "d_tile": 16,
+        "h_dim": 64,
+        "mfma_k": 32
+      },
+      "correctness": {
+        "max_abs_diff": 0.000003814697265625,
+        "mean_abs_diff": 0.0000005939509719610214
+      },
+      "timing_ms": {
+        "median": 0.007619999814778566,
+        "min": 0.007120000198483467,
+        "max": 0.01708099991083145
+      },
+      "fixed_bug": "The previously failed CK contribution-tile probes used the wrong C-fragment row scatter. The passing layout is m=(lane>>4)*4+frag, n=lane&15 for the 16x16 output tile."
+    },
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_ck_contrib_mode1_s128_layer2_sc16_sb64_bd512_thr256_20260605.json",
+      "status": "timed",
+      "shape": {
+        "sequence_length": 128,
+        "topk": 32
+      },
+      "timing_ms": {
+        "score_plus_ck_contrib_sink_median": 4.233794212341309
+      },
+      "read": "The mixed rocWMMA score-page plus CK contribution-consumer source-boundary translation unit compiles and runs. S128 is only a build/runtime smoke because it has topk=32, not the S4096 topk=512 target."
+    },
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_ck_contrib_mode1_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+      "status": "failed_latency_gate",
+      "shape": {
+        "sequence_length": 4096,
+        "topk": 512
+      },
+      "timing_ms": {
+        "score_plus_ck_contrib_sink_median": 38.06447982788086,
+        "prior_score_plus_rocwmma_contrib_sink_median": 33.47657012939453,
+        "triton_full_sparse_attention_backward_gate": 11.13
+      },
+      "read": "Dropping the validated CK contribution tile into the old multi-wave rocWMMA score-page scaffold is slower than the prior rocWMMA contribution consumer and remains far above the full Triton sparse-attention boundary. The useful result is that CK is correct and callable; the old producer/consumer decomposition is rejected as the final schedule."
+    },
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_ck_score_mode0_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+      "status": "failed_latency_gate",
+      "shape": {
+        "sequence_length": 4096,
+        "topk": 512
+      },
+      "timing_ms": {
+        "ck_score_only_median": 32.70266342163086,
+        "prior_rocwmma_score_only_median": 15.3904,
+        "triton_full_sparse_attention_backward_gate": 11.13
+      },
+      "read": "A direct-source CK score-page producer is slower than the staged rocWMMA score page. It loads q/grad_output/kv directly inside the MFMA loop and loses the shared-staged selected-KV reuse that made the prior score page less bad. This rejects direct-source CK score production as the next schedule."
+    },
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_ck_score_contrib_mode1_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+      "status": "failed_latency_gate",
+      "shape": {
+        "sequence_length": 4096,
+        "topk": 512
+      },
+      "timing_ms": {
+        "ck_score_plus_ck_contrib_sink_median": 54.28645324707031,
+        "ck_score_only_median": 32.70266342163086,
+        "prior_rocwmma_score_plus_rocwmma_contrib_sink_median": 33.47657012939453,
+        "triton_full_sparse_attention_backward_gate": 11.13
+      },
+      "read": "Replacing both score and contribution MFMA with direct CK in the old source-boundary scaffold regresses further. The decomposition evidence is now strong: CK MFMA arithmetic is correct, but the source-boundary schedule must stage/reuse operands and reduce by route before global memory; a simple CK backend swap is not the path."
+    }
+  ],
+  "next_kernel_contract": {
+    "name": "query_major_ck_mfma_score_page_source_boundary_v1",
+    "inputs": [
+      "q",
+      "grad_output",
+      "compressed_kv",
+      "top_indices",
+      "forward_output",
+      "lse_or_row_stats",
+      "sink_or_sink_grad"
+    ],
+    "outputs": [
+      "grad_q",
+      "grad_compressed_kv",
+      "row/checksum diagnostics for first bring-up"
+    ],
+      "schedule": [
+        "Keep CTA ownership query-major: token tile x head block x selected window x D tile.",
+      "Compute QK/PV/softmax row terms into a tiny score page in registers/LDS; do not use the rejected direct-source CK score loop.",
+      "Consume that score page immediately inside the same workgroup for dQ and CK-MFMA dKV contribution tiles.",
+      "Use the validated CK BF16 M16N16K32 contribution tile with store-mode 6 fragment mapping.",
+      "Perform group-aware segmented epilogue before global memory; no P/scaled-dP/selected-KV HBM slab is allowed."
+    ],
+    "first_timing_gates": {
+      "producer_checksum_source_boundary_ms": "must be materially below the rocWMMA score-page producer; target under about 8 ms before adding full dQ+dKV",
+      "full_dq_dkv_source_boundary_ms": "must beat 11.13 ms at S4096/H64/D512/topk512",
+      "e2e_tflops": "do not run or promote e2e TFLOPs until the full sparse-attention boundary beats the retained Triton boundary"
+    }
+  },
+  "dependency_pins_changed": false
+}

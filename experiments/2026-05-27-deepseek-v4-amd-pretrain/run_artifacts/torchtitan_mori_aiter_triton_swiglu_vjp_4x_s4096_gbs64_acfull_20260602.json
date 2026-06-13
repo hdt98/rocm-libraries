@@ -1,0 +1,129 @@
+{
+  "run_id": "torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s4096_gbs64_steps2_acfull_20260602",
+  "date_utc": "2026-06-02",
+  "result": "passed_two_steps",
+  "model": "DeepSeek-V4-Flash_4layer_guarded_dense_fallback_for_s4096_compressed_layers",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s4096_gbs64_steps2_acfull_20260602/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s4096_gbs64_steps2_acfull_20260602",
+  "structured_logs": [
+    "training.global_rank_0.20260602-032846-HEOSWC.jsonl",
+    "training.global_rank_1.20260602-032846-53V2BO.jsonl",
+    "training.global_rank_2.20260602-032846-VI2HN2.jsonl",
+    "training.global_rank_3.20260602-032846-KB5GO1.jsonl"
+  ],
+  "node": "do-sonle5-mi350-gpu",
+  "visible_devices": "4,5,6,7",
+  "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+  "tokens_per_step": 262144,
+  "config": {
+    "gpus_per_node": 4,
+    "fsdp": 4,
+    "ep": 4,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "sequence_length": 4096,
+    "steps": 2,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "li_kl_backend": "pytorch",
+    "attention_read": "S4096 compressed layers use the guarded dense fallback in this systems run; this is not the final sparse-MLA/LightningIndexer performance path."
+  },
+  "step1": {
+    "loss": 12.14107,
+    "grad_norm": 11.125,
+    "memory_gib_range": [
+      83.96,
+      89.79
+    ],
+    "tokens_per_gpu_s_range": [
+      2042,
+      2046
+    ],
+    "node_tokens_per_s_range": [
+      8168,
+      8184
+    ],
+    "tflops_per_gpu_range": [
+      38.64,
+      38.70
+    ],
+    "mfu_pct_range": [
+      1.67,
+      1.68
+    ],
+    "target_comparison": "below_normalized_4x_target"
+  },
+  "step2": {
+    "loss": 9.05285,
+    "grad_norm": 21.625,
+    "memory_gib_range": [
+      152.80,
+      240.70
+    ],
+    "tokens_per_gpu_s": 2882,
+    "node_tokens_per_s": 11528,
+    "tflops_per_gpu": 54.53,
+    "mfu_pct": 2.36,
+    "structured_step_time_ms_rank0": 22740.438156062737,
+    "implied_step_time_s_at_gbs64": 22.74,
+    "global_valid_tokens": 262144,
+    "cuda_memory_allocation_retries": 1,
+    "target_comparison": "above_normalized_4x_target"
+  },
+  "target_comparison": {
+    "normalized_4x_target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "normalized_4x_target_node_tokens_per_s_range": [
+      8800,
+      9600
+    ],
+    "normalized_4x_target_step_time_s_range": [
+      27,
+      30
+    ],
+    "step1": "below_target",
+    "step2": "above_target",
+    "caveat": "Throughput clears the normalized 4x band on step 2, but this is guarded dense-fallback systems evidence with prototype MoE backward, not final sparse-MLA/LI plus fused MoE performance."
+  },
+  "completion": {
+    "training_completed": true,
+    "training_completed_count": 4,
+    "process_group_destroyed": true,
+    "process_group_destroyed_count": 4,
+    "checkpoint_directory_created": false
+  },
+  "command_shape": {
+    "RUN_ID": "torchtitan_direct_dsv4_mori_aiter_triton_swiglu_vjp_4x_s4096_gbs64_steps2_acfull_20260602",
+    "IMAGE": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "REMOTE_ROOT": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "GPUS_PER_NODE": "4",
+    "CANARY_VISIBLE_DEVICES": "4,5,6,7",
+    "CANARY_EP": "4",
+    "CANARY_GBS": "64",
+    "CANARY_SEQ_LEN": "4096",
+    "CANARY_STEPS": "2",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "full",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "MASTER_PORT": "29631",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  },
+  "read": "This promotes the earlier S4096 Triton-SwiGLU wiring preflight to an actual two-step 4xMI350 target-slice systems pass. The run proves the Triton SwiGLU owner-rank VJP backend is stable at S4096 under MORI routed padded backward and full activation checkpointing. It does not close the Ascend recipe gap by itself: compressed attention is still guarded/dense for this run, LI uses the PyTorch path, and MoE backward still needs fused/production grouped training GEMM rather than the padded owner-rank bridge."
+}

@@ -1,0 +1,42 @@
+{
+  "artifact": "sparse_attention_kernel_actual_li_query_recompute_profile_decision_20260605",
+  "date": "2026-06-05",
+  "status": "measured_actual_sparse_attention_backward_kernel",
+  "source_artifact": "run_artifacts/sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn64_bd128_20260605.json",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352,
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128
+  },
+  "measured_kernel_latency_ms": {
+    "query_major_no_dkv": 1.9622999429702759,
+    "query_major_dkv_reduce_sink": 2.853471040725708,
+    "query_major_full": 11.134678840637207
+  },
+  "diagnostic_deltas_ms": {
+    "dkv_dot_math_approx": 0.8911710977554321,
+    "global_dkv_accumulation_approx": 8.281207799911499,
+    "dkv_dot_plus_global_accumulation": 9.172378897666931
+  },
+  "read": {
+    "what_was_measured": "This is the existing Triton query-major sparse-MLA shared-KV backward kernel on the actual TorchTitan LightningIndexer route. It consumes q, kv_bank, grad_output, output, lse, and compressed indices, then produces dQ and dKV.",
+    "not_a_reducer_slice": "The full number is the sparse-attention backward kernel latency. The no_dkv and dkv_reduce_sink modes are only profile splits inside the same kernel boundary.",
+    "current_bottleneck": "The kernel body without dKV is about 1.96 ms. Keeping dKV dot math but replacing full dKV accumulation with checksum stores is about 2.85 ms. Full dKV accumulation raises the same kernel to about 11.13 ms, so the dominant wall is still global many-to-one dKV accumulation inside sparse attention.",
+    "tilelang_route_owned_result": "The first source-boundary TileLang dQ+dKV route-owned variant is not promoted: GP256/block_d64 ran at 16.70 ms and GP512/block_d32 ran at 28.72 ms, both slower than the actual sparse-attention kernel.",
+    "next_owner_requirement": "The next rewrite must keep the query-major sparse-attention owner and reduce dKV before global memory inside that owner. A route-owned/group-panel owner has now failed the sparse-attention kernel latency gate."
+  },
+  "promotion_gate": {
+    "current_full_sparse_attention_backward_ms": 11.134678840637207,
+    "must_beat_current_full_kernel": true,
+    "target_direction": "Reduce the approximately 8.28 ms global dKV accumulation wall while preserving the roughly 2 ms no-dKV query-major producer."
+  }
+}

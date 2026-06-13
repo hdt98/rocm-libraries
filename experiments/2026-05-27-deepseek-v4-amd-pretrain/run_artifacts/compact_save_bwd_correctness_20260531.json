@@ -1,0 +1,108 @@
+{
+  "artifact": "compact_save_bwd_correctness_20260531",
+  "created_utc": "2026-05-31T07:29:46Z",
+  "candidate": {
+    "moe_impl": "grouped-expert-batches-dynamic-compact-save-bwd-dense-wgrad",
+    "intent": "Save compact routed MoE forward intermediates and run backward on compact grouped rows, avoiding padded saved tensors in the backward contract."
+  },
+  "local_static_checks": {
+    "workdir": "/Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform/sdks/mlops/playground",
+    "commands": [
+      "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/fp4.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/reference_layer.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/check_correctness.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_microbench.py",
+      "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "git -C /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/fp4.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/reference_layer.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/check_correctness.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh"
+    ],
+    "result": "passed"
+  },
+  "remote_cpu_correctness": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531",
+    "command": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/check_correctness.py --device cpu --dtype float64 --batch 1 --seqlen 4 --checks moe_expert_batches_dynamic_compact_save_bwd_dense_wgrad_match,moe_expert_batches_dynamic_compact_save_bwd_learned_router_match --json",
+    "result": {
+      "ok": true,
+      "device": "cpu",
+      "dtype": "float64",
+      "batch": 1,
+      "seqlen": 4,
+      "checks": [
+        {
+          "name": "moe_expert_batches_dynamic_compact_save_bwd_dense_wgrad_match",
+          "ok": true,
+          "output_max_abs": 0.0,
+          "max_grad_rel_l2": 3.6501615255140047e-16,
+          "grad_max_abs": {
+            "input": 0.0,
+            "moe.w1": 8.673617379884035e-19,
+            "moe.w2": 8.673617379884035e-19,
+            "moe.w3": 4.336808689942018e-19
+          }
+        },
+        {
+          "name": "moe_expert_batches_dynamic_compact_save_bwd_learned_router_match",
+          "ok": true,
+          "output_max_abs": 0.0,
+          "max_grad_rel_l2": 3.2798057843630187e-16,
+          "grad_max_abs": {
+            "input": 1.3552527156068805e-20,
+            "moe.gate": 1.3552527156068805e-20,
+            "moe.w1": 1.0842021724855044e-19,
+            "moe.w2": 1.6263032587282567e-19,
+            "moe.w3": 1.0842021724855044e-19
+          }
+        }
+      ]
+    }
+  },
+  "remote_cuda_correctness": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531",
+    "command": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 CUDA_VISIBLE_DEVICES=0 python3 dsv4_layer_microbench/check_correctness.py --device cuda --dtype bfloat16 --batch 1 --seqlen 16 --checks moe_expert_batches_dynamic_compact_save_bwd_dense_wgrad_match,moe_expert_batches_dynamic_compact_save_bwd_learned_router_match --json",
+    "result": {
+      "ok": true,
+      "device": "cuda",
+      "dtype": "bfloat16",
+      "batch": 1,
+      "seqlen": 16,
+      "checks": [
+        {
+          "name": "moe_expert_batches_dynamic_compact_save_bwd_dense_wgrad_match",
+          "ok": true,
+          "output_max_abs": 0.0,
+          "max_grad_rel_l2": 0.003972408772170212
+        },
+        {
+          "name": "moe_expert_batches_dynamic_compact_save_bwd_learned_router_match",
+          "ok": true,
+          "output_max_abs": 0.0,
+          "max_grad_rel_l2": 0.004653319444080876,
+          "moe_gate_grad_rel_l2": 0.004653319444080876
+        }
+      ]
+    }
+  },
+  "full_layer_perf_gate": {
+    "summary_json": "run_artifacts/compact_save_bwd_full_layer_s2048_20260531.json",
+    "host": "do-sonle-kernel",
+    "run_tag": "compact_save_bwd_s2048_20260531",
+    "command": "env RUN_TAG=compact_save_bwd_s2048_20260531 MOE_IMPL=grouped-expert-batches-dynamic-compact-save-bwd-dense-wgrad bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-2048",
+    "result": {
+      "seqlen": 2048,
+      "avg_ms": 64.69493699260056,
+      "min_ms": 64.1656449297443,
+      "tokens_per_s": 31656.263924242456,
+      "estimated_tflops": 150.49329115559019
+    },
+    "baseline_comparison": {
+      "retained_compact_reduce_avg_ms": 52.58071997668594,
+      "delta_ms": 12.114217015914619,
+      "assessment": "regressed; keep as a correctness/control artifact, do not promote for S2048 performance"
+    }
+  },
+  "next_gates": [
+    "Return to fused compact grouped MoE training kernel design; compact-save alone removes padded saved tensors but does not improve the current full-layer timing.",
+    "Use this variant as a correctness reference for a future compact grouped backward kernel that avoids both padded saved tensors and Python-level per-expert overhead."
+  ],
+  "dependency_pin_changes": []
+}

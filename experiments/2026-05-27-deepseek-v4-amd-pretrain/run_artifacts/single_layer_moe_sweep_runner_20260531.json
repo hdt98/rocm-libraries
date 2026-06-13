@@ -1,0 +1,72 @@
+{
+  "artifact": "single_layer_moe_sweep_runner",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "runner": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+  "purpose": "Make the next free MI350 window test whether the missed B=1 S=2048 development target is improved by a retained MoE bridge variant rather than repeating the canonical compact-reduce timing.",
+  "new_runner_capabilities": {
+    "env_overrides": [
+      "ATTN_IMPL",
+      "MOE_IMPL",
+      "PROBE_VARIANT"
+    ],
+    "actions": {
+      "probe-ops-sweep-2048": "Runs isolated dense, no-mask, compact-reduce, and compact-scatter dynamic MoE bridge probes at S=2048.",
+      "probe-ops-sweep-4096": "Runs the same isolated MoE bridge probe sweep at S=4096.",
+      "bench-moe-sweep-2048": "Runs selected full-layer S=2048 MoE implementation variants with the canonical attention path.",
+      "bench-moe-sweep-4096": "Runs selected full-layer S=4096 MoE implementation variants with the canonical attention path.",
+      "sweep-2048": "Runs both the S=2048 isolated MoE bridge probe sweep and the S=2048 full-layer MoE implementation sweep."
+    }
+  },
+  "full_layer_moe_variants": [
+    {
+      "label": "compact_reduce",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "role": "Current retained canonical learned-router path."
+    },
+    {
+      "label": "no_mask_bmm_out",
+      "moe_impl": "grouped-expert-batches-dynamic-no-mask-bmm-out-dgrad-dense-wgrad",
+      "role": "Tests whether compact valid-row reduction overhead is worth it at S=2048."
+    },
+    {
+      "label": "compact_scatter",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-scatter-bmm-out-dgrad-dense-wgrad",
+      "role": "Tests compact grad_y construction versus compact-reduce."
+    },
+    {
+      "label": "dynamic_bmm_out",
+      "moe_impl": "grouped-expert-batches-dynamic-bmm-out-dgrad-dense-wgrad",
+      "role": "Older dense masked dynamic path with bmm-out dgrad."
+    },
+    {
+      "label": "no_mask_dense",
+      "moe_impl": "grouped-expert-batches-dynamic-no-mask-dense-wgrad",
+      "role": "No-mask path without the bmm-out dgrad specialization."
+    }
+  ],
+  "recommended_next_commands_when_node_is_idle": [
+    "RUN_TAG=retained_moe_sweep_20260531Tnext bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh sweep-2048",
+    "RUN_TAG=retained_moe_sweep_20260531Tnext bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-moe-sweep-4096"
+  ],
+  "last_attempted_node_status": {
+    "gpu_use_percent": 0,
+    "blocking_kfd_process": {
+      "pid": 3107598,
+      "process_name": "python3",
+      "vram_used_bytes": 60987277312,
+      "command": "python3 /exp/tools/dsv4_coda_attention_layer_gate.py --m-values 64 --cache-seqlen 512 --groups 1 --dtype bf16 --device cuda --q-absorb-backend gemm-qpe-on-read --q-absorb-direct-backend sumsq-gemm --q-partials-handoff partials --post-tail-mode next-gemm-coda --post-tail-backend tilelang --post-next-backend deepgemm-next-row-scale --num-split 1 --mla-kv-format fp8-block --mla-value-group-tiles 2 --block-n 64 --bench-timing event --warmup 1 --rep 2 --rounds 1 --aiter-root /exp/sources/wip/aiter --aiter-aot-import --json-output /exp/artifacts/dsv4_coda_fp8_blockkv_mla_20260531_dev/direct_fp8block_group2_smoke_m64_retry3.json"
+    },
+    "blocking_container": {
+      "id": "8a7112093514",
+      "name": "charming_mestorf",
+      "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+      "status": "Up 21 seconds"
+    },
+    "decision": "Skipped perf sweep to avoid contaminating measurements or interrupting an external GPU workload."
+  },
+  "validation": {
+    "bash_n": "passed",
+    "gpu_timing_run": "not_run_due_to_external_vram_holder"
+  }
+}

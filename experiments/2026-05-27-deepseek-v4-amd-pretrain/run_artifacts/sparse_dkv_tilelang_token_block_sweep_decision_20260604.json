@@ -1,0 +1,78 @@
+{
+  "status": "promote_token_block_256_for_tilelang_panel_dense_fold_branch",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_compact_producer_shape_sweep",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "common_shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "topk_workspace": 640,
+    "route_pattern": "panel_capacity_random",
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "panel_count": 2,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "fold_backend": "tilelang_panel_dense"
+  },
+  "sweep": [
+    {
+      "token_block": 64,
+      "full_output_median_ms": 8.1296706199646,
+      "fold_only_median_ms": 0.048500001430511475,
+      "compact_partial_stream_mib": 128.0,
+      "artifact_decision": "run_artifacts/sparse_dkv_tilelang_panel_dense_fold_decision_20260604.json"
+    },
+    {
+      "token_block": 128,
+      "full_output_median_ms": 8.090791702270508,
+      "fold_only_median_ms": 0.019140000455081463,
+      "compact_partial_stream_mib": 64.0,
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb128_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+    },
+    {
+      "token_block": 192,
+      "full_output_median_ms": 12.024747848510742,
+      "fold_only_median_ms": 0.016320000402629375,
+      "compact_partial_stream_mib": 44.0,
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb192_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+    },
+    {
+      "token_block": 256,
+      "full_output_median_ms": 7.990410327911377,
+      "fold_only_median_ms": 0.01397999981418252,
+      "compact_partial_stream_mib": 32.0,
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+    },
+    {
+      "token_block": 512,
+      "full_output_median_ms": 15.915321350097656,
+      "fold_only_median_ms": 0.013900000136345625,
+      "compact_partial_stream_mib": 16.0,
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb512_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+    }
+  ],
+  "promoted": {
+    "token_block": 256,
+    "s128_final_dkv_correctness_max_abs_diff": 1.862645149230957e-08,
+    "s4096_full_output_median_ms": 7.990410327911377,
+    "s4096_fold_only_median_ms": 0.01397999981418252,
+    "compact_partial_stream_mib": 32.0,
+    "write_reduction_x": 128.0,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s128_valid512_tb256_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+  },
+  "comparison": {
+    "tb256_minus_tb64_ms": -0.13926029205322266,
+    "tb256_speedup_over_tb64_x": 1.0174260827301764,
+    "tb256_minus_previous_torch_fold_ms": -0.2131495475769043,
+    "tb256_speedup_over_previous_torch_fold_x": 1.0266708657426724,
+    "tb512_minus_tb256_ms": 7.924911022186279
+  },
+  "read": "The retained TileLang panel-dense final-output branch improves further by widening the query-major producer to token_block=256. This cuts the compact partial stream from 128 MiB to 32 MiB and gives S4096 full final-dKV median 7.990 ms, with S128 final-dKV parity max diff 1.86e-8. The sweep is not monotonic: token_block=192 lowers badly at 12.025 ms and token_block=512 collapses to 15.915 ms, so the win appears to be a power-of-two scheduling/parallelism knee rather than a pure partial-stream reduction. Retain tb256/gps512/cap320/k64/d64/threads512/fold_backend=tilelang_panel_dense as the current TileLang sparse-dKV branch. The next lever is still producer fusion or compressor/LI consumption, because the final fold is now only about 0.014 ms."
+}

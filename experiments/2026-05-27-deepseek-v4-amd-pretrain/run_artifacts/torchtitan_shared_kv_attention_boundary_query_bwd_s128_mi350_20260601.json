@@ -1,0 +1,159 @@
+{
+  "attention_dims": {
+    "compress_ratio": 4,
+    "dsa_indexer_topk": 512,
+    "kv_lora_rank": 512,
+    "n_heads": 64,
+    "qk_head_dim": 512,
+    "qk_nope_head_dim": 448,
+    "qk_rope_head_dim": 64,
+    "v_head_dim": 512,
+    "window_size": 128
+  },
+  "backend": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_path": "sparse_mla_shared_kv_triton_forward_backend.py",
+    "module": null
+  },
+  "backward": {
+    "attn_sink_grad_norm": 0.00026017724303528666,
+    "enabled": true,
+    "input_grad_norm": 0.000513739709276706,
+    "loss": 0.0114681925624609
+  },
+  "backward_timing": {
+    "attn_sink_grad_norm": 0.00026017724303528666,
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "backward_mode_value": "query_recompute",
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 2.546025037765503,
+      "mean_ms": 2.359523057937622,
+      "median_ms": 2.359523057937622,
+      "min_ms": 2.173021078109741,
+      "samples_ms": [
+        2.546025037765503,
+        2.173021078109741
+      ],
+      "stdev_ms": 0.2637536292820225
+    },
+    "enabled": true,
+    "input_grad_norm": 0.0005137396510690451,
+    "loss": 0.0114681925624609,
+    "peak_memory_allocated_bytes": 893739008,
+    "peak_memory_allocated_gib": 0.8323593139648438,
+    "timed_iters": 2,
+    "wall": {
+      "enabled": true,
+      "max_ms": 2.6008340064436197,
+      "mean_ms": 2.407904015854001,
+      "median_ms": 2.407904015854001,
+      "min_ms": 2.2149740252643824,
+      "samples_ms": [
+        2.6008340064436197,
+        2.2149740252643824
+      ],
+      "stdev_ms": 0.27284420928035236
+    },
+    "warmup_iters": 1
+  },
+  "batch": 1,
+  "boundary": {
+    "aux_loss": null,
+    "compressed_x_shape": [
+      1,
+      32,
+      4096
+    ],
+    "index_scores_shape": [
+      1,
+      128,
+      32
+    ],
+    "indices_shape": [
+      1,
+      128,
+      160
+    ],
+    "kv_bank_shape": [
+      1,
+      160,
+      512
+    ],
+    "kv_compressed_shape": [
+      1,
+      32,
+      512
+    ],
+    "kv_shared_shape": [
+      1,
+      128,
+      512
+    ],
+    "q_shape": [
+      1,
+      128,
+      64,
+      512
+    ],
+    "selected_count": 160,
+    "stage_records": [],
+    "stage_total_wall_ms": null,
+    "top_scores_shape": [
+      1,
+      128,
+      32
+    ],
+    "topk": 32,
+    "window": 128
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "model_dim": 4096,
+  "output_checksum": 0.000872337375767529,
+  "output_shape": [
+    1,
+    128,
+    4096
+  ],
+  "projection_mode": "Self-contained TorchTitan-shape q path plus shared kv_norm(wkv_a(x)[:kv_lora_rank]) with the final qk_rope_head_dim positions replaced by rotated k_pe; wkv_b is intentionally bypassed because it expands to per-head K/V.",
+  "promotion_read": "This is a boundary/integration probe, not a production model path. It measures the TorchTitan-shape q/wkv_a/RoPE/LightningIndexer/compression/shared-KV sparse MLA/wo overhead without importing the full TorchTitan package stack in the older SGLang image. The real model still needs an explicit shared latent-KV projection contract, attn_sink parameter, and fused backward.",
+  "scope": "torchtitan_dsv4_sparse_mla_shared_kv_attention_boundary_probe",
+  "seed": 1234,
+  "seq_len": 128,
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 1.1424920558929443,
+      "mean_ms": 1.1275315284729004,
+      "median_ms": 1.1275315284729004,
+      "min_ms": 1.1125710010528564,
+      "samples_ms": [
+        1.1424920558929443,
+        1.1125710010528564
+      ],
+      "stdev_ms": 0.02115738077768072
+    },
+    "enabled": true,
+    "peak_memory_allocated_bytes": 901289472,
+    "peak_memory_allocated_gib": 0.8393912315368652,
+    "timed_iters": 2,
+    "wall": {
+      "enabled": true,
+      "max_ms": 1.198907964862883,
+      "mean_ms": 1.166687987279147,
+      "median_ms": 1.166687987279147,
+      "min_ms": 1.1344680096954107,
+      "samples_ms": [
+        1.198907964862883,
+        1.1344680096954107
+      ],
+      "stdev_ms": 0.04556592927827681
+    },
+    "warmup_iters": 1
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "artifact": "torchtitan_dsv4_noac_alloc_expand_stability4_ep8_s4096_gbs128_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Allocator-expanded four-step no-activation-checkpoint stability A/B for the retained 8xMI350 target-shape canary.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_noac_alloc_expand_stability4_ep8_s4096_gbs128_20260603",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_stability4_ep8_s4096_gbs128_20260603",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_noac_alloc_expand_stability4_ep8_s4096_gbs128_20260603/docker-run.log",
+  "command_shape": {
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "target_host": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "gpus_per_node": 8,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "sequence_length": 4096,
+    "gradient_accumulation_steps": 16,
+    "steps": 4
+  },
+  "settings": {
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none",
+    "enable_profiling": false,
+    "enable_structured_logging": false,
+    "additive_timing_path": "unset",
+    "chunked_ce_num_chunks": 2,
+    "pytorch_cuda_alloc_conf": "expandable_segments:True",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_tuple": [
+      64,
+      32,
+      8
+    ],
+    "mori_shmem_heap_size": "32G"
+  },
+  "result": {
+    "status": "passed_allocator_stabilized",
+    "process_groups_destroyed": true,
+    "loss_movement": "12.46618 -> 8.77203 -> 14.93040 -> 12.48110",
+    "step1": {
+      "loss": 12.46618,
+      "grad_norm": 11.5625,
+      "tok_per_gpu_s_range": [
+        2412,
+        2419
+      ],
+      "tflops_per_gpu_range": [
+        45.64,
+        45.77
+      ],
+      "mfu_percent": 1.98,
+      "peak_logged_memory_gib": 52.55
+    },
+    "step2": {
+      "loss": 8.77203,
+      "grad_norm": 20.25,
+      "tok_per_gpu_s": 4832,
+      "node_tok_s": 38656,
+      "implied_step_time_s": 13.56,
+      "tflops_per_gpu": 91.44,
+      "mfu_percent": 3.96,
+      "peak_logged_memory_gib": 68.48
+    },
+    "step3": {
+      "loss": 14.9304,
+      "grad_norm": 45.25,
+      "tok_per_gpu_s": 3684,
+      "node_tok_s": 29472,
+      "implied_step_time_s": 17.78,
+      "tflops_per_gpu": 69.71,
+      "mfu_percent": 3.02,
+      "peak_logged_memory_gib": 104.21
+    },
+    "step4": {
+      "loss": 12.4811,
+      "grad_norm": 42.5,
+      "tok_per_gpu_s": 3516,
+      "node_tok_s": 28128,
+      "implied_step_time_s": 18.64,
+      "tflops_per_gpu": 66.53,
+      "mfu_percent": 2.88,
+      "peak_logged_memory_gib": 104.21,
+      "cuda_memory_allocation_retry_warning_count": 0
+    },
+    "step2_to_step4": {
+      "tflops_drop_percent": 27.24,
+      "tok_per_gpu_s_drop_percent": 27.24,
+      "peak_memory_growth_gib": 35.73
+    },
+    "mean_steps2_to4": {
+      "tok_per_gpu_s": 4010.67,
+      "tflops_per_gpu": 75.89
+    },
+    "mean_steps3_to4": {
+      "tok_per_gpu_s": 3600.0,
+      "tflops_per_gpu": 68.14
+    }
+  },
+  "comparison_to_no_allocator_noac_stability4": {
+    "artifact": "run_artifacts/torchtitan_dsv4_noac_stability4_ep8_s4096_gbs128_20260603.json",
+    "step2_tflops_uplift_percent": 6.85,
+    "step4_tflops_uplift_percent": 18.38,
+    "step4_peak_memory_reduction_gib": 145.28,
+    "step4_peak_memory_reduction_percent": 58.23,
+    "allocation_retry_warnings": "2 -> 0"
+  },
+  "comparison_to_retained_full_ac_anchor": {
+    "anchor_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "anchor_step2_tok_per_gpu_s": 3103,
+    "anchor_step2_tflops_per_gpu": 58.71,
+    "anchor_step2_implied_step_time_s": 21.12,
+    "step2_tflops_uplift_percent": 53.87,
+    "step4_tflops_uplift_percent": 13.32,
+    "mean_steps2_to4_tflops_uplift_percent": 29.11,
+    "mean_steps3_to4_tflops_uplift_percent": 15.92
+  },
+  "comparison_to_target": {
+    "target_tflops_per_gpu": 277.0,
+    "step2_target_fraction_percent": 33.01,
+    "step4_target_fraction_percent": 24.02,
+    "mean_steps2_to4_target_fraction_percent": 27.4,
+    "remaining_speedup_to_target_from_step4": 4.16
+  },
+  "read": [
+    "Setting both allocator aliases to expandable_segments:True materially changes the no-AC candidate: step-2 throughput rises to 91.44 TFLOPs/GPU and rank peak memory stays below 69 GiB at step 2.",
+    "Late-step throughput still decays, but the run is much healthier than default allocator no-AC: step 4 is 66.53 TFLOPs/GPU, peak memory is 104.21 GiB, and allocation-retry warnings disappear.",
+    "This is the first no-AC variant that looks like a plausible retained branch, but it still needs a longer no-profile run before promotion because throughput drops 27.2% from step 2 to step 4."
+  ]
+}

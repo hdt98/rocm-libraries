@@ -1,0 +1,20 @@
+{
+  "artifact": "compressed_dkv_segmented_hip_extension_smoke",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "extension_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/torch_extensions/compressed_dkv_segmented_hip_20260602",
+  "build_seconds": 16.59484494011849,
+  "run_seconds": 0.0008940550033003092,
+  "size": 4096,
+  "max_abs_diff": 0.0,
+  "passed": true,
+  "included_headers": [
+    "rocprim/device/device_reduce_by_key.hpp",
+    "rocprim/device/device_segmented_reduce.hpp",
+    "hipcub/device/device_segmented_reduce.hpp",
+    "ck_tile/core.hpp"
+  ],
+  "read": "This validates the PyTorch HIP extension build/call surface for the next compressed-dKV segmented accumulator. It is a copy-kernel smoke, not a performance or dKV correctness kernel."
+}

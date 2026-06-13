@@ -1,0 +1,97 @@
+{
+  "deferred_forward_loss": null,
+  "deferred_grad_norms": {},
+  "device": "cuda",
+  "direct_grad_norms": {},
+  "direct_loss": null,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {},
+  "li_kl_backend": "triton_tl_dot",
+  "li_kl_chunk_size": 16,
+  "li_kl_chunk_size_arg": null,
+  "max_grad_diff": null,
+  "parity_skipped": true,
+  "read": "Parity was skipped for long-sequence timing. The timing block below measures the current public Ascend-style wrapper; no correctness claim is made by this run.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 64,
+    "groups": 1024,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 32,
+    "seq_len": 4096,
+    "shared_main_k": true,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 4.357643127441406,
+      "mean_ms": 4.195529460906982,
+      "median_ms": 4.171520948410034,
+      "min_ms": 4.158360958099365,
+      "samples_ms": [
+        4.357643127441406,
+        4.2100419998168945,
+        4.198882102966309,
+        4.176721096038818,
+        4.16632080078125,
+        4.160801887512207,
+        4.158360958099365,
+        4.202840805053711,
+        4.16084098815918,
+        4.162840843200684
+      ],
+      "stdev_ms": 0.06020556347878625
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 3.136889063171111e-05,
+      "index_q": 3.061852476093918e-05,
+      "weights": 2.492847852408886e-05
+    },
+    "li_kl_backend": "triton_tl_dot",
+    "li_kl_chunk_size": 16,
+    "li_kl_chunk_size_arg": null,
+    "li_kl_chunk_size_env": null,
+    "li_kl_max_selected_main_k_elements_env": null,
+    "peak_memory_allocated_bytes": 691274752,
+    "peak_memory_allocated_gib": 0.6437997817993164,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle with the selected TorchTitan LI KL backend.",
+    "timed_iters": 10,
+    "wall": {
+      "enabled": true,
+      "max_ms": 4.416047944687307,
+      "mean_ms": 4.221483098808676,
+      "median_ms": 4.193902015686035,
+      "min_ms": 4.1804269421845675,
+      "samples_ms": [
+        4.416047944687307,
+        4.232926992699504,
+        4.221096984110773,
+        4.199067014269531,
+        4.1887370171025395,
+        4.183677025139332,
+        4.1804269421845675,
+        4.2249070247635245,
+        4.182946984656155,
+        4.184997058473527
+      ],
+      "stdev_ms": 0.0711057674346108
+    },
+    "warmup_iters": 2
+  },
+  "top_indices_equal": null,
+  "top_indices_shape": [
+    1,
+    4096,
+    512
+  ]
+}

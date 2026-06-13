@@ -1,0 +1,87 @@
+{
+  "artifact": "tilelang_sparse_mqa_bwd_dkv_overwrite_decision_20260604",
+  "date": "2026-06-04",
+  "scope": "TileLang DSv4 sparse-MQA backward diagnostic with raw racy dKV stores instead of atomic accumulation.",
+  "runtime": {
+    "node": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "gpu": "MI350X/gfx950",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "tilelang": "0.1.7.post3+cuda.gita55a8230"
+  },
+  "code": {
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py",
+    "diagnostic_kernel": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+    "variant": "dkv_overwrite_directdq"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "kv_len": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "dtype": "bfloat16",
+    "forward_state": "synthetic",
+    "block_size": 16,
+    "threads": 256
+  },
+  "timings_ms": {
+    "no_dkv_directdq_core": {
+      "artifact": "tilelang_sparse_mqa_bwd_nodkv_directdq_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_synthetic_20260604.json",
+      "median_ms": 2.1869380474090576
+    },
+    "dkv_compute_nowrite_core": {
+      "artifact": "tilelang_sparse_mqa_bwd_dkv_compute_nowrite_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_timing20_synthetic_20260604.json",
+      "median_ms": 2.2741994857788086
+    },
+    "dkv_overwrite_core_timing20": {
+      "artifact": "tilelang_sparse_mqa_bwd_dkv_overwrite_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_timing20_synthetic_20260604.json",
+      "median_ms": 9.259000778198242,
+      "min_ms": 9.208800315856934,
+      "mean_ms": 9.27028293609619
+    },
+    "straight_reference_atomic_best_full_width": {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_thr256_synthetic_20260604.json",
+      "median_ms": 28.085914611816406
+    },
+    "current_triton_sparse_atomic_dkv_wall": {
+      "artifact": "sparse_dkv_compact_micro_partial_store_decision_20260603.json",
+      "median_ms": 8.006924390792847
+    }
+  },
+  "deltas_ms": {
+    "raw_racy_store_minus_dkv_compute_nowrite": 6.984801292419434,
+    "straight_atomic_minus_raw_racy_store": 18.826913833618164,
+    "raw_racy_store_minus_current_triton_sparse_atomic_wall": 1.2520763874053955
+  },
+  "write_model": {
+    "selected_rows": 2097152,
+    "scalar_dkv_store_elements": 1073741824,
+    "modeled_store_bytes_fp32": 4294967296,
+    "atomic_addx4_calls_in_reference": 268435456
+  },
+  "expected_warning": {
+    "tilelang_data_race_warning": true,
+    "reason": "The diagnostic intentionally overwrites dKV[group, d] from many CTAs instead of accumulating; final dKV values are invalid and only timing is used."
+  },
+  "decision": {
+    "status": "reject_raw_selected_row_writeback",
+    "read": [
+      "Adding dKV contribution math without any global dKV writes costs only about 0.09 ms over the no-dKV diagnostic.",
+      "Adding raw racy dKV stores raises the full-head TileLang core to 9.26 ms, already slower than the current 8.01 ms Triton sparse-atomic wall.",
+      "Therefore the main wall is the raw selected-row write volume itself; atomics make the straight reference much worse, but simply replacing atomics with normal stores is not a speed path."
+    ],
+    "next_kernel_contract": [
+      "Keep the fast direct H64/D512 query-major TileLang contribution schedule.",
+      "Do not emit one selected KxD row per token/slot to global memory, even as compact partials.",
+      "The next executable candidate must reduce by compressed group before global memory: token-window segmented accumulation, split-wave/CTA grouped accumulation, or an MFMA producer that emits only compact reduced rows."
+    ],
+    "promotion_gate": "At S4096/H64/D512/topk512, a useful reduced-writeback candidate must keep the 2.27 ms producer math and add less than about 5.7 ms of grouped dKV writeback to beat the current 8.01 ms wall."
+  },
+  "commands": [
+    "python3 tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py --bwd-variant dkv_overwrite_directdq --seq-len 4096 --kv-len 1024 --heads 64 --dim 512 --topk 512 --bwd-block-size 16 --bwd-threads 256 --forward-state synthetic --warmup-iters 5 --timed-iters 20 --skip-full-interface --summary-path run_artifacts/tilelang_sparse_mqa_bwd_dkv_overwrite_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_timing20_synthetic_20260604.json --json"
+  ],
+  "dependency_pin_changes": []
+}

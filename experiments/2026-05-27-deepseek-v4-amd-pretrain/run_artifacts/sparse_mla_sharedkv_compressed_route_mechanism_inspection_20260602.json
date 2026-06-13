@@ -1,0 +1,218 @@
+{
+  "artifact": "sparse_mla_sharedkv_compressed_route_mechanism_inspection_20260602",
+  "created_date": "2026-06-02",
+  "status": "mechanism_localized_to_compressed_dkv_atomic_accumulation_with_mfma_floors",
+  "scope": "S4096 shared latent-KV sparse MLA backward compressed-topk route",
+  "trigger": "compressed-only 11.02 ms accounts for about 76.5% of the full local+compressed raw backward slice",
+  "current_best_evidence": {
+    "full_local128_compressed512_ms": 14.392242431640625,
+    "local128_only_ms": 3.8283939361572266,
+    "compressed512_only_ms": 11.017240524291992,
+    "compressed_only_ratio_of_full": 0.765499,
+    "dq_only_full640_ms": 2.267822027206421,
+    "compressed512_query_major_ms": 11.017240524291992,
+    "compressed512_separate_dq_plus_dkv_ms": 15.050722122192383,
+    "prefix_route_fanin_topk512_compressed_selection_share": 0.7528575368492018,
+    "prefix_route_fanin_topk512_compressed_total_selections": 1572352,
+    "prefix_route_fanin_topk512_compressed_estimated_atomic_add_elements": 805044224,
+    "prefix_route_fanin_topk512_max_compressed_group_fanin": 4093,
+    "prefix_route_fanin_topk512_mean_nonzero_compressed_group_fanin": 3071.0,
+    "compressed_only_topk_scaling_query_major_ms": {
+      "topk64": 2.00831800699234,
+      "topk128": 3.609113931655884,
+      "topk256": 6.341623783111572,
+      "topk512": 10.95469856262207
+    },
+    "compressed_only_topk512_profile_split_ms": {
+      "full_atomic": 10.894770622253418,
+      "no_dkv": 1.8989759683609009,
+      "dkv_reduce_sink": 2.684101104736328,
+      "estimated_dkv_dot_math": 0.7851251363754272,
+      "estimated_full_dkv_atomic_accumulation": 8.21066951751709,
+      "full_dkv_atomic_accumulation_share_of_full": 0.7536377147549414
+    },
+    "compressed_only_topk256_profile_split_ms": {
+      "full_atomic": 6.3780131340026855,
+      "no_dkv": 1.170928955078125,
+      "dkv_reduce_sink": 1.6458929777145386,
+      "estimated_dkv_dot_math": 0.4749640226364136,
+      "estimated_full_dkv_atomic_accumulation": 4.732120156288147,
+      "full_dkv_atomic_accumulation_share_of_full": 0.7419549647919674
+    },
+    "query_major_route_load_removed_delta_ms": {
+      "compressed512_only": 0.06227684020996094,
+      "full640": 0.027402877807617188
+    },
+    "best_compressed_tile_sweep_ms": 10.997425079345703,
+    "best_inverse_route_two_pass_s4096_ms": 140.67405700683594,
+    "compressed_dkv_group_reduce_s128_br128_ms": 0.5634054839611053,
+    "compressed_dkv_group_reduce_s128_br512_ms": 0.5874049961566925,
+    "compressed_dkv_group_reduce_s4096_topk512_br512_ms": 333.8633728027344,
+    "compressed_dkv_group_reduce_s4096_atomic_elements_upper_bound": 134217728,
+    "rocprof_retained_tile_query_full_atomic_kernel_avg_ms": 11.06122375,
+    "rocprof_retained_tile_no_dkv_kernel_avg_ms": 1.1442145,
+    "rocprof_retained_tile_dkv_reduce_sink_kernel_avg_ms": 1.882611,
+    "rocprof_retained_tile_estimated_dkv_dot_math_ms": 0.7383965000000001,
+    "rocprof_retained_tile_estimated_full_dkv_atomic_accumulation_ms": 9.17861275,
+    "rocprof_h64n64_counter_query_atomic_wavefronts": 16777216.0,
+    "rocprof_h64n64_counter_query_tcc_atomic_dram_32b_requests": 402522112.0,
+    "rocprof_h64n64_counter_no_dkv_atomic_wavefronts": 0.0,
+    "rocprof_h64n64_counter_dkv_reduce_sink_atomic_wavefronts": 0.0,
+    "rocprof_h64n64_counter_tagconflict_stall_cycles": 0.0,
+    "rocprof_h64n64_counter_observed_tcc_atomic_32b_requests_per_estimated_scalar_atomic_add": 0.5,
+    "compressed_dkv_bmm_floor_s128_fp32_max_abs_diff": 0.0000324249267578125,
+    "compressed_dkv_bmm_floor_s128_mixed_max_abs_diff": 0.12979507446289062,
+    "compressed_dkv_bmm_floor_s128_bf16_max_abs_diff": 0.2010364532470703,
+    "compressed_dkv_bmm_floor_s4096_mixed_ms": 7.065645217895508,
+    "compressed_dkv_bmm_floor_s4096_mixed_peak_gib": 5.851562976837158,
+    "compressed_dkv_bmm_floor_s4096_bf16_ms": 4.756993770599365,
+    "compressed_dkv_bmm_floor_s4096_bf16_peak_gib": 4.319336414337158,
+    "compressed_dkv_bmm_floor_s128_mixed_chunk32_max_abs_diff": 0.1124725341796875,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk2048_ms": 7.6910271644592285,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk2048_peak_gib": 4.507812976837158,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk1024_ms": 7.71589994430542,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk1024_peak_gib": 3.882812976837158,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk512_ms": 8.112430572509766,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk512_peak_gib": 3.602539539337158,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk256_ms": 9.507842063903809,
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk256_peak_gib": 3.477539539337158,
+    "compressed_dkv_flat_gemm_s128_mixed_max_abs_diff": 0.1440563201904297,
+    "compressed_dkv_flat_gemm_s128_bf16_max_abs_diff": 0.1984710693359375,
+    "compressed_dkv_flat_gemm_s4096_mixed_ms": 7.052491188049316,
+    "compressed_dkv_flat_gemm_s4096_mixed_peak_gib": 5.602539539337158,
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk1024_ms": 7.6899847984313965,
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk1024_peak_gib": 3.729004383087158,
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk512_ms": 7.783565998077393,
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk512_peak_gib": 3.416504383087158,
+    "compressed_dkv_flat_gemm_s4096_bf16_ms": 4.727312088012695,
+    "compressed_dkv_flat_gemm_s4096_bf16_peak_gib": 4.101074695587158
+  },
+  "source_references": {
+    "backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "query_major_kernel_start_line": 1264,
+    "query_major_runner_start_line": 2406,
+    "query_major_profile_wrapper_start_line": 3241,
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_backward_combined.py",
+    "compressed_dkv_group_reduce_benchmark": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_compressed_dkv_group_reduce.py",
+    "compressed_dkv_bmm_floor_benchmark": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py",
+    "benchmark_profile_timing_start_line": 397,
+    "autograd_query_recompute_dispatch_lines": "2823-2849",
+    "public_query_recompute_wrapper_start_line": 3214
+  },
+  "artifact_references": {
+    "ascend_amd_contract": "run_artifacts/ascend_sasg_slig_amd_fusion_contract_20260601.json",
+    "compressed_only_query_major": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_compressed512_only_s4096_timing5_mi350_20260601.json",
+    "full_route_query_major": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_full_s4096_timing5_mi350_20260601.json",
+    "local_only_query_major": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_local128_only_s4096_timing5_mi350_20260601.json",
+    "dq_only": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_dq_s4096_mi350_20260601.json",
+    "structured_index_probe": "run_artifacts/torchtitan_sparse_mla_shared_kv_structured_index_route_probe_20260601.json",
+    "compressed_tile_sweep": "run_artifacts/shared_kv_compressed_tile_sweep_20260601/summary.json",
+    "inverse_route_two_pass": "run_artifacts/structured_dkv_inverse_route_sweep_20260601/summary.json",
+    "route_fanin_prefix_topk_sweep": "run_artifacts/sparse_mla_sharedkv_route_fanin_s4096_prefix_topk_sweep_20260602.json",
+    "compressed_topk64_smoke": "run_artifacts/sharedkv_compressed_only_topk64_smoke_20260602.json",
+    "compressed_topk128": "run_artifacts/sharedkv_compressed_only_topk128_20260602.json",
+    "compressed_topk256": "run_artifacts/sharedkv_compressed_only_topk256_20260602.json",
+    "compressed_topk512": "run_artifacts/sharedkv_compressed_only_topk512_20260602.json",
+    "compressed_topk256_profile_split": "run_artifacts/sharedkv_compressed_only_topk256_profile_split_20260602.json",
+    "compressed_topk512_profile_split": "run_artifacts/sharedkv_compressed_only_topk512_profile_split_20260602.json",
+    "compressed_dkv_group_reduce_s128_br128": "run_artifacts/sharedkv_compressed_dkv_group_reduce_s128_br128_bd64_20260602.json",
+    "compressed_dkv_group_reduce_s128_br512": "run_artifacts/sharedkv_compressed_dkv_group_reduce_s128_br512_bd64_20260602.json",
+    "compressed_dkv_group_reduce_s4096_topk512_br512": "run_artifacts/sharedkv_compressed_dkv_group_reduce_s4096_topk512_br512_bd64_20260602.json",
+    "rocprof_retained_tile_kerneltrace_summary": "run_artifacts/sharedkv_compressed_only_s4096_rocprof_kerneltrace_summary_20260602.json",
+    "rocprof_h64n64_counter_summary": "run_artifacts/sharedkv_compressed_only_s4096_h64n64_rocprof_counter_summary_20260602.json",
+    "compressed_dkv_bmm_floor_summary": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_summary_20260602.json",
+    "compressed_dkv_bmm_floor_s128_fp32": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_fp32_20260602.json",
+    "compressed_dkv_bmm_floor_s128_mixed": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_mixed_20260602.json",
+    "compressed_dkv_bmm_floor_s128_bf16": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_bf16_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_mixed": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_bf16": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_bf16_20260602.json",
+    "compressed_dkv_bmm_floor_chunk_sweep": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_chunk_sweep_20260602.json",
+    "compressed_dkv_bmm_floor_s128_mixed_chunk32": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_mixed_chunk32_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk2048": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk2048_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk1024": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk1024_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk512": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk512_20260602.json",
+    "compressed_dkv_bmm_floor_s4096_mixed_chunk256": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk256_20260602.json",
+    "compressed_dkv_flat_gemm_summary": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_summary_20260602.json",
+    "compressed_dkv_flat_gemm_s128_mixed": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s128_mixed_20260602.json",
+    "compressed_dkv_flat_gemm_s128_bf16": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s128_bf16_20260602.json",
+    "compressed_dkv_flat_gemm_s4096_mixed": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_20260602.json",
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk1024": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_chunk1024_20260602.json",
+    "compressed_dkv_flat_gemm_s4096_mixed_chunk512": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_chunk512_20260602.json",
+    "compressed_dkv_flat_gemm_s4096_bf16": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_bf16_20260602.json",
+    "integrated_query_recompute_negative": "run_artifacts/torchtitan_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_negative_20260602.json"
+  },
+  "mechanism_read": {
+    "not_route_index_load": "The structured-index probe removes synthetic route tensor loads and saves only 0.03-0.06 ms at S4096.",
+    "not_simple_hn_tile_choice": "The compressed-only tile sweep is flat around H64/N64: best actual route-loading point is 10.997 ms, H64/N128 is 11.102 ms, H64/N256 is 11.322 ms, and smaller head tiles regress badly.",
+    "not_wholesale_key_major_reduction": "The two-pass inverse-route dKV reduction removes hot-path atomics but gives up query-major QK/probability reuse and writes large scratch; best S4096 point is 140.67 ms.",
+    "not_naive_group_major_row_reduction": "A compressed-only group-reduce diagnostic aggregates 512 token-head rows per compressed group and D block before one atomic-add. It passes S128 parity at 0.56-0.59 ms, but the real S4096/top-k512 shape is 333.86 ms. Lowering atomic count on paper is not enough if the traversal loops group-major over too many row blocks and loses query-major locality.",
+    "dq_side_is_not_the_wall": "The dQ-only recompute probe is 2.27 ms for the full 640-key local+compressed route.",
+    "topk_scaling_is_near_linear": "Compressed-only query-major latency scales with selected compressed groups: top-k 64/128/256/512 measures 2.01/3.61/6.34/10.95 ms. This rules out a large fixed launch/wrapper cost and keeps the wall tied to per-selected-group work.",
+    "dkv_dot_math_is_not_the_wall": "The diagnostic checksum-sink split keeps QK/probability/dQ work and computes dKV dot products, but replaces full tl.atomic_add dKV accumulation with one scalar store per tile. At top-k 512, no_dKV is 1.90 ms, checksum-sink is 2.68 ms, and full atomic is 10.89 ms; at top-k 256, no_dKV is 1.17 ms, checksum-sink is 1.65 ms, and full atomic is 6.38 ms. The dKV dot math is about 0.5-0.8 ms; full dKV atomic accumulation is about 4.7-8.2 ms.",
+    "rocprof_confirms_kernel_wall": "A retained-tile rocprof kernel trace isolates _sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel at 11.06 ms avg for full atomic, 1.14 ms no-dKV, and 1.88 ms checksum-sink. The kernel-stat delta attributes about 0.74 ms to dKV dot math and about 9.18 ms to full compressed dKV atomic accumulation.",
+    "rocprof_counters_confirm_atomic_volume": "The H64/N64 counter sweep reports 16.78M atomic wavefronts and 402.52M TCC 32-byte atomic DRAM write requests in the full compressed dKV path. The no-dKV and checksum-sink controls both report zero atomic wavefronts and zero TCC atomic requests. The TCC request count is exactly half of the 805.04M scalar dKV atomic-add elements predicted by the route fan-in analyzer, so the selected compressed-group fan-in model matches hardware traffic. TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum is zero, so this counter set points to atomic traffic volume rather than a visible TCP tag-conflict stall counter.",
+    "mfma_accumulation_floor_is_positive_but_materializing": "A compressed-prefix batched-GEMM floor turns the two dKV accumulation terms into KxS @ SxD bmm over heads. S128 FP32 formula parity passes with max diff 3.24e-5, and the mixed FP32-score/BF16-bmm contract passes with max diff 0.1298. At S4096, mixed mode is 7.07 ms and pure BF16 timing is 4.76 ms, versus about 11.0 ms for the retained query-major atomic path. This proves an MFMA-friendly compressed dKV topology can beat atomic accumulation, but the current full probe materializes [B,H,S,K] scores/probs and peaks at 4.3-5.9 GiB, so it is a design floor rather than a production backend.",
+    "chunked_mfma_floor_bounds_materialization": "The chunked BMM floor keeps the mixed contract correct at S128 chunk32 with max diff 0.112. At S4096/top-k512, chunk2048 and chunk1024 retain the 7 ms band at 7.69-7.72 ms while reducing peak allocation to 4.51 and 3.88 GiB and active score/prob slabs to 0.25 and 0.125 GiB. Smaller external-BMM chunks bend upward: chunk512 is 8.11 ms and chunk256 is 9.51 ms. This says materialization can be bounded without returning to the 11 ms atomic wall, but a production path must fuse the streaming schedule rather than launch many separate BMM chunks.",
+    "flat_gemm_floor_reduces_heads_directly": "The flat-GEMM variant reshapes heads and tokens into HS rows and accumulates Kx(HS) @ (HS)xD directly, avoiding a separate head-local gradient output before reduction. It is viable but not a major mixed-mode speedup: full S4096 mixed is 7.05 ms and 5.60 GiB, essentially the 7.07 ms BMM floor with slightly lower memory. Chunk1024/chunk512 are 7.69/7.78 ms and 3.73/3.42 GiB, slightly better memory than BMM chunks. Pure BF16 flat-GEMM passes the S128 tolerance at max diff 0.198 and times S4096 at 4.73 ms with 4.10 GiB peak, making BF16 accumulation a plausible fused-kernel design point.",
+    "compressed_topk_is_dense_enough_to_hurt": "The compressed-only probe selects 512 compressed groups per query out of 1024 groups. The prefix-route fan-in analyzer reports 1,572,352 compressed selections at top-k 512, a 75.3% share of the full local+compressed route and about 805M estimated compressed dKV atomic-add elements at D=512/BLOCK_H=64.",
+    "kernel_mechanism": "The query-major kernel launches one program per token and head block, loops over selected keys in block_n chunks, recomputes QK and dO.V across four D=128 chunks, forms probabilities and grad logits, then reloads KV/Q/dO for each D chunk to compute dQ and dKV. dQ stays local, but dKV is tl.atomic_add back into the shared compressed KV gradient bank for every selected group and D chunk.",
+    "likely_wall": "The remaining wall is many-to-one full dKV atomic accumulation into the compressed shared-KV gradient bank under dynamic top-k routes. Repeated selected-KV reads and D-pass recompute still exist, but the profile split shows dKV dot math is small relative to the full atomic accumulation cost. It is not wrapper glue, index loading, a trivial Triton block retune, raw dense dot math, or a problem solved by a naive group-major row reduction."
+  },
+  "completed_profile_cuts": [
+    {
+      "name": "topk_scaling_64_128_256_512",
+      "result": "Compressed-only query-major latency rises 2.01 -> 3.61 -> 6.34 -> 10.95 ms as selected compressed top-k rises 64 -> 128 -> 256 -> 512."
+    },
+    {
+      "name": "dkv_no_atomic_or_throwaway_store",
+      "result": "Diagnostic dkv_reduce_sink computes dKV dot products but avoids full atomic accumulation. At top-k512, full minus sink is about 8.21 ms while sink minus no_dKV is only about 0.79 ms; at top-k256, full minus sink is about 4.73 ms while sink minus no_dKV is about 0.48 ms."
+    },
+    {
+      "name": "compressed_dkv_group_major_row_reduce",
+      "result": "The compressed-only group-reduce dKV probe passes formula parity, but S4096/top-k512 with block_rows=512 is 333.86 ms despite reducing the estimated atomic elements upper bound from about 805M to 134M. This rejects a naive all-groups/all-row-blocks reduction topology."
+    },
+    {
+      "name": "rocprof_retained_tile_kerneltrace",
+      "result": "Rocprof kernel stats on the retained H64/D512 compressed-only path report the target backward kernel at 11.06 ms full atomic, 1.14 ms no-dKV, and 1.88 ms checksum-sink. This independently corroborates that the full compressed dKV atomic accumulation delta, about 9.18 ms, dominates the retained kernel."
+    },
+    {
+      "name": "rocprof_h64n64_atomic_counter_sweep",
+      "result": "Hardware counters on the retained H64/N64 tile report 16.78M atomic wavefronts and 402.52M TCC 32-byte atomic DRAM write requests in the full path, versus zero atomic counters in no-dKV and checksum-sink controls. The TCC request count matches half of the 805.04M predicted scalar dKV atomic-add elements."
+    },
+    {
+      "name": "compressed_prefix_dkv_bmm_floor",
+      "result": "A materializing batched-GEMM floor passes S128 in FP32 and mixed FP32-score/BF16-bmm modes, then times at 7.07 ms mixed and 4.76 ms pure BF16 for S4096/top-k512. This is a positive design floor for MFMA-friendly compressed dKV accumulation, not a production kernel because it materializes [B,H,S,K] scores/probs."
+    },
+    {
+      "name": "compressed_prefix_dkv_bmm_chunk_sweep",
+      "result": "A chunked BMM floor passes S128 mixed chunk32 with max diff 0.112. At S4096/top-k512, chunk2048/chunk1024 keep median latency at 7.69/7.72 ms while lowering peak memory to 4.51/3.88 GiB; chunk512/chunk256 bend to 8.11/9.51 ms, exposing repeated external BMM launch and packing overhead."
+    },
+    {
+      "name": "compressed_prefix_dkv_flat_gemm_floor",
+      "result": "Flattening heads and sequence into HS rows is viable but not a major mixed-mode speedup: S4096 mixed full is 7.05 ms and chunk1024/chunk512 are 7.69/7.78 ms. The useful improvement is memory and BF16 viability: chunk512 peak is 3.42 GiB, and pure BF16 passes S128 at max diff 0.198 while timing S4096 at 4.73 ms."
+    }
+  ],
+  "next_profile_cuts": [
+    {
+      "name": "dq_only_vs_dkv_only_compressed512",
+      "purpose": "Separate dQ math from dKV accumulation on the compressed-only route.",
+      "expected_signal": "If dQ remains around 1-2 ms and dKV consumes most of the 11 ms, prioritize dKV conflict/scatter scheduling."
+    },
+    {
+      "name": "compressed_group_fan_in_histogram",
+      "purpose": "Count per-compressed-group selection fan-in over S4096 for actual LI top-k and synthetic prefix routes.",
+      "expected_signal": "Hot groups or high fan-in variance explain atomic contention and guide bucketed/conflict-aware reduction."
+    },
+    {
+      "name": "dim_scaling_64_128_256_512",
+      "purpose": "Measure whether D=512 repeats are the bottleneck through four D=128 passes.",
+      "expected_signal": "Linear D scaling favors value/dKV math fusion; nonlinear scaling flags occupancy/register pressure or memory behavior."
+    },
+    {
+      "name": "conflict_aware_compressed_dkv_microdesign",
+      "purpose": "Prototype a fused streaming/bucketed MFMA compressed dKV accumulation schedule that reduces atomic request volume without materializing [B,H,S,K] scores/probs or scanning all groups over all row blocks.",
+      "expected_signal": "Approach the 4.8-7.1 ms bmm floor while preserving the no-selected-state training contract and retaining S128 parity."
+    }
+  ],
+  "next_implementation_direction": "Preserve the query-major FlashAttention-style reuse for QK/probability/dQ, but redesign compressed dKV accumulation around MFMA-friendly grouped KxS @ SxD work or an equivalent fused streaming/bucketed schedule. The next candidate should reduce atomic traffic without falling into the 140 ms key-major scratch-reduction trap, the 333 ms naive group-major row-reduction trap, the repeated-BMM overhead visible below chunk512, or the 4.3-5.9 GiB full materialized-probability footprint of the bmm floor, then fuse LI target-probability/KL derivative and compressor gradients into the same recompute path."
+}

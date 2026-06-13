@@ -1,0 +1,72 @@
+{
+  "correctness": {
+    "backward": {
+      "custom_vs_autograd": {
+        "grad_k": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        },
+        "grad_q": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        },
+        "grad_weights": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        }
+      },
+      "manual_vs_autograd": {
+        "grad_k": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        },
+        "grad_q": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        },
+        "grad_weights": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_diff": 0.0
+        }
+      }
+    },
+    "device": "cpu",
+    "dtype": "bfloat16",
+    "forward": {
+      "invalid_slots": 36,
+      "topk_indices_equal": true,
+      "topk_scores_vs_function": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rel_diff": 0.0
+      },
+      "topk_scores_vs_gather": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rel_diff": 0.0
+      }
+    },
+    "shape": {
+      "batch": 1,
+      "compress_ratio": 4,
+      "head_dim": 8,
+      "heads": 4,
+      "seqlen_kv": 8,
+      "seqlen_q": 32,
+      "topk": 4
+    }
+  },
+  "gradcheck": {
+    "enabled": false
+  },
+  "probe": "lightning_indexer_reference",
+  "timing": {
+    "enabled": false
+  }
+}

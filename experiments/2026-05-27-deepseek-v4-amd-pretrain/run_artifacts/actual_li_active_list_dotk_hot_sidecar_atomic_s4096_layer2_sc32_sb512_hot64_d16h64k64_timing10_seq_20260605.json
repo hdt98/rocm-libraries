@@ -1,0 +1,232 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 0.16216216216216217,
+    "dense_slots_after_compaction": 254976,
+    "nonempty_tiles": 128,
+    "tiles": 128,
+    "unique_groups_max": 64,
+    "unique_groups_mean_all_tiles": 62.25,
+    "unique_groups_mean_nonempty": 62.25,
+    "unique_groups_total": 7968
+  },
+  "active_route_workspace": {
+    "active_counts_bytes": 512,
+    "active_flat_groups_bytes": null,
+    "active_groups_bytes": 32768,
+    "active_offsets_bytes": null,
+    "hot_pair_counts_bytes": 1024,
+    "micro_to_seq_slots_bytes": null,
+    "route_slots_bytes": null,
+    "seq_active_counts_bytes": null,
+    "seq_active_flat_groups_bytes": null,
+    "seq_active_groups_bytes": null,
+    "seq_active_offsets_bytes": null
+  },
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "active_blocks": 1,
+    "active_group_shape": [
+      1,
+      128,
+      1,
+      64
+    ],
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64,
+    "block_u": 64,
+    "group_block": 64,
+    "kernel": "dot_k_hot_sidecar_atomic",
+    "num_warps": 8,
+    "selected_block": 512,
+    "seq_chunk": 32
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": null,
+    "dkv_atol": 0.1,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "grad_kv_dtype": "float32",
+  "layer_id": 2,
+  "materialized_workspace": {
+    "grad_logits_bytes": 536870912,
+    "probs_bytes": 536870912,
+    "safe_groups_bytes": 16777216,
+    "valid_bytes": 2097152
+  },
+  "modeled_write_reduction": {
+    "actual_kernel_atomic_elements": 690732544,
+    "actual_kernel_atomic_reduction_x": 1.1654934040577072,
+    "actual_kernel_modeled_payload_bytes": 2762930176,
+    "actual_kernel_write_elements": 690732544,
+    "actual_kernel_write_reduction_x": 1.1654934040577072,
+    "coalesced_active_list_atomic_elements": 33806848,
+    "coalesced_active_list_reduction_x": 23.813051840857806,
+    "compact_partial_slab_elements": 33806848,
+    "compact_partial_slab_over_raw_write_x": 0.04199377747476392,
+    "dense_partial_slab_elements": 67108864,
+    "dense_partial_slab_over_raw_write_x": 0.08336046890263758,
+    "hot_group_limit": 64,
+    "hot_selected_pair_coverage": 0.14706185383425593,
+    "hot_selected_pairs": 231233,
+    "query_major_raw_atomic_elements": 805044224,
+    "raw_atomic_fp32_payload_bytes": 3220176896,
+    "raw_atomic_selected_grad_kv_payload_bytes": 3220176896,
+    "read": "dot_k_hot_sidecar_atomic keeps the fast query-major dot-K producer, locally accumulates a bounded set of hottest compressed groups per (seq tile, selected-key tile), and falls back to raw global atomics for non-hot groups. It is the first Triton-sidecar kernel that reduces writes before global memory without moving to a route-owned producer.",
+    "seq_compact_partial_slab_elements": null,
+    "seq_compact_partial_slab_over_raw_write_x": null
+  },
+  "read": "Diagnostic dynamic active-list D16 compressed-dKV accumulator. It consumes materialized probs/grad_logits and precomputed active compressed-group lists, so it isolates the reduced-write accumulator only. A production kernel must fuse score/prob/grad-logit recompute and avoid materialized selected state.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_active_list_dkv_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "ok",
+  "timing": {
+    "active_list_triton_from_materialized_probs": {
+      "checksum_norm": 960.2521362304688,
+      "event": {
+        "enabled": true,
+        "max_ms": 16.50348472595215,
+        "mean_ms": 16.114557647705077,
+        "median_ms": 16.064001083374023,
+        "min_ms": 16.039201736450195,
+        "samples_ms": [
+          16.106481552124023,
+          16.50348472595215,
+          16.075281143188477,
+          16.04372215270996,
+          16.039201736450195,
+          16.045520782470703,
+          16.05272102355957,
+          16.1490421295166,
+          16.079320907592773,
+          16.050800323486328
+        ],
+        "stdev_ms": 0.14089159765623002
+      },
+      "label": "active_list_triton_from_materialized_probs",
+      "peak_memory_allocated_bytes": 2720570880,
+      "peak_memory_allocated_gib": 2.533729076385498,
+      "wall": {
+        "enabled": true,
+        "max_ms": 16.59225206822157,
+        "mean_ms": 16.15150962024927,
+        "median_ms": 16.099984059110284,
+        "min_ms": 16.058723907917738,
+        "samples_ms": [
+          16.15431299433112,
+          16.59225206822157,
+          16.094024060294032,
+          16.062644077464938,
+          16.058723907917738,
+          16.104704001918435,
+          16.06892398558557,
+          16.165322856977582,
+          16.095264116302133,
+          16.118924133479595
+        ],
+        "stdev_ms": 0.15898985159534304
+      }
+    }
+  }
+}

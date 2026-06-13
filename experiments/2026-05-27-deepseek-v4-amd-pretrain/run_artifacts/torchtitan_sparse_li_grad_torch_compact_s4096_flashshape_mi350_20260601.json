@@ -1,0 +1,68 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "read": "Prefix-selected torch.bmm floor for compact LI gradients. It tests whether MI350 library GEMM can beat the scalar Triton dot loops, but it is not a general dynamic-topk production kernel.",
+    "workspace": {
+      "head_logits_logical_bytes": 268435456,
+      "index_logits_bytes": 8388608,
+      "main_logits_logical_bytes": 268435456,
+      "row_count": 4093.0,
+      "target_probs_bytes": 8388608
+    }
+  },
+  "matmul_dtype": "input",
+  "max_abs_diff": null,
+  "oracle": null,
+  "scope": "torch_compact_prefix_sparse_lightning_indexer_grad_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 1024,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 6.010136127471924,
+      "mean_ms": 5.797148068745931,
+      "median_ms": 5.824534893035889,
+      "min_ms": 5.5567731857299805,
+      "samples_ms": [
+        6.010136127471924,
+        5.824534893035889,
+        5.5567731857299805
+      ],
+      "stdev_ms": 0.2279188843530609
+    },
+    "peak_memory_allocated_bytes": 3891287552,
+    "peak_memory_allocated_gib": 3.6240439414978027,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 6.074610981158912,
+      "mean_ms": 5.841558294681211,
+      "median_ms": 5.862451973371208,
+      "min_ms": 5.587611929513514,
+      "samples_ms": [
+        6.074610981158912,
+        5.862451973371208,
+        5.587611929513514
+      ],
+      "stdev_ms": 0.24417090005317976
+    },
+    "warmup_iters": 1
+  },
+  "torch_grad_norms": {
+    "index_k": 3.1295905500883237e-05,
+    "index_q": 3.092690167250112e-05,
+    "weights": 2.7345909984433092e-05
+  }
+}

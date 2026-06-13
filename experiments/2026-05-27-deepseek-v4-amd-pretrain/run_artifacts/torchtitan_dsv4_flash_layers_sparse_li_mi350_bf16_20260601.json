@@ -1,0 +1,68 @@
+{
+  "attn_backend": "sdpa",
+  "batch": 1,
+  "compressed_layers_all_indexer_grads_present": true,
+  "compressed_layers_all_sparse_used": true,
+  "compressed_layers_any_indexer_grad_nonzero": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_results": [
+    {
+      "compress_ratio": 4,
+      "implementation_status": "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "indexer_all_grads_present": true,
+      "indexer_any_grad_nonzero": true,
+      "indexer_grad_norms": {
+        "weights_proj.weight": 0.0001335559063591063,
+        "wk.weight": 0.00016597833018749952,
+        "wq.weight": 0.00014554534573107958
+      },
+      "input_grad_norm": 0.0008486235165037215,
+      "last_indexer_loss": 4.264877861714922e-05,
+      "last_sparse_compressed_groups": 32,
+      "last_sparse_selected_keys": 160,
+      "layer_id": 2,
+      "loss": 0.021132100373506546,
+      "output_shape": [
+        1,
+        128,
+        4096
+      ],
+      "pytorch_sparse_mla_max_seq_len": 512,
+      "sparse_used": true
+    },
+    {
+      "compress_ratio": 128,
+      "implementation_status": "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "indexer_all_grads_present": true,
+      "indexer_any_grad_nonzero": false,
+      "indexer_grad_norms": {
+        "weights_proj.weight": 0.0,
+        "wk.weight": 0.0,
+        "wq.weight": 0.0
+      },
+      "input_grad_norm": 0.0006210549036040902,
+      "last_indexer_loss": 0.0,
+      "last_sparse_compressed_groups": 1,
+      "last_sparse_selected_keys": 129,
+      "layer_id": 3,
+      "loss": 0.015783142298460007,
+      "output_shape": [
+        1,
+        128,
+        4096
+      ],
+      "pytorch_sparse_mla_max_seq_len": 512,
+      "sparse_used": true
+    }
+  ],
+  "model_dim": 4096,
+  "seed": 1234,
+  "selected_layers": [
+    2,
+    3
+  ],
+  "seq_len": 128,
+  "status": "passed"
+}

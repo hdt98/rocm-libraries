@@ -1,0 +1,47 @@
+{
+  "artifact": "actual_li_unique_bmm_dkv_floor_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Dynamic unique-group route-BMM floor for actual LightningIndexer compressed dKV.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_unique_bmm_floor.py",
+  "host": "do-sonle5-mi350-gpu",
+  "device": "1xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "status": "external_unique_bmm_bridge_rejected_but_density_supports_in_kernel_compaction",
+  "read": "Compacting actual selected compressed groups per query tile gives good route density, but doing torch.unique/scatter/BMM outside a fused kernel is overwhelmingly slow. This branch strengthens the requirement that unique-group compaction must happen cheaply inside the query-major D16 kernel.",
+  "s128_layer2": {
+    "artifact": "run_artifacts/actual_li_unique_bmm_dkv_s128_layer2_sc16_20260602.json",
+    "seq_len": 128,
+    "seq_chunk": 16,
+    "max_abs_diff": 0.09790802001953125,
+    "unique_bmm_median_ms": 8.055606842041016,
+    "pytorch_reference_median_ms": 0.47236499190330505,
+    "dense_slot_overhead_x": 1.1428571428571428,
+    "unique_groups_mean_nonempty": 18.0,
+    "unique_groups_max": 32
+  },
+  "s4096_layer2_density": {
+    "artifact": "run_artifacts/actual_li_unique_bmm_density_s4096_layer2_sc32_20260602.json",
+    "seq_len": 4096,
+    "seq_chunk": 32,
+    "valid_pairs": 1572352,
+    "unique_groups_total": 66029,
+    "unique_groups_mean_nonempty": 515.8515625,
+    "unique_groups_max": 1024,
+    "dense_slot_overhead_x": 1.3438008791924454,
+    "dense_slots_after_compaction": 2112928
+  },
+  "s4096_layer2_timing": {
+    "artifact": "run_artifacts/actual_li_unique_bmm_dkv_s4096_layer2_sc32_timing_20260602.json",
+    "seq_len": 4096,
+    "seq_chunk": 32,
+    "correctness": "skipped",
+    "timed_iters": 1,
+    "unique_bmm_ms": 3220.26904296875,
+    "peak_gib": 3.8046908378601074
+  },
+  "interpretation": {
+    "positive": "Dynamic route compaction lowers S4096 layer-2 dense route slots to 1.344x the valid selected pairs, better than the best fixed-panel density points.",
+    "negative": "External PyTorch unique/scatter/BMM loops are orders of magnitude too slow: S4096 is 3.22 seconds and S128 is already 8.06 ms.",
+    "next_step": "Do not pursue external unique route-BMM. If using dynamic unique groups, implement compaction and reduction inside the query-major D16 sparse attention kernel, or fuse LI/compressor gradients to avoid this compressed dKV write path."
+  }
+}

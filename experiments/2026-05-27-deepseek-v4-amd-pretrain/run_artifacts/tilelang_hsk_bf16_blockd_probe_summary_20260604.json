@@ -1,0 +1,43 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_block_d_probe",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "heads": 64,
+    "dim": 512,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "block_k": 64,
+    "threads": 512,
+    "plan_on_device": true
+  },
+  "baseline": {
+    "block_d": 64,
+    "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_current_baseline_s4096_layer2_gp512_20260604.json",
+    "hsk_bf16_source_ms": 5.105003833770752,
+    "best_same_session_baseline_ms": 5.042367935180664
+  },
+  "probe": {
+    "block_d": 32,
+    "s128_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_blockd32_s128_layer2_gp32_20260604.json",
+    "s128_correct": true,
+    "s128_reference_max_abs_diff": 5.7220458984375e-06,
+    "s128_hsk_bf16_source_ms": 0.07430050149559975,
+    "s4096_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_blockd32_s4096_layer2_gp512_20260604.json",
+    "s4096_hsk_bf16_source_ms": 8.50096321105957,
+    "s4096_regression_x_vs_5p105": 1.6647035007887294,
+    "s4096_regression_x_vs_best_same_session": 1.735112013021334
+  },
+  "decision": {
+    "promote_block_d_32": false,
+    "retain_block_d_64": true,
+    "read": "Shrinking the D tile halves the per-CTA active-group accumulator columns, but it doubles the D-block launch/work count and loses MFMA/tile efficiency. The S4096 HSK bf16 source path regresses from about 5.0 ms to 8.5 ms, so the LDS conflict problem cannot be solved by a smaller D tile alone.",
+    "next_kernel_direction": "Keep block_d=64 and reduce the number or conflict pattern of group_acc read-modify-write operations inside the existing single producer pass. Viable next probes are wave-private/lane-group accumulation before group_acc, generated-source-level LDS layout inspection, or a lower-level HIP/CK/TileLang schedule that accumulates multiple selected rows for a hot group in registers before touching LDS."
+  }
+}

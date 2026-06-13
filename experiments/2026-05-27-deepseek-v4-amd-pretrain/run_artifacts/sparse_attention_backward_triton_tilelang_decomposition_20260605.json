@@ -1,0 +1,95 @@
+{
+  "status": "decomposed",
+  "created_at": "2026-06-05",
+  "scope": "sparse_attention_backward_triton_vs_tilelang_latency_surfaces",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "li_topk": 512
+  },
+  "triton_current_actual_source_boundary": {
+    "artifact": "run_artifacts/sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn64_bd128_sweep_20260605.json",
+    "kernel": "sparse_mla_shared_kv_backward_dq_dkv_query_recompute_profile",
+    "active_block_env": {
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": 64,
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": 64,
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": 128
+    },
+    "latency_ms": {
+      "full": 11.13883113861084,
+      "no_dkv": 2.0338199138641357,
+      "dkv_reduce_sink": 2.943429946899414,
+      "full_minus_no_dkv": 9.105011224746704,
+      "sink_minus_no_dkv": 0.9096100330352783,
+      "full_minus_sink": 8.195401191711426
+    },
+    "read": "This is the current apples-to-apples Triton source-boundary gate: q, dO, KV, indices, output, and lse in; dQ and dKV out. The full-minus-sink split is the approximate global dKV accumulation wall."
+  },
+  "tilelang_route_owned_fused_source_boundary": {
+    "artifact": "run_artifacts/tilelang_selected_limit_direct_dq_dkv_s4096_layer2_gp256_rocprof_20260605.json",
+    "kernel": "mfma_panel_atomic_final_limited_bshd_source_direct_dblocked_dq_prim_kernel",
+    "shape": {
+      "group_panel_size": 256,
+      "panel_capacity": 256,
+      "token_block": 32,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "latency_ms": {
+      "benchmark_event_direct_source_dq_dkv": 16.673128128051758,
+      "rocprof_average_same_kernel": 17.0003105
+    },
+    "read": "The 16.67 ms benchmark event and 17.00 ms rocprof average are the same generated TileLang dQ+dKV source-boundary kernel measured two ways. This is the closest TileLang fused equivalent measured so far, and it loses to the 11.13 ms Triton gate."
+  },
+  "tilelang_late_or_easier_dkv_surfaces_not_internal_slices": {
+    "selected_limit_materialized_or_hsk_inputs": {
+      "artifact": "run_artifacts/tilelang_selected_limit_direct_dq_dkv_s4096_layer2_gp256_rocprof_20260605.json",
+      "latency_ms": {
+        "hsk_bf16_source_kernel": 5.9702839851379395,
+        "kernel_only_dkv_reducer": 6.900969982147217,
+        "source_indexed_kernel": 7.729257106781006
+      },
+      "read": "These are useful dKV reducer/body surfaces, but they are not slices of the 16.67 ms fused source-boundary kernel. They depend on easier/materialized inputs or omit source-boundary dQ/recompute work."
+    },
+    "two_kernel_pdp_then_dkv_rejected": {
+      "artifacts": [
+        "run_artifacts/sparse_dkv_tilelang_recompute_pdp_store_decision_20260604.json",
+        "run_artifacts/sparse_dkv_tilelang_pdp_pipeline_grouped_dkv_decision_20260604.json",
+        "run_artifacts/sparse_dkv_tilelang_recompute_spill_overflow_decision_20260604.json"
+      ],
+      "latency_ms": {
+        "pdp_slab_producer_s4096": 8.689,
+        "projected_pdp_plus_selected_limit_dkv": 15.599,
+        "measured_full_no_overflow_two_kernel": 16.238,
+        "measured_split_panel_with_spill": 19.848
+      },
+      "read": "A P/dP producer followed by the TileLang dKV consumer does not materialize the apparent dKV-only win; the HBM slab boundary and route spill erase it."
+    }
+  },
+  "non_additivity_warning": {
+    "invalid_composite": "Triton no_dkv ~2.03 ms + TileLang dKV-only ~5.97-6.90 ms",
+    "why_invalid": [
+      "The TileLang 5.97-6.90 ms dKV numbers are not operating on the same live source-boundary state as the Triton no-dKV kernel.",
+      "They do not include the source-boundary recompute and dQ ownership costs that make the measured fused TileLang route-owned kernel 16.67 ms.",
+      "The measured two-kernel P/dP producer plus dKV consumer is already 16.2-19.8 ms, so the apparent 8 ms hybrid is not materialized."
+    ]
+  },
+  "decision": {
+    "current_best_source_boundary_sparse_attention_backward": "triton_query_major_full_11p13ms",
+    "tilelang_fused_route_owned_status": "rejected_against_11p13ms_gate",
+    "tilelang_dkv_body_status": "promising_but_not_materialized_at_source_boundary",
+    "next_kernel_contract": [
+      "consume q, dO, compressed/shared KV, LI indices, output, and lse directly",
+      "preserve the Triton query-major q/dO and row-term reuse",
+      "add true lane/warp/block segmented dKV accumulation before global memory",
+      "avoid materialized P/scaled-dP slabs and avoid route-owned recompute that repeats QK/PV per D block",
+      "compare against the 11.13 ms full source-boundary sparse-attention backward gate"
+    ]
+  },
+  "dependency_pin_changes": []
+}

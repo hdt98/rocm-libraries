@@ -1,0 +1,134 @@
+{
+  "artifact": "torchtitan_direct_dsv4_s512_manual_split_sparse_backward_20260601",
+  "date_local": "2026-06-01",
+  "scope": "TorchTitan DeepSeek-V4 sparse-MLA/LightningIndexer manual_split backward bridge validation at S512.",
+  "source_snapshot": {
+    "torchtitan_base": "7fcd9beacde733f3ceca4a4da7e2f0518d64f68e",
+    "local_path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan",
+    "changed_file": "torchtitan/models/deepseek_v4/model.py"
+  },
+  "mode": {
+    "env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=manual_split",
+    "intent": "Split local-window and LightningIndexer compressed branches so the bridge no longer concatenates local and compressed selected K/V into one larger selected-state tensor.",
+    "still_materializes": [
+      "local selected K/V",
+      "compressed selected K/V",
+      "softmax probabilities"
+    ],
+    "does_not_materialize": [
+      "combined selected_k = cat(local_k, csa_k)",
+      "combined selected_v = cat(local_v, csa_v)"
+    ],
+    "not_final": "This is still a PyTorch correctness bridge. The final S4096 target still needs fused sparse MLA/LightningIndexer kernels that avoid selected K/V materialization and reduce the softmax/backward launch count."
+  },
+  "validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+      "result": "passed"
+    },
+    "local_cpu_parity_attempt": {
+      "result": "not_run",
+      "reason": "Host Python lacked torch: ModuleNotFoundError: No module named 'torch'."
+    },
+    "remote_container_parity": {
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "result": "passed",
+      "check": "Compared _SparseMLASplitManualBackward against _SparseMLAManualBackward on a mixed-validity CPU sparse pattern.",
+      "outputs_checked": [
+        "output",
+        "q.grad",
+        "k.grad",
+        "v.grad",
+        "compressed_k.grad",
+        "compressed_v.grad"
+      ],
+      "tolerance": {
+        "atol": 1e-6,
+        "rtol": 1e-6
+      },
+      "max_out_abs_diff": 1.1920928955078125e-7
+    },
+    "check_config": {
+      "command": "env CANARY_SPARSE_MLA_BACKWARD_MODE=manual_split CANARY_SEQ_LEN=512 CANARY_GBS=64 CANARY_STEPS=1 GPUS_PER_NODE=4 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "passed",
+      "attention_sparse_backward_mode_by_layer": [
+        "manual_split",
+        "manual_split",
+        "manual_split",
+        "manual_split"
+      ],
+      "attention_compress_ratio_by_layer": [
+        0,
+        0,
+        4,
+        128
+      ]
+    },
+    "one_gpu_smoke": {
+      "host": "do-sonle5-mi350-gpu",
+      "run_id": "torchtitan_direct_dsv4_s512_manual_split_1xmi350_smoke_20260601",
+      "raw_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_split_1xmi350_smoke_20260601/docker-run.log",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_split_1xmi350_smoke_20260601",
+      "command_shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512, CANARY_VISIBLE_DEVICES=0, CANARY_SKIP_SINGLE_RANK_FSDP=true, checkpoint disabled, activation_checkpoint=none",
+      "result": "passed",
+      "step": {
+        "loss": 12.23117,
+        "grad_norm": 13.1875,
+        "memory_gib": 207.05,
+        "tokens_per_gpu_s": 54,
+        "tflops_per_gpu": 0.72,
+        "mfu": 0.0003
+      },
+      "teardown": "process group destroyed"
+    },
+    "four_gpu_smoke": {
+      "host": "do-sonle5-mi350-gpu",
+      "run_id": "torchtitan_direct_dsv4_s512_manual_split_4xmi350_noac_20260601",
+      "raw_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_split_4xmi350_noac_20260601/docker-run.log",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_split_4xmi350_noac_20260601",
+      "command_shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512, CANARY_VISIBLE_DEVICES=2,3,4,5, checkpoint disabled, activation_checkpoint=none",
+      "result": "passed",
+      "step": {
+        "loss": 12.23311,
+        "grad_norm": 10.5,
+        "memory_gib": 75.66,
+        "tokens_per_gpu_s_range": [
+          536,
+          538
+        ],
+        "tflops_per_gpu_range": [
+          7.12,
+          7.14
+        ],
+        "mfu": 0.0031
+      },
+      "teardown": "process groups destroyed"
+    }
+  },
+  "comparison_to_previous_manual_bridge": {
+    "previous_artifact": "run_artifacts/torchtitan_direct_dsv4_s512_manual_sparse_backward_20260601.json",
+    "previous_4x_noac_memory_gib": 165.47,
+    "previous_4x_noac_tokens_per_gpu_s_range": [
+      397,
+      398
+    ],
+    "manual_split_4x_noac_memory_gib": 75.66,
+    "manual_split_4x_noac_tokens_per_gpu_s_range": [
+      536,
+      538
+    ],
+    "read": "The branch split removes the large combined selected K/V cat from the bridge and is materially lighter at S512. It does not solve the final S4096 fused sparse-MLA/LI kernel requirement because local and compressed selected K/V plus probabilities are still saved."
+  },
+  "external_node_state": {
+    "note": "During validation, external containers briefly occupied GPUs 0 and 1. The 4x smoke used the non-conflicting visible slice 2,3,4,5 and did not disturb those workloads."
+  },
+  "decision": {
+    "status": "manual_split_bridge_promoted_for_short_sequence_correctness",
+    "next": [
+      "Use manual_split rather than manual for short-sequence sparse-LI correctness runs.",
+      "Continue toward the retained microbench fused sparse-MLA kernel contract for S4096.",
+      "Do not report manual_split as final sparse-MLA/LightningIndexer performance."
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "artifact": "sparse_mla_ck_rocwmma_tile_owner_next_branch",
+  "date": "2026-06-05",
+  "status": "triton_query_major_schedule_with_ck_epilogue_control_selected",
+  "scope": "Concrete next branch after rejecting TileLang late-dKV, detached HBM score pages, and ordinary same-workgroup scorepage widening: keep the Triton 11.13 ms query-major schedule shape, but reimplement the source-boundary owner in HIP/CK/rocWMMA for lower-level dKV epilogue control",
+  "source_boundary_inputs": [
+    "q [B,S,H,D]",
+    "grad_output [B,S,H,D]",
+    "output [B,S,H,D]",
+    "lse/sink row stats [B,S,H]",
+    "kv_bank/full+compressed shared KV [B,KV,D]",
+    "safe_groups/topk route [B,S,selected]",
+    "valid route mask [B,S,selected]"
+  ],
+  "required_outputs": [
+    "grad_q [B,S,H,D]",
+    "grad_kv [B,KV,D]",
+    "optional checksum/debug sinks only for probes"
+  ],
+  "rejected_surfaces": {
+    "late_dkv_tilelang_or_reducer_only": "Does not materialize e2e because PyTorch/Triton still materializes selected K/V, probabilities, scaled-dP, bridge tensors, and calls the faster reducer too late.",
+    "two_kernel_p_or_dp_page": "Can recompute P/scaled-dP but writes a score/prob/dP slab to HBM before dKV, preserving the memory round trip.",
+    "ordinary_same_workgroup_scorepage": "Correct S128 and valid S4096 execution, but S4096 mode3 valid dKV is 25.94 ms and mode4 contribution/reduce without dKV writes is 21.77 ms.",
+    "wider_same_cta_d_parallel": "512-thread two-D16 no-write mode is 23.65 ms; matching mode6 valid dKV is 24.26 ms, so final dKV writes add only about 0.61 ms in that widened shape. 1024-thread four-D16 mode is 31.36 ms. Widening one CTA does not recover enough D parallelism and shifts the wall into producer/consumer overhead.",
+    "cooperative_grid_global_scorepage": "HIP cooperative launch works on MI350, but grid sync only enables grid-wide synchronization/global-memory visibility. It does not provide cross-CTA LDS for an on-chip score page."
+  },
+  "validated_build_surfaces": {
+    "ck_tile_probe": "tools/dsv4_runtime_probe/probe_sparse_mla_ck_tile_surface.py",
+    "ck_tile_shape": "WarpGemmMfmaBf16Bf16F32M16N16K32 with TileGemmShape 16x64x32 over 256 threads",
+    "rocwmma_source_boundary_probe": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+    "cooperative_groups_smoke": "tools/dsv4_runtime_probe/hip_cooperative_groups_smoke.hip"
+  },
+  "selected_kernel_contract": {
+    "owner": "CK/rocWMMA/HIP implementation of the Triton-style query-major source-boundary sparse-MLA backward owner",
+    "design_principle": "Do not switch to a group-major contribution producer. Preserve the Triton baseline's token/head/query-major selected-window loop because it keeps q and grad_output reuse. Use CK/rocWMMA/HIP only where the lower-level surface matters: MFMA score/contribution tiles and a controllable grouped dKV epilogue before global memory.",
+    "schedule": [
+      "match the Triton baseline decomposition: token tile -> head block -> selected-window/K tile -> D block",
+      "query-major token tile owns q/dO reuse",
+      "score producer computes QK and dO.V for selected K16/K32 pages",
+      "softmax and scaled-dP row terms are produced in on-chip storage",
+      "D-parallel consumers immediately consume the score page for dQ and dKV contribution math",
+      "group-aware dKV epilogue performs local segmented reduction by compressed group before global writes",
+      "no selected K/V, P, grad_logits, or scaled-dP slab is written to HBM"
+    ],
+    "initial_shape_gate": {
+      "batch": 1,
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "selected_topk": 512,
+      "compressed_groups": 1024,
+      "selected_tile": 512,
+      "score_k_tile": "16 or 32",
+      "d_tile": 16,
+      "dtype": "BF16 inputs with FP32 accumulation"
+    },
+    "promotion_gate_ms": {
+      "must_beat_triton_full_sparse_attention_backward": 11.13,
+      "should_beat_triton_sparse_atomic_dkv_wall": 8.80629825592041,
+      "old_sparse_backward_reference_context": 5.07
+    }
+  },
+  "next_code_step": "Do not add another standalone dKV reducer first and do not make compressed group the outer contribution loop. Start from the Triton 11.13 ms schedule shape, then build the HIP/CK/rocWMMA source-boundary owner around token/head/query-major selected windows with a CK-style epilogue: reduce selected-slot contributions by compressed group inside the producer tile, emit fewer compact partials or reduced atomics, and only then add dQ. If CK templates become necessary, keep the Python-facing probe separate until the S4096 boundary latency beats 11.13 ms.",
+  "dependency_pins_changed": false
+}

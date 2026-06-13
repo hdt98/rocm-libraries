@@ -1,0 +1,80 @@
+{
+  "checks": {},
+  "estimated_flops": {
+    "forward_recompute_gemm": 1242940047360.0,
+    "full_vjp_gemm_family": 3728820142080.0,
+    "w2_dgrad_gemm": 414313349120.0,
+    "wgrad_gemms": 1242940047360.0,
+    "xgrad_gemms": 828626698240.0
+  },
+  "estimated_tflops": {
+    "aiter_compact_dgrad_swiglu": 204.72190992849897,
+    "aiter_compact_forward_recompute": 353.22386141831606,
+    "aiter_compact_full_vjp": 365.9605732288437,
+    "aiter_compact_wgrad": 434.5160161210426,
+    "aiter_compact_xgrad_reduce": 356.52891068772806
+  },
+  "ok": null,
+  "probe": "owned_expert_vjp_ep_shape",
+  "read": "Models the local owner-rank VJP behind MORI routed backward. It compares retained padded torch.bmm-style grouped expert math against AITER compact grouped GMM/TGMM at the EP-local shape.",
+  "route_stats": {
+    "assignments_to_owner_rank": 24695,
+    "expected_assignments_uniform": 24576.0,
+    "expert_start": 0,
+    "expert_stop": 32,
+    "local_experts": 32,
+    "max_per_local_expert": 816,
+    "mean_per_local_expert": 771.71875,
+    "min_per_local_expert": 708,
+    "owner_rank": 0,
+    "padded_rows_local_max": 26112,
+    "padding_multiplier_local_max": 1.0573800364446244,
+    "source_tokens_all_ranks": 32768,
+    "tokens_per_rank": 4096,
+    "tokens_with_owner_expert": 18215,
+    "topk": 6,
+    "total_experts": 256,
+    "world_size": 8
+  },
+  "shape": {
+    "backend": "aiter",
+    "dtype": "bfloat16",
+    "experts": 256,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "local_experts": 32,
+    "source_tokens_all_ranks": 32768,
+    "tokens_per_rank": 4096,
+    "topk": 6,
+    "wgrad_op": "nptgmm",
+    "world_size": 8
+  },
+  "timing_ms": {
+    "aiter_compact_dgrad_swiglu_ms_max": 2.044466972351074,
+    "aiter_compact_dgrad_swiglu_ms_mean": 2.0298396746317544,
+    "aiter_compact_dgrad_swiglu_ms_median": 2.0237860679626465,
+    "aiter_compact_dgrad_swiglu_ms_min": 2.021265983581543,
+    "aiter_compact_forward_recompute_ms_max": 3.8083300590515137,
+    "aiter_compact_forward_recompute_ms_mean": 3.603646675745646,
+    "aiter_compact_forward_recompute_ms_median": 3.5188450813293457,
+    "aiter_compact_forward_recompute_ms_min": 3.483764886856079,
+    "aiter_compact_full_vjp_ms_max": 10.245451927185059,
+    "aiter_compact_full_vjp_ms_mean": 10.201651255289713,
+    "aiter_compact_full_vjp_ms_median": 10.189130783081055,
+    "aiter_compact_full_vjp_ms_min": 10.170371055603027,
+    "aiter_compact_full_vjp_single_wall_ms": 10.351221077144146,
+    "aiter_compact_wgrad_ms_max": 3.1559600830078125,
+    "aiter_compact_wgrad_ms_mean": 2.941810687383016,
+    "aiter_compact_wgrad_ms_median": 2.86051607131958,
+    "aiter_compact_wgrad_ms_min": 2.8089559078216553,
+    "aiter_compact_xgrad_reduce_ms_max": 2.38611102104187,
+    "aiter_compact_xgrad_reduce_ms_mean": 2.337550401687622,
+    "aiter_compact_xgrad_reduce_ms_median": 2.3241500854492188,
+    "aiter_compact_xgrad_reduce_ms_min": 2.3023900985717773
+  },
+  "versions": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  }
+}

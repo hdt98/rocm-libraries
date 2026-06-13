@@ -1,0 +1,125 @@
+{
+  "date": "2026-06-11",
+  "purpose": "Goal 1 first MBS ladder for MORI EP versus MORI EP plus native balanced-MoE compact-dispatch. This is intended to find the MBS tipping point where MindSpeed-style hot-helper should begin helping memory/load shape.",
+  "note": "MBS1 results were on do-sonle5-mi350-gpu; MBS2 A/B was run as a same-node pair on do-vunguyen-mi350-gpu because do-sonle5 became occupied by an external workload. Treat cross-node MBS1-to-MBS2 scaling as directional only; the MBS2 plain-vs-balanced result is same-node comparable.",
+  "common_shape": {
+    "gpus": 8,
+    "gpu_type": "MI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "dp_shard": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "none",
+    "mtp_modules": 0,
+    "hyper_connections": false,
+    "mori_comm_backend": "mori",
+    "mori_aiter": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "aiter_compact",
+    "mori_aiter_compact_recompute_mode": "expert_loop",
+    "mori_aiter_lazy_backward_ops": true,
+    "mori_aiter_op_cache_mode": "backward"
+  },
+  "mbs1_do_sonle": {
+    "plain_mori": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs1_noac_heap64_lazybwd_19step_interrupted_8x_20260611.json",
+      "status": "interrupted_after_step19",
+      "micro_batch_size": 1,
+      "gradient_accumulation": 16,
+      "heap": "64G",
+      "steps_2_19_tok_per_gpu_s": 504.8888888888889,
+      "steps_13_19_tok_per_gpu_s": 498.57142857142856,
+      "peak_memory_gib": 119.49
+    },
+    "balanced_mori_compact_dispatch": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_goal1_mori_ep_balanced_compactdispatch_capfix_mbs1_noac_heap64_lazybwd_20step_8x_20260611.json",
+      "status": "completed_20_steps",
+      "micro_batch_size": 1,
+      "gradient_accumulation": 16,
+      "heap": "64G",
+      "steps_2_20_tok_per_gpu_s": 525.7894736842105,
+      "steps_13_20_tok_per_gpu_s": 523.625,
+      "peak_memory_gib": 134.05,
+      "read": "Balanced is modestly faster in the late window but uses more peak memory. MBS1 is too small to prove the desired hot-helper memory-shape advantage."
+    }
+  },
+  "mbs2_do_vunguyen": {
+    "plain_mori": {
+      "run_id": "torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs2_noac_heap64_lazybwd_steps6_8x_dovunguyen_20260611",
+      "status": "completed_6_steps",
+      "micro_batch_size": 2,
+      "gradient_accumulation": 8,
+      "heap": "64G",
+      "steps_2_6_tok_per_gpu_s": 895.4,
+      "steps_2_6_tflops_per_gpu": 41.004,
+      "peak_memory_gib": 151.57,
+      "loss_step_1": 12.22379,
+      "loss_step_6": 10.18976
+    },
+    "balanced_mori_compact_dispatch": {
+      "run_id": "torchtitan_dsv4_flash12_goal1_balanced_mori_ep_mbs2_noac_heap64_lazybwd_steps6_8x_dovunguyen_20260611",
+      "status": "failed_before_step1",
+      "micro_batch_size": 2,
+      "gradient_accumulation": 8,
+      "heap": "64G",
+      "failure": "MORI static heap exhaustion during dispatch/combine op construction; ranks report hip invalid argument followed by Out of heap memory requesting 402653184 bytes with 64G heap.",
+      "steps_completed": 0,
+      "heap96_retry": {
+        "run_id": "torchtitan_dsv4_flash12_goal1_balanced_mori_ep_mbs2_noac_heap96_lazybwd_steps6_8x_dovunguyen_20260611",
+        "status": "completed_6_steps",
+        "heap": "96G",
+        "steps_2_6_tok_per_gpu_s": 938.4,
+        "steps_2_6_tflops_per_gpu": 42.986,
+        "peak_memory_gib": 165.32,
+        "loss_step_1": 12.29286,
+        "loss_step_6": 10.80471,
+        "delta_vs_plain_heap64": {
+          "tok_per_gpu_s_pct": 4.8025,
+          "tflops_per_gpu_pct": 4.8337,
+          "peak_memory_gib": 13.75
+        },
+        "read": "Balanced compact-dispatch is faster than plain MORI at MBS2 once the heap is raised, but it still uses more peak memory and requires a larger static MORI heap. This is a throughput signal, not yet the desired hot-helper memory-shape win."
+      }
+    }
+  },
+  "mbs4_do_vunguyen": {
+    "plain_mori": {
+      "run_id": "torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs4_noac_heap96_lazybwd_steps6_8x_dovunguyen_20260611",
+      "status": "failed_after_step1_in_step2_backward",
+      "micro_batch_size": 4,
+      "gradient_accumulation": 4,
+      "heap": "96G",
+      "step1_tok_per_gpu_s": 779,
+      "step1_tflops_per_gpu": 35.69,
+      "step1_loss": 12.26074,
+      "step1_grad_norm": 12.875,
+      "step1_peak_memory_gib": 163.62,
+      "failure": "PyTorch CUDA OOM in MORI/AITER local owner VJP SwiGLU backward: _swiglu_backward dgate allocation requested 6.00 GiB with 1.80 GiB free; 174.64 GiB allocated by PyTorch and 6.43 GiB reserved but unallocated.",
+      "failure_phase": "step2_backward_local_owner_vjp_swiglu_backward",
+      "read": "Plain MORI reaches a real first optimizer step at MBS4, then hits the owner-rank VJP activation/workspace cliff in the next backward."
+    },
+    "balanced_mori_compact_dispatch": {
+      "heap96": {
+        "run_id": "torchtitan_dsv4_flash12_goal1_balanced_mori_ep_mbs4_noac_heap96_lazybwd_steps6_8x_dovunguyen_20260611",
+        "status": "failed_before_step1",
+        "micro_batch_size": 4,
+        "gradient_accumulation": 4,
+        "heap": "96G",
+        "failure": "MORI dispatch/combine op construction fails with static heap exhaustion; requested 6455033856 bytes with current heap size 103079215104 bytes.",
+        "steps_completed": 0
+      },
+      "heap128": {
+        "run_id": "torchtitan_dsv4_flash12_goal1_balanced_mori_ep_mbs4_noac_heap128_lazybwd_steps6_8x_dovunguyen_20260611",
+        "status": "failed_before_step1",
+        "micro_batch_size": 4,
+        "gradient_accumulation": 4,
+        "heap": "128G",
+        "failure": "MORI dispatch/combine op construction still fails with static heap exhaustion; requested 805306368 bytes with current heap size 137438953472 bytes.",
+        "steps_completed": 0
+      },
+      "read": "Balanced compact-dispatch does not reach a metric step at MBS4. Increasing heap from 96G to 128G gets further but still fails in static MORI heap creation, which means current balanced compact-dispatch adds MORI heap residency instead of removing enough normal-route state."
+    }
+  },
+  "read": "The MBS ladder now identifies the first cliff. MBS1 is too small; balanced is slightly faster but higher memory. At MBS2, plain MORI fits at heap64 and balanced needs heap96, then runs about 4.8% faster but with about 13.75 GiB more peak memory. At MBS4, plain MORI reaches one step then OOMs in owner-rank VJP SwiGLU backward, while balanced compact-dispatch fails before metrics from MORI heap pressure even at heap128. So the MindSpeed-style idea is still correct, but the current native compact-dispatch implementation has not materialized the memory-shape advantage. The next source target is to make hot/cold/helper rows truly first-class in MORI dispatch/combine so balanced mode removes hot rows from the normal MORI state instead of layering extra compact-dispatch state on top."
+}

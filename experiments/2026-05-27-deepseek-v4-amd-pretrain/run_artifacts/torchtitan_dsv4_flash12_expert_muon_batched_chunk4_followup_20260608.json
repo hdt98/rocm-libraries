@@ -1,0 +1,175 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_batched_chunk4_followup_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "moe": "standard EP helper-execute top-8 with grouped_mm and MORI/SDMA hot-weight transport"
+  },
+  "question": "Muon drops AdamW's second moment state, so why did the native expert-Muon run consume more memory and run slower?",
+  "answer": "Native PyTorch Muon halves persistent expert optimizer state, but it replaces fused AdamW with expensive Newton-Schulz matrix orthogonalization and uses large transient update/Gram workspaces. The native wrapper also split DSv4 rank-3 expert banks into 1152 rank-2 Parameter views per rank, adding optimizer overhead. A batched expert-bank Muon implementation fixes the wrapper/temporary memory problem, but Newton-Schulz remains too slow to promote.",
+  "code_changes": {
+    "optimizer": "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "new_optimizer_impl": "BatchedMuonExpertParams",
+    "selector": "TORCHTITAN_OPTIMIZER_MUON_IMPL=batched or CANARY_OPTIMIZER_MUON_IMPL=batched",
+    "default_chunk_matrices": 32,
+    "tested_chunk_matrices": 4,
+    "memory_fix": "The final implementation applies Muon chunk by chunk and no longer materializes a full per-parameter update tensor plus full output tensor.",
+    "numerics_fix": "Newton-Schulz normalization computes the Frobenius norm in FP32 before casting back to the selected compute dtype, avoiding the native ROCm BF16 norm FPE seen in stock torch.optim.Muon."
+  },
+  "isolated_optimizer_microprofile": {
+    "script": "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+    "one_layer_chunk_sweep_batched_muon": {
+      "shape": "1 layer, 3 expert tensors, rank-local expert bank [32, out, in]",
+      "records": [
+        {
+          "chunk_matrices": 1,
+          "step2_gpu_ms": 76.958,
+          "peak_allocated_gib": 6.074
+        },
+        {
+          "chunk_matrices": 2,
+          "step2_gpu_ms": 60.275,
+          "peak_allocated_gib": 6.074
+        },
+        {
+          "chunk_matrices": 4,
+          "step2_gpu_ms": 53.368,
+          "peak_allocated_gib": 6.074
+        },
+        {
+          "chunk_matrices": 8,
+          "step2_gpu_ms": 54.604,
+          "peak_allocated_gib": 6.074
+        },
+        {
+          "chunk_matrices": 16,
+          "step2_gpu_ms": 55.778,
+          "peak_allocated_gib": 6.449
+        },
+        {
+          "chunk_matrices": 32,
+          "step2_gpu_ms": 55.786,
+          "peak_allocated_gib": 7.324
+        }
+      ],
+      "read": "chunk=4 is the best measured knee: faster than chunk=1 and avoids the larger Gram-workspace peak of chunk=16/32."
+    },
+    "twelve_layer_expert_shape": {
+      "command": "HIP_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES=4 PYTHONPATH=/workspace/sources/wip/torchtitan python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 12 --modes adamw muon_batched --repeat 2",
+      "adamw": {
+        "persistent_state_gib": 36.0,
+        "step2_gpu_ms": 37.627,
+        "step_peak_allocated_gib": 72.0
+      },
+      "native_muon_previous": {
+        "persistent_state_gib": 18.0,
+        "step2_gpu_ms": 871.4,
+        "step_peak_allocated_gib": 72.074,
+        "native_rank2_param_count": 1152
+      },
+      "batched_muon_chunk4": {
+        "persistent_state_gib": 18.0,
+        "step2_gpu_ms": 632.697,
+        "step_peak_allocated_gib": 54.355,
+        "native_rank2_param_count": 0
+      },
+      "read": "The batched implementation fixes the isolated memory peak and improves native-Muon speed, but expert Muon is still about 16.8x slower than fused AdamW for the expert optimizer slice."
+    }
+  },
+  "e2e_batched_muon_run": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_8x_s4096_gbs128_mbs4_steps3_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_8x_s4096_gbs128_mbs4_steps3_20260608/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_8x_s4096_gbs128_mbs4_steps3_20260608",
+    "env": {
+      "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+      "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+      "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+      "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+      "CANARY_OPTIMIZER_PROFILE_RESET_PEAK": "true"
+    },
+    "step_metrics": {
+      "1": {
+        "tokens_per_gpu_s": 1596,
+        "tflops_per_gpu": 80.82,
+        "loss": 12.28531,
+        "grad_norm": 19.125,
+        "memory_gib_max": 155.95
+      },
+      "2": {
+        "tokens_per_gpu_s": 7275,
+        "tflops_per_gpu": 368.35,
+        "loss": 9.16355,
+        "grad_norm": 99.5,
+        "memory_gib_max": 176.29
+      },
+      "3": {
+        "tokens_per_gpu_s": 7417,
+        "tflops_per_gpu": 375.51,
+        "loss": 9.26731,
+        "grad_norm": 126.0,
+        "memory_gib_max": 176.29
+      }
+    },
+    "summary": {
+      "steps_2_to_3_tokens_per_gpu_s_mean": 7346.0,
+      "steps_2_to_3_tflops_per_gpu_mean": 371.93,
+      "peak_logged_memory_gib": 176.29,
+      "delta_vs_retained_adamw_steps_2_to_6_tokens_per_gpu_pct": -8.51,
+      "delta_vs_retained_adamw_steps_2_to_6_tflops_pct": -8.51,
+      "delta_vs_retained_adamw_peak_memory_gib": -17.51,
+      "delta_vs_native_muon_step3_tokens_per_gpu_pct": 25.41,
+      "delta_vs_native_muon_peak_memory_gib": -33.02
+    }
+  },
+  "optimizer_sidecar": {
+    "path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_8x_s4096_gbs128_mbs4_steps3_20260608/optimizer_profile",
+    "records": 48,
+    "expert_muon_container": {
+      "optimizer_type": "BatchedMuonExpertParams",
+      "param_gib_rankmax": 18.0,
+      "grad_gib_rankmax": 18.0,
+      "state_gib_rankmax": 18.0,
+      "gpu_ms_rankmax": 672.995,
+      "gpu_ms_rankmean": 644.156
+    },
+    "dense_adamw_container": {
+      "optimizer_type": "AdamW",
+      "param_gib_rankmax": 0.916,
+      "grad_gib_rankmax": 0.843,
+      "state_gib_rankmax": 1.686,
+      "gpu_ms_rankmax": 177.514,
+      "gpu_ms_rankmean": 62.432
+    },
+    "caveat": "The optimizer sidecar uses CUDA events around the optimizer containers and is useful for rank-relative attribution, but the isolated optimizer probe is the cleaner source for absolute expert-step latency because distributed work can already be queued when the event is recorded."
+  },
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "read": "Batched expert Muon fixes the memory regression and recovers a large fraction of native-Muon throughput, but still loses the retained AdamW baseline by about 8.5% on steps 2-3. Keep this as a memory-relief diagnostic, not the best throughput candidate.",
+    "next_action": "If Muon is still required, the next speed path must be a fused or lower-step expert-Muon kernel/update. If memory relief is the actual goal, optimizer-state swap/offload is more promising because it keeps AdamW's fast fused update semantics."
+  },
+  "validation": {
+    "local_py_compile": [
+      "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+      "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py"
+    ],
+    "remote_unit_tests": "PYTHONPATH=/workspace/sources/wip/torchtitan python3 -m unittest /workspace/sources/wip/torchtitan/tests/unit_tests/test_optimizer_param_groups.py",
+    "remote_unit_tests_result": "21 tests OK",
+    "remote_microprofile_result": "completed",
+    "remote_e2e_result": "completed 3 steps"
+  }
+}

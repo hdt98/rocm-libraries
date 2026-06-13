@@ -1,0 +1,66 @@
+{
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_D": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SPLIT_SOURCES": "0"
+  },
+  "max_output_abs_diff": null,
+  "output_atol": 0.01,
+  "output_checksum": 2.4213008146034554e-05,
+  "requires_grad": false,
+  "scope": "synthetic_sparse_mla_triton_forward",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "csa_count": 384,
+    "head_dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "selected_count": 512,
+    "seq_len": 4096,
+    "value_dim": 512
+  },
+  "skip_correctness": true,
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 60.37186050415039,
+      "mean_ms": 60.268289947509764,
+      "median_ms": 60.24317932128906,
+      "min_ms": 60.21460723876953,
+      "samples_ms": [
+        60.24317932128906,
+        60.37186050415039,
+        60.288169860839844,
+        60.21460723876953,
+        60.2236328125
+      ],
+      "stdev_ms": 0.0644761731785965
+    },
+    "iters": 5,
+    "peak_memory_allocated_bytes": 1495793664,
+    "peak_memory_allocated_gib": 1.39306640625,
+    "wall": {
+      "enabled": true,
+      "max_ms": 60.392896994017065,
+      "mean_ms": 60.311796609312296,
+      "median_ms": 60.31651597004384,
+      "min_ms": 60.22908701561391,
+      "samples_ms": [
+        60.31651597004384,
+        60.392896994017065,
+        60.34394702874124,
+        60.22908701561391,
+        60.27653603814542
+      ],
+      "stdev_ms": 0.06268448572653078
+    },
+    "warmup_iters": 2
+  }
+}

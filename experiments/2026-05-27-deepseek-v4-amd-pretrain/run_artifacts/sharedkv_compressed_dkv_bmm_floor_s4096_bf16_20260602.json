@@ -1,0 +1,70 @@
+{
+  "backend_path": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "bmm_input_dtype": "bfloat16",
+  "correctness": {
+    "candidate_norm": null,
+    "dkv_atol": 0.2,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "math_dtype": "bfloat16",
+  "read": "This is a diagnostic lower-bound for the compressed prefix route, not a production sparse MLA backward. It materializes [B,H,S,K] scores/probs and computes the two compressed dKV terms as batched KxS @ SxD GEMMs over heads, then sums the head-local gradients. The goal is to test whether MFMA-friendly accumulation can beat the query-major per-row atomic dKV path before writing a fused streaming/bucketed kernel.",
+  "scope": "sparse_mla_shared_latent_kv_compressed_prefix_dkv_bmm_floor_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 0,
+    "materialized_scores_or_probs_fp32_gib": 0.5,
+    "materialized_shared_selected_kv_fp32_gib": 4.0,
+    "selected_count": 512,
+    "seq_len": 4096
+  },
+  "status": "not_checked",
+  "timing": {
+    "compressed_prefix_dkv_bmm_floor": {
+      "checksum_norm": 1848.937255859375,
+      "event": {
+        "enabled": true,
+        "max_ms": 5.023836135864258,
+        "mean_ms": 4.780666446685791,
+        "median_ms": 4.756993770599365,
+        "min_ms": 4.5532732009887695,
+        "samples_ms": [
+          5.023836135864258,
+          4.589033126831055,
+          4.980195999145508,
+          4.756993770599365,
+          4.5532732009887695
+        ],
+        "stdev_ms": 0.2167573257701995
+      },
+      "label": "compressed_prefix_dkv_bmm_floor",
+      "peak_memory_allocated_bytes": 4637852160,
+      "peak_memory_allocated_gib": 4.319336414337158,
+      "wall": {
+        "enabled": true,
+        "max_ms": 5.09485590737313,
+        "mean_ms": 4.817123967222869,
+        "median_ms": 4.7814249992370605,
+        "min_ms": 4.5750170247629285,
+        "samples_ms": [
+          5.09485590737313,
+          4.627866903319955,
+          5.006455001421273,
+          4.7814249992370605,
+          4.5750170247629285
+        ],
+        "stdev_ms": 0.22841283634571083
+      }
+    }
+  }
+}

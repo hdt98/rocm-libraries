@@ -1,0 +1,60 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_decomposition",
+  "created_at": "2026-06-05",
+  "status": "multi_wave_improves_rocwmma_bringup_not_promoted",
+  "scope": "S4096 layer-2 compressed-only sparse-MLA source-boundary dKV producer on 1xMI350",
+  "source_file": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+  "harness": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 16,
+    "selected_block": 64,
+    "block_d": 512,
+    "threads": 256,
+    "k_tile": 16,
+    "h_tile": 16
+  },
+  "mechanism": {
+    "base": "D512 score page in one CTA, sourced directly from q, grad_output, output, lse, kv_bank, and LI route metadata without materialized P or scaled-dP slabs",
+    "kv_reuse": "Load each selected-KV D16 tile once and reuse it across all four H16 score-page head blocks before advancing D.",
+    "multi_wave": "Use four wavefronts in one CTA: one wavefront per H16 score-page head block, then one wavefront per D16 contribution consumer for four consecutive D blocks.",
+    "limitation": "This is still a dKV-only bring-up kernel. It does not produce dQ and does not implement a production grouped dKV epilogue."
+  },
+  "mode_artifacts": {
+    "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode0_scoreonly_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json",
+    "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode1_contribsink_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json",
+    "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode2_full_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json"
+  },
+  "timing_ms": {
+    "score_page_only": 15.390443801879883,
+    "score_plus_contrib_sink": 33.47657012939453,
+    "full_dkv_atomic": 43.82099533081055,
+    "contribution_sweep_delta": 18.08612632751465,
+    "dkv_global_write_atomic_delta": 10.344425201416016
+  },
+  "comparison": {
+    "previous_reusekv_score_page_only_ms": 17.300220489501953,
+    "previous_reusekv_score_plus_contrib_sink_ms": 51.82865905761719,
+    "previous_reusekv_full_dkv_atomic_ms": 59.252864837646484,
+    "score_page_improvement_x_vs_reusekv": 1.150729767911522,
+    "score_plus_contrib_improvement_x_vs_reusekv": 1.5482147422827873,
+    "full_improvement_x_vs_reusekv": 1.3521531599960437,
+    "full_vs_triton_full_sparse_attention_backward_x": 3.9371963459847754,
+    "triton_full_sparse_attention_backward_ms": 11.13
+  },
+  "decision": {
+    "promote_to_torchtitan_e2e": false,
+    "reason": "The same-workgroup score-page producer/consumer idea is validated as a mechanism, but the raw rocWMMA bring-up remains 43.82 ms for dKV-only, about 3.94x slower than the current 11.13 ms full Triton sparse-attention backward boundary.",
+    "next_step": "Keep the source-boundary and same-workgroup score-page contract, but move to a lower-level CK/HIP/MFMA cooperative kernel with better occupancy and a real dQ+dKV boundary instead of extending this rocWMMA CTA shape."
+  }
+}

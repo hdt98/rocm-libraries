@@ -1,0 +1,475 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "include_triton_atomic": true,
+  "parity": {
+    "index_add_flat": {
+      "checksum": 0.00816506426781416,
+      "max_abs_diff_vs_index_add_flat": 0.0
+    },
+    "scatter_add_dim1": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "split_index_add": {
+      "checksum": 0.008165053091943264,
+      "max_abs_diff_vs_index_add_flat": 0.000640869140625
+    },
+    "triton_atomic_bm16_bd16": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm16_bd32": {
+      "checksum": 0.008165073581039906,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm16_bd64": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm32_bd16": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm32_bd32": {
+      "checksum": 0.008165072649717331,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm32_bd64": {
+      "checksum": 0.00816506426781416,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm8_bd16": {
+      "checksum": 0.0030775542836636305,
+      "max_abs_diff_vs_index_add_flat": 259.024169921875
+    },
+    "triton_atomic_bm8_bd32": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    },
+    "triton_atomic_bm8_bd64": {
+      "checksum": 0.008165075443685055,
+      "max_abs_diff_vs_index_add_flat": 0.0007781982421875
+    }
+  },
+  "peak_memory_allocated_bytes": 10816061440,
+  "peak_memory_allocated_gib": 10.0732421875,
+  "ranked_by_median_ms": [
+    {
+      "mean_ms": 2.46036966641744,
+      "median_ms": 2.418102979660034,
+      "method": "triton_atomic_bm8_bd16"
+    },
+    {
+      "mean_ms": 4.2542416254679365,
+      "median_ms": 4.2054009437561035,
+      "method": "triton_atomic_bm8_bd64"
+    },
+    {
+      "mean_ms": 5.000461260477702,
+      "median_ms": 4.960324764251709,
+      "method": "triton_atomic_bm16_bd32"
+    },
+    {
+      "mean_ms": 5.182705402374268,
+      "median_ms": 5.142611026763916,
+      "method": "triton_atomic_bm32_bd16"
+    },
+    {
+      "mean_ms": 6.511252244313558,
+      "median_ms": 6.492891788482666,
+      "method": "triton_atomic_bm32_bd32"
+    },
+    {
+      "mean_ms": 6.705115636189778,
+      "median_ms": 6.699426174163818,
+      "method": "triton_atomic_bm16_bd64"
+    },
+    {
+      "mean_ms": 8.687856674194336,
+      "median_ms": 8.669524192810059,
+      "method": "triton_atomic_bm8_bd32"
+    },
+    {
+      "mean_ms": 8.790346463521322,
+      "median_ms": 8.770173072814941,
+      "method": "triton_atomic_bm16_bd16"
+    },
+    {
+      "mean_ms": 13.44950008392334,
+      "median_ms": 13.44555377960205,
+      "method": "triton_atomic_bm32_bd64"
+    },
+    {
+      "mean_ms": 20.57053565979004,
+      "median_ms": 20.578031539916992,
+      "method": "scatter_add_dim1"
+    },
+    {
+      "mean_ms": 20.647708257039387,
+      "median_ms": 20.826404571533203,
+      "method": "split_index_add"
+    },
+    {
+      "mean_ms": 21.303430557250977,
+      "median_ms": 21.28370475769043,
+      "method": "index_add_flat"
+    }
+  ],
+  "read": "This is a PyTorch-only bridge probe for dKV scatter-add. Passing parity here does not make the shared-KV backend production-ready; it tells us whether a cheap PyTorch replacement exists before writing the fused output-row kernel.",
+  "scope": "sparse_mla_shared_latent_kv_dkv_scatter_pytorch_variants",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "kv_len": 5120,
+    "local_count": 128,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "values_gib": 5.0
+  },
+  "status": "passed",
+  "timed_iters": 3,
+  "timings": {
+    "index_add_flat": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 21.463655471801758,
+        "mean_ms": 21.303430557250977,
+        "median_ms": 21.28370475769043,
+        "min_ms": 21.162931442260742,
+        "samples_ms": [
+          21.463655471801758,
+          21.162931442260742,
+          21.28370475769043
+        ],
+        "stdev_ms": 0.15132932915358333
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 21.5018589515239,
+        "mean_ms": 21.329126320779324,
+        "median_ms": 21.302610053680837,
+        "min_ms": 21.182909957133234,
+        "samples_ms": [
+          21.5018589515239,
+          21.182909957133234,
+          21.302610053680837
+        ],
+        "stdev_ms": 0.16111936435864269
+      }
+    },
+    "scatter_add_dim1": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 20.584062576293945,
+        "mean_ms": 20.57053565979004,
+        "median_ms": 20.578031539916992,
+        "min_ms": 20.54951286315918,
+        "samples_ms": [
+          20.584062576293945,
+          20.578031539916992,
+          20.54951286315918
+        ],
+        "stdev_ms": 0.018454317478083203
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 20.60797205194831,
+        "mean_ms": 20.590608667892713,
+        "median_ms": 20.596091984771192,
+        "min_ms": 20.567761966958642,
+        "samples_ms": [
+          20.60797205194831,
+          20.596091984771192,
+          20.567761966958642
+        ],
+        "stdev_ms": 0.020658238228644005
+      }
+    },
+    "split_index_add": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 20.884803771972656,
+        "mean_ms": 20.647708257039387,
+        "median_ms": 20.826404571533203,
+        "min_ms": 20.231916427612305,
+        "samples_ms": [
+          20.826404571533203,
+          20.231916427612305,
+          20.884803771972656
+        ],
+        "stdev_ms": 0.36126825312602884
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 20.90268104802817,
+        "mean_ms": 20.668341351362567,
+        "median_ms": 20.851530018262565,
+        "min_ms": 20.250812987796962,
+        "samples_ms": [
+          20.851530018262565,
+          20.250812987796962,
+          20.90268104802817
+        ],
+        "stdev_ms": 0.36249352787029016
+      }
+    },
+    "triton_atomic_bm16_bd16": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 8.843132972717285,
+        "mean_ms": 8.790346463521322,
+        "median_ms": 8.770173072814941,
+        "min_ms": 8.757733345031738,
+        "samples_ms": [
+          8.843132972717285,
+          8.770173072814941,
+          8.757733345031738
+        ],
+        "stdev_ms": 0.04613565185029585
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 8.914489997550845,
+        "mean_ms": 8.826290994572142,
+        "median_ms": 8.788131992332637,
+        "min_ms": 8.776250993832946,
+        "samples_ms": [
+          8.914489997550845,
+          8.788131992332637,
+          8.776250993832946
+        ],
+        "stdev_ms": 0.07661323401453095
+      }
+    },
+    "triton_atomic_bm16_bd32": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 5.0981340408325195,
+        "mean_ms": 5.000461260477702,
+        "median_ms": 4.960324764251709,
+        "min_ms": 4.942924976348877,
+        "samples_ms": [
+          5.0981340408325195,
+          4.960324764251709,
+          4.942924976348877
+        ],
+        "stdev_ms": 0.08503332976807525
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 5.129383062012494,
+        "mean_ms": 5.0350663950666785,
+        "median_ms": 5.017292103730142,
+        "min_ms": 4.9585240194574,
+        "samples_ms": [
+          5.129383062012494,
+          5.017292103730142,
+          4.9585240194574
+        ],
+        "stdev_ms": 0.08680522553451428
+      }
+    },
+    "triton_atomic_bm16_bd64": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 6.782980918884277,
+        "mean_ms": 6.705115636189778,
+        "median_ms": 6.699426174163818,
+        "min_ms": 6.63293981552124,
+        "samples_ms": [
+          6.782980918884277,
+          6.63293981552124,
+          6.699426174163818
+        ],
+        "stdev_ms": 0.07518218311679989
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.81327807251364,
+        "mean_ms": 6.74008100759238,
+        "median_ms": 6.757157971151173,
+        "min_ms": 6.649806979112327,
+        "samples_ms": [
+          6.81327807251364,
+          6.649806979112327,
+          6.757157971151173
+        ],
+        "stdev_ms": 0.08306272694624495
+      }
+    },
+    "triton_atomic_bm32_bd16": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 5.2712531089782715,
+        "mean_ms": 5.182705402374268,
+        "median_ms": 5.142611026763916,
+        "min_ms": 5.134252071380615,
+        "samples_ms": [
+          5.2712531089782715,
+          5.142611026763916,
+          5.134252071380615
+        ],
+        "stdev_ms": 0.07679837428225009
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 5.300643038935959,
+        "mean_ms": 5.20306631612281,
+        "median_ms": 5.158972926437855,
+        "min_ms": 5.149582982994616,
+        "samples_ms": [
+          5.300643038935959,
+          5.158972926437855,
+          5.149582982994616
+        ],
+        "stdev_ms": 0.08463424475755918
+      }
+    },
+    "triton_atomic_bm32_bd32": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 6.581532955169678,
+        "mean_ms": 6.511252244313558,
+        "median_ms": 6.492891788482666,
+        "min_ms": 6.45933198928833,
+        "samples_ms": [
+          6.581532955169678,
+          6.492891788482666,
+          6.45933198928833
+        ],
+        "stdev_ms": 0.06313555867593296
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.65007799398154,
+        "mean_ms": 6.545004978155096,
+        "median_ms": 6.509689963422716,
+        "min_ms": 6.475246977061033,
+        "samples_ms": [
+          6.65007799398154,
+          6.509689963422716,
+          6.475246977061033
+        ],
+        "stdev_ms": 0.09261119704725691
+      }
+    },
+    "triton_atomic_bm32_bd64": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 13.540473937988281,
+        "mean_ms": 13.44950008392334,
+        "median_ms": 13.44555377960205,
+        "min_ms": 13.362472534179688,
+        "samples_ms": [
+          13.540473937988281,
+          13.362472534179688,
+          13.44555377960205
+        ],
+        "stdev_ms": 0.08906629512786912
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 13.614585041068494,
+        "mean_ms": 13.485298996480802,
+        "median_ms": 13.46163498237729,
+        "min_ms": 13.379676965996623,
+        "samples_ms": [
+          13.614585041068494,
+          13.379676965996623,
+          13.46163498237729
+        ],
+        "stdev_ms": 0.11922852052303336
+      }
+    },
+    "triton_atomic_bm8_bd16": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 2.5803840160369873,
+        "mean_ms": 2.46036966641744,
+        "median_ms": 2.418102979660034,
+        "min_ms": 2.382622003555298,
+        "samples_ms": [
+          2.5803840160369873,
+          2.418102979660034,
+          2.382622003555298
+        ],
+        "stdev_ms": 0.10543864567741972
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.657391014508903,
+        "mean_ms": 2.496218658052385,
+        "median_ms": 2.4340020027011633,
+        "min_ms": 2.3972629569470882,
+        "samples_ms": [
+          2.657391014508903,
+          2.4340020027011633,
+          2.3972629569470882
+        ],
+        "stdev_ms": 0.14078293836626732
+      }
+    },
+    "triton_atomic_bm8_bd32": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 8.770562171936035,
+        "mean_ms": 8.687856674194336,
+        "median_ms": 8.669524192810059,
+        "min_ms": 8.623483657836914,
+        "samples_ms": [
+          8.770562171936035,
+          8.669524192810059,
+          8.623483657836914
+        ],
+        "stdev_ms": 0.07523351801344928
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 8.803199976682663,
+        "mean_ms": 8.72232400191327,
+        "median_ms": 8.725391002371907,
+        "min_ms": 8.638381026685238,
+        "samples_ms": [
+          8.803199976682663,
+          8.725391002371907,
+          8.638381026685238
+        ],
+        "stdev_ms": 0.08245226763663563
+      }
+    },
+    "triton_atomic_bm8_bd64": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 4.379642963409424,
+        "mean_ms": 4.2542416254679365,
+        "median_ms": 4.2054009437561035,
+        "min_ms": 4.177680969238281,
+        "samples_ms": [
+          4.379642963409424,
+          4.177680969238281,
+          4.2054009437561035
+        ],
+        "stdev_ms": 0.10948160080558544
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.411105997860432,
+        "mean_ms": 4.2747526507203775,
+        "median_ms": 4.2199669405817986,
+        "min_ms": 4.193185013718903,
+        "samples_ms": [
+          4.411105997860432,
+          4.193185013718903,
+          4.2199669405817986
+        ],
+        "stdev_ms": 0.11884230879129035
+      }
+    }
+  },
+  "triton_available": true,
+  "warmup_iters": 1
+}

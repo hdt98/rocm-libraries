@@ -1,0 +1,65 @@
+{
+  "artifact": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_isolated_train_step",
+  "purpose": "Record the first integrated TorchTitan DeepSeek-V4-style train-step smoke that enters the opt-in MORI dispatch + AITER fused_moe + MORI combine forward bridge.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": {
+    "tag": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "base_tag": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "base_id": "sha256:48c8b82bb0c23c9c1833480a3a6c7717763220f97ce56e8d427d3f81806075a2",
+    "overlay_id": "sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012"
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000/docker-run.log",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000"
+  },
+  "shape": {
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "seq_len": 128,
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "steps": 1,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_DSA_INDEXER_LOSS_COEFF": "0",
+    "CANARY_DEDICATED_EP_PG": "true",
+    "CANARY_REQUIRE_IDLE_GPUS": "true",
+    "MASTER_PORT": "29565"
+  },
+  "fixes_required_before_pass": [
+    "Shard DeepSeekV4Attention.attn_sink as a per-head parameter with Shard(0).",
+    "Initialize DeepSeekV4Attention.attn_sink in reset_parameters().",
+    "Slice MORI combine output back to the original local token count because MORI may return max-token padded output.",
+    "Pass the LI KL chunk_size argument to _SparseIndexerKLLossBackward.apply."
+  ],
+  "result": {
+    "status": "pass",
+    "loss_step_1": 12.21064,
+    "grad_norm_step_1": 12.1875,
+    "memory_gib_step_1": 129.33,
+    "training_completed": true,
+    "process_groups_destroyed": true,
+    "checkpoint_dir_created": false
+  },
+  "structured_logs": [
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000/structured_logs/training.global_rank_0.20260601-171512-OBAJ1M.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000/structured_logs/training.global_rank_1.20260601-171512-QO9XMR.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000/structured_logs/training.global_rank_2.20260601-171512-T5RPER.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602T000000/structured_logs/training.global_rank_3.20260601-171512-P6Y4LC.jsonl"
+  ],
+  "timing_read": "Not performance evidence: first-run container timing includes MORI/AITER JIT build, LI aux is disabled, and the MORI bridge still uses a PyTorch reference VJP for backward.",
+  "limitations": [
+    "This only proves the integrated direct TorchTitan path can enter MORI+AITER MoE and complete one isolated training step.",
+    "Normal GBS64 and LI aux re-enable are still pending.",
+    "The training backward still needs the fused production implementation."
+  ]
+}

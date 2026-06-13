@@ -1,0 +1,47 @@
+{
+  "arch": "gfx950",
+  "artifact": "sparse_mla_ck_tile_surface_probe",
+  "binary_path": "/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface",
+  "build_root": "/tmp/dsv4_ck_tile_sparse_mla_surface",
+  "compile": {
+    "command": [
+      "/opt/rocm-7.0.2/bin/hipcc",
+      "--offload-arch=gfx950",
+      "-std=c++17",
+      "-O3",
+      "-I",
+      "/opt/rocm-7.0.2/include",
+      "/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip",
+      "-o",
+      "/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface"
+    ],
+    "returncode": 0,
+    "seconds": 1.7958092580083758,
+    "stderr_tail": "/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip:61:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]\n   61 |         hipFree(device_out);\n      |         ^~~~~~~ ~~~~~~~~~~\n/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip:65:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]\n   65 |     hipFree(device_out);\n      |     ^~~~~~~ ~~~~~~~~~~\n2 warnings generated when compiling for gfx950.\n/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip:61:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]\n   61 |         hipFree(device_out);\n      |         ^~~~~~~ ~~~~~~~~~~\n/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip:65:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]\n   65 |     hipFree(device_out);\n      |     ^~~~~~~ ~~~~~~~~~~\n2 warnings generated when compiling for host.\n",
+    "stdout_tail": ""
+  },
+  "dependency_pins_changed": false,
+  "rocm_root": "/opt/rocm-7.0.2",
+  "run": {
+    "parsed_stdout": {
+      "block_size": 256,
+      "num_warps": 4,
+      "ok": true,
+      "score_shape_sum": 112,
+      "score_warp_sum": 64
+    },
+    "returncode": 0,
+    "stderr_tail": "",
+    "stdout_tail": "{\"ok\":true,\"score_warp_sum\":64,\"score_shape_sum\":112,\"block_size\":256,\"num_warps\":4}\n"
+  },
+  "scope": "compile/run smoke for CK-Tile BF16 MFMA types needed by source-boundary sparse-MLA producer",
+  "source_path": "/tmp/dsv4_ck_tile_sparse_mla_surface/ck_tile_sparse_mla_surface.hip",
+  "status": "passed",
+  "validated_surface": {
+    "block_size": 256,
+    "contrib_warp": "ck_tile::WarpGemmMfmaBf16Bf16F32M16N16K32TransposedCDistribution",
+    "read": "This is the intended four-wave building block for a query-major source producer: K16 selected rows by H64 heads over D32 chunks. It only proves CK-Tile surface availability; it does not compute or time the sparse-MLA backward yet.",
+    "score_shape": "TileGemmShape<BlockTile=16x64x32, BlockWarps=1x4x1, WarpTile=16x16x32>",
+    "score_warp": "ck_tile::WarpGemmMfmaBf16Bf16F32M16N16K32"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "status": "partial_progress_dynamic_route_blocked",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "tool": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+  "baseline_context": {
+    "current_triton_sparse_atomic_dkv_wall_ms": 8.0,
+    "tilelang_dkv_compute_nowrite_ms": 2.274,
+    "tilelang_raw_overwrite_ms": 9.259,
+    "straight_tilelang_atomic_reference_ms": 28.086
+  },
+  "positive_results": {
+    "compact_output_surface_s4096": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_zero_s4096_k512_tb32_sw512_d32_clustered_20260604.json",
+      "shape": "S4096,H64,D512,topk512,token_block32,selected_window512,D32",
+      "route_pattern": "clustered_unique",
+      "active_partial_rows": 97541,
+      "raw_selected_rows": 2097152,
+      "write_reduction_x": 21.500210168031906,
+      "partials_mib": 190.509765625,
+      "zero_write_median_ms": 0.3857249915599823,
+      "read": "The compact partial-row output allocation/write surface lowers in TileLang and is not the wall by itself."
+    },
+    "static_slot_scalar_smoke": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_static_slot_s32_k32_tb8_sw32_d32_smoke_20260604.json",
+      "shape": "S32,H64,D512,topk32,token_block8,selected_window32,D32",
+      "route_pattern": "slot_aligned",
+      "write_reduction_x": 8.0,
+      "median_ms": 8.181928634643555,
+      "max_abs_diff_vs_pytorch": 5.835655611008406e-05,
+      "read": "A real TileLang compact-row dKV math kernel can compile and match a PyTorch oracle on a constrained slot-aligned route."
+    },
+    "static_slot_scalar_medium": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_static_slot_s128_k128_tb16_sw128_d32_20260604.json",
+      "shape": "S128,H64,D512,topk128,token_block16,selected_window128,D32",
+      "route_pattern": "slot_aligned",
+      "write_reduction_x": 16.0,
+      "median_ms": 65.07299041748047,
+      "max_abs_diff_vs_pytorch": 8.707819506525993e-05,
+      "read": "The scalar compact-row math path is a correctness/lowering proof only; it is far too slow to promote."
+    }
+  },
+  "blocked_results": {
+    "dynamic_pair_slot_scalar": {
+      "mode": "scalar_reduced",
+      "failure": "TileLang LayoutInference failed with 'no available layout found' before codegen.",
+      "read": "Dynamic PairSlots[token, selected] routed updates into compact partial rows are the current TileLang lowering blocker even without MFMA or local shared tables."
+    },
+    "dynamic_local_table_scalar": {
+      "failure": "TileLang LayoutInference failed with 'no available layout found' when group_acc[slot, d] was a dynamic shared-memory update.",
+      "read": "The desired local active-group table is not yet lowering in TileLang with dynamic slot indexing."
+    },
+    "mfma_reduced": {
+      "failure": "K16/D16 hit a TileLang MFMA layout divide-by-zero; K32/D32 and K32/D64 failed with 'no available layout found'.",
+      "read": "The intended TileLang GEMM contribution body still needs a schedule/layout rewrite before it can be combined with compact routing."
+    }
+  },
+  "decision": {
+    "promote_to_torchtitan": false,
+    "speed_candidate": false,
+    "keep_branch_alive": true,
+    "next_action": "Use the working compact output/static-slot math surface as a bring-up harness, but the next production-relevant kernel must solve dynamic routed slot lowering plus MFMA contribution layout. If TileLang cannot lower dynamic compact slots, move the compact producer to HIP/CK/rocWMMA while keeping TileLang only for reference and schedule experiments.",
+    "why": "The compact write surface is cheap and the constrained math kernel works, but scalar math is already 65 ms at S128/topk128 and the production dynamic routed/MFMA form does not compile yet."
+  }
+}

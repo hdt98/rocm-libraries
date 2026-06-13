@@ -1,0 +1,151 @@
+{
+  "artifact": "sparse_mla_persistent_coop_kernel_gate",
+  "created_at": "2026-06-05",
+  "scope": "S4096 DeepSeek-V4 sparse-MLA backward lower-level HIP/CK/rocWMMA cooperative-kernel gate",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024
+  },
+  "active_latency_gates_ms": {
+    "must_beat_current_full_sparse_attention_backward": 11.13,
+    "current_sparse_atomic_dkv_wall": 8.80629825592041,
+    "old_flash_sparse_mla_backward_reference": 5.07,
+    "producer_only_target_for_next_gate": 3.163376932144166,
+    "producer_target_read": "The producer target is capped at 4 ms because the materialized dQ+dKV floor is already close to the 11.13 ms boundary. A slower source producer cannot materialize an e2e gain even if the dKV epilogue is clever."
+  },
+  "measured_floors_ms": {
+    "materialized_hsk_dq": 2.027456045150757,
+    "materialized_hsk_dkv": 5.939167022705078,
+    "materialized_hsk_dq_plus_dkv": 7.966623067855835,
+    "source_direct_recompute_only": 9.092472076416016,
+    "source_direct_dq_dkv_full": 16.570850372314453,
+    "ck_actual_li_raw_dkv_late_slice": 5.66092586517334,
+    "ck_actual_li_contrib_sink_late_slice": 4.483092784881592,
+    "query_headblock_ck_source_producer_only": 29.238218307495117
+  },
+  "derived_budget_ms": {
+    "bridge_or_recompute_budget_to_beat_11p13": 3.163376932144166,
+    "current_bridge_or_recompute_over_materialized_floor": 8.604227304458618,
+    "current_bridge_reduction_needed_x": 2.71995006887358,
+    "current_direct_source_full_gap_to_11p13": 5.440850372314452,
+    "current_direct_source_full_gap_to_old_5p07": 11.500850372314453,
+    "read": "Once P/scaled-dP are materialized, dQ+dKV is about 7.97 ms. The next source-boundary kernel can only spend about 3.16 ms on score/prob/scaled-dP recompute and bridge overhead before it misses the retained 11.13 ms boundary."
+  },
+  "rejected_scaffolds": [
+    {
+      "name": "current_rocwmma_selected_tile_score_page",
+      "score_only_ms": 21.455720901489258,
+      "score_plus_contrib_sink_ms": 41.595951080322266,
+      "dkv_only_ms": 53.26873779296875,
+      "dq_dkv_ms": 63.68678283691406,
+      "reason": "The score/contribution producer is already slower than the full sparse-attention backward gate, so dKV epilogue work on this scaffold cannot be promoted."
+    },
+    {
+      "name": "naive_same_cta_pair_reduced_ck_epilogue",
+      "median_ms": 51.40591049194336,
+      "reason": "It reduces modeled writes but serializes too much leader scan work. Keep CK direct-fragment math, reject this epilogue."
+    },
+    {
+      "name": "query_headblock_ck_producer_only",
+      "median_ms": 29.238218307495117,
+      "reason": "The one-token/H16/selected64 CK source-boundary producer is 29 ms before dQ or dKV writes. It is a buildable lower-level surface, but it is not the cooperative producer schedule we need."
+    },
+    {
+      "name": "ordinary_headsplit_h16_h32",
+      "best_thread_cap_fit": {
+        "token_block": 4,
+        "selected_block": 512,
+        "head_tile": 64,
+        "head_splits": 1,
+        "waves_per_token": 4,
+        "fully_parallel_threads": 1024,
+        "fits_thread_cap": true,
+        "route_reduction_x_if_h64_reduced": 3.04843444037302,
+        "effective_page_reduction_x_after_head_split": 3.04843444037302,
+        "serial_token_batches_if_single_cta": 1,
+        "classification": "fits_but_head_split_erases_reduction"
+      },
+      "best_full_h64_reduction_needing_persistent": {
+        "token_block": 128,
+        "selected_block": 512,
+        "head_tile": 64,
+        "head_splits": 1,
+        "waves_per_token": 4,
+        "fully_parallel_threads": 32768,
+        "fits_thread_cap": false,
+        "route_reduction_x_if_h64_reduced": 93.07162306144193,
+        "effective_page_reduction_x_after_head_split": 93.07162306144193,
+        "serial_token_batches_if_single_cta": 32,
+        "classification": "needs_cross_cta_or_persistent_h64_reduction"
+      },
+      "reason": "Head splitting fits ordinary workgroups but emits multiple independent dKV pages. Useful H64 reductions need a persistent or multi-stage cooperative producer-consumer design."
+    }
+  ],
+  "active_kernel_contract": {
+    "name": "query_major_persistent_or_cooperative_mfma_sparse_mla_backward_v1",
+    "first_surface_to_code": "A new HIP/CK source-boundary producer, not another patch on source_boundary_score_page_rocwmma_d512.hip.",
+    "must_consume": [
+      "q[B,S,H,D] BF16",
+      "grad_output[B,S,H,D] BF16",
+      "output[B,S,H,D] BF16",
+      "lse[B,S,H] FP32",
+      "compressed/shared KV bank[B,S+G,D] BF16",
+      "safe_groups[B,S,topk]",
+      "valid_u8[B,S,topk]"
+    ],
+    "must_emit": [
+      "grad_q[B,S,H,D]",
+      "grad_compressed_kv[B,S+G,D]"
+    ],
+    "must_not_materialize": [
+      "selected K/V slab",
+      "scores/probs/scaled-dP slab",
+      "multi-GiB selected-row dKV partial slab"
+    ],
+    "implementation_order": [
+      {
+        "step": "producer_checksum",
+        "gate": "S4096 source-boundary producer-only <= producer_only_target_for_next_gate",
+        "purpose": "Prove the query-major source recompute schedule is fast before adding dQ or dKV writes."
+      },
+      {
+        "step": "dQ_plus_ck_raw_dKV",
+        "gate": "q,dO,kv,indices,lse/output -> dQ+dKV < 11.13 ms",
+        "purpose": "Use the known-fast CK direct-fragment dKV slice first; do not spend more time on local dKV reduction until the source producer itself is under budget."
+      },
+      {
+        "step": "route_aware_epilogue",
+        "gate": "Beat raw-atomic dKV without a leader-scan cliff",
+        "purpose": "Only after the source-boundary kernel beats the full boundary, add a segmented/compact dKV epilogue that does O(1) slot lookup or warp/block segmented reduction."
+      }
+    ],
+    "non_goals_for_next_iteration": [
+      "TileLang late dKV replacement",
+      "Saving full softmax/scaled-dP from forward",
+      "MORI shared-memory workaround for attention score pages",
+      "Plain H16/H32 head-split source-boundary kernels",
+      "Naive pairwise leader-scan dKV reducers"
+    ]
+  },
+  "promotion_rule": {
+    "single_gpu": "Do not call this a sparse-attention candidate until the S4096 source-boundary dQ+dKV latency is below 11.13 ms.",
+    "multi_gpu_e2e": "Do not run 4x/8x TFLOPs materialization for this path until the single-GPU sparse-attention boundary improves."
+  },
+  "source_artifacts": {
+    "rocwmma_decomposition": "run_artifacts/sparse_mla_source_boundary_rocwmma_8wave_decomposition_decision_20260605.json",
+    "ck_next_gate": "run_artifacts/sparse_mla_ck_mfma_coop_kernel_next_gate_20260605.json",
+    "headsplit_tradeoff": "run_artifacts/sparse_mla_coop_headsplit_tradeoff_s4096_layer2_20260605.json",
+    "ck_route_grid": "run_artifacts/actual_li_ck_route_grid_materialization_decision_20260605.json",
+    "ck_pair_reduced": "run_artifacts/actual_li_ck_pair_reduced_epilogue_decision_20260605.json",
+    "hsk_floor": "run_artifacts/tilelang_hsk_dq_score_reuse_floor_decision_20260605.json",
+    "persistent_contract": "run_artifacts/sparse_mla_persistent_coop_kernel_contract_20260605.json",
+    "query_headblock_ck_mode0": "run_artifacts/sparse_mla_source_boundary_query_headblock_ck_mode0_producer_s4096_layer2_20260605.json"
+  },
+  "dependency_pins_changed": false
+}

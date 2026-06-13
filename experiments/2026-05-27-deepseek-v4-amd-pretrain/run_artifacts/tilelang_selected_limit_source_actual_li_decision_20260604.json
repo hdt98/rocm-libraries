@@ -1,0 +1,77 @@
+{
+  "status": "promote_kernel_body_keep_bridge_diagnostic",
+  "scope": "tilelang_selected_limit_source_actual_li_compressed_dkv",
+  "date": "2026-06-04",
+  "read": "This is the concrete TileLang response to the raw selected-row write-volume failure. The kernel keeps the query-major MFMA contribution body, maps packed LI slots back to original selected slots with SourceSelected, accumulates by compressed group inside the TileLang CTA, then emits final [group,D] dKV atomics only after the in-CTA reduction.",
+  "implementation": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "kernel_builder": "make_mfma_panel_atomic_final_limited_bshd_source_indexed_kernel_builder",
+    "entrypoint": "run_selected_limit_dkv_from_source",
+    "torch_titan_backend_toggle": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_source",
+    "contract": "q,dO [S,H,D] bf16; probs,scaled_dP [S,K,H] bf16 in original LI selected-slot order; SourceSelected/PairSlots/TileOffsets/ActiveGroups static route metadata; output [G,D] fp32"
+  },
+  "correctness_gate": {
+    "artifact": "run_artifacts/tilelang_selected_limit_source_actual_li_s128_layer2_gp32_20260604.json",
+    "shape": {
+      "seq_len": 128,
+      "compressed_groups": 32,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 32,
+      "actual_li_valid_pairs": 2016,
+      "group_panel_size": 32,
+      "panel_capacity": 32,
+      "token_block": 16,
+      "block_k": 32,
+      "block_d": 64,
+      "threads": 256
+    },
+    "max_abs_diff_vs_torch_reference": 0.00000762939453125,
+    "source_vs_packed_max_abs_diff": 0.0,
+    "source_indexed_kernel_median_ms": 0.07356050238013268,
+    "write_reduction_x": 14.0
+  },
+  "target_shape_timing": {
+    "artifact": "run_artifacts/tilelang_selected_limit_source_actual_li_s4096_layer2_gp512_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 512,
+      "actual_li_valid_pairs": 1572352,
+      "actual_li_compress_ratio": 4,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "packed_topk": 1024,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "active_rows": 131543,
+    "write_reduction_x": 11.953140798066032,
+    "route_limit_modeled_chunk_fraction": 0.431396484375,
+    "packed_kernel_only_median_ms": 6.191986083984375,
+    "source_indexed_kernel_median_ms": 7.290557861328125,
+    "pack_only_median_ms": 2.016300916671753,
+    "pack_plus_kernel_median_ms": 8.172247886657715,
+    "static_plan_wall_ms": 183.01286920905113
+  },
+  "comparison": {
+    "straight_tilelang_atomic_reference_ms": 28.086,
+    "raw_overwrite_store_diagnostic_ms": 9.259,
+    "no_dkv_compute_only_ms": 2.274,
+    "previous_sparse_atomic_wall_ms": "8.0-8.8",
+    "read": "The selected-limit TileLang body finally beats raw selected-row stores because it reduces by compressed group before global memory. The source-indexed path is below the old sparse-atomic wall, while pack+kernel is only borderline because it still materializes and repacks P/scaled-dP."
+  },
+  "decision": {
+    "promote_kernel_body": true,
+    "promote_materialized_pack_bridge": false,
+    "next": [
+      "Reuse or produce LI route metadata on device instead of rebuilding the selected-limit plan in the bridge.",
+      "Fuse or adjacent-produce P and scaled-dP so the dKV producer does not require 512 MiB probs plus 512 MiB grad-logit slabs at S4096.",
+      "Connect final [G,D] dKV to the compressor/LI backward consumer while preserving the no-selected-state saved-tensor contract."
+    ]
+  }
+}

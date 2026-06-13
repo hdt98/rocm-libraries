@@ -1,0 +1,90 @@
+{
+  "artifact": "sparse_attn_sharedkv_ascend_abi_route_overhead_verifier_patch_20260602",
+  "created_date": "2026-06-02",
+  "status": "verifier_extended_cpu_container_smoke_passed_mi350_refresh_completed",
+  "scope": "Ascend SparseAttnSharedkv public ABI verifier extension for route-split wrapper overhead timing",
+  "changed_file": "tools/dsv4_runtime_probe/verify_sparse_attn_sharedkv_ascend_abi.py",
+  "change_summary": [
+    "Records active sparse shared-KV backend environment knobs in the verifier result.",
+    "Adds --time-legacy-abi to time public sparse_attn_sharedkv(...) against prebuilt concatenated-bank sparse_mla_shared_kv(...) on the same shape.",
+    "Reports public_minus_legacy_median_ms so wrapper/index/cat overhead is explicit for the next S4096 MI350 refresh."
+  ],
+  "why_it_matters": "The Ascend SASG contract keeps original KV and compressed KV separate at the public boundary and returns d_ori_kv plus d_cmp_kv. The AMD backend currently routes that public ABI through a concatenated shared-KV bank. This verifier extension makes the overhead of that wrapper measurable before the next route-split kernel cut.",
+  "cpu_container_validation": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "cpu",
+    "dtype": "float32",
+    "shape": {
+      "batch": 1,
+      "seq_len": 16,
+      "heads": 2,
+      "dim": 8,
+      "local_count": 4,
+      "topk": 4,
+      "compress_ratio": 4,
+      "compressed_groups": 4,
+      "selected_count": 8
+    },
+    "command": "docker run --rm --network=host --ipc=host --volume /scratch/sonle5/dsv4_pretrain_canary_20260527:/scratch/sonle5/dsv4_pretrain_canary_20260527 --env PYTHONPATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan --entrypoint /bin/bash onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'cd /scratch/sonle5/dsv4_pretrain_canary_20260527 && python3 tools/dsv4_runtime_probe/verify_sparse_attn_sharedkv_ascend_abi.py --backend-path sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py --device cpu --dtype float32 --seq-len 16 --heads 2 --dim 8 --local-count 4 --topk 4 --compress-ratio 4 --check-backward --timed-iters 1 --time-legacy-abi --json'",
+    "result": {
+      "status": "passed",
+      "max_output_abs_diff": 0.0,
+      "max_q_grad_abs_diff": 0.0,
+      "max_ori_kv_grad_abs_diff": 0.0,
+      "max_cmp_kv_grad_abs_diff": 0.0,
+      "max_sinks_grad_abs_diff": 0.0,
+      "public_wall_ms": 0.5414829356595874,
+      "legacy_concat_wall_ms": 0.6050339434295893,
+      "public_minus_legacy_wall_ms": -0.06355100777000189
+    },
+    "read": "CPU wall timing is only a smoke for the new reporting path; it is not performance evidence for MI350."
+  },
+  "mi350_refresh_status": {
+    "status": "completed_followup",
+    "artifact": "run_artifacts/sparse_attn_sharedkv_ascend_abi_s4096_route_overhead_queryrecompute_20260602.json",
+    "read": "The follow-up S4096 BF16 MI350 refresh passed on a later free GPU slice with query_recompute and H64/N128. Public wrapper overhead over prebuilt concatenated-bank ABI was 0.189 ms CUDA-event median.",
+    "initial_defer_reason": "All MI350 GPUs were occupied by active external containers during the first attempt.",
+    "observed_gpu_pids": [
+      {
+        "pid": 2082106,
+        "gpu": 0
+      },
+      {
+        "pid": 2082107,
+        "gpu": 1
+      },
+      {
+        "pid": 2082108,
+        "gpu": 2
+      },
+      {
+        "pid": 2082111,
+        "gpu": 3
+      },
+      {
+        "pid": 2082113,
+        "gpu": 4
+      },
+      {
+        "pid": 2082114,
+        "gpu": 5
+      },
+      {
+        "pid": 2082116,
+        "gpu": 6
+      },
+      {
+        "pid": 2082117,
+        "gpu": 7
+      }
+    ]
+  },
+  "next_mi350_command": {
+    "purpose": "Refresh S4096 BF16 public Ascend ABI route-split timing with wrapper-overhead A/B under the current safe scatter default.",
+    "stage_command": "REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh stage",
+    "run_command": "ssh do-sonle5-mi350-gpu \"docker run --rm --network=host --ipc=host --device=/dev/kfd --device=/dev/dri --group-add video --volume /scratch/sonle5/dsv4_pretrain_canary_20260527:/scratch/sonle5/dsv4_pretrain_canary_20260527 --env HIP_VISIBLE_DEVICES=0 --env PYTHONPATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan --env TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_SCATTER_MODE=auto --entrypoint /bin/bash onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'cd /scratch/sonle5/dsv4_pretrain_canary_20260527 && mkdir -p run_artifacts && python3 tools/dsv4_runtime_probe/verify_sparse_attn_sharedkv_ascend_abi.py --backend-path sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py --device cuda --dtype bf16 --seq-len 4096 --heads 64 --dim 512 --local-count 128 --topk 512 --compress-ratio 4 --check-backward --warmup-iters 1 --timed-iters 3 --time-legacy-abi --summary-path run_artifacts/sparse_attn_sharedkv_ascend_abi_s4096_route_overhead_safeauto_20260602.json --json'\"",
+    "copy_back_command": "scp do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/sparse_attn_sharedkv_ascend_abi_s4096_route_overhead_safeauto_20260602.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  },
+  "promotion_read": "This is a verifier and measurement-surface improvement. It does not close the fused sparse MLA/LI backward gap by itself; it prepares the next route-split S4096 MI350 benchmark needed before replacing the concatenated-bank bridge with a production route-split SASG-style kernel."
+}

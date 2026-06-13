@@ -1,0 +1,69 @@
+{
+  "artifact": "torchtitan_mori_native_weighted_output_backward_smoke_20260612",
+  "date": "2026-06-12",
+  "node": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+  "workdir": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "source": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori",
+  "purpose": "Validate native MORI inverse for compact combine weighted-token output before wiring it into TorchTitan autograd.",
+  "path_decision": {
+    "mainline": "Continue MORI-native balanced-MoE around the proven hot/cold/helper owner-compact layout.",
+    "side_branch": "Primus-Turbo TurboEPBackend remains bounded to raw-top-k/no-helper EP viability because it does not natively consume the winning hot/cold/helper owner-compact partition."
+  },
+  "source_changes": [
+    "include/mori/ops/dispatch_combine/dispatch_combine.hpp: added StandardEpCompactWeightedOutputBackwardArgs",
+    "src/ops/dispatch_combine/intranode.hpp: added StandardEpCompactWeightedOutputBackwardIntraNodeKernel",
+    "src/ops/kernels/ep_intranode.hip: registered f32/bf16 kernel wrappers",
+    "include/mori/ops/dispatch_combine/launch.hpp and src/ops/dispatch_combine/launch.cpp: added launch wrapper",
+    "src/pybind/pybind_ops.cpp: added pybind entrypoint",
+    "python/mori/ops/dispatch_combine.py: added standard_ep_compact_weighted_output_backward_native",
+    "tools/mori_native_weighted_combine_smoke.py: extended smoke to verify grad rows and grad top-score outputs"
+  ],
+  "math": {
+    "forward": "Y[token(flat), d] += source_row[row, d] * top_scores_flat[flat]",
+    "backward_grad_source_row": "d_source_row[row, d] = dY[token(flat), d] * top_scores_flat[flat]",
+    "backward_grad_top_score": "d_top_scores_flat[flat] += sum_d dY[token(flat), d] * source_row[row, d]"
+  },
+  "build": {
+    "command": "docker run --rm --network host --ipc host --device=/dev/kfd --device=/dev/dri --group-add video --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --entrypoint bash -v /scratch:/scratch -w /scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori/build onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps -lc 'ninja -j8'",
+    "result": "pass",
+    "notes": [
+      "The devdeps image entrypoint is titan-run, so --entrypoint bash is required.",
+      "The CMake cache uses absolute /scratch paths, so /scratch must be mounted into the container.",
+      "Rebuilt libmori_ops.so and libmori_pybinds.so, then copied them into python/mori/."
+    ]
+  },
+  "smoke_world_size_1": {
+    "command": "python tools/mori_native_weighted_combine_smoke.py --hidden-dim 16",
+    "result": "pass",
+    "rank0": {
+      "row_diff": 0.0,
+      "flat_ok": true,
+      "token_output_diff": 0.0,
+      "grad_row_diff": 0.0,
+      "grad_score_diff": 0.0,
+      "out_flat": [0, 1, 2, 3]
+    }
+  },
+  "smoke_world_size_2": {
+    "command": "torchrun --standalone --nnodes=1 --nproc_per_node=2 tools/mori_native_weighted_combine_smoke.py --hidden-dim 16",
+    "result": "pass",
+    "rank0": {
+      "row_diff": 0.0,
+      "flat_ok": true,
+      "token_output_diff": 0.0,
+      "grad_row_diff": 0.0,
+      "grad_score_diff": 0.0,
+      "out_flat": [0, 1, 2, 3]
+    },
+    "rank1": {
+      "row_diff": 0.0,
+      "flat_ok": true,
+      "token_output_diff": 0.0,
+      "grad_row_diff": 0.0,
+      "grad_score_diff": 0.0,
+      "out_flat": [2, 3, 0, 1]
+    }
+  },
+  "read": "The native MORI backward primitive is correct in the isolated compact owner-row contract, including cross-rank flat-position ordering. It is not yet a throughput result; the next gate is wiring TorchTitan autograd to use it instead of _weighted_scatter_flat_backward, then profiling whether it removes source-rank row/flat-position bridge pressure without increasing lifetime or memory."
+}

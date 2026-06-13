@@ -1,0 +1,365 @@
+{
+  "artifact": "torchtitan_standard_ep_mori_compact_fixedseed_ab",
+  "date": "2026-06-09",
+  "flops_per_token_tflop_used_for_estimate": 0.05063013274107742,
+  "largest_stage_deltas_abs_ge_2ms": [
+    {
+      "mori_minus_torch_rankmax_ms": -172.38408017158508,
+      "mori_rankmax_ms": 145.2725030183792,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.permute",
+      "torch_rankmax_ms": 317.6565831899643
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -166.58260107040405,
+      "mori_rankmax_ms": 328.99322175979614,
+      "stage": "standard_ep_combine:standard_ep.combine.all_to_all_wait",
+      "torch_rankmax_ms": 495.5758228302002
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 12.552798002958298,
+      "mori_rankmax_ms": 12.552798002958298,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_materialize_mori_compact.pack",
+      "torch_rankmax_ms": 0.0
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -8.55916652083397,
+      "mori_rankmax_ms": 78.91823080182076,
+      "stage": "standard_ep_combine:standard_ep.combine.unpermute",
+      "torch_rankmax_ms": 87.47739732265472
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 3.847297018393874,
+      "mori_rankmax_ms": 3.847297018393874,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_materialize_mori_compact.init",
+      "torch_rankmax_ms": 0.0
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -3.2703091390430927,
+      "mori_rankmax_ms": 11.867110915482044,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_count_all_to_all",
+      "torch_rankmax_ms": 15.137420054525137
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -2.910211980342865,
+      "mori_rankmax_ms": 16.452540010213852,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.build_hot_plan",
+      "torch_rankmax_ms": 19.362751990556717
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.6793322563171387,
+      "mori_rankmax_ms": 702.4795160293579,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x",
+      "torch_rankmax_ms": 699.8001837730408
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.509498953819275,
+      "mori_rankmax_ms": 199.8085909485817,
+      "stage": "standard_ep_hot_weight:standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+      "torch_rankmax_ms": 197.29909199476242
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -2.27203106880188,
+      "mori_rankmax_ms": 141.35504174232483,
+      "stage": "standard_ep_hot_split:standard_ep.hot_split.weighted_scatter_tokens",
+      "torch_rankmax_ms": 143.6270728111267
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.1442090272903442,
+      "mori_rankmax_ms": 43.164908051490784,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_metadata",
+      "torch_rankmax_ms": 41.02069902420044
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -2.0778450965881348,
+      "mori_rankmax_ms": 53.44139099121094,
+      "stage": "chunked_ce_loss:dsv4.loss.chunk_0.lm_head_forward",
+      "torch_rankmax_ms": 55.51923608779907
+    }
+  ],
+  "note": "Diagnostic only. Step 1 includes compile/warmup. Step 2 torch-ownercompact is an outlier; step 3 is the cleaner late point. TFLOPs are estimated from retained 12-layer flops/token because structured logs expose wall/tokens, not printed TFLOPs.",
+  "read": {
+    "next_source_target": "Add a native cold/normal compact-row MORI dispatcher ABI: consume the saved standard-EP hot/cold/helper partition, dispatch only cold/normal compact rows, preserve owner-compact helper rows, and return compact dX/dTopK without selected-order dense adapters.",
+    "what_mori_buys_here": "In this fixed-seed short diagnostic, mori_compact adds 16.4 ms rank-max for init+pack but reduces dispatch.permute by 172.4 ms and combine all_to_all_wait by 166.6 ms. The latter is likely route/timing/skew-sensitive, so it needs a longer gate before promotion.",
+    "what_mori_does_not_remove_here": "Helper MLP VJP, W1/W2/W3/gate VJP, hot-weight broadcast/reduce, compact dX/dTopK return, normal all-to-all count exchange, and weighted scatter remain the standard-EP helper graph.",
+    "why_not_cold_normal_mori_yet": "The winning standard-EP helper layout first removes remote-hot rows and dispatches only the remaining cold/normal rows. Current MORI dispatch accepts the raw token/topk route matrix or a sidecar route mask, not the already-prefiltered compact cold-row plan with saved hot/cold/helper partitions. Using MORI today therefore either replaces only a small materialization edge, as this A/B does, or reintroduces route-mask/adapter work around the standard-EP graph."
+  },
+  "runs": {
+    "mori_compact_ownercompact": {
+      "hot_split_materialize_backend": "mori_compact",
+      "hot_split_meta": {
+        "hot_split_weight_layout_effective": {
+          "selected": 392
+        },
+        "max_owned_per_rank": {
+          "count": 392,
+          "max": 4,
+          "mean": 2.6122448979591835,
+          "min": 2
+        },
+        "records": 392,
+        "remote_hot_groups": {
+          "count": 392,
+          "max": 8,
+          "mean": 7.0,
+          "min": 4
+        },
+        "remote_offsets_presorted_by": {
+          "owner_compact": 392
+        },
+        "remote_owner_compact_groups": {
+          "count": 392,
+          "max": 8,
+          "mean": 7.0,
+          "min": 4
+        },
+        "remote_rows": {
+          "count": 392,
+          "max": 152426,
+          "mean": 85491.96173469388,
+          "min": 20038
+        },
+        "remote_rows_materialized_by": {
+          "owner_compact": 392
+        }
+      },
+      "profile_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/remote_logs/torchtitan_dsv4_flash12_fixedseed_mori_compact_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609/profile_timing",
+      "run_id": "torchtitan_dsv4_flash12_fixedseed_mori_compact_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609",
+      "steps": {
+        "1": {
+          "rank_count": 8,
+          "step_ms_rankmax": 52417.05771791749,
+          "step_ms_rankmean": 52325.80263420823,
+          "step_ms_rankmin": 52240.38029112853,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 63.412322750588615,
+          "tokens_per_gpu_s_rankmax": 1254.508478590255,
+          "tokens_per_gpu_s_rankmean": 1252.4621073952014,
+          "tokens_per_gpu_s_rankmin": 1250.2800205361036
+        },
+        "2": {
+          "rank_count": 8,
+          "step_ms_rankmax": 7928.4607951994985,
+          "step_ms_rankmean": 7928.410869586514,
+          "step_ms_rankmin": 7928.38048399426,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 418.50711749721506,
+          "tokens_per_gpu_s_rankmax": 8266.000872725957,
+          "tokens_per_gpu_s_rankmean": 8265.9691934339,
+          "tokens_per_gpu_s_rankmin": 8265.917142414395
+        },
+        "3": {
+          "rank_count": 8,
+          "step_ms_rankmax": 7855.476276949048,
+          "step_ms_rankmean": 7855.398522369796,
+          "step_ms_rankmin": 7855.3019349928945,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 422.39695033302235,
+          "tokens_per_gpu_s_rankmax": 8342.900189241329,
+          "tokens_per_gpu_s_rankmean": 8342.797608158782,
+          "tokens_per_gpu_s_rankmin": 8342.715029553017
+        }
+      },
+      "structured_logs_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/remote_logs/torchtitan_dsv4_flash12_fixedseed_mori_compact_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609/structured_logs"
+    },
+    "torch_ownercompact": {
+      "hot_split_materialize_backend": "torch",
+      "hot_split_meta": {
+        "hot_split_weight_layout_effective": {
+          "selected": 392
+        },
+        "max_owned_per_rank": {
+          "count": 392,
+          "max": 4,
+          "mean": 2.6122448979591835,
+          "min": 2
+        },
+        "records": 392,
+        "remote_hot_groups": {
+          "count": 392,
+          "max": 8,
+          "mean": 7.0,
+          "min": 4
+        },
+        "remote_offsets_presorted_by": {
+          "owner_compact": 392
+        },
+        "remote_owner_compact_groups": {
+          "count": 392,
+          "max": 8,
+          "mean": 7.0,
+          "min": 4
+        },
+        "remote_rows": {
+          "count": 392,
+          "max": 152398,
+          "mean": 85400.6862244898,
+          "min": 20038
+        },
+        "remote_rows_materialized_by": {
+          "owner_compact": 392
+        }
+      },
+      "profile_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/remote_logs/torchtitan_dsv4_flash12_fixedseed_torch_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609/profile_timing",
+      "run_id": "torchtitan_dsv4_flash12_fixedseed_torch_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609",
+      "steps": {
+        "1": {
+          "rank_count": 8,
+          "step_ms_rankmax": 52425.926577998325,
+          "step_ms_rankmean": 52289.87060426152,
+          "step_ms_rankmin": 52224.66989001259,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 63.45591380510541,
+          "tokens_per_gpu_s_rankmax": 1254.8858640566161,
+          "tokens_per_gpu_s_rankmean": 1253.3230779705646,
+          "tokens_per_gpu_s_rankmin": 1250.0685114739317
+        },
+        "2": {
+          "rank_count": 8,
+          "step_ms_rankmax": 11621.102492092177,
+          "step_ms_rankmean": 11620.880554750329,
+          "step_ms_rankmin": 11620.813017012551,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 285.52882579488926,
+          "tokens_per_gpu_s_rankmax": 5639.536571499523,
+          "tokens_per_gpu_s_rankmean": 5639.503796189595,
+          "tokens_per_gpu_s_rankmin": 5639.3960938383725
+        },
+        "3": {
+          "rank_count": 8,
+          "step_ms_rankmax": 8028.296824079007,
+          "step_ms_rankmean": 8028.204354312038,
+          "step_ms_rankmin": 8028.0189090408385,
+          "tflops_per_gpu_est_from_retained_flops_per_token": 413.304922645183,
+          "tokens_per_gpu_s_rankmax": 8163.408774012221,
+          "tokens_per_gpu_s_rankmean": 8163.220206409986,
+          "tokens_per_gpu_s_rankmin": 8163.126181812315
+        }
+      },
+      "structured_logs_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/remote_logs/torchtitan_dsv4_flash12_fixedseed_torch_ownercompact_8x_s4096_gbs128_mbs8_steps3_20260609/structured_logs"
+    }
+  },
+  "scope": "8xMI350 DSv4 Flash 12-layer MBS8 GBS128 fixed-seed 3-step diagnostic",
+  "stage_delta_rankmax_ms": [
+    {
+      "mori_minus_torch_rankmax_ms": -1.1972264982759953,
+      "mori_rankmax_ms": 122.49366989731789,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.count_all_to_all",
+      "torch_rankmax_ms": 123.69089639559388
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -3.2703091390430927,
+      "mori_rankmax_ms": 11.867110915482044,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_count_all_to_all",
+      "torch_rankmax_ms": 15.137420054525137
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -2.910211980342865,
+      "mori_rankmax_ms": 16.452540010213852,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.build_hot_plan",
+      "torch_rankmax_ms": 19.362751990556717
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.1442090272903442,
+      "mori_rankmax_ms": 43.164908051490784,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_metadata",
+      "torch_rankmax_ms": 41.02069902420044
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 3.847297018393874,
+      "mori_rankmax_ms": 3.847297018393874,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_materialize_mori_compact.init",
+      "torch_rankmax_ms": 0.0
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 12.552798002958298,
+      "mori_rankmax_ms": 12.552798002958298,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.hot_materialize_mori_compact.pack",
+      "torch_rankmax_ms": 0.0
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -172.38408017158508,
+      "mori_rankmax_ms": 145.2725030183792,
+      "stage": "standard_ep_dispatch:standard_ep.dispatch.permute",
+      "torch_rankmax_ms": 317.6565831899643
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -166.58260107040405,
+      "mori_rankmax_ms": 328.99322175979614,
+      "stage": "standard_ep_combine:standard_ep.combine.all_to_all_wait",
+      "torch_rankmax_ms": 495.5758228302002
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -8.55916652083397,
+      "mori_rankmax_ms": 78.91823080182076,
+      "stage": "standard_ep_combine:standard_ep.combine.unpermute",
+      "torch_rankmax_ms": 87.47739732265472
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -0.17288124561309814,
+      "mori_rankmax_ms": 161.0068278312683,
+      "stage": "standard_ep_combine:standard_ep.combine.weighted_scatter_add",
+      "torch_rankmax_ms": 161.1797090768814
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 0.8455255031585693,
+      "mori_rankmax_ms": 173.87487077713013,
+      "stage": "standard_ep_hot_split:standard_ep.hot_split.broadcast_hot_weights",
+      "torch_rankmax_ms": 173.02934527397156
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -2.27203106880188,
+      "mori_rankmax_ms": 141.35504174232483,
+      "stage": "standard_ep_hot_split:standard_ep.hot_split.weighted_scatter_tokens",
+      "torch_rankmax_ms": 143.6270728111267
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.6793322563171387,
+      "mori_rankmax_ms": 702.4795160293579,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x",
+      "torch_rankmax_ms": 699.8001837730408
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 1.0747193098068237,
+      "mori_rankmax_ms": 204.47881436347961,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.autograd_vjp.w1",
+      "torch_rankmax_ms": 203.4040950536728
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -0.1361936330795288,
+      "mori_rankmax_ms": 216.5153648853302,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.autograd_vjp.w2",
+      "torch_rankmax_ms": 216.65155851840973
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 1.1234674453735352,
+      "mori_rankmax_ms": 411.64544343948364,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.autograd_vjp.w3",
+      "torch_rankmax_ms": 410.5219759941101
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 0.18678748607635498,
+      "mori_rankmax_ms": 243.2540408372879,
+      "stage": "standard_ep_hot_split_backward:standard_ep.hot_split.backward.autograd_vjp.activation_gate",
+      "torch_rankmax_ms": 243.06725335121155
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -0.2089339792728424,
+      "mori_rankmax_ms": 83.85507100820541,
+      "stage": "standard_ep_hot_split_compact_return:standard_ep.hot_split.backward.compact_dx_return.index_add",
+      "torch_rankmax_ms": 84.06400498747826
+    },
+    {
+      "mori_minus_torch_rankmax_ms": -0.22809598594903946,
+      "mori_rankmax_ms": 4.728229004889727,
+      "stage": "standard_ep_hot_split_compact_return:standard_ep.hot_split.backward.compact_dtopk_return.index_add",
+      "torch_rankmax_ms": 4.956324990838766
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 1.4424888491630554,
+      "mori_rankmax_ms": 79.6374779343605,
+      "stage": "standard_ep_hot_weight:standard_ep_hot_weight.w2.forward.all_reduce_hot_weight",
+      "torch_rankmax_ms": 78.19498908519745
+    },
+    {
+      "mori_minus_torch_rankmax_ms": 2.509498953819275,
+      "mori_rankmax_ms": 199.8085909485817,
+      "stage": "standard_ep_hot_weight:standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+      "torch_rankmax_ms": 197.29909199476242
+    }
+  ]
+}

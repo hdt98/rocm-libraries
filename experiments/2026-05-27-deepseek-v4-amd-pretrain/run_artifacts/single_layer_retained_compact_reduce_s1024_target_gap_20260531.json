@@ -1,0 +1,58 @@
+{
+  "artifact": "single_layer_retained_compact_reduce_s1024_target_gap_20260531",
+  "date": "2026-05-31",
+  "scope": "Optional S1024 scaling probe for the retained DeepSeek V4 single-layer BF16 full fwd+loss+bwd+grads path on one MI350X",
+  "source_artifact": "run_artifacts/single_layer_retained_compact_reduce_s1024_20260531.json",
+  "command": "RUN_TAG=retained_compact_reduce_s1024_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-1024",
+  "target_basis": {
+    "normalized_layer_tokens_per_s": 128100,
+    "tokens": 1024,
+    "target_ms_exact": 7.993754879000781,
+    "target_ms_rounded": 8.0
+  },
+  "observed": {
+    "avg_ms": 42.9396707797423,
+    "min_ms": 42.61193098500371,
+    "tokens_per_s": 23847.411528900073,
+    "estimated_tflops": 108.41899876895003,
+    "loss_mean": 1.004089856147766,
+    "router_override_mode": "learned",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum"
+  },
+  "gap": {
+    "avg_ms_over_target_exact": 5.371652174692372,
+    "min_ms_over_target_exact": 5.330652694510718,
+    "tokens_per_s_ratio_to_target": 0.18616246314519963,
+    "target_tokens_per_s_over_observed": 5.371652174692371
+  },
+  "comparison_to_current_retained_shapes": {
+    "s1024": {
+      "avg_ms": 42.9396707797423,
+      "target_ms_exact": 7.993754879000781,
+      "avg_ms_over_target_exact": 5.371652174692372,
+      "tokens_per_s": 23847.411528900073,
+      "estimated_tflops": 108.41899876895003
+    },
+    "s2048": {
+      "avg_ms": 52.58071997668594,
+      "target_ms_exact": 15.987509758001562,
+      "avg_ms_over_target_exact": 3.288862416510483,
+      "tokens_per_s": 38949.63783128253,
+      "estimated_tflops": 185.16585534463903
+    },
+    "s4096": {
+      "avg_ms": 76.57323967820655,
+      "target_ms_exact": 31.975019516003124,
+      "avg_ms_over_target_exact": 2.3947832038032857,
+      "tokens_per_s": 53491.27211037617,
+      "estimated_tflops": 276.50802181590427
+    }
+  },
+  "decision": {
+    "use_s1024_for": "trend and overhead diagnosis only",
+    "do_not_use_s1024_for": "promotion decisions over S2048/S4096",
+    "reason": "The retained learned-router compact-reduce path is farthest from target at S1024, with only 18.6% of the normalized layer-token target. Throughput and TFLOPs improve substantially with longer sequence, so S1024 is dominated by fixed launch, routing, and small-shape underutilization effects rather than exposing the primary S4096 parity bottleneck.",
+    "next": "Keep S4096 as the primary parity proxy and S2048 as the development proxy. Use S1024 only when testing launch-overhead reductions, route-cache effects, or correctness of new kernels before scaling to S2048/S4096."
+  }
+}

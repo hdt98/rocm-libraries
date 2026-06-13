@@ -1,0 +1,87 @@
+{
+  "artifact": "sharedkv_compressed_only_s4096_h64n64_rocprof_counter_summary_20260602",
+  "created_date": "2026-06-02",
+  "status": "hardware_counters_confirm_full_dkv_atomic_accumulation_volume",
+  "scope": "S4096 compressed-only shared latent-KV sparse MLA backward query-major retained H64/N64 tile",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 0,
+    "csa_count": 512,
+    "compressed_groups": 1024,
+    "selected_count": 512,
+    "kv_len": 5120
+  },
+  "retained_tile_env": {
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TRITON_SCATTER_BLOCK_M": 16,
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": 64,
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": 64,
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TRITON_SCATTER_BLOCK_D": 512
+  },
+  "target_kernel": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+  "counter_sums_by_mode": {
+    "query_full_atomic": {
+      "TD_ATOMIC_WAVEFRONT_sum": 16777216.0,
+      "TCC_EA0_WRREQ_ATOMIC_DRAM_32B_sum": 402522112.0,
+      "TD_LOAD_WAVEFRONT_sum": 40173568.0,
+      "TD_STORE_WAVEFRONT_sum": 1605632.0,
+      "TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum": 0.0,
+      "TCP_GATE_EN1_sum": 5619435748.0
+    },
+    "no_dkv": {
+      "TD_ATOMIC_WAVEFRONT_sum": 0.0,
+      "TCC_EA0_WRREQ_ATOMIC_DRAM_32B_sum": 0.0,
+      "TD_LOAD_WAVEFRONT_sum": 12091392.0,
+      "TD_STORE_WAVEFRONT_sum": 524288.0,
+      "TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum": 0.0,
+      "TCP_GATE_EN1_sum": 812227428.0
+    },
+    "dkv_reduce_sink": {
+      "TD_ATOMIC_WAVEFRONT_sum": 0.0,
+      "TCC_EA0_WRREQ_ATOMIC_DRAM_32B_sum": 0.0,
+      "TD_LOAD_WAVEFRONT_sum": 16547840.0,
+      "TD_STORE_WAVEFRONT_sum": 720896.0,
+      "TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum": 0.0,
+      "TCP_GATE_EN1_sum": 1323408404.0
+    }
+  },
+  "derived": {
+    "query_minus_no_dkv": {
+      "TD_ATOMIC_WAVEFRONT_sum": 16777216.0,
+      "TCC_EA0_WRREQ_ATOMIC_DRAM_32B_sum": 402522112.0,
+      "TD_LOAD_WAVEFRONT_sum": 28082176.0,
+      "TD_STORE_WAVEFRONT_sum": 1081344.0,
+      "TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum": 0.0,
+      "TCP_GATE_EN1_sum": 4807208320.0
+    },
+    "query_minus_dkv_reduce_sink": {
+      "TD_ATOMIC_WAVEFRONT_sum": 16777216.0,
+      "TCC_EA0_WRREQ_ATOMIC_DRAM_32B_sum": 402522112.0,
+      "TD_LOAD_WAVEFRONT_sum": 23625728.0,
+      "TD_STORE_WAVEFRONT_sum": 884736.0,
+      "TCP_ATOMIC_TAGCONFLICT_STALL_CYCLES_sum": 0.0,
+      "TCP_GATE_EN1_sum": 4296027344.0
+    },
+    "query_atomic_wavefronts_per_store_wavefront": 10.448979591836734,
+    "query_atomic_wavefronts_per_load_wavefront": 0.4176182707993475,
+    "estimated_scalar_atomic_add_elements_from_route_fanin": 805044224,
+    "observed_tcc_atomic_32b_requests_per_estimated_scalar_atomic_add": 0.5
+  },
+  "kernel_static": {
+    "grid_size": 2097152,
+    "workgroup_size": 512,
+    "full_atomic_vgpr_count": 128,
+    "full_atomic_sgpr_count": 96,
+    "full_atomic_scratch_size": 136,
+    "no_dkv_vgpr_count": 128,
+    "no_dkv_sgpr_count": 80,
+    "no_dkv_scratch_size": 0,
+    "dkv_reduce_sink_vgpr_count": 128,
+    "dkv_reduce_sink_sgpr_count": 96,
+    "dkv_reduce_sink_scratch_size": 12
+  },
+  "remote_raw_profile_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/profiles/rocprof_counters_sharedkv_s4096_h64n64_20260602",
+  "read": "The H64/N64 hardware counters make the slow mechanism explicit. The full compressed dKV path issues 16.78M atomic wavefronts and 402.52M TCC 32-byte atomic DRAM write requests in the target Triton kernel. Both no-dKV and checksum-sink controls have zero atomic wavefronts and zero TCC atomic requests, while retaining the QK/probability/dQ and dKV-dot portions respectively. The observed TCC atomic request count is exactly half of the route fan-in estimate of 805.04M scalar dKV atomic-add elements, so the selected compressed-group fan-in model matches hardware traffic. The TCP tag-conflict stall counter is zero, so this counter set does not show a TCP tag-conflict stall mechanism; the measured wall is the sheer global atomic accumulation traffic into the shared compressed grad_kv bank."
+}

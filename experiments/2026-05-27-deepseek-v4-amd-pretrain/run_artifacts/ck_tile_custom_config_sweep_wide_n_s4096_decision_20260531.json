@@ -1,0 +1,105 @@
+{
+  "artifact": "ck_tile_custom_config_sweep_wide_n_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Follow-up S=4096 DeepSeek V4-Pro routed MoE W2 dgrad grouped GEMM CK-Tile sweep with N_Tile=256.",
+  "source_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/ck_tile_custom_config_sweep_wide_n_s4096_20260531.json",
+  "prior_n128_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/ck_tile_custom_config_sweep_s4096_20260531.json",
+  "operator_contract": {
+    "dtype": "bf16",
+    "tokens": 4096,
+    "topk": 6,
+    "assignments": 24576,
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "shape": "384 ragged grouped GEMMs, A[M_e,7168] x B[7168,3072] -> C[M_e,3072]",
+    "route_stats": {
+      "min_per_expert": 45,
+      "mean_per_expert": 64.0,
+      "max_per_expert": 88,
+      "padding_multiplier_vs_compact": 1.0,
+      "uses_ck_kPadM": true
+    }
+  },
+  "baseline": {
+    "name": "torch_padded_bmm_out",
+    "median_ms": 4.304213047027588
+  },
+  "prior_best_n128": {
+    "name": "m64n128_v3_padm_true",
+    "best_ms": 5.87867,
+    "tflops": 184.112,
+    "speedup_vs_torch_padded_bmm_out": 0.7321746325321183
+  },
+  "candidates": [
+    {
+      "name": "m32n256_v4_padm_true",
+      "pipeline": "COMPUTE_V4",
+      "m_tile": 32,
+      "n_tile": 256,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.92739,
+      "tflops": 156.239,
+      "gb_per_s": 2513.9,
+      "speedup_vs_torch_padded_bmm_out": 0.6213325721559761
+    },
+    {
+      "name": "m64n256_v4_padm_true",
+      "pipeline": "COMPUTE_V4",
+      "m_tile": 64,
+      "n_tile": 256,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 26.9881,
+      "tflops": 40.104,
+      "gb_per_s": 645.274,
+      "speedup_vs_torch_padded_bmm_out": 0.1594855898350602
+    },
+    {
+      "name": "m32n256_v3_padm_true",
+      "pipeline": "COMPUTE_V3",
+      "m_tile": 32,
+      "n_tile": 256,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.40062,
+      "tflops": 169.098,
+      "gb_per_s": 2720.79,
+      "speedup_vs_torch_padded_bmm_out": 0.6724681432466836
+    },
+    {
+      "name": "m64n256_v3_padm_true",
+      "pipeline": "COMPUTE_V3",
+      "m_tile": 64,
+      "n_tile": 256,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.03968,
+      "tflops": 179.204,
+      "gb_per_s": 2883.39,
+      "speedup_vs_torch_padded_bmm_out": 0.7126558107428851,
+      "kernel": "gemm_grouped_bf16_64x256x64_8x8x1_1x0x0_Persistent_NoMultiD_SingleSmemBuffer"
+    }
+  ],
+  "decision": {
+    "status": "demote_wide_n_for_s4096_w2_dgrad",
+    "best_candidate": "m64n256_v3_padm_true",
+    "best_ms": 6.03968,
+    "torch_padded_bmm_out_ms": 4.304213047027588,
+    "best_speedup_vs_torch_padded_bmm_out": 0.7126558107428851,
+    "best_vs_prior_n128_best": 0.9733416508848173,
+    "read": "Widening N_Tile from 128 to 256 did not improve the S4096 W2 dgrad grouped GEMM. The best N256 config is about 2.7% slower than the prior best N128 config and about 29% slower than the retained PyTorch padded bmm(out=) baseline. This closes the simple wider-N CK-Tile branch for this exact contract."
+  },
+  "next_actions": [
+    "Do not promote N256 CK-Tile configs into the PyTorch microbench path.",
+    "Avoid more same-family CK-Tile tile sweeps unless the candidate changes scheduling or fuses surrounding MoE work; M/N tile tweaks alone have not beaten PyTorch.",
+    "Use current evidence to prioritize full-block MoE backward attribution and sparse MLA kernels over standalone W2 dgrad replacement."
+  ],
+  "commands": {
+    "tool_update": "Added --candidate-set wide_n to tools/dsv4_layer_microbench/probe_ck_tile_custom_config_sweep.py.",
+    "remote_probe": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_ck_tile_custom_config_sweep.py --candidate-set wide_n --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --warmup 1 --repeat 3 --validate 0 --torch-baseline-ms 4.304213047027588 --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/ck_tile_custom_configs_wide_n_s4096_20260531/ck_tile_custom_config_sweep_wide_n_s4096/summary.json",
+    "local_validation": "jq empty run_artifacts/ck_tile_custom_config_sweep_wide_n_s4096_20260531.json"
+  },
+  "dependency_pin_changes": []
+}

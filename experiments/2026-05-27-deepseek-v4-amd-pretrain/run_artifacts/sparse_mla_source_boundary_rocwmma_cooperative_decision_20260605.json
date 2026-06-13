@@ -1,0 +1,78 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_cooperative_decision",
+  "date": "2026-06-05",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "gate": {
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "target_read": "A source-boundary HIP/CK/rocWMMA candidate must beat the actual sparse-attention backward boundary, not just a late dKV-only slice."
+  },
+  "tested_candidates": [
+    {
+      "name": "selected_tile_dq_scalar_atomic_dkv_group_atomic",
+      "artifact": "sparse_mla_source_boundary_rocwmma_dqdkv_s4096_layer2_compile_timing1_20260605.json",
+      "scope": "source-boundary dQ+dKV; selected-tile CTA; scalar dQ partial atomics; group-aware dKV atomics",
+      "event_median_ms": 136.06771850585938,
+      "status": "rejected",
+      "read": "This proves the output contract and build surface, but scalar dQ accumulation is a bring-up artifact and far too slow."
+    },
+    {
+      "name": "selected_tile_dq_mfma_4wave_dkv_group_atomic",
+      "artifact": "sparse_mla_source_boundary_rocwmma_dqmfma_s4096_layer2_compile_timing1_20260605.json",
+      "scope": "source-boundary dQ+dKV; selected-tile CTA; rocWMMA dQ tile; four D16 consumers; group-aware dKV atomics",
+      "event_median_ms": 80.05265808105469,
+      "status": "rejected",
+      "read": "MFMA fixes the inner dQ math and cuts latency by about 1.70x versus scalar dQ, but selected-tile partial dQ accumulation still dominates."
+    },
+    {
+      "name": "query_owned_dq_4wave",
+      "artifact": "sparse_mla_source_boundary_rocwmma_querydq_s4096_layer2_compile_timing1_20260605.json",
+      "scope": "source-boundary dQ only; CTA owns token,H16,D64 and writes each dQ element once",
+      "event_median_ms": 146.86581420898438,
+      "status": "rejected",
+      "read": "Owning dQ output removes global dQ atomics, but replays QK and dO.V score production across D groups and loses the score-page reuse that made the selected-tile producer viable."
+    },
+    {
+      "name": "selected_tile_dq_mfma_8wave_dkv_group_atomic",
+      "artifact": "sparse_mla_source_boundary_rocwmma_dqmfma_8wave_s4096_layer2_compile_timing1_20260605.json",
+      "scope": "source-boundary dQ+dKV; selected-tile CTA; rocWMMA dQ tile; eight D16 consumers; group-aware dKV atomics",
+      "event_median_ms": 63.68678283691406,
+      "status": "rejected",
+      "read": "More same-workgroup D consumers help by about 1.26x versus four waves, but do not solve selected-tile dQ partial accumulation or dKV global atomics."
+    }
+  ],
+  "decision": {
+    "status": "no_promoted_sparse_attention_backward_candidate",
+    "why": [
+      "Selected-tile ownership preserves QK/dO.V score-page reuse, but dQ becomes many selected-tile partial writes or atomics.",
+      "Query-owned dQ writes once, but score-page recompute across D groups dominates.",
+      "Increasing D consumers inside one CTA helps, but not enough to approach the 11.13 ms sparse-attention boundary gate."
+    ],
+    "next_kernel_contract": {
+      "preferred_surface": "HIP/CK/rocWMMA cooperative or persistent producer-consumer",
+      "required_shape": "score page produced once for a token/selected window, consumed by enough D/H consumers before HBM, with dQ accumulation kept local or compact and dKV reduced by compressed group before global writes",
+      "avoid": [
+        "materializing P or scaled_dP slabs to HBM",
+        "query-owned dQ that replays score production for every D group",
+        "selected-tile dQ scalar or MFMA partial atomics as a production path",
+        "late dKV-only replacements that arrive after PyTorch/Triton materialized selected state"
+      ],
+      "next_branch": "Move below the current TileLang/CTA abstraction: prototype a persistent HIP or CK block-level design where a score-page producer feeds multiple output consumers inside one cooperative kernel, and use compact per-token or per-route partials only if the partial stream is bounded and reduced before HBM."
+    }
+  },
+  "correctness": {
+    "s4096_timing_runs": "timing-only; correctness skipped because all tested variants are latency-rejected",
+    "reference_oracle": "reference_dq/reference_dkv in probe_sparse_mla_source_boundary_hip_coop.py remains wired for follow-up correctness gates"
+  },
+  "dependency_pins_changed": false
+}

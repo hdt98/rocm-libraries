@@ -1,0 +1,55 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_pairslot_atomic_decision",
+  "date": "2026-06-03",
+  "status": "rejected_as_s4096_production_kernel_but_kept_as_reducer_rung",
+  "branch": "compact_pairslot_atomic",
+  "contract": {
+    "producer": "existing query-major rocWMMA contribution math",
+    "tile_reducer": "precomputed pair_slots[S,K] maps each valid selected row to a compact tile-local active-group slot",
+    "scatter": "one reduced global atomic row per active compressed group per route tile and D16 block",
+    "diagnostic_limit": "still consumes materialized [S,K,H] probs and grad_logits; not the fused sparse MLA/LI backward"
+  },
+  "evidence": {
+    "s128": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s128_layer2_t32k32_20260603.json",
+      "status": "passed",
+      "compact_pairslot_atomic_ms": 0.1236409991979599,
+      "grouped_atomic_ms": 0.13140100240707397,
+      "raw_atomic_ms": 0.22460199892520905,
+      "raw_vs_pairslot_max_abs_diff": 0.00002288818359375
+    },
+    "s512": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s512_layer2_t32k128_20260603.json",
+      "status": "passed",
+      "compact_pairslot_atomic_ms": 0.5269259810447693,
+      "grouped_atomic_ms": 0.5854859948158264,
+      "raw_atomic_ms": 2.7297089099884033,
+      "modeled_write_reduction_x": 30.0,
+      "raw_vs_pairslot_max_abs_diff": 0.000026702880859375
+    },
+    "s4096": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t32k512_timing_20260603.json",
+      "status": "timed_reference_skipped",
+      "compact_pairslot_atomic_ms": 18.446964263916016,
+      "grouped_atomic_ms": 20.89019203186035,
+      "raw_atomic_ms": 46.18320083618164,
+      "contrib_sink_ms": 8.997262001037598,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "raw_vs_pairslot_max_abs_diff": 0.0001220703125,
+      "promotion_gate_ms": 8.80629825592041
+    }
+  },
+  "decision": {
+    "keep": [
+      "pair_slots[S,K] metadata contract; it is correct at S128/S512 and only about 8 MiB at S4096 topk512",
+      "compact active-group emit shape; it improves grouped_atomic by 1.06x at S128, 1.11x at S512, and 1.13x at S4096",
+      "reduced global atomic row target; S4096 preserves the 23.813x modeled write reduction"
+    ],
+    "reject": [
+      "current compact pair-slot CTA/LDS schedule as the S4096 production kernel: 18.45 ms is still 2.09x slower than the 8.806 ms sparse-atomic wall gate",
+      "metadata-only or slot-lookup-only tweaks as sufficient closure; the residual over contrib_sink is still about 9.45 ms at S4096"
+    ],
+    "next_kernel": "query-major MFMA producer with lane/warp-level segmented accumulation that avoids dense active-slot initialization and per-contribution LDS stores, or a group-owned cooperative schedule that preserves token-local Q reuse without recomputing segments",
+    "next_gate": "Beat S4096 sparse atomic dKV wall 8.80629825592041 ms while preserving the 23.813x modeled write reduction and S128/S512 parity"
+  }
+}

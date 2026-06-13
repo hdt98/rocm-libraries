@@ -1,0 +1,271 @@
+{
+  "backend_path": "sparse_mla_shared_kv_triton_forward_backend.py",
+  "backward_timing": {
+    "attn_sink_grad_norm": 3.011486114701256e-05,
+    "backward_mode": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "backward_mode_value": "query_recompute",
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 17.951171875,
+      "mean_ms": 17.796943028767902,
+      "median_ms": 17.731088638305664,
+      "min_ms": 17.708568572998047,
+      "samples_ms": [
+        17.951171875,
+        17.731088638305664,
+        17.708568572998047
+      ],
+      "stdev_ms": 0.1340398862015615
+    },
+    "enabled": true,
+    "kv_grad_norm": 0.00013022612256463617,
+    "loss": 0.00948738120496273,
+    "peak_memory_allocated_bytes": 3407873536,
+    "peak_memory_allocated_gib": 3.1738295555114746,
+    "q_grad_norm": 2.1330501112970524e-05,
+    "read": "Measures forward plus the selected backend backward mode for the shared latent-KV sparse MLA ABI. This is diagnostic timing, not a fused production-backward result.",
+    "seq_len": 4096,
+    "shape": {
+      "batch": 1,
+      "compressed_groups": 1024,
+      "csa_count": 512,
+      "dim": 512,
+      "heads": 64,
+      "kv_len": 5120,
+      "local_count": 128,
+      "selected_count": 640,
+      "seq_len": 4096
+    },
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 18.000549054704607,
+      "mean_ms": 17.830886334801715,
+      "median_ms": 17.758769914507866,
+      "min_ms": 17.73334003519267,
+      "samples_ms": [
+        18.000549054704607,
+        17.758769914507866,
+        17.73334003519267
+      ],
+      "stdev_ms": 0.14748134995358564
+    },
+    "warmup_iters": 1
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "metadata": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "has_sparse_mla_shared_kv": true,
+    "has_sparse_mla_shared_kv_with_lse": true,
+    "is_production_backend": false,
+    "is_reference_backend": false,
+    "materializes_selected_state": false,
+    "max_promoted_seq_len": 4096,
+    "max_selected_keys": 1024,
+    "promotion_blockers": [
+      "Shared-KV backward is still a mixed explicit PyTorch/Triton prototype, not one fused production kernel.",
+      "TorchTitan shared-KV DSv4 attention path is still experimental and needs full pretraining-image validation.",
+      "LightningIndexer backward and compressor backward are not fused into this probe."
+    ],
+    "shared_kv_abi": "sparse_mla_shared_kv(q, kv, attn_sink, indices, scale)",
+    "signature": "(q: 'torch.Tensor', kv: 'torch.Tensor', attn_sink: 'torch.Tensor', indices: 'torch.Tensor', scale: 'float') -> 'torch.Tensor'",
+    "signature_matches_required_abi": true,
+    "signature_parameters": [
+      "q",
+      "kv",
+      "attn_sink",
+      "indices",
+      "scale"
+    ],
+    "supports_attn_sink": true,
+    "supports_backward": true,
+    "supports_long_sequence": false,
+    "supports_torchtitan_shared_kv_abi": true
+  },
+  "module": null,
+  "promotable_for_s4096": false,
+  "promotion_blockers": [
+    "module does not mark SUPPORTS_LONG_SEQUENCE=True",
+    "module does not mark IS_PRODUCTION_BACKEND=True",
+    "Shared-KV backward is still a mixed explicit PyTorch/Triton prototype, not one fused production kernel.",
+    "TorchTitan shared-KV DSv4 attention path is still experimental and needs full pretraining-image validation.",
+    "LightningIndexer backward and compressor backward are not fused into this probe."
+  ],
+  "promotion_shape_estimate": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_current_per_head_kv_bf16_gib": 320.0,
+    "materialized_shared_latent_one_bank_bf16_gib": 2.5,
+    "materialized_shared_latent_two_bank_equivalent_bf16_gib": 5.0,
+    "qk_dim_for_current_per_head_path": 512,
+    "saved_output_plus_two_row_stats_bf16_fp32_gib": 0.251953125,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "value_dim_for_current_per_head_path": 512
+  },
+  "promotion_timing": {
+    "enabled": false
+  },
+  "read": "This preflights the DeepSeek-V4 sparse MLA shared latent-KV ABI. It is intentionally separate from the older per-head sparse_mla fused ABI because the production TorchTitan path must avoid expanding K/V per head before compression.",
+  "required_abi": "sparse_mla_shared_kv(q, kv, attn_sink, indices, scale)",
+  "seed": 1234,
+  "smoke": {
+    "backward": {
+      "attn_sink_grad_norm": 0.0008185660117305815,
+      "enabled": true,
+      "grad_atol": 0.1,
+      "grad_parity_passed": true,
+      "kv_grad_norm": 0.0017875866033136845,
+      "loss": 0.05514600872993469,
+      "max_attn_sink_grad_abs_diff": 4.682806320488453e-08,
+      "max_kv_grad_abs_diff": 8.106231689453125e-06,
+      "max_q_grad_abs_diff": 2.9802322387695312e-08,
+      "q_grad_norm": 0.0006079362938180566,
+      "reference_loss": 0.05514558404684067
+    },
+    "lse_atol": 0.05,
+    "lse_shape": [
+      1,
+      128,
+      64
+    ],
+    "max_lse_abs_diff": 9.5367431640625e-07,
+    "max_output_abs_diff": 0.0078125,
+    "output_atol": 0.05,
+    "output_shape": [
+      1,
+      128,
+      64,
+      512
+    ],
+    "saved_state": {
+      "category_bytes": {
+        "attention_activation": 33554432,
+        "attention_sink": 256,
+        "row_stat": 32768,
+        "shared_kv_bank": 163840,
+        "sparse_indices": 163840
+      },
+      "category_counts": {
+        "attention_activation": 3,
+        "attention_sink": 1,
+        "row_stat": 1,
+        "shared_kv_bank": 1,
+        "sparse_indices": 1
+      },
+      "enabled": true,
+      "read": "Selected state means saved shared/per-head selected K/V or attention probabilities. Saving q, the shared KV bank, indices, output, and row stats is allowed for this experimental ABI.",
+      "saved_tensor_count": 7,
+      "saved_tensor_total_bytes": 33915136,
+      "saved_tensor_total_gib": 0.0315859317779541,
+      "selected_state_saved": false,
+      "selected_state_saved_records": [],
+      "top_saved_tensors_by_bytes": [
+        {
+          "bytes": 16777216,
+          "device": "cuda:0",
+          "dtype": "float32",
+          "index": 6,
+          "numel": 4194304,
+          "requires_grad": true,
+          "shape": [
+            1,
+            128,
+            64,
+            512
+          ]
+        },
+        {
+          "bytes": 8388608,
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "index": 0,
+          "numel": 4194304,
+          "requires_grad": true,
+          "shape": [
+            1,
+            128,
+            64,
+            512
+          ]
+        },
+        {
+          "bytes": 8388608,
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "index": 4,
+          "numel": 4194304,
+          "requires_grad": true,
+          "shape": [
+            1,
+            128,
+            64,
+            512
+          ]
+        },
+        {
+          "bytes": 163840,
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "index": 1,
+          "numel": 81920,
+          "requires_grad": true,
+          "shape": [
+            1,
+            160,
+            512
+          ]
+        },
+        {
+          "bytes": 163840,
+          "device": "cuda:0",
+          "dtype": "int64",
+          "index": 3,
+          "numel": 20480,
+          "requires_grad": false,
+          "shape": [
+            1,
+            128,
+            160
+          ]
+        },
+        {
+          "bytes": 32768,
+          "device": "cuda:0",
+          "dtype": "float32",
+          "index": 5,
+          "numel": 8192,
+          "requires_grad": false,
+          "shape": [
+            1,
+            128,
+            64
+          ]
+        },
+        {
+          "bytes": 256,
+          "device": "cuda:0",
+          "dtype": "float32",
+          "index": 2,
+          "numel": 64,
+          "requires_grad": true,
+          "shape": [
+            64
+          ]
+        }
+      ]
+    },
+    "selected_count": 160,
+    "seq_len": 128,
+    "status": "passed"
+  },
+  "status": "passed_abi_not_promotable"
+}

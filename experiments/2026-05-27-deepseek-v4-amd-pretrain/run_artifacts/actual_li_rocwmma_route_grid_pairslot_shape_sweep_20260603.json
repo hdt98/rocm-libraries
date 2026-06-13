@@ -1,0 +1,84 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_pairslot_shape_sweep",
+  "date": "2026-06-03",
+  "status": "block_shape_tuning_rejected_for_pairslot_reducer",
+  "scope": "S4096 layer-2 actual-LI compact_pairslot_atomic route-grid probe",
+  "baseline_gate": {
+    "sparse_atomic_wall_ms": 8.80629825592041,
+    "coalesced_write_target_reduction_x": 23.813051840857806
+  },
+  "results": [
+    {
+      "token_block": 16,
+      "selected_block": 256,
+      "compact_pairslot_atomic_ms": 19.570415496826172,
+      "raw_atomic_ms": 46.03750801086426,
+      "contrib_sink_ms": 7.933547019958496,
+      "write_reduction_x": 6.221961932650073,
+      "max_active_groups": 1016,
+      "compact_rows": 252710,
+      "dense_slot_overhead_x": 2.074662656800285,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t16k256_sweep_20260603.json"
+    },
+    {
+      "token_block": 16,
+      "selected_block": 512,
+      "compact_pairslot_atomic_ms": 18.539953231811523,
+      "raw_atomic_ms": 47.26107597351074,
+      "contrib_sink_ms": 8.102065086364746,
+      "write_reduction_x": 11.952959063438367,
+      "max_active_groups": 1024,
+      "compact_rows": 131545,
+      "dense_slot_overhead_x": 1.992808544604508,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t16k512_sweep_20260603.json"
+    },
+    {
+      "token_block": 32,
+      "selected_block": 256,
+      "compact_pairslot_atomic_ms": 18.598904609680176,
+      "raw_atomic_ms": 45.52989196777344,
+      "contrib_sink_ms": 9.60377550125122,
+      "write_reduction_x": 12.338365924856399,
+      "max_active_groups": 1024,
+      "compact_rows": 127436,
+      "dense_slot_overhead_x": 2.05706393797671,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t32k256_sweep_20260603.json"
+    },
+    {
+      "token_block": 64,
+      "selected_block": 256,
+      "compact_pairslot_atomic_ms": 18.283761978149414,
+      "raw_atomic_ms": 45.66880416870117,
+      "contrib_sink_ms": 8.324272155761719,
+      "write_reduction_x": 24.468215558425793,
+      "max_active_groups": 1024,
+      "compact_rows": 64261,
+      "dense_slot_overhead_x": 2.0396819221611864,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t64k256_sweep_20260603.json"
+    },
+    {
+      "token_block": 64,
+      "selected_block": 512,
+      "compact_pairslot_atomic_ms": 18.484627723693848,
+      "raw_atomic_ms": 44.971906661987305,
+      "contrib_sink_ms": 7.953589677810669,
+      "write_reduction_x": 47.254673318506946,
+      "max_active_groups": 1024,
+      "compact_rows": 33274,
+      "dense_slot_overhead_x": 1.9695858628358478,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t64k512_sweep_20260603.json"
+    }
+  ],
+  "read": "Pair-slot block-shape tuning does not close the S4096 dKV wall. The best sweep point is 64x256 at 18.28 ms, only a small improvement over the original 32x512 18.45 ms and still 2.08x slower than the 8.806 ms sparse-atomic wall. The pair-slot branch remains almost flat while modeled write reduction varies from 6.22x to 47.25x, so the current residual is dominated by the per-contribution LDS accumulation and CTA schedule rather than only global write count or active-row count.",
+  "decision": {
+    "keep": [
+      "pair_slots metadata as a useful route encoding",
+      "64x256 as the best measured pair-slot timing point if this branch is used for future comparisons"
+    ],
+    "reject": [
+      "token_block/selected_block tuning of the existing pair-slot LDS table as a production path",
+      "larger write-reduction tiles as sufficient; 64x512 reaches 47.25x modeled write reduction but still takes 18.48 ms"
+    ],
+    "next": "Move to a different reducer inner loop: lane/warp-level segmented reductions over K16 contribution rows, register-owned small segment accumulators, or a group-owned cooperative schedule that avoids per-contribution LDS stores while preserving query-major Q/dO reuse."
+  }
+}

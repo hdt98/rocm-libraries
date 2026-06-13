@@ -1,0 +1,72 @@
+{
+  "artifact": "continuation_adamw_guard_and_flash_confirm_20260531",
+  "created": "2026-05-31",
+  "status": "continued_with_single_gpu_flash_confirm_after_8gpu_idle_guard_block",
+  "scope": "Continuation toward the DeepSeek-V4-Flash pretraining benchmark after the 8xMI350 AdamW perf smoke could not be launched safely.",
+  "eight_gpu_adamw_canary": {
+    "node": "do-sonle5-mi350-gpu",
+    "attempted_action": "checkpoint-free AdamW GBS128 perf smoke",
+    "guard_source": "torchtitan_adamw_gbs128_idle_guard_20260531.json",
+    "status": "not_launched",
+    "reason": "The canonical launcher check-idle gate found active Primus/TorchTitan processes using GPUs, including two python workers on GPU 1 with about 167383355392 bytes VRAM each.",
+    "decision": "Do not co-schedule; retry when check-idle passes."
+  },
+  "single_gpu_flash_confirmation": {
+    "node": "do-sonle-kernel",
+    "source": "single_layer_flash_s4096_split_triton_confirm_20260531.json",
+    "status": "passed",
+    "shape": {
+      "batch": 1,
+      "seqlen": 4096,
+      "hidden_size": 4096,
+      "num_heads": 64,
+      "kv_dim": 512,
+      "q_lora_rank": 1024,
+      "o_lora_rank": 1024,
+      "o_groups": 8,
+      "moe_intermediate": 2048,
+      "num_experts": 256,
+      "routed_top_k": 6,
+      "shared_experts": 1,
+      "window_size": 128,
+      "csa_ratio": 4,
+      "hca_ratio": 128,
+      "dtype": "bfloat16"
+    },
+    "implementation": {
+      "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-split-ch-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "impl": "fp4-packed-sim",
+      "rmsnorm_save_policy": "saved-accum"
+    },
+    "timing": {
+      "avg_ms": 31.34476679842919,
+      "min_ms": 31.30926506128162,
+      "tokens_per_s": 130675.72096932195,
+      "estimated_tflops": 283.63848931763437,
+      "target_full_layer_ms": 24.9,
+      "time_ratio_to_target": 1.2588259758405298,
+      "throughput_fraction_of_target": 0.794390979525419
+    },
+    "comparison": {
+      "baseline_source": "single_layer_flash_s4096_compact_reduce_20260531.json",
+      "baseline_avg_ms": 31.697463981496792,
+      "delta_vs_baseline_avg_ms": -0.3526971830676011,
+      "improvement_vs_baseline_avg_pct": 1.1126984268315154,
+      "previous_split_source": "single_layer_flash_s4096_split_triton_20260531.json",
+      "previous_split_avg_ms": 31.398327322676778,
+      "delta_vs_previous_split_avg_ms": -0.05356052424758673,
+      "improvement_vs_previous_split_avg_pct": 0.1705840049922136
+    },
+    "command": "ssh do-sonle-kernel \"docker exec -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc 'mkdir -p run_outputs/flash_single_layer_s4096_split_triton_confirm_20260531 && PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/run_microbench.py --preset full --impl fp4-packed-sim --moe-impl grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad --shared-expert-impl linear-pair --attention-impl sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-split-ch-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum --batch 1 --seqlen 4096 --dtype bfloat16 --device cuda --warmup 3 --iters 5 --rmsnorm-save-policy saved-accum --hidden-size 4096 --num-heads 64 --kv-dim 512 --rope-dim 64 --q-lora-rank 1024 --o-lora-rank 1024 --o-groups 8 --moe-intermediate 2048 --num-experts 256 --routed-top-k 6 --shared-experts 1 --window-size 128 --csa-ratio 4 --hca-ratio 128 --json --summary-path run_outputs/flash_single_layer_s4096_split_triton_confirm_20260531/summary.json'\""
+  },
+  "notes": [
+    "An earlier helper-script bench in this continuation used the default full-size harness shape with hidden_size=7168 and was not used for Flash-target reporting.",
+    "The corrected explicit Flash-shape run confirms the split-compressed attention path remains the best current single-layer candidate, but the full-layer target gap is still about 25.9% by time."
+  ],
+  "next": [
+    "Retry the AdamW GBS128 canary on do-sonle5-mi350-gpu once the idle guard passes.",
+    "For single-GPU math, focus next on MoE compact-native grouped training GEMM efficiency and remaining sparse MLA backward reductions."
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,171 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_needed_mori_materialized_reuse_patch_20260612",
+  "date": "2026-06-12",
+  "purpose": "Validate the standard-EP hot-helper needed/MORI hot-weight exchange path after fixing materialized owner-compact remote-row reuse.",
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "summary": "Allow needed_owner_compact hot-helper layout to use already materialized remote rows when the remapped group ids are available, and rebuild group-end offsets with bincount/cumsum instead of requiring remote_materialized_group_ends.",
+    "key_symbols": [
+      "materialized_needed_remap",
+      "materialized_ready",
+      "_count_route_ids"
+    ]
+  },
+  "shared_shape": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "hardware": "8xMI350",
+    "parallelism": "TP1 PP1 CP1 FSDP8 EP8",
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation": 2,
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "moe_comm_backend": "standard",
+    "balanced_moe": "top-8 hot-helper execute",
+    "hot_split_presort_mode": "owner_compact",
+    "hot_split_materialize_rows": "owner_compact",
+    "weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_score_mode": "torch",
+    "sparse_mla": {
+      "max_seq_len": 4096,
+      "compress_ratio_allowlist": "4,128",
+      "sharedkv_backward_mode": "query_recompute",
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128,
+      "li_kl_backend": "triton_tl_dot"
+    }
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_mori_materialized_reuse_patch_mbs8_8x_steps2_20260612",
+      "type": "low-intrusion timing profile",
+      "hot_split_weight_layout": "needed",
+      "needed_weight_exchange_impl": "mori",
+      "status": "pass 2 steps",
+      "throughput_from_step_end": {
+        "step_2_tok_per_gpu_s": 6018.70,
+        "step_2_tflops_per_gpu_est": 297.98
+      },
+      "profile_read": {
+        "hot_split_records_step2_remote": 202,
+        "used_materialized_rows": {
+          "true": 202
+        },
+        "layouts": {
+          "needed_owner_compact|needed|owner_compact|owner_compact": 202
+        },
+        "standard_ep_dispatch_rankmax_ms": 368.899,
+        "standard_ep_combine_rankmax_ms": 329.069,
+        "standard_ep_hot_split_rankmax_ms": 844.948,
+        "top_hot_split_stages_rankmax_ms": {
+          "broadcast_hot_weights": 309.421,
+          "standard_ep_hot_weight.w2.forward.needed.mori_exchange": 247.576,
+          "weighted_scatter_tokens": 72.886,
+          "grouped_w3": 55.053,
+          "grouped_w2": 48.894,
+          "grouped_w1": 44.988,
+          "standard_ep_hot_weight.w1.forward.needed.mori_exchange": 31.312,
+          "standard_ep_hot_weight.w3.forward.needed.mori_exchange": 30.681,
+          "use_materialized_rows": 4.501
+        },
+        "additive_step_2_rankmax_ms": {
+          "step_wall": 10889.190,
+          "forward": 2798.604,
+          "loss": 604.249,
+          "backward": 7371.305,
+          "fwd_bwd_call": 10774.574,
+          "optimizer": 49.167
+        }
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_selected_layout_materialized_control_mbs8_8x_steps2_20260612",
+      "type": "matched selected-layout timing control",
+      "hot_split_weight_layout": "selected",
+      "needed_weight_exchange_impl": "auto",
+      "status": "pass 2 steps",
+      "throughput_from_step_end": {
+        "step_2_tok_per_gpu_s": 6041.35,
+        "step_2_tflops_per_gpu_est": 299.10
+      },
+      "profile_read": {
+        "hot_split_records_step2_remote": 202,
+        "used_materialized_rows": {
+          "true": 202
+        },
+        "layouts": {
+          "owner_compact|selected|owner_compact|owner_compact": 202
+        },
+        "standard_ep_dispatch_rankmax_ms": 364.873,
+        "standard_ep_combine_rankmax_ms": 341.196,
+        "standard_ep_hot_split_rankmax_ms": 506.962,
+        "top_hot_split_stages_rankmax_ms": {
+          "broadcast_hot_weights": 282.534,
+          "weighted_scatter_tokens": 72.659,
+          "grouped_w3": 55.049,
+          "grouped_w2": 48.303,
+          "grouped_w1": 46.122,
+          "use_materialized_rows": 1.261
+        },
+        "additive_step_2_rankmax_ms": {
+          "step_wall": 10848.414,
+          "forward": 2775.361,
+          "loss": 603.361,
+          "backward": 7356.008,
+          "fwd_bwd_call": 10734.118,
+          "optimizer": 48.622
+        }
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_mori_materialized_reuse_patch_mbs8_8x_steps6_20260612",
+      "type": "non-profile six-step gate",
+      "hot_split_weight_layout": "needed",
+      "needed_weight_exchange_impl": "mori",
+      "status": "pass 6 steps",
+      "metrics_from_step_end": {
+        "step_1_tok_per_gpu_s": 1999.76,
+        "step_2_tok_per_gpu_s": 6031.06,
+        "step_3_tok_per_gpu_s": 6126.00,
+        "step_4_tok_per_gpu_s": 6082.74,
+        "step_5_tok_per_gpu_s": 6213.60,
+        "step_6_tok_per_gpu_s": 6215.28,
+        "steps_2_to_6_tok_per_gpu_s": 6133.74,
+        "steps_2_to_6_tflops_per_gpu_est": 303.68,
+        "steps_4_to_6_tok_per_gpu_s": 6170.54,
+        "steps_4_to_6_tflops_per_gpu_est": 305.50,
+        "peak_logged_memory_gib": 272.46
+      }
+    }
+  ],
+  "comparison_points": {
+    "selected_layout_hot_helper_20step_late_window": {
+      "source_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs1_mbs2_ce8_ladder_20step_20260612.json",
+      "steps_13_to_20_tok_per_gpu_s": 8632.78,
+      "steps_13_to_20_tflops_per_gpu": 395.37,
+      "peak_memory_gib": 256.19
+    },
+    "needed_mori_patch_vs_selected_late_window": {
+      "note": "The six-step needed/MORI gate is not directly equivalent to the selected 20-step late window, but it is already far below the retained selected-layout level and should not be promoted without a substantial ABI change."
+    }
+  },
+  "decision": {
+    "mechanical_fix": "successful: needed_owner_compact now takes the materialized remote-row path for all 202 profiled remote hot-split records.",
+    "performance_decision": "not promoted: the remaining cost is the needed/MORI hot-weight exchange ABI, especially W2, not row materialization.",
+    "next_target": "Do not keep tuning this wrapper as the mainline. Preserve the proven standard-EP hot/cold/helper owner-compact layout and make MORI consume that partition natively: compact normal/cold dispatch-combine, batched helper grouped MLP/VJP, compact dX/dTopK return, and async hot dW reduce by owner slot."
+  },
+  "validation": {
+    "commands": [
+      "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/moe.py",
+      "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/moe.py",
+      "8xMI350 two-step needed/MORI timing profile",
+      "8xMI350 two-step selected-layout timing control",
+      "8xMI350 six-step needed/MORI non-profile gate"
+    ],
+    "dependency_pin_changes": "none"
+  }
+}

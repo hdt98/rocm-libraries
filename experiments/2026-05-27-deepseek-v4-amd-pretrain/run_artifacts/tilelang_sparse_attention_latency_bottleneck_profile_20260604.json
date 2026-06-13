@@ -1,0 +1,85 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_attention_latency_bottleneck_profile",
+  "created_at": "2026-06-04",
+  "read": "TileLang is a promising sparse-attention backward path, but the current e2e bottleneck question has two layers. Isolated compressed-dKV accumulation can now be driven to about 5.11 ms at S4096/H64/D512 with HSK BF16 source tensors and selected-limit reduction. End-to-end TorchTitan still needs the deferred 8x additive profile because the retained 4x/8x profiles rank MoE routed backward skew, owner-rank VJP math, activation checkpoint recompute, and loss/lm-head ahead of sparse attention in the current prototype canary.",
+  "single_gpu_tilelang_repro": {
+    "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_kernel_repro_do_sonle_kernel_20260604.json",
+    "host": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "env": {
+      "HIP_VISIBLE_DEVICES": "0",
+      "TILELANG_SELECTED_LIMIT_DIRECT_PLAN": "1"
+    },
+    "shape": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 512,
+      "valid_pairs": 1572352,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512,
+      "input_layout": "bshd"
+    },
+    "timing_ms": {
+      "static_plan_wall": 183.3284180611372,
+      "warmed_plan": 10.477010726928711,
+      "pack_only": 2.01889705657959,
+      "kernel_only": 6.204412937164307,
+      "pack_plus_kernel": 8.177749633789062,
+      "source_indexed_kernel": 7.317062854766846,
+      "hsk_source_kernel": 8.599834442138672,
+      "hsk_bf16_source_kernel": 5.113724231719971
+    },
+    "route_plan": {
+      "write_reduction_x": 11.953140798066032,
+      "active_rows": 131543,
+      "max_active_groups": 512,
+      "overflow_pairs": 0
+    },
+    "decision": "Promote the HSK BF16 source kernel as the next sparse-dKV candidate. Do not promote the materialized pack bridge as production-ready."
+  },
+  "current_bottleneck_read": [
+    {
+      "level": "isolated sparse attention backward",
+      "bottleneck": "compressed dKV many-to-one accumulation plus bridge/materialization overhead",
+      "evidence": "TileLang selected-limit reduction cuts the target-shape dKV producer to 5.11 ms when fed BF16 HSK source tensors, while materialized pack+kernel is 8.18 ms and dynamic warmed planning is 10.48 ms.",
+      "next": "Fuse probability and LI-derivative production into the TileLang source contract, cache/precompute static route plans for fixed S/layer shape, and avoid materialized selected-state tensors."
+    },
+    {
+      "level": "TorchTitan e2e prototype canary",
+      "bottleneck": "not yet re-ranked after the TileLang source path",
+      "evidence": "Existing low-intrusion/deep 4x profiles still rank MoE routed backward skew, owner-rank VJP math, activation checkpoint recompute, and loss/lm-head above sparse attention for the retained prototype path.",
+      "next": "Run the staged 8x low-intrusion additive profile once do-sonle5-mi350-gpu is free, with explicit TileLang call timers and MORI/MoE phase timers."
+    }
+  ],
+  "deferred_8x_profile": {
+    "status": "deferred_gpu_busy",
+    "host": "do-sonle5-mi350-gpu",
+    "blocking_workload": "Qwen3 TorchTitan FT job",
+    "active_pids": [
+      1825793,
+      1825867,
+      1825868,
+      1825869,
+      1825870,
+      1825871,
+      1825872,
+      1825873,
+      1825874
+    ],
+    "all_gpus_have_vram_allocated": true,
+    "planned_artifact": "run_artifacts/torchtitan_tilelang_8x_lowintrusion_profile_plan_20260604.json"
+  },
+  "commands": [
+    "ssh do-sonle-kernel docker run ... python3 benchmark_tilelang_selected_limit_adapter.py --seq-len 4096 --groups 1024 --heads 64 --dim 512 --layer-id 2 --group-panel-size 512 --panel-capacity 512 --token-block 16 --block-k 64 --block-d 64 --threads 512 --input-layout bshd --plan-on-device --skip-group-filter --backend-path /work/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py --warmup-iters 2 --timed-iters 5",
+    "scp do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_kernel_repro_do_sonle_kernel_20260604.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/",
+    "ssh do-sonle5-mi350-gpu pgrep/rocm-smi/docker inspection for 8x availability"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,147 @@
+{
+  "artifact": "torchtitan_8x_step_burst_diagnosis_20260604",
+  "created_at": "2026-06-04",
+  "status": "completed",
+  "question": "Why do the 8xMI350 DSv4 canaries show a one-step TFLOPs burst and then slow down?",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "chunked_ce_num_chunks": 2,
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "sparse_mla_backward_mode": "shared_kv",
+    "enable_profiling": false,
+    "raw_logs_outside_repo": true
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+      "activation_checkpoint_mode": "none",
+      "allocator": "expandable_segments:True",
+      "status": "passed_6_steps",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604/docker-run.log",
+      "tflops_per_gpu_by_step": {
+        "1": 41.97,
+        "2": 88.45,
+        "3": 74.54,
+        "4": 64.07,
+        "5": 65.10,
+        "6": 65.56
+      },
+      "tok_per_gpu_s_by_step": {
+        "2": 4675,
+        "3": 3939,
+        "4": 3386,
+        "5": 3440,
+        "6": 3465
+      },
+      "peak_logged_memory_gib_range_by_step": {
+        "2": [
+          80.66,
+          84.19
+        ],
+        "6": [
+          80.91,
+          108.04
+        ]
+      },
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 69.94,
+        "mean_steps3_to6_tflops_per_gpu": 65.07,
+        "mean_steps4_to6_tflops_per_gpu": 64.91,
+        "step2_to_step6_drop_percent": 25.88,
+        "allocation_retry_warning_count": 0
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604",
+      "activation_checkpoint_mode": "full",
+      "allocator": "default",
+      "status": "passed_6_steps_but_not_promoted",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604/docker-run.log",
+      "tflops_per_gpu_by_step": {
+        "1": 25.89,
+        "2": 57.80,
+        "3": 49.49,
+        "4": 44.62,
+        "5": 46.80,
+        "6": 45.51
+      },
+      "peak_logged_memory_gib_range_by_step": {
+        "2": [
+          81.72,
+          167.83
+        ],
+        "6": [
+          144.55,
+          248.83
+        ]
+      },
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 48.84,
+        "mean_steps3_to6_tflops_per_gpu": 47.11,
+        "mean_steps4_to6_tflops_per_gpu": 45.64,
+        "step2_to_step6_drop_percent": 21.26,
+        "allocation_retry_warning_count": 3
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_fullac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+      "activation_checkpoint_mode": "full",
+      "allocator": "expandable_segments:True",
+      "status": "passed_6_steps_but_not_promoted",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_fullac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604/docker-run.log",
+      "tflops_per_gpu_by_step": {
+        "1": 34.14,
+        "2": 55.74,
+        "3": 49.63,
+        "4": 47.54,
+        "5": 48.03,
+        "6": 48.16
+      },
+      "tok_per_gpu_s_by_step": {
+        "2": 2946,
+        "3": 2623,
+        "4": 2512,
+        "5": 2538,
+        "6": 2545
+      },
+      "peak_logged_memory_gib_range_by_step": {
+        "2": [
+          77.44,
+          92.25
+        ],
+        "6": [
+          95.63,
+          106.02
+        ]
+      },
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 49.82,
+        "mean_steps3_to6_tflops_per_gpu": 48.84,
+        "mean_steps4_to6_tflops_per_gpu": 47.91,
+        "step2_to_step6_drop_percent": 10.47
+      }
+    }
+  ],
+  "decision": {
+    "current_best_sustained_candidate": "torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+    "promoted_reporting_metric": "mean_steps4_to6_tflops_per_gpu",
+    "current_best_sustained_tflops_per_gpu": 64.91,
+    "target_tflops_per_gpu": 277.0,
+    "speedup_needed_to_target": 4.27,
+    "read": [
+      "Step 2 is a real burst but not a stable baseline. In every six-step gate, step 2 is materially faster than steps 4-6.",
+      "Expandable allocator helps memory behavior but does not make full activation checkpointing sustain the burst. Full-AC plus expandable allocator still settles around 47.91 TFLOPs/GPU over steps 4-6.",
+      "The likely causes are warmup/steady-state differences, activation-checkpoint recompute and autograd lifetime, and dynamic MoE owner-rank tail synchronization. The evidence is stronger for checkpointing and distributed backward tail effects than for allocator-only fragmentation.",
+      "Future performance reporting should use late-step or multi-step averages, not a single step-2 number."
+    ]
+  },
+  "dependency_pin_changes": []
+}

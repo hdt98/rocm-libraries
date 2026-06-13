@@ -1,0 +1,110 @@
+{
+  "artifact": "rocprof_blocks_s2048_backward_attribution_20260531",
+  "status": "passed",
+  "purpose": "Selected-region rocprofv3 attribution for the retained DSv4-Pro full-layer B=1 S=2048 backward development proxy on one MI350.",
+  "command": "env RUN_TAG=retained_rocprof_blocks_s2048_20260531T0705Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-blocks-2048",
+  "target_host": "do-sonle-kernel",
+  "remote_profile_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_rocprof_blocks_s2048_20260531T0705Z/rocprof_s2048_backward_blocks_1iter",
+  "remote_summary_files": {
+    "torch_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_rocprof_blocks_s2048_20260531T0705Z/rocprof_s2048_backward_blocks_1iter/torch_summary/summary.json",
+    "block_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_rocprof_blocks_s2048_20260531T0705Z/rocprof_s2048_backward_blocks_1iter/block_summary.json",
+    "kernel_trace": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_rocprof_blocks_s2048_20260531T0705Z/rocprof_s2048_backward_blocks_1iter/trace_kernel_trace.csv",
+    "marker_trace": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_rocprof_blocks_s2048_20260531T0705Z/rocprof_s2048_backward_blocks_1iter/trace_marker_api_trace.csv"
+  },
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16"
+  },
+  "implementations": {
+    "attention": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "boundary": "separate"
+  },
+  "torch_phase_ms": {
+    "forward": 18.5694289393723,
+    "loss": 0.0990299740806222,
+    "backward": 37.130637909285724
+  },
+  "rocprof_totals": {
+    "marker_range_count": 39,
+    "kernel_dispatch_count": 903,
+    "total_kernel_duration_ms": 114.928521,
+    "attributed_kernel_duration_ms": 114.928521,
+    "unattributed_kernel_duration_ms": 0.0
+  },
+  "top_backward_blocks": [
+    {
+      "name": "backward.moe.routed.dgrad",
+      "marker_ms": 28.278717,
+      "kernel_ms": 28.15694,
+      "kernel_count": 33,
+      "top_kernel_ms": 17.229656,
+      "top_kernel_count": 3
+    },
+    {
+      "name": "backward.moe.routed.wgrad",
+      "marker_ms": 27.69388,
+      "kernel_ms": 27.524536,
+      "kernel_count": 32,
+      "top_kernel_ms": 16.657491,
+      "top_kernel_count": 3
+    },
+    {
+      "name": "backward.attention.wgrad",
+      "marker_ms": 7.558557,
+      "kernel_ms": 6.977937,
+      "kernel_count": 172,
+      "top_kernel_ms": 1.084608,
+      "top_kernel_count": 3
+    },
+    {
+      "name": "backward.attention.dgrad",
+      "marker_ms": 7.353768,
+      "kernel_ms": 6.799573,
+      "kernel_count": 174,
+      "top_kernel_ms": 0.964809,
+      "top_kernel_count": 4
+    },
+    {
+      "name": "backward.moe.routed.w1_w3.dgrad",
+      "marker_ms": 6.66886,
+      "kernel_ms": 6.544612,
+      "kernel_count": 3,
+      "top_kernel_ms": 6.418771,
+      "top_kernel_count": 2
+    },
+    {
+      "name": "backward.moe.routed.w2.wgrad",
+      "marker_ms": 6.137362,
+      "kernel_ms": 6.039528,
+      "kernel_count": 1,
+      "top_kernel_ms": 6.039528,
+      "top_kernel_count": 1
+    },
+    {
+      "name": "backward.moe.routed.w1.wgrad",
+      "marker_ms": 6.019224,
+      "kernel_ms": 5.906767,
+      "kernel_count": 1,
+      "top_kernel_ms": 5.906767,
+      "top_kernel_count": 1
+    },
+    {
+      "name": "backward.moe.routed.w3.wgrad",
+      "marker_ms": 5.629265,
+      "kernel_ms": 5.525844,
+      "kernel_count": 1,
+      "top_kernel_ms": 5.525844,
+      "top_kernel_count": 1
+    }
+  ],
+  "health": {
+    "loss": 1.0037038326263428,
+    "input_grad_norm": 0.000525283336173743,
+    "moe_input_grad_norm": 3.880830990965478e-05,
+    "attention_input_grad_norm": 3.0413299100473523e-05
+  },
+  "conclusion": "The S2048 development proxy is still routed-MoE bound. The two top segmented backward regions are routed dgrad and routed wgrad at about 28 ms each under rocprof attribution; each is dominated by a small number of hipBLASLt GEMM kernels. The next performance step should target fused/streamlined grouped routed-MoE training kernels rather than attention."
+}

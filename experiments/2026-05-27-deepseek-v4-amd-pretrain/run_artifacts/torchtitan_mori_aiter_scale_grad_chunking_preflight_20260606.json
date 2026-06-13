@@ -1,0 +1,75 @@
+{
+  "artifact": "torchtitan_mori_aiter_scale_grad_chunking_preflight_20260606",
+  "date": "2026-06-06",
+  "status": "preflight_passed_followed_by_full_8x_rerun",
+  "change": {
+    "summary": "Bound compact routed gradient scaling by row chunks instead of materializing a full FP32 owner-rank slab.",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "changesets/torchtitan_mori_aiter_scale_grad_chunking.md"
+    ],
+    "env": {
+      "runtime": "TORCHTITAN_MORI_AITER_SCALE_CHUNK_ROWS",
+      "launcher": "CANARY_MORI_AITER_SCALE_CHUNK_ROWS",
+      "default_rows": 4096
+    }
+  },
+  "triggering_failure": {
+    "source_artifact": "run_artifacts/torchtitan_dsv4_flash12_8x_mbs4_heap_ladder_20260606.json",
+    "shape": "8xMI350 S4096 GBS128 MBS4 FSDP8 EP8 full activation checkpointing heap144",
+    "failure_site": "mori_aiter_moe.py scaled_dy_compact = (dy_compact.float() * weight_compact.unsqueeze(-1)).to(...)",
+    "requested_allocation_gib": 5.29,
+    "free_memory_gib": 3.72
+  },
+  "validations": [
+    {
+      "kind": "local_py_compile",
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/components/optimizer.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/benchmark_swap_optimizer.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/tests/unit_tests/test_optimizer_param_groups.py",
+      "result": "passed"
+    },
+    {
+      "kind": "local_shell_syntax",
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "result": "passed"
+    },
+    {
+      "kind": "rocm_container_expression_parity",
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "visible_devices": "1",
+      "env": {
+        "TORCHTITAN_MORI_AITER_SCALE_CHUNK_ROWS": "257"
+      },
+      "shape": {
+        "rows": [
+          4097,
+          513
+        ],
+        "weight": [
+          4097
+        ],
+        "output_dtype": "torch.bfloat16"
+      },
+      "reference": "(rows.float() * weight.unsqueeze(-1)).to(torch.bfloat16)",
+      "max_abs_diff": 0.0,
+      "result": "passed"
+    }
+  ],
+  "node_state_at_preflight": {
+    "do_sonle5_mi350_gpu": "busy_external_primus_qwen_fault_tolerance_workload",
+    "do_vunguyen_mi350_gpu": "busy_external_primus_qwen_fault_tolerance_workload_gpu0",
+    "scratch_space_do_vunguyen": {
+      "mount": "/scratch",
+      "size": "40T",
+      "used": "4.4T",
+      "available": "34T",
+      "use_percent": "12%"
+    }
+  },
+  "follow_up": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_scalechunk_8x_mbs4_fullac_20260606.json",
+    "result": "completed_four_steps_rejected_for_throughput"
+  },
+  "read": "The preflight proved expression-level parity for bounded scale chunking. The follow-up 8x run confirms the old MBS4 step-3 scale OOM is fixed, but MBS4 is still not a throughput promotion."
+}

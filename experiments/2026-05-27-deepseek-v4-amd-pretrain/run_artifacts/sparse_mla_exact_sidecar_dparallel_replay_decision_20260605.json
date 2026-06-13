@@ -1,0 +1,70 @@
+{
+  "scope": "sparse_mla_exact_sidecar_dparallel_replay_decision",
+  "date": "2026-06-05",
+  "status": "exact_forward_group_sidecar_confirmed_dparallel_source_boundary_variant_rejected",
+  "shape": {
+    "hardware": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "contract": {
+    "forward_sidecar": "safe_groups/group_ids[B,S,K] is the exact forward-known selected compressed-group id for every selected slot.",
+    "dkv_layout": "The shared latent-KV backward output is accumulated into preallocated KV-bank rows, effectively dKV[seq_len + group, d]. Heads are a reduction dimension, not a stored h dimension.",
+    "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]",
+    "current_atomic_shape": "The direct exact-sidecar path still performs one indirect global atomic per selected contribution and D element. At S4096 layer 2 this is modeled as 805044224 scalar atomic-add elements."
+  },
+  "code_change": {
+    "file": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "read": "The exact-sidecar modes 15/16 now allocate contribution scratch for kScorepageConsumerDGroups and are allowed to compile with SCOREPAGE_THREADS=512. This tests whether adding a second D consumer group reduces q/dO/prob/dP replay while preserving the forward group-id sidecar."
+  },
+  "artifacts": {
+    "mode15_256_sink_sorted": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+    "mode16_256_valid_sorted": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+    "mode15_512_sink_original": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_thr512_20260605.json",
+    "mode16_512_valid_original": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_thr512_20260605.json",
+    "mode15_512_sink_sorted": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_thr512_sorted_20260605.json",
+    "mode16_512_valid_sorted": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_thr512_sorted_20260605.json",
+    "triton_exact_group_id_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "prior_qgo_replay_attribution": "run_artifacts/sparse_mla_forward_sidecar_qgo_reload_attribution_20260605.json"
+  },
+  "timing_ms": {
+    "mode15_256_sink_sorted_event_median": 21.471811294555664,
+    "mode16_256_valid_sorted_event_median": 22.955167770385742,
+    "mode16_256_final_atomic_delta_vs_mode15_ms": 1.4833564758300781,
+    "mode15_512_sink_original_event_median": 23.570903778076172,
+    "mode16_512_valid_original_event_median": 24.681324005126953,
+    "mode16_512_original_final_atomic_delta_vs_mode15_ms": 1.1104202270507812,
+    "mode15_512_sink_sorted_event_median": 23.319183349609375,
+    "mode16_512_valid_sorted_event_median": 24.86708641052246,
+    "mode16_512_sorted_final_atomic_delta_vs_mode15_ms": 1.5479021072387695,
+    "triton_exact_group_id_atomic_dkv_slice_median": 8.144311904907227,
+    "triton_full_sparse_attention_backward_gate": 11.13
+  },
+  "read": [
+    "The current best Triton dKV slice already uses exact forward group ids through safe_groups/group_ids; it is not missing the forward sidecar.",
+    "In the shared latent-KV path, dKV is not parametrized as group x head x dim. The head dimension is reduced into the compressed KV row, so the fixed global target slot is group x dim inside the preallocated KV-gradient buffer.",
+    "D-parallelizing the exact-sidecar HIP source-boundary contribution consumer does not close the gap. Sorted valid-dKV regresses from 22.96 ms at 256 threads to 24.87 ms at 512 threads.",
+    "The sorted sink/valid split shows final global atomics are about 1.55 ms in this HIP source-boundary schedule. The large wall is still the producer/replay path, consistent with the prior q/dO/prob/dP replay attribution.",
+    "Because token_block=1 and selected_block=512 yield route_atomic_reduction_x=1.0, merely carrying group ids through this one-token query-major CTA does not reduce write count. The sidecar only becomes a speedup mechanism if the epilogue can reduce across a wider token/selected tile before global memory while keeping q/dO/prob/scaled-dP resident."
+  ],
+  "decision": {
+    "reject": [
+      "Treating the exact group-id sidecar alone as the optimization.",
+      "Increasing exact-sidecar source-boundary modes 15/16 to 512 threads as the D-replay fix.",
+      "Reporting the HIP source-boundary dKV-only branch as a materialized sparse-attention speedup."
+    ],
+    "retain": [
+      "Exact forward group_ids[B,S,K] sidecar contract.",
+      "Preallocated dKV[group,d] global buffer with final atomics after local reduction.",
+      "Need for a query-major producer whose score/prob/scaled-dP and q/dO operands are consumed before HBM or replay."
+    ],
+    "next_kernel_contract": "Build a lower-level cooperative query-major producer that uses a wider token tile than 1, keeps q/dO and score/prob/scaled-dP resident, performs segmented local reduction by exact group id across that tile, and only then issues the remaining global atomic stream."
+  }
+}

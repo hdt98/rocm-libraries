@@ -1,0 +1,173 @@
+{
+  "schema": "torchtitan_dsv4_flash4_to_flash12_scaling_decomposition.v1",
+  "created_at": "2026-06-06T00:00:00+07:00",
+  "question": "Why does tok/GPU/s drop from the retained 4-layer canary to the active 12-layer DeepSeek-V4-Flash probe, and which mechanisms prevent the 12-layer run from scaling toward the target?",
+  "anchors": {
+    "retained_4layer_system_anchor": {
+      "artifact": "run_artifacts/torchtitan_mori_saved_dispatch_reuse_ab_20260605.json",
+      "run_id": "torchtitan_dsv4_mori_saved_dispatch_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_20260605",
+      "model": "DeepSeek-V4-Flash 4-layer BF16 canary",
+      "hardware": "4xMI350",
+      "shape": "S4096_GBS128_MBS4_GA8_TP1_PP1_CP1_FSDP4_EP4_noAC",
+      "metric_window": "steps_4_to_6",
+      "tokens_per_gpu_s": 12570.33,
+      "node_tokens_s": 50281.32,
+      "tflops_per_gpu": 237.19,
+      "implied_gflop_per_token": 18.87,
+      "peak_logged_memory_gib": 115.04,
+      "read": "This is the retained systems/MORI baseline and passes the 4x target, but it is not the same model contract as the active 12-layer probe."
+    },
+    "current_12layer_4x_comparison": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_dtopk_dense_allreduce_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+      "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_materialized_4x_s4096_gbs128_mbs2_steps6_20260606",
+      "model": "DeepSeek-V4-Flash flash_12layer_ceiling_probe",
+      "hardware": "4xMI350",
+      "shape": "S4096_GBS128_MBS2_GA16_TP1_PP1_CP1_FSDP4_EP4_noAC",
+      "metric_window": "steps_2_to_6",
+      "tokens_per_gpu_s": 4327.0,
+      "node_tokens_s": 17308.0,
+      "tflops_per_gpu": 219.082,
+      "implied_gflop_per_token": 50.63256,
+      "peak_logged_memory_gib": 214.42,
+      "read": "Best same-node 4x comparison for the active 12-layer probe, but memory pressure limits MBS to 2."
+    },
+    "current_best_12layer_materialized": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606.json",
+      "profile_artifact": "run_artifacts/torchtitan_dsv4_flash12_reuse_forward_xop_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606.json",
+      "run_id": "torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606",
+      "model": "DeepSeek-V4-Flash flash_12layer_ceiling_probe",
+      "hardware": "8xMI350",
+      "shape": "S4096_GBS128_MBS4_GA4_TP1_PP1_CP1_FSDP8_EP8_noAC",
+      "metric_window": "steps_2_to_6",
+      "tokens_per_gpu_s": 4896.0,
+      "node_tokens_s": 39168.0,
+      "tflops_per_gpu": 248.284,
+      "implied_gflop_per_token": 50.7116,
+      "peak_logged_memory_gib": 167.67,
+      "target_tokens_per_gpu_s": 12200.0,
+      "target_ratio_tokens_per_gpu": 0.40131,
+      "read": "Current best 12-layer materialized candidate. EP8 incurs more collective/skew cost but enables MBS4 and beats the current 4x 12-layer candidate per GPU."
+    }
+  },
+  "scaling_math": {
+    "tflops_formula": "TFLOPs/GPU ~= tok/GPU/s * GFLOP/token / 1000",
+    "best_12layer_vs_4layer": {
+      "tokens_per_gpu_ratio": 0.38949,
+      "tokens_per_gpu_drop_pct": -61.05,
+      "gflop_per_token_ratio": 2.68742,
+      "tflops_per_gpu_ratio": 1.04677,
+      "expected_12layer_tokens_per_gpu_s_at_4layer_tflops": 4677.23,
+      "actual_12layer_tokens_per_gpu_s": 4896.0,
+      "actual_vs_expected_at_4layer_tflops_pct": 4.68,
+      "read": "Most of the 4-layer to 12-layer tok/GPU/s drop is expected work growth: GFLOP/token rises from 18.87 to about 50.71. The best 12-layer run is actually slightly higher TFLOPs/GPU than the 4-layer anchor."
+    },
+    "target_requirement_for_12layer": {
+      "target_tokens_per_gpu_s": 12200.0,
+      "current_12layer_gflop_per_token": 50.7116,
+      "required_tflops_per_gpu_for_target": 618.68,
+      "current_tflops_per_gpu": 248.284,
+      "current_tflops_vs_required_ratio": 0.40131,
+      "tflops_gap_to_target": 370.40,
+      "read": "At the active 12-layer FLOP/token, the 12.2k tok/GPU/s target requires about 619 TFLOPs/GPU. The current best is about 248 TFLOPs/GPU, so the remaining gap is achieved compute efficiency and runtime overlap, not FLOP accounting."
+    },
+    "best_12layer_8x_vs_12layer_4x": {
+      "tokens_per_gpu_uplift_pct": 13.15,
+      "tflops_per_gpu_uplift_pct": 13.33,
+      "node_tokens_uplift_pct": 126.30,
+      "memory_read": "The 8x EP8 run has lower per-rank memory pressure and can run MBS4 at 167.67 GiB, while the 4x EP4 run is limited to MBS2 at 214.42 GiB. EP8 pays back, but not enough to reach target."
+    }
+  },
+  "current_best_12layer_profile_step2": {
+    "source_artifact": "run_artifacts/torchtitan_dsv4_flash12_reuse_forward_xop_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606.json",
+    "profile_overhead_vs_clean_tokens_pct": -2.41,
+    "additive_rankmax_ms": {
+      "step_wall": 12147.43,
+      "train_step": 12146.717,
+      "microbatch_forward_backward": 11647.941,
+      "model_forward": 2540.04,
+      "loss": 346.632,
+      "backward": 7666.744,
+      "forward_backward_residual": 1117.601,
+      "accumulated_loss_reduce": 389.57,
+      "optimizer_step": 45.594
+    },
+    "additive_rankmax_pct_of_step_wall": {
+      "model_forward": 20.91,
+      "loss": 2.85,
+      "backward": 63.11,
+      "forward_backward_residual": 9.20,
+      "accumulated_loss_reduce": 3.21,
+      "optimizer_step": 0.38
+    },
+    "mori_step2_window_ms": {
+      "local_vjp_rankmax": 2083.768,
+      "local_vjp_rankmax_rank": 7,
+      "local_vjp_rankmin": 1244.826,
+      "local_vjp_max_min_ratio": 1.674,
+      "combine_dx_rankmax": 1747.401,
+      "combine_dx_rankmax_rank": 6,
+      "combine_dx_rankmin": 898.961,
+      "heavy_owner_rank7_detail": {
+        "wgrad": 698.766,
+        "xgrad": 451.845,
+        "recompute_forward": 466.661,
+        "w2_dgrad_swiglu": 178.354,
+        "dtopk_weight": 130.163,
+        "gather": 123.09
+      },
+      "read": "The heavy-owner ranks spend time in local VJP; lighter ranks then spend the equivalent time waiting in combine_dx. This points to routed owner-rank VJP imbalance and dX-return peer-arrival skew, not raw combine kernel math alone."
+    },
+    "dsv4_profile_rankmax_ms": {
+      "sharedkv_query_recompute": 1520.479,
+      "sharedkv_grad_attn_sink": 186.612,
+      "attention_linear_bwd_dinput": 303.581,
+      "attention_linear_bwd_dweight": 293.979,
+      "attention_wo_bwd_dinput": 234.432,
+      "attention_wo_bwd_dweight": 222.958,
+      "loss_backward": 233.67,
+      "loss_lm_head_forward": 76.813,
+      "loss_cross_entropy_forward": 33.86
+    }
+  },
+  "mechanism_ranking_for_scaling": [
+    {
+      "rank": 1,
+      "mechanism": "MoE/EP routed owner-rank backward and dX return skew",
+      "evidence": "The current 12-layer profile has backward at 7.67s of a 12.15s step. In the MORI timing window, rank 7 spends 2.08s in local VJP while rank 6 spends 1.75s in combine_dx wait. Heavy-owner VJP is led by wgrad, xgrad, forward recompute, and W2 dgrad/SwiGLU.",
+      "next_measurement": "Tag MORI timings by layer, microbatch, owner rank, expert id range, assignment count, padded rows, recv count, and VJP substage so the 12-layer run exposes which layers and expert owners create the tail.",
+      "next_fix": "Fuse compact owner-rank VJP for dW13/dW2/dX/dTopKWeight while preserving AITER fused forward and saved compact dispatch state; then overlap or chunk dX return once the owner tail is shorter."
+    },
+    {
+      "rank": 2,
+      "mechanism": "Sparse shared-KV/MLA backward, especially C4 compressed dKV",
+      "evidence": "The profiled 12-layer step shows sharedKV query recompute at about 1.52s rank-max plus 0.187s sink. Separately, the isolated C4 S4096 boundary remains about 11.0ms with about 8.2ms in compressed dKV accumulation. This is a real kernel target but not the largest current EP8 scaling bucket.",
+      "next_measurement": "Keep C4 layer-2 source-boundary sparse-attention latency as the kernel gate and require any TileLang/HIP/CK rewrite to materialize into the 12-layer e2e TFLOPs, not only dKV slice timing.",
+      "next_fix": "Keep the fast query-major QK/P/scaled-dP/dQ schedule and add a group-aware compressed dKV epilogue before global memory."
+    },
+    {
+      "rank": 3,
+      "mechanism": "Forward/backward wrapper residual and FSDP/autograd lifetime",
+      "evidence": "The current profile still has about 1.12s rank-max fwd/bwd residual after model forward, loss, and backward are measured. It is smaller than the older 4.5s residual but large enough to hide kernel wins.",
+      "next_measurement": "Run the same additive/module timing on a matched 4-layer profile and the 12-layer current candidate with per-layer boundaries, then split residual into FSDP reduce/unshard, autograd graph release, loss return/unwind, and allocator synchronization.",
+      "next_fix": "Only patch once the residual is named; earlier detached-loss and no-AC probes show this can be a real runtime-lifetime bucket."
+    },
+    {
+      "rank": 4,
+      "mechanism": "Loss, lm-head, and dense linear backward",
+      "evidence": "Loss and dense linear pieces are visible but smaller than MoE/EP and shared-KV in the current profile: loss is 0.347s additive, loss backward is 0.234s rank-max, and individual attention projection bwd pieces are about 0.22-0.30s.",
+      "next_measurement": "Keep these in the additive trace but do not make them the first scaling target unless MoE/attention improvements expose them as the new wall.",
+      "next_fix": "Sharded/fused vocab loss remains useful but is not the immediate 4-to-12 scaling blocker."
+    }
+  ],
+  "decision": {
+    "main_read": "The tok/GPU/s drop from 4-layer to 12-layer is mostly the 2.69x increase in FLOP/token, not a hidden arithmetic mismatch. The 12-layer candidate slightly exceeds the 4-layer anchor in TFLOPs/GPU, but the target requires about 619 TFLOPs/GPU at this model contract.",
+    "what_prevents_target_scaling": "Backward runtime, especially MoE/EP owner VJP plus combine_dx skew, is the largest named mechanism preventing the 12-layer run from turning 8x memory room into target tok/GPU/s. Sparse C4 dKV remains a parallel kernel track.",
+    "no_more_shadow_chasing_gate": "Future optimizations should be judged by current 12-layer e2e tok/GPU/s, TFLOPs/GPU, peak memory, and a profile showing which step bucket moved. A dKV slice or local VJP microbench is not promotable unless it moves the 12-layer materialized run."
+  },
+  "next_actions": [
+    "Add per-layer/per-owner MORI route and VJP-skew attribution for the current 12-layer profile path.",
+    "Run a matched 4-layer additive/MORI/profile sidecar if node time is available, so the 4-to-12 comparison uses the same instrumentation instead of only the retained 4-layer throughput anchor.",
+    "Continue fused compact MORI/AITER owner-rank backward as the lead e2e scaling path.",
+    "Continue the C4 sparse-attention compressed-dKV rewrite as the parallel kernel path, but require full sparse-attention boundary latency and 12-layer TFLOPs movement."
+  ]
+}

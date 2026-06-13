@@ -1,0 +1,113 @@
+{
+  "artifact": "torchtitan_mori_aiter_persistent_jit_cache_20260602",
+  "created_date": "2026-06-02",
+  "status": "validated",
+  "purpose": "Record persistent MORI/AITER JIT cache support for the direct TorchTitan DeepSeek-V4 MORI+AITER bridge so cold container JIT compile does not contaminate follow-up canary timings.",
+  "host": "do-sonle5-mi350-gpu",
+  "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "base_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "cache_policy": {
+    "CANARY_PERSIST_JIT_CACHE": "auto",
+    "auto_enables_when": "CANARY_MOE_COMM_BACKEND=mori or CANARY_EXPERIMENTAL_MORI_AITER_MOE is non-empty",
+    "cache_key": "onenexus_nexus-titan_rocm722-pytorch-nightly-mori",
+    "canonical_scratch_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori",
+    "launcher_default_root": "/local/data/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori",
+    "note": "/local/data/sonle5/dsv4_pretrain_canary_20260527 is the compatibility symlink to /scratch for this experiment payload."
+  },
+  "mounted_paths": {
+    "mori": {
+      "host": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori/mori",
+      "container": "/root/.mori/jit",
+      "size_after_warm": "956K"
+    },
+    "aiter_jit": {
+      "host": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori/aiter_jit",
+      "container": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit",
+      "size_after_warm": "29M",
+      "init_rule": "Before bind-mounting, copy the image's aiter/jit package files into the host cache when __init__.py is absent, so the mount does not hide AITER's Python JIT helpers."
+    }
+  },
+  "cache_products_after_warm": [
+    {
+      "path": "aiter_jit/module_aiter_core.so",
+      "bytes": 548024
+    },
+    {
+      "path": "aiter_jit/module_moe_ck2stages_b16_b16_preshuffle_on_b16_silu_no_mulWeightStage2.so",
+      "bytes": 6878944
+    },
+    {
+      "path": "aiter_jit/module_moe_sorting_opus.so",
+      "bytes": 1444816
+    }
+  ],
+  "check_config": {
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_STEPS=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "result": "pass",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+    "moe_score_before_experts": false,
+    "router_score_func": "sqrtsoftplus",
+    "attention_compress_ratio_by_layer": [
+      0,
+      0,
+      4,
+      128
+    ]
+  },
+  "warm_run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_jitcache_warm_4x_s128_gbs4_20260602T000000",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_jitcache_warm_4x_s128_gbs4_20260602T000000/docker-run.log",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+    "visible_devices": "4,5,6,7",
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "dsa_indexer_loss_coeff": 0,
+    "mori_compile_count": 2,
+    "mori_cached_count": 2,
+    "aiter_start_build_count": 3,
+    "aiter_import_module_aiter_core_count": 4,
+    "aiter_import_module_moe_sorting_opus_count": 4,
+    "aiter_import_module_moe_ck2stages_count": 4,
+    "step1": {
+      "loss": 12.2971,
+      "grad_norm": 12.1875,
+      "memory_gib": 129.33,
+      "tokens_per_gpu_s_reported": 1
+    },
+    "process_group_destroyed": true,
+    "read": "Cold persistent-cache warmup compiled MORI shmem/EP kernels and AITER core/sorting/two-stage MoE kernels into the mounted cache. Do not use this timing as performance evidence."
+  },
+  "reuse_run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_jitcache_reuse_4x_s128_gbs4_20260602T000000",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_jitcache_reuse_4x_s128_gbs4_20260602T000000/docker-run.log",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+    "visible_devices": "4,5,6,7",
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "dsa_indexer_loss_coeff": 0,
+    "mori_compile_count": 0,
+    "mori_cached_count": 0,
+    "aiter_start_build_count": 0,
+    "aiter_import_module_aiter_core_count": 4,
+    "aiter_import_module_moe_sorting_opus_count": 4,
+    "aiter_import_module_moe_ck2stages_count": 4,
+    "step1": {
+      "loss": 12.39759,
+      "grad_norm": 12.1875,
+      "memory_gib": 129.33,
+      "tokens_per_gpu_s_reported": 5
+    },
+    "process_group_destroyed": true,
+    "read": "Second disposable container imported the cached MORI/AITER products and completed the same train step with no observed AITER start-build or MORI compile lines."
+  },
+  "commands_run": [
+    "bash -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_STEPS=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "RUN_ID=torchtitan_direct_dsv4_mori_aiter_jitcache_warm_4x_s128_gbs4_20260602T000000 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_GBS=4 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "RUN_ID=torchtitan_direct_dsv4_mori_aiter_jitcache_reuse_4x_s128_gbs4_20260602T000000 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_GBS=4 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  ],
+  "dependency_pin_changes": []
+}

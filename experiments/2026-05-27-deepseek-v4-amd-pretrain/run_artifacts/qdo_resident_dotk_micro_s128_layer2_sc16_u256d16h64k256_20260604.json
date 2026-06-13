@@ -1,0 +1,242 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 1.1428571428571428,
+    "dense_slots_after_compaction": 2304,
+    "nonempty_tiles": 8,
+    "tiles": 8,
+    "unique_groups_max": 32,
+    "unique_groups_mean_all_tiles": 18.0,
+    "unique_groups_mean_nonempty": 18.0,
+    "unique_groups_total": 144
+  },
+  "active_route_workspace": {
+    "active_counts_bytes": 32,
+    "active_flat_groups_bytes": null,
+    "active_groups_bytes": 1024,
+    "active_offsets_bytes": null,
+    "micro_to_seq_slots_bytes": null,
+    "route_slots_bytes": null,
+    "seq_active_counts_bytes": null,
+    "seq_active_flat_groups_bytes": null,
+    "seq_active_groups_bytes": null,
+    "seq_active_offsets_bytes": null
+  },
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "active_blocks": 1,
+    "active_group_shape": [
+      1,
+      8,
+      1,
+      32
+    ],
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 256,
+    "block_u": 256,
+    "group_block": 64,
+    "kernel": "dot_k_micro",
+    "num_warps": 8,
+    "selected_block": 64,
+    "seq_chunk": 16
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 4128768,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 4128768
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 1032192,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 1032192
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "prefix_compressed_same_topk": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 32,
+    "valid_selected_per_query": {
+      "gini": 0.3386656746031746,
+      "max": 32,
+      "mean_all_rows": 15.75,
+      "mean_nonzero_rows": 16.128,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 125,
+      "p50_all_rows": 16.0,
+      "p50_nonzero_rows": 16.0,
+      "p90_all_rows": 28.299999999999997,
+      "p90_nonzero_rows": 28.60000000000001,
+      "p99_all_rows": 31.0,
+      "p99_nonzero_rows": 31.0,
+      "rows": 128,
+      "top16_share": 0.2361111111111111,
+      "top1_share": 0.015873015873015872,
+      "top64_share": 0.753968253968254,
+      "top8_share": 0.12202380952380952,
+      "total_selections": 2016,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": 595.8078002929688,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 0.0840911865234375,
+    "mean_abs_diff": 0.0013856939040124416,
+    "passed": true,
+    "reference_norm": 595.8150024414062
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "materialized_workspace": {
+    "grad_logits_bytes": 1048576,
+    "probs_bytes": 1048576,
+    "safe_groups_bytes": 32768,
+    "valid_bytes": 4096
+  },
+  "modeled_write_reduction": {
+    "actual_kernel_atomic_elements": 73728,
+    "actual_kernel_atomic_reduction_x": 14.0,
+    "actual_kernel_write_elements": 73728,
+    "actual_kernel_write_reduction_x": 14.0,
+    "coalesced_active_list_atomic_elements": 73728,
+    "coalesced_active_list_reduction_x": 14.0,
+    "compact_partial_slab_elements": 73728,
+    "compact_partial_slab_over_raw_write_x": 0.07142857142857142,
+    "dense_partial_slab_elements": 131072,
+    "dense_partial_slab_over_raw_write_x": 0.12698412698412698,
+    "query_major_raw_atomic_elements": 1032192,
+    "read": "dot_k_micro builds active compressed-group lists per selected-key block, then uses dense tl.dot routing only over that micro active list. It tests whether smaller route matrices can preserve dot-K math speed while reducing global writes below the raw KxD volume.",
+    "seq_compact_partial_slab_elements": null,
+    "seq_compact_partial_slab_over_raw_write_x": null
+  },
+  "read": "Diagnostic dynamic active-list D16 compressed-dKV accumulator. It consumes materialized probs/grad_logits and precomputed active compressed-group lists, so it isolates the reduced-write accumulator only. A production kernel must fuse score/prob/grad-logit recompute and avoid materialized selected state.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_active_list_dkv_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_pairs": 2016
+  },
+  "status": "ok",
+  "timing": {
+    "active_list_triton_from_materialized_probs": {
+      "checksum_norm": 595.8078002929688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.6704049706459045,
+        "mean_ms": 0.5974579850832621,
+        "median_ms": 0.563444972038269,
+        "min_ms": 0.5585240125656128,
+        "samples_ms": [
+          0.6704049706459045,
+          0.563444972038269,
+          0.5585240125656128
+        ],
+        "stdev_ms": 0.06322183948241424
+      },
+      "label": "active_list_triton_from_materialized_probs",
+      "peak_memory_allocated_bytes": 485303808,
+      "peak_memory_allocated_gib": 0.45197439193725586,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.7252928335219622,
+        "mean_ms": 0.6295625741283098,
+        "median_ms": 0.5845818668603897,
+        "min_ms": 0.5788130220025778,
+        "samples_ms": [
+          0.7252928335219622,
+          0.5845818668603897,
+          0.5788130220025778
+        ],
+        "stdev_ms": 0.08295499873684731
+      }
+    },
+    "pytorch_reference_dkv": {
+      "checksum_norm": 595.8150024414062,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.1568089723587036,
+        "mean_ms": 0.7323656678199768,
+        "median_ms": 0.5216040015220642,
+        "min_ms": 0.5186840295791626,
+        "samples_ms": [
+          1.1568089723587036,
+          0.5186840295791626,
+          0.5216040015220642
+        ],
+        "stdev_ms": 0.3675815836448456
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 565101568,
+      "peak_memory_allocated_gib": 0.5262918472290039,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.1947241146117449,
+        "mean_ms": 0.7640190112094084,
+        "median_ms": 0.5510409828275442,
+        "min_ms": 0.5462919361889362,
+        "samples_ms": [
+          1.1947241146117449,
+          0.5462919361889362,
+          0.5510409828275442
+        ],
+        "stdev_ms": 0.3730091191024784
+      }
+    }
+  }
+}

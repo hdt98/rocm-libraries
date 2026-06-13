@@ -1,0 +1,195 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.34357682619647356,
+      "max": 3969,
+      "mean_all_rows": 1985.0,
+      "mean_nonzero_rows": 1985.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 1985.0,
+      "p50_nonzero_rows": 1985.0,
+      "p90_all_rows": 3572.2000000000003,
+      "p90_nonzero_rows": 3572.2000000000003,
+      "p99_all_rows": 3929.32,
+      "p99_nonzero_rows": 3929.32,
+      "rows": 32,
+      "top16_share": 0.7579345088161209,
+      "top1_share": 0.06248425692695214,
+      "top64_share": 1.0,
+      "top8_share": 0.4434508816120907,
+      "total_selections": 63520,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 130088960,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 130088960
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 32522240,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 32522240
+      }
+    },
+    "compress_ratio": 128,
+    "compressed_groups": 32,
+    "prefix_compressed_same_topk": {
+      "gini": 0.34357682619647356,
+      "max": 3969,
+      "mean_all_rows": 1985.0,
+      "mean_nonzero_rows": 1985.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 1985.0,
+      "p50_nonzero_rows": 1985.0,
+      "p90_all_rows": 3572.2000000000003,
+      "p90_nonzero_rows": 3572.2000000000003,
+      "p99_all_rows": 3929.32,
+      "p99_nonzero_rows": 3929.32,
+      "rows": 32,
+      "top16_share": 0.7579345088161209,
+      "top1_share": 0.06248425692695214,
+      "top64_share": 1.0,
+      "top8_share": 0.4434508816120907,
+      "total_selections": 63520,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 32,
+    "valid_selected_per_query": {
+      "gini": 0.3435924462767632,
+      "max": 32,
+      "mean_all_rows": 15.5078125,
+      "mean_nonzero_rows": 16.00403124212648,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 3969,
+      "p50_all_rows": 16.0,
+      "p50_nonzero_rows": 16.0,
+      "p90_all_rows": 28.0,
+      "p90_nonzero_rows": 28.0,
+      "p99_all_rows": 31.0,
+      "p99_nonzero_rows": 31.0,
+      "rows": 4096,
+      "top16_share": 0.007824307304785894,
+      "top1_share": 0.0005037783375314861,
+      "top64_share": 0.03125,
+      "top8_share": 0.003920025188916877,
+      "total_selections": 63520,
+      "zero_rows": 127
+    }
+  },
+  "correctness": {
+    "candidate_norm": 3215.32080078125,
+    "dkv_atol": 0.75,
+    "max_abs_diff": 0.0004730224609375,
+    "mean_abs_diff": 1.1895670581907325e-07,
+    "passed": true,
+    "reference_norm": 3215.321044921875
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 3,
+  "read": "This diagnostic uses actual TorchTitan LightningIndexer routes. It sorts valid (token, compressed_group) pairs by group, then runs a group-major Triton dKV reduction. Unlike the retained query-major kernel, it reduces many token/head contributions before writing global dKV, so it tests the sparse route-bucketed branch after the dense-route matrix branch was ruled out. It is not a production kernel: the QK and dO.V recompute here is row-wise rather than the forward-style MFMA selected-key schedule.",
+  "route_stats": {
+    "atomic_element_reduction_x": 510.2008032128514,
+    "bucket_partial_atomic_elements": 4079616,
+    "max_pairs_per_group": 3969,
+    "nonzero_groups": 32,
+    "p50_pairs_per_nonzero_group": 1985.0,
+    "p90_pairs_per_nonzero_group": 3572.2000000000003,
+    "p99_pairs_per_nonzero_group": 3929.32,
+    "query_major_raw_atomic_elements": 2081423360,
+    "total_pairs": 63520
+  },
+  "scope": "sparse_mla_shared_latent_kv_actual_li_dkv_bucket_reduce_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 128,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 4128,
+    "seq_len": 4096,
+    "topk": 32
+  },
+  "status": "passed",
+  "tile": {
+    "block_d": 64,
+    "block_rows": 512,
+    "dot_block_d": 64
+  },
+  "timing": {
+    "route_prepare_sort": {
+      "checksum_norm": 63520.0,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.4685249924659729,
+        "mean_ms": 0.4110439916451772,
+        "median_ms": 0.38424399495124817,
+        "min_ms": 0.38036298751831055,
+        "samples_ms": [
+          0.4685249924659729,
+          0.38036298751831055,
+          0.38424399495124817
+        ],
+        "stdev_ms": 0.04981781454654415
+      },
+      "label": "route_prepare_sort",
+      "peak_memory_allocated_bytes": 1605001216,
+      "peak_memory_allocated_gib": 1.4947738647460938,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.5254880525171757,
+        "mean_ms": 0.45463206091274816,
+        "median_ms": 0.4244890296831727,
+        "min_ms": 0.41391910053789616,
+        "samples_ms": [
+          0.5254880525171757,
+          0.41391910053789616,
+          0.4244890296831727
+        ],
+        "stdev_ms": 0.06159025499394419
+      }
+    },
+    "triton_bucket_reduce_dkv": {
+      "checksum_norm": 3215.32080078125,
+      "event": {
+        "enabled": true,
+        "max_ms": 19.72691535949707,
+        "mean_ms": 19.501832962036133,
+        "median_ms": 19.397192001342773,
+        "min_ms": 19.381391525268555,
+        "samples_ms": [
+          19.72691535949707,
+          19.397192001342773,
+          19.381391525268555
+        ],
+        "stdev_ms": 0.19508710361301582
+      },
+      "label": "triton_bucket_reduce_dkv",
+      "peak_memory_allocated_bytes": 1609956352,
+      "peak_memory_allocated_gib": 1.4993886947631836,
+      "wall": {
+        "enabled": true,
+        "max_ms": 19.7900669882074,
+        "mean_ms": 19.535844679921865,
+        "median_ms": 19.41876905038953,
+        "min_ms": 19.39869800116867,
+        "samples_ms": [
+          19.7900669882074,
+          19.41876905038953,
+          19.39869800116867
+        ],
+        "stdev_ms": 0.2203915794142905
+      }
+    }
+  }
+}

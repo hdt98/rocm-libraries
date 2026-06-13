@@ -1,0 +1,252 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.34357682619647356,
+      "max": 3969,
+      "mean_all_rows": 1985.0,
+      "mean_nonzero_rows": 1985.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 1985.0,
+      "p50_nonzero_rows": 1985.0,
+      "p90_all_rows": 3572.2000000000003,
+      "p90_nonzero_rows": 3572.2000000000003,
+      "p99_all_rows": 3929.32,
+      "p99_nonzero_rows": 3929.32,
+      "rows": 32,
+      "top16_share": 0.7579345088161209,
+      "top1_share": 0.06248425692695214,
+      "top64_share": 1.0,
+      "top8_share": 0.4434508816120907,
+      "total_selections": 63520,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 130088960,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 130088960
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 32522240,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 32522240
+      }
+    },
+    "compress_ratio": 128,
+    "compressed_groups": 32,
+    "prefix_compressed_same_topk": {
+      "gini": 0.34357682619647356,
+      "max": 3969,
+      "mean_all_rows": 1985.0,
+      "mean_nonzero_rows": 1985.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 1985.0,
+      "p50_nonzero_rows": 1985.0,
+      "p90_all_rows": 3572.2000000000003,
+      "p90_nonzero_rows": 3572.2000000000003,
+      "p99_all_rows": 3929.32,
+      "p99_nonzero_rows": 3929.32,
+      "rows": 32,
+      "top16_share": 0.7579345088161209,
+      "top1_share": 0.06248425692695214,
+      "top64_share": 1.0,
+      "top8_share": 0.4434508816120907,
+      "total_selections": 63520,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 32,
+    "valid_selected_per_query": {
+      "gini": 0.3435924462767632,
+      "max": 32,
+      "mean_all_rows": 15.5078125,
+      "mean_nonzero_rows": 16.00403124212648,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 3969,
+      "p50_all_rows": 16.0,
+      "p50_nonzero_rows": 16.0,
+      "p90_all_rows": 28.0,
+      "p90_nonzero_rows": 28.0,
+      "p99_all_rows": 31.0,
+      "p99_nonzero_rows": 31.0,
+      "rows": 4096,
+      "top16_share": 0.007824307304785894,
+      "top1_share": 0.0005037783375314861,
+      "top64_share": 0.03125,
+      "top8_share": 0.003920025188916877,
+      "total_selections": 63520,
+      "zero_rows": 127
+    }
+  },
+  "correctness": {
+    "dkv_atol": 0.75,
+    "max_abs_diff_index_add": 0.028113126754760742,
+    "max_abs_diff_segment": 0.028090953826904297,
+    "max_abs_diff_sort_index_add": 0.028058767318725586,
+    "mean_abs_diff_segment": 1.388184136885684e-05,
+    "passed": true,
+    "reference_norm": 3215.32080078125,
+    "segment_norm": 3215.30810546875
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 3,
+  "math_dtype": "bfloat16",
+  "read": "This diagnostic tests the branch implied by the bucket-reduce negative result: keep query-major selected-gradient production, materialize compact dKV partials, then compare flat index_add against sort+segment_reduce and sort+index_add. It is a floor, not a production kernel, because it materializes selected K/V, probabilities, and compact [valid_pairs,D] partials.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_dkv_partial_reduce_floor",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compact_values_fp32_gib": 0.12115478515625,
+    "compress_ratio": 128,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 4128,
+    "max_pairs_per_group": 3969,
+    "nonzero_groups": 32,
+    "p50_pairs_per_nonzero_group": 1985.0,
+    "p99_pairs_per_nonzero_group": 3929.320068359375,
+    "seq_len": 4096,
+    "topk": 32,
+    "valid_pairs": 63520
+  },
+  "status": "passed",
+  "timing": {
+    "produce_compact_selected_dkv_partials": {
+      "checksum_norm": 3206.970947265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 3.547873020172119,
+        "mean_ms": 3.0019473234812417,
+        "median_ms": 2.7548649311065674,
+        "min_ms": 2.703104019165039,
+        "samples_ms": [
+          3.547873020172119,
+          2.703104019165039,
+          2.7548649311065674
+        ],
+        "stdev_ms": 0.47349334497099266
+      },
+      "label": "produce_compact_selected_dkv_partials",
+      "peak_memory_allocated_bytes": 4420490752,
+      "peak_memory_allocated_gib": 4.116902828216553,
+      "wall": {
+        "enabled": true,
+        "max_ms": 3.6141580203548074,
+        "mean_ms": 3.0396466609090567,
+        "median_ms": 2.778060967102647,
+        "min_ms": 2.726720995269716,
+        "samples_ms": [
+          3.6141580203548074,
+          2.726720995269716,
+          2.778060967102647
+        ],
+        "stdev_ms": 0.4982031962724697
+      }
+    },
+    "reduce_index_add": {
+      "checksum_norm": 3215.30810546875,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.18100200593471527,
+        "mean_ms": 0.17689533531665802,
+        "median_ms": 0.17584200203418732,
+        "min_ms": 0.17384199798107147,
+        "samples_ms": [
+          0.18100200593471527,
+          0.17584200203418732,
+          0.17384199798107147
+        ],
+        "stdev_ms": 0.003694395989472568
+      },
+      "label": "reduce_index_add",
+      "peak_memory_allocated_bytes": 1734105088,
+      "peak_memory_allocated_gib": 1.615011215209961,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.21205993834882975,
+        "mean_ms": 0.19720332541813454,
+        "median_ms": 0.19156001508235931,
+        "min_ms": 0.18799002282321453,
+        "samples_ms": [
+          0.21205993834882975,
+          0.19156001508235931,
+          0.18799002282321453
+        ],
+        "stdev_ms": 0.012989435015117618
+      }
+    },
+    "reduce_sort_index_add": {
+      "checksum_norm": 3215.30810546875,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.2587220072746277,
+        "mean_ms": 0.256028672059377,
+        "median_ms": 0.25484201312065125,
+        "min_ms": 0.2545219957828522,
+        "samples_ms": [
+          0.2587220072746277,
+          0.2545219957828522,
+          0.25484201312065125
+        ],
+        "stdev_ms": 0.0023379785521695775
+      },
+      "label": "reduce_sort_index_add",
+      "peak_memory_allocated_bytes": 1864193536,
+      "peak_memory_allocated_gib": 1.7361655235290527,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.27683901134878397,
+        "mean_ms": 0.27161564988394576,
+        "median_ms": 0.2693489659577608,
+        "min_ms": 0.26865897234529257,
+        "samples_ms": [
+          0.27683901134878397,
+          0.2693489659577608,
+          0.26865897234529257
+        ],
+        "stdev_ms": 0.004536700512550849
+      }
+    },
+    "reduce_sort_segment": {
+      "checksum_norm": 3215.307861328125,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.2363309860229492,
+        "mean_ms": 1.2267576853434246,
+        "median_ms": 1.2354910373687744,
+        "min_ms": 1.2084510326385498,
+        "samples_ms": [
+          1.2084510326385498,
+          1.2354910373687744,
+          1.2363309860229492
+        ],
+        "stdev_ms": 0.015859587900638652
+      },
+      "label": "reduce_sort_segment",
+      "peak_memory_allocated_bytes": 1864195584,
+      "peak_memory_allocated_gib": 1.7361674308776855,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.2562560150399804,
+        "mean_ms": 1.2476853250215452,
+        "median_ms": 1.255525043234229,
+        "min_ms": 1.2312749167904258,
+        "samples_ms": [
+          1.2312749167904258,
+          1.255525043234229,
+          1.2562560150399804
+        ],
+        "stdev_ms": 0.014216529241667681
+      }
+    }
+  }
+}

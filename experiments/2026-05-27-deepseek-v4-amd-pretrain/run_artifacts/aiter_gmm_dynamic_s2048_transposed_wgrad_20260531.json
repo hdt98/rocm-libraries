@@ -1,0 +1,160 @@
+{
+  "errors": {},
+  "estimated_tflops": {
+    "aiter_nptgmm_wgrad_w1": 93.15964323070965,
+    "aiter_nptgmm_wgrad_w2": 91.6339292338716,
+    "aiter_ptgmm_wgrad_w1": 88.77423303519424,
+    "aiter_ptgmm_wgrad_w2": 88.36667010538724
+  },
+  "note": "Uses compact non-uniform learned-router-like expert groups. This isolates AITER grouped GEMM/TGMM viability for routed MoE training contractions; dispatch, combine, activation, and packed-FP4 quantization are not included.",
+  "ok": null,
+  "operand_layouts": {
+    "nptgmm_wgrad_w1": {
+      "lhs_is_contiguous": false,
+      "lhs_shape": [
+        3072,
+        12288
+      ],
+      "lhs_stride": [
+        1,
+        3072
+      ],
+      "rhs_is_contiguous": true,
+      "rhs_shape": [
+        12288,
+        7168
+      ],
+      "rhs_stride": [
+        7168,
+        1
+      ]
+    },
+    "nptgmm_wgrad_w2": {
+      "lhs_is_contiguous": false,
+      "lhs_shape": [
+        7168,
+        12288
+      ],
+      "lhs_stride": [
+        1,
+        7168
+      ],
+      "rhs_is_contiguous": true,
+      "rhs_shape": [
+        12288,
+        3072
+      ],
+      "rhs_stride": [
+        3072,
+        1
+      ]
+    },
+    "ptgmm_wgrad_w1": {
+      "lhs_is_contiguous": false,
+      "lhs_shape": [
+        3072,
+        12288
+      ],
+      "lhs_stride": [
+        1,
+        3072
+      ],
+      "rhs_is_contiguous": true,
+      "rhs_shape": [
+        12288,
+        7168
+      ],
+      "rhs_stride": [
+        7168,
+        1
+      ]
+    },
+    "ptgmm_wgrad_w2": {
+      "lhs_is_contiguous": false,
+      "lhs_shape": [
+        7168,
+        12288
+      ],
+      "lhs_stride": [
+        1,
+        7168
+      ],
+      "rhs_is_contiguous": true,
+      "rhs_shape": [
+        12288,
+        3072
+      ],
+      "rhs_stride": [
+        3072,
+        1
+      ]
+    }
+  },
+  "probe": "aiter_triton_gmm_dynamic_moe_bf16",
+  "route_stats": {
+    "assignments": 12288,
+    "experts": 384,
+    "max_per_expert": 47,
+    "mean_per_expert": 32.0,
+    "min_per_expert": 15,
+    "padded_rows_global_max": 18048,
+    "padding_multiplier_global_max": 1.46875,
+    "touched_experts": 384
+  },
+  "shape": {
+    "assignments": 12288,
+    "check": false,
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "ops": [
+      "ptgmm_wgrad_w2",
+      "nptgmm_wgrad_w2",
+      "ptgmm_wgrad_w1",
+      "nptgmm_wgrad_w1"
+    ],
+    "prealloc": true,
+    "tokens": 2048,
+    "topk": 6
+  },
+  "timing_ms": {
+    "aiter_nptgmm_wgrad_w1_ms_max": 6.102259159088135,
+    "aiter_nptgmm_wgrad_w1_ms_mean": 5.858408641815186,
+    "aiter_nptgmm_wgrad_w1_ms_median": 5.809016227722168,
+    "aiter_nptgmm_wgrad_w1_ms_min": 5.716094970703125,
+    "aiter_nptgmm_wgrad_w2_ms_max": 6.562578201293945,
+    "aiter_nptgmm_wgrad_w2_ms_mean": 6.044400882720947,
+    "aiter_nptgmm_wgrad_w2_ms_median": 5.905736923217773,
+    "aiter_nptgmm_wgrad_w2_ms_min": 5.833856105804443,
+    "aiter_ptgmm_wgrad_w1_ms_max": 6.274580001831055,
+    "aiter_ptgmm_wgrad_w1_ms_mean": 6.123538875579834,
+    "aiter_ptgmm_wgrad_w1_ms_median": 6.0959792137146,
+    "aiter_ptgmm_wgrad_w1_ms_min": 6.04329776763916,
+    "aiter_ptgmm_wgrad_w2_ms_max": 6.907660961151123,
+    "aiter_ptgmm_wgrad_w2_ms_mean": 6.315376281738281,
+    "aiter_ptgmm_wgrad_w2_ms_median": 6.1240949630737305,
+    "aiter_ptgmm_wgrad_w2_ms_min": 6.08061408996582,
+    "nptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_max": 0.19372199475765228,
+    "nptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_mean": 0.18968999683856963,
+    "nptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_median": 0.18884199857711792,
+    "nptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_min": 0.18832199275493622,
+    "nptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_max": 0.4929639995098114,
+    "nptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_mean": 0.4291879951953888,
+    "nptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_median": 0.41116398572921753,
+    "nptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_min": 0.4110040068626404,
+    "ptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_max": 0.20332199335098267,
+    "ptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_mean": 0.1906499981880188,
+    "ptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_median": 0.1859620064496994,
+    "ptgmm_wgrad_w1_lhs_transpose_contiguous_copy_ms_min": 0.1846819967031479,
+    "ptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_max": 0.551485002040863,
+    "ptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_mean": 0.45290019512176516,
+    "ptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_median": 0.4298439919948578,
+    "ptgmm_wgrad_w2_lhs_transpose_contiguous_copy_ms_min": 0.4253639876842499
+  },
+  "versions": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a"
+  }
+}

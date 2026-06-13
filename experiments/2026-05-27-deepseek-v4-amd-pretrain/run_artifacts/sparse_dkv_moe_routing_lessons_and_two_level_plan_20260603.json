@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-03",
+  "question": "What MoE routing lessons apply to sparse MLA compressed dKV, and what is the next kernel plan?",
+  "short_answer": "Sparse compressed dKV is MoE-like in routing, but not in compute ownership. Borrow MoE route packing, compact ragged metadata, and combine/reduce discipline. Do not borrow expert-owned compute directly: in sparse dKV, query-major Q/dO reuse is the fast producer, while compressed group should own only reduction/writeback.",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk_groups_per_token": 512,
+    "heads": 64,
+    "dim": 512,
+    "valid_pairs": 1572352
+  },
+  "moe_analogy": {
+    "moe": {
+      "route": "token -> expert",
+      "owner": "expert owns routed token rows",
+      "math": "expert-local grouped GEMM over X_e W_e",
+      "why_owner_compute_works": "expert weights differ, top-k is small, and the expert GEMM is naturally expert-owned"
+    },
+    "sparse_dkv": {
+      "route": "(token, selected_slot) -> compressed_group",
+      "owner": "compressed group owns the final dKV reduction",
+      "math": "sum grad_logits[token,head,slot] * Q[token,head,d] + probs[token,head,slot] * dO[token,head,d]",
+      "why_owner_compute_does_not_work": "the same token's Q/dO are reused across hundreds of selected groups at layer 2, so group-owned contribution production reloads/recomputes token state"
+    },
+    "transferable_lessons": [
+      "Prepack route metadata once and consume compact offsets/lists instead of rescanning top-k.",
+      "Keep ragged rows compact; avoid dense [token, group] route materialization or padded panels.",
+      "Separate producer ownership from reducer ownership when the producer has stronger reuse than the routed owner.",
+      "Use reduce-by-key or segmented combine semantics for dKV writeback, closer to MoE combine backward than MoE expert GEMM."
+    ],
+    "non_transferable_lesson": "Do not make compressed group the outer contribution-compute owner just because MoE makes expert the outer compute owner."
+  },
+  "existing_evidence": {
+    "route_pack_median_ms": [0.52, 0.54],
+    "group_outer_reuse": {
+      "overall_pair_over_unique_token_x": 1.0,
+      "duplicate_token_segments": 0,
+      "max_pairs_per_token_per_segment_p99": 1.0,
+      "read": "The useful group segments have at most one selected row per token, so they cannot reuse one token's Q/dO across selected slots."
+    },
+    "retained_sparse_atomic_wall_ms": [8.0, 8.8],
+    "raw_selected_dkv_stream_mib_fp32": 3071.0,
+    "rocprim_final_reducer_floor_ms": {
+      "sorted_reduce_only": 0.438,
+      "random_sort_reorder_reduce": 1.108
+    }
+  },
+  "two_level_query_major_plan": {
+    "source_artifact": "actual_li_two_level_segmented_producer_plan_s4096_layer2_20260603.json",
+    "contract": "query-major micro producer -> local segmented micro rows -> selected-tile merge -> final compact reduce",
+    "bringup_32x256": {
+      "k64": {
+        "raw_to_micro_reduction_x": 3.428225069715621,
+        "micro_to_tile_merge_x": 3.5990536426127626,
+        "raw_to_tile_reduction_x": 12.338365924856399,
+        "micro_partial_stream_mib": 951.7905311584473,
+        "tile_partial_stream_mib": 264.45544815063477,
+        "producer_ctas_all_d": 28672,
+        "tile_merge_ctas_all_d": 7168
+      },
+      "k128": {
+        "raw_to_micro_reduction_x": 6.368246896579656,
+        "micro_to_tile_merge_x": 1.9374823440785962,
+        "raw_to_tile_reduction_x": 12.338365924856399,
+        "micro_partial_stream_mib": 512.3786659240723,
+        "tile_partial_stream_mib": 264.45544815063477,
+        "producer_ctas_all_d": 14336,
+        "tile_merge_ctas_all_d": 7168
+      }
+    },
+    "retained_32x512": {
+      "k64": {
+        "raw_to_micro_reduction_x": 3.428225069715621,
+        "micro_to_tile_merge_x": 6.946175165457602,
+        "raw_to_tile_reduction_x": 23.813051840857806,
+        "micro_partial_stream_mib": 951.7906532287598,
+        "tile_partial_stream_mib": 137.02356338500977,
+        "producer_ctas_all_d": 32768,
+        "tile_merge_ctas_all_d": 4096
+      },
+      "k128": {
+        "raw_to_micro_reduction_x": 6.368246896579656,
+        "micro_to_tile_merge_x": 3.739341804358691,
+        "raw_to_tile_reduction_x": 23.813051840857806,
+        "micro_partial_stream_mib": 512.3785438537598,
+        "tile_partial_stream_mib": 137.02356338500977,
+        "producer_ctas_all_d": 16384,
+        "tile_merge_ctas_all_d": 4096
+      }
+    }
+  },
+  "decision": {
+    "promote_next_runtime_rung": "Implement or prototype a query-major K128 micro producer with in-microtile segmented accumulation, first at 32x256 and then 32x512.",
+    "why_k128_first": "It halves producer CTAs and shrinks the modeled micro partial stream from about 952 MiB to about 512 MiB while preserving the final tile-reduction target.",
+    "gate": "producer + tile merge + final reducer must beat the 8.0-8.8 ms sparse-atomic dKV wall, including route-pack cost or explicitly amortizing/fusing it.",
+    "avoid": [
+      "group-outermost contribution production",
+      "naive panel rescans",
+      "dense route matrices",
+      "per-contribution local table atomics",
+      "global compact partial slabs without an in-producer reduction"
+    ]
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/plan_sparse_dkv_two_level_segmented_producer.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/plan_sparse_dkv_two_level_segmented_producer.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/plan_sparse_dkv_two_level_segmented_producer.py --seq-len 4096 --layer-id 2 --token-windows 16,32,64 --selected-tiles 256,512 --micro-selecteds 32,64,128 --summary-path /workspace/run_artifacts/actual_li_two_level_segmented_producer_plan_s4096_layer2_20260603.json --json'",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_two_level_segmented_producer_plan_s4096_layer2_20260603.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  ],
+  "dependency_pin_changes": []
+}

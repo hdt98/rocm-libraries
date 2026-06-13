@@ -1,0 +1,53 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 256,
+  "candidate_estimated_selected_state_elements": 25769803776,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": 0.004245100077241659,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 384,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": 1.4901161193847656e-08,
+  "max_output_abs_diff": 0.00390625,
+  "max_param_grad_abs_diff": 1.1920928955078125e-07,
+  "nonfinite_diffs": [],
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 4.6566128730773926e-09,
+    "indexer.wk.weight": 5.704350769519806e-09,
+    "indexer.wq.weight": 1.760781742632389e-09,
+    "kv_norm.weight": 1.1920928955078125e-07,
+    "q_norm.weight": 7.450580596923828e-09,
+    "wkv_a.weight": 1.1920928955078125e-07,
+    "wkv_b.weight": 2.9802322387695312e-08,
+    "wo.weight": 1.4901161193847656e-08,
+    "wq_a.weight": 7.450580596923828e-09,
+    "wq_b.weight": 7.450580596923828e-09
+  },
+  "reference_compressed_groups": 256,
+  "reference_estimated_selected_state_elements": 25769803776,
+  "reference_kernel_module": null,
+  "reference_loss": 0.004245101474225521,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 384,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 1024,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": false
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

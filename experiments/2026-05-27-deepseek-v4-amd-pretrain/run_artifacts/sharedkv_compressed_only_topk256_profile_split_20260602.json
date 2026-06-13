@@ -1,0 +1,272 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "dkv_atol": 0.35,
+    "dkv_candidate_norm": 2068.96337890625,
+    "dkv_max_abs_diff": 0.11913299560546875,
+    "dkv_mean_abs_diff": 0.000348923378624022,
+    "dkv_reference_norm": 2068.983642578125,
+    "dq_atol": 0.35,
+    "dq_candidate_norm": 1466.089599609375,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00020190711074974388,
+    "dq_reference_norm": 1466.09765625,
+    "passed": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "query_major_correctness": {
+    "dkv_candidate_norm": 2068.96337890625,
+    "dkv_max_abs_diff": 0.11902618408203125,
+    "dkv_mean_abs_diff": 0.0003489127557259053,
+    "dq_candidate_norm": 1466.0894775390625,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00020190708164591342,
+    "passed": true,
+    "read": "Query-major fused recompute keeps dQ local to the query row and atomically accumulates only dKV."
+  },
+  "read": "This tests whether a single recompute tile can reuse QK/probability work for both dQ and dKV. The original combined line is key-major and atomically accumulates dQ; the newer query-major line keeps dQ local to the query row and atomically accumulates only dKV. The structured query-major variant computes the synthetic route inside the tile to isolate index-load overhead. The no_dkv and dkv_reduce_sink profile modes are diagnostic-only splits for dKV compute versus full atomic accumulation and do not produce correct dKV. This is still a diagnostic Triton prototype, and no LightningIndexer parameter gradients are emitted here.",
+  "scope": "sparse_mla_shared_latent_kv_backward_combined_dq_dkv_recompute_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 256,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 0,
+    "materialized_probs_fp32_gib": 0.25,
+    "materialized_shared_selected_kv_fp32_gib": 2.0,
+    "selected_count": 256,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "structured_query_major_correctness": {
+    "dkv_candidate_norm": 2068.96337890625,
+    "dkv_max_abs_diff": 0.1190643310546875,
+    "dkv_mean_abs_diff": 0.0003489130758680403,
+    "dq_candidate_norm": 1466.0894775390625,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00020190708164591342,
+    "passed": true,
+    "read": "Structured query-major recompute computes synthetic local and prefix-compressed indices inside the Triton tile instead of loading the route tensor."
+  },
+  "tile": {
+    "block_d": 512,
+    "block_h": 64,
+    "block_m": 16
+  },
+  "timing": {
+    "triton_dq_dkv_query_major_dkv_reduce_sink_profile": {
+      "checksum_norm": {
+        "dkv_norm": 6735.1845703125,
+        "dq_norm": 1466.0894775390625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 1.733333945274353,
+        "mean_ms": 1.6512799660364788,
+        "median_ms": 1.6458929777145386,
+        "min_ms": 1.5746129751205444,
+        "samples_ms": [
+          1.733333945274353,
+          1.6458929777145386,
+          1.5746129751205444
+        ],
+        "stdev_ms": 0.07949749256440161
+      },
+      "label": "triton_dq_dkv_query_major_dkv_reduce_sink_profile",
+      "peak_memory_allocated_bytes": 1447037440,
+      "peak_memory_allocated_gib": 1.347658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.7767129465937614,
+        "mean_ms": 1.6777766480421026,
+        "median_ms": 1.6649039462208748,
+        "min_ms": 1.5917130513116717,
+        "samples_ms": [
+          1.7767129465937614,
+          1.6649039462208748,
+          1.5917130513116717
+        ],
+        "stdev_ms": 0.09316930907079714
+      }
+    },
+    "triton_dq_dkv_query_major_no_dkv_profile": {
+      "checksum_norm": {
+        "dkv_norm": 0.0,
+        "dq_norm": 1466.0894775390625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 1.268970012664795,
+        "mean_ms": 1.1912626425425212,
+        "median_ms": 1.170928955078125,
+        "min_ms": 1.1338889598846436,
+        "samples_ms": [
+          1.268970012664795,
+          1.1338889598846436,
+          1.170928955078125
+        ],
+        "stdev_ms": 0.06979840141058616
+      },
+      "label": "triton_dq_dkv_query_major_no_dkv_profile",
+      "peak_memory_allocated_bytes": 1447037440,
+      "peak_memory_allocated_gib": 1.347658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.3133439933881164,
+        "mean_ms": 1.218894651780526,
+        "median_ms": 1.1916359653696418,
+        "min_ms": 1.1517039965838194,
+        "samples_ms": [
+          1.3133439933881164,
+          1.1517039965838194,
+          1.1916359653696418
+        ],
+        "stdev_ms": 0.08419708504668359
+      }
+    },
+    "triton_dq_dkv_query_major_recompute": {
+      "checksum_norm": {
+        "dkv_norm": 2068.963623046875,
+        "dq_norm": 1466.0894775390625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 6.457812786102295,
+        "mean_ms": 6.378812948862712,
+        "median_ms": 6.3780131340026855,
+        "min_ms": 6.300612926483154,
+        "samples_ms": [
+          6.3780131340026855,
+          6.300612926483154,
+          6.457812786102295
+        ],
+        "stdev_ms": 0.07860298177503904
+      },
+      "label": "triton_dq_dkv_query_major_recompute",
+      "peak_memory_allocated_bytes": 1447037440,
+      "peak_memory_allocated_gib": 1.347658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.473352899774909,
+        "mean_ms": 6.396376915896933,
+        "median_ms": 6.398113910108805,
+        "min_ms": 6.317663937807083,
+        "samples_ms": [
+          6.398113910108805,
+          6.317663937807083,
+          6.473352899774909
+        ],
+        "stdev_ms": 0.07785901413018176
+      }
+    },
+    "triton_dq_dkv_query_major_structured_recompute": {
+      "checksum_norm": {
+        "dkv_norm": 2068.963623046875,
+        "dq_norm": 1466.0894775390625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 6.2952117919921875,
+        "mean_ms": 6.24871826171875,
+        "median_ms": 6.2605719566345215,
+        "min_ms": 6.190371036529541,
+        "samples_ms": [
+          6.190371036529541,
+          6.2605719566345215,
+          6.2952117919921875
+        ],
+        "stdev_ms": 0.05341608899818247
+      },
+      "label": "triton_dq_dkv_query_major_structured_recompute",
+      "peak_memory_allocated_bytes": 1447037440,
+      "peak_memory_allocated_gib": 1.347658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.311733974143863,
+        "mean_ms": 6.266117716828982,
+        "median_ms": 6.277164095081389,
+        "min_ms": 6.209455081261694,
+        "samples_ms": [
+          6.209455081261694,
+          6.277164095081389,
+          6.311733974143863
+        ],
+        "stdev_ms": 0.05202653012331257
+      }
+    },
+    "triton_dq_dkv_recompute_combined": {
+      "checksum_norm": {
+        "dkv_norm": 2068.96337890625,
+        "dq_norm": 1466.089599609375
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 34.66628646850586,
+        "mean_ms": 34.32939783732096,
+        "median_ms": 34.18217086791992,
+        "min_ms": 34.13973617553711,
+        "samples_ms": [
+          34.18217086791992,
+          34.13973617553711,
+          34.66628646850586
+        ],
+        "stdev_ms": 0.2925245940867717
+      },
+      "label": "triton_dq_dkv_recompute_combined",
+      "peak_memory_allocated_bytes": 1447037440,
+      "peak_memory_allocated_gib": 1.347658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 34.729457926005125,
+        "mean_ms": 34.385672925661005,
+        "median_ms": 34.26505089737475,
+        "min_ms": 34.16250995360315,
+        "samples_ms": [
+          34.26505089737475,
+          34.16250995360315,
+          34.729457926005125
+        ],
+        "stdev_ms": 0.30210884815509176
+      }
+    },
+    "triton_dq_plus_dkv_separate": {
+      "checksum_norm": {
+        "dkv_norm": 2068.96337890625,
+        "dq_norm": 1466.0869140625
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 7.296060085296631,
+        "mean_ms": 7.2524722417195635,
+        "median_ms": 7.271578788757324,
+        "min_ms": 7.189777851104736,
+        "samples_ms": [
+          7.296060085296631,
+          7.271578788757324,
+          7.189777851104736
+        ],
+        "stdev_ms": 0.0556576448566124
+      },
+      "label": "triton_dq_plus_dkv_separate",
+      "peak_memory_allocated_bytes": 1715472896,
+      "peak_memory_allocated_gib": 1.597658634185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.325740065425634,
+        "mean_ms": 7.274836689854662,
+        "median_ms": 7.291270070709288,
+        "min_ms": 7.207499933429062,
+        "samples_ms": [
+          7.325740065425634,
+          7.291270070709288,
+          7.207499933429062
+        ],
+        "stdev_ms": 0.06080891553363369
+      }
+    }
+  }
+}

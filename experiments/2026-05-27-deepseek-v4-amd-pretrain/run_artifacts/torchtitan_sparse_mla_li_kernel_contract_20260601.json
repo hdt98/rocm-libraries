@@ -1,0 +1,479 @@
+{
+  "artifact": "torchtitan_sparse_mla_li_kernel_contract_20260601",
+  "dependency_pin_changes": [],
+  "layers": [
+    {
+      "backward_kernel_contract": {
+        "inputs": {
+          "compressed_k": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "compressed_v": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "grad_out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "invalid_mask": [
+            1,
+            4096,
+            640
+          ],
+          "k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "li_top_indices": [
+            1,
+            4096,
+            512
+          ],
+          "local_indices": [
+            1,
+            4096,
+            128
+          ],
+          "out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "row_stats": [
+            1,
+            64,
+            4096
+          ],
+          "v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "outputs": {
+          "grad_compressed_k": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "grad_compressed_v": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "grad_k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "grad_q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "grad_v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "required_behavior": [
+          "recompute scores/probabilities tile-by-tile from q and selected k",
+          "accumulate dV with probability-weighted grad_out",
+          "accumulate dQ and dK from softmax backward scores",
+          "scatter-add repeated local-window and LI compressed-key gradients",
+          "keep row-stat/output semantics compatible with manual_stream parity"
+        ]
+      },
+      "compress_ratio": 4,
+      "compressed_groups": 1024,
+      "forward_kernel_contract": {
+        "inputs": {
+          "compressed_k": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "compressed_v": [
+            1,
+            1024,
+            64,
+            512
+          ],
+          "invalid_mask": [
+            1,
+            4096,
+            640
+          ],
+          "k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "li_top_indices": [
+            1,
+            4096,
+            512
+          ],
+          "local_indices": [
+            1,
+            4096,
+            128
+          ],
+          "q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "must_not_materialize": {
+          "probabilities": [
+            1,
+            64,
+            4096,
+            640
+          ],
+          "selected_k": [
+            1,
+            4096,
+            640,
+            64,
+            512
+          ],
+          "selected_v": [
+            1,
+            4096,
+            640,
+            64,
+            512
+          ]
+        },
+        "outputs": {
+          "out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "row_max_or_lse": [
+            1,
+            64,
+            4096
+          ],
+          "row_sum_or_lse_aux": [
+            1,
+            64,
+            4096
+          ]
+        }
+      },
+      "li_selected_compressed_keys_average_causal_valid": 383.875,
+      "li_selected_compressed_keys_max": 512,
+      "li_topk_config": 512,
+      "local_window_keys": 128,
+      "materialized_probability_bytes": {
+        "fp32": 671088640,
+        "fp32_gib": 0.625
+      },
+      "materialized_selected_kv_bytes": {
+        "bf16": 343597383680,
+        "bf16_gib": 320.0,
+        "fp32": 687194767360,
+        "fp32_gib": 640.0
+      },
+      "selected_keys_max": 640,
+      "streaming_saved_stats_bytes": {
+        "output_bf16": 268435456,
+        "row_max_fp32": 1048576,
+        "row_sum_fp32": 1048576,
+        "total_gib": 0.251953125
+      },
+      "torch_titan_guard_selected_state_elements": 171798691840
+    },
+    {
+      "backward_kernel_contract": {
+        "inputs": {
+          "compressed_k": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "compressed_v": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "grad_out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "invalid_mask": [
+            1,
+            4096,
+            160
+          ],
+          "k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "li_top_indices": [
+            1,
+            4096,
+            32
+          ],
+          "local_indices": [
+            1,
+            4096,
+            128
+          ],
+          "out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "row_stats": [
+            1,
+            64,
+            4096
+          ],
+          "v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "outputs": {
+          "grad_compressed_k": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "grad_compressed_v": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "grad_k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "grad_q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "grad_v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "required_behavior": [
+          "recompute scores/probabilities tile-by-tile from q and selected k",
+          "accumulate dV with probability-weighted grad_out",
+          "accumulate dQ and dK from softmax backward scores",
+          "scatter-add repeated local-window and LI compressed-key gradients",
+          "keep row-stat/output semantics compatible with manual_stream parity"
+        ]
+      },
+      "compress_ratio": 128,
+      "compressed_groups": 32,
+      "forward_kernel_contract": {
+        "inputs": {
+          "compressed_k": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "compressed_v": [
+            1,
+            32,
+            64,
+            512
+          ],
+          "invalid_mask": [
+            1,
+            4096,
+            160
+          ],
+          "k": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "li_top_indices": [
+            1,
+            4096,
+            32
+          ],
+          "local_indices": [
+            1,
+            4096,
+            128
+          ],
+          "q": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "v": [
+            1,
+            4096,
+            64,
+            512
+          ]
+        },
+        "must_not_materialize": {
+          "probabilities": [
+            1,
+            64,
+            4096,
+            160
+          ],
+          "selected_k": [
+            1,
+            4096,
+            160,
+            64,
+            512
+          ],
+          "selected_v": [
+            1,
+            4096,
+            160,
+            64,
+            512
+          ]
+        },
+        "outputs": {
+          "out": [
+            1,
+            4096,
+            64,
+            512
+          ],
+          "row_max_or_lse": [
+            1,
+            64,
+            4096
+          ],
+          "row_sum_or_lse_aux": [
+            1,
+            64,
+            4096
+          ]
+        }
+      },
+      "li_selected_compressed_keys_average_causal_valid": 15.5078125,
+      "li_selected_compressed_keys_max": 32,
+      "li_topk_config": 512,
+      "local_window_keys": 128,
+      "materialized_probability_bytes": {
+        "fp32": 167772160,
+        "fp32_gib": 0.15625
+      },
+      "materialized_selected_kv_bytes": {
+        "bf16": 85899345920,
+        "bf16_gib": 80.0,
+        "fp32": 171798691840,
+        "fp32_gib": 160.0
+      },
+      "selected_keys_max": 160,
+      "streaming_saved_stats_bytes": {
+        "output_bf16": 268435456,
+        "row_max_fp32": 1048576,
+        "row_sum_fp32": 1048576,
+        "total_gib": 0.251953125
+      },
+      "torch_titan_guard_selected_state_elements": 42949672960
+    }
+  ],
+  "next_kernel_steps": [
+    "Forward fused dynamic-LI sparse MLA: local window + compressed top-k online softmax/value accumulation.",
+    "Backward fused dynamic-LI sparse MLA: recompute tile scores, produce dQ/dK/dV/dCompressedK/dCompressedV with scatter-add.",
+    "Optional split implementation: one local-window kernel and one compressed-LI kernel if single fusion is too large.",
+    "Keep manual_stream as the reference parity oracle until fused kernels match output and gradients."
+  ],
+  "read": {
+    "lightning_indexer_gradient_boundary": "Attention top-k indices are discrete. Current training gradients for LightningIndexer come through the auxiliary indexer loss; the fused attention kernel must preserve the top-index contract and expose compressed K/V gradients for that loss path.",
+    "relationship_to_1a_attention": "The retained 1a attention microbench is a forward/perf anchor, not the final training path. The TorchTitan path needs dynamic LightningIndexer top-k, row-stat saved-state semantics, and fused forward/backward without selected-K/V or probability materialization.",
+    "why_manual_stream_matters": "manual_stream validates the no-full-selected-state autograd contract by saving original q/k/v/compressed states, indices, row stats, and output; the production step is to replace its Python chunk loops with fused ROCm kernels."
+  },
+  "scope": "TorchTitan DeepSeek-V4 Flash compressed attention layers at B=1 S=4096 H=64 Dq=Dv=512.",
+  "shape": {
+    "batch": 1,
+    "flash_4layer_compress_ratios": [
+      0,
+      0,
+      4,
+      128
+    ],
+    "heads": 64,
+    "indexer_topk": 512,
+    "qk_head_dim": 512,
+    "seq_len": 4096,
+    "v_head_dim": 512,
+    "window_size": 128
+  },
+  "source_boundary": {
+    "current_bridge": "torchtitan.models.deepseek_v4.model._SparseMLAStreamingManualBackward",
+    "retained_1a_microbench_artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_attention_kernel_contract_s4096_20260531.json",
+    "target_contract": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml"
+  },
+  "status": "contract_ready_fused_kernel_pending"
+}

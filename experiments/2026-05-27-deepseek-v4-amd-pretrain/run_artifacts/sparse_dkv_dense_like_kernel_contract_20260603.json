@@ -1,0 +1,128 @@
+{
+  "artifact": "sparse_dkv_dense_like_kernel_contract_20260603",
+  "created_at": "2026-06-03",
+  "scope": "Turn the compressed sparse-MLA dKV many-to-one atomic wall into a dense-attention-like output-tile reduction contract.",
+  "question": "Normal dense attention also reduces many query-token contributions into the same dK/dV row. What makes the current sparse dKV path different, and what kernel contract makes it dense-like?",
+  "dense_attention_reference": {
+    "dV": "dV = P^T dO",
+    "dK": "dK = dS^T Q",
+    "kernel_property": "Output rows or output tiles are owned by the GEMM/reduction schedule. A tile accumulates over query tokens in registers/LDS/MFMA state and writes each dK/dV output tile once or as a small number of split-K partials.",
+    "global_atomic_role": "Dense attention may use split reductions or atomics in some implementations, but the main contract is not one global atomic per query/key/head/D contribution."
+  },
+  "sparse_mla_current_contract": {
+    "formula": "dKV_g = sum_{t,h,j: top_index[t,j] = g} (dS_{t,h,j} * Q_{t,h} * scale + P_{t,h,j} * dO_{t,h})",
+    "current_kernel_property": "The fast query-major producer computes a contribution for each selected (token, head, selected_slot, D) and immediately atomic_adds it into dKV[compressed_group, D].",
+    "why_it_is_not_dense_like": [
+      "The output compressed group is an indirect LightningIndexer top-k value, not a contiguous key-column tile.",
+      "The same compressed group is revisited by many tokens and selected slots in no naturally contiguous order.",
+      "The reduction is delegated to global memory atomics instead of being owned by an output tile or compact reducer.",
+      "The retained S4096 layer-2 route performs about 805M scalar dKV atomic-add elements."
+    ]
+  },
+  "measured_evidence": {
+    "sparse_atomic_gate": {
+      "artifacts": [
+        "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+        "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_rerun_20260603.json"
+      ],
+      "median_ms_range": "8.0-8.8",
+      "raw_dkv_scalar_atomic_add_elements": 805044224,
+      "read": "This is the current dKV wall to beat."
+    },
+    "mechanism_split": {
+      "source": "run_artifacts/sparse_mla_sharedkv_compressed_route_mechanism_inspection_20260602.json",
+      "dKV_dot_math_only_ms": 0.79,
+      "full_dKV_atomic_accumulation_ms": 8.21,
+      "read": "Contribution math is not the wall; global many-to-one accumulation is."
+    },
+    "route_prepack": {
+      "source": "run_artifacts/actual_li_prepacked_route_consumption_decision_20260603.json",
+      "torch_sort_pack_ms": "0.52-0.54",
+      "pair_or_segment_metadata_walk_ms": "about 0.02",
+      "one_d_lane_scalar_input_walk_ms": "0.58-0.68",
+      "read": "Prepacking actual LI routes is cheap enough to use for dense-like output ownership."
+    },
+    "compact_partial_plan": {
+      "source": "run_artifacts/actual_li_compact_partial_reducer_plan_20260603.json",
+      "token_block": 32,
+      "selected_block": 512,
+      "d_tile": 16,
+      "partial_rows_all_dblocks": 2112928,
+      "partial_value_stream_mib": 128.962890625,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "read": "A compact row per touched (compressed_group, D16) per producer tile can reduce global writes by about 23.8x without materializing a dense selected route matrix."
+    },
+    "rocprim_final_reducer": {
+      "source": "run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_decision_20260603.json",
+      "sorted_reduce_only_median_ms": 0.4376469999551773,
+      "random_sort_reorder_values_plus_reduce_median_ms": 1.1080750226974487,
+      "read": "The final reduce-by-key stage is viable. The open problem is producing compact partial rows fast enough."
+    }
+  },
+  "closed_branches": [
+    {
+      "branch": "detached raw ScatterAdd",
+      "reason": "It pays a real HBM round trip for selected partials and still spends about 10 ms on scatter/atomic writes."
+    },
+    {
+      "branch": "panel-owned or group-major contribution producer",
+      "artifacts": [
+        "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_decision_20260603.json",
+        "run_artifacts/actual_li_group_owned_sparse_dkv_schedule_plan_decision_20260603.json"
+      ],
+      "reason": "It loses the fast query-major producer. S4096 panel-D16 contribution sink is 111-130 ms even without dKV writes."
+    },
+    {
+      "branch": "per-route-tile local atomic/table compact partial producer",
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_compact_partial_decision_20260603.json",
+      "reason": "Correct but S4096 compact partial emit is about 22.21 ms; the local accumulator body is slower than the retained sparse atomic gate."
+    },
+    {
+      "branch": "small bounded hot-group accumulator plus tail atomics",
+      "artifact": "run_artifacts/actual_li_hot_group_hybrid_reduction_decision_20260603.json",
+      "reason": "Hot-256 only models about 1.96x reduction and hot-512 only about 4.81x. Useful reduction requires hot-768 to hot-1024, which collapses back into the wide active-list/local-table problem."
+    }
+  ],
+  "dense_like_target_contract": {
+    "name": "query_major_compact_keyed_dkv_producer_plus_rocprim_reduce",
+    "producer_input": [
+      "q[B,S,H,D]",
+      "dO[B,S,H,D]",
+      "probs[B,H,S,Kvalid] or recomputed online probabilities",
+      "grad_logits[B,H,S,Kvalid] or recomputed online dS",
+      "prepacked route pairs sorted/grouped by (query_tile, compressed_group, token, selected_slot)"
+    ],
+    "producer_output": [
+      "partial_key[row] = compressed_group * num_d16_blocks + d16_block",
+      "partial_value[row,16] = sum over the producer tile's token/head/selected contributions for that key"
+    ],
+    "producer_required_property": "Keep the fast query-major dot-K/MFMA contribution schedule, but perform warp/block segmented reduction over equal compressed_group inside the tile before any global write. Do not use one global atomic per contribution.",
+    "reducer": "rocPRIM reduce_by_key over sorted or cheaply sorted partial_key rows, producing final dKV[compressed_group,D16].",
+    "why_this_matches_dense_attention": "Dense attention owns output rows in GEMM tiles and reduces query contributions before global writes. This contract gives sparse compressed groups the same ownership by creating compact keyed output rows, then reducing rows by key instead of scattering every selected contribution into global dKV."
+  },
+  "latency_budget": {
+    "current_sparse_atomic_gate_ms": 8.0,
+    "route_pack_budget_ms": 0.54,
+    "final_reducer_budget_ms_sorted": 0.44,
+    "final_reducer_budget_ms_with_sort": 1.11,
+    "producer_budget_to_beat_gate_sorted_ms": 7.02,
+    "producer_budget_to_beat_gate_with_sort_ms": 6.35,
+    "producer_budget_for_5ms_dkv_path_sorted_ms": 4.02,
+    "producer_budget_for_5ms_dkv_path_with_sort_ms": 3.35,
+    "read": "A producer in the 3-4 ms range plus route packing and reduce-by-key would make the dKV path competitive with the older sparse-MLA backward target envelope. A producer above about 6.3 ms may still beat the current atomic wall but will not be enough for the full layer target."
+  },
+  "implementation_notes": [
+    "First bring-up shape remains token_block=32, selected_block=512, d_tile=16 for S128/S512 parity and S4096 timing.",
+    "The route list should avoid naive group-panel rescans; route traversal is cheap only when prepacked.",
+    "The compact producer must avoid per-contribution LDS atomics and wide table zeroing. Prefer wave-level or block-level segmented reduction over route-sorted groups.",
+    "If partial keys can be emitted globally ordered by key, the reducer floor is about 0.44 ms. If not, the measured sort/reorder/reduce floor is about 1.1 ms and is still viable.",
+    "Do not materialize selected K/V, dense [S,K,group] route matrices, or multi-GiB selected probability/logit slabs in the production path."
+  ],
+  "validation_gate": [
+    "S128 parity against the current shared-KV dKV reference.",
+    "S512 timing must beat the active-list sparse-atomic gate before S4096.",
+    "S4096 end-to-end producer plus reducer must beat 8.0-8.8 ms and should target below 5 ms.",
+    "The final path must preserve the no-selected-state sparse MLA/LI backward contract."
+  ],
+  "dependency_pin_changes": []
+}

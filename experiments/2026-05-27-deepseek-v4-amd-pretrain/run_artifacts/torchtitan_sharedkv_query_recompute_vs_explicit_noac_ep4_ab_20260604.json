@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "question": "At the aligned FSDP4/EP4 S4096 no-AC shape, does sparse shared-KV query-recompute improve memory or materialized TFLOPs versus the explicit PyTorch shared-KV backward control?",
+  "answer": "No. In the 4xMI350 FSDP4/EP4 no-AC A/B, explicit_pytorch is faster and has essentially the same peak memory class. Query-recompute is not promoted as the retained integrated candidate yet.",
+  "shared_shape": {
+    "hardware": "4xMI350",
+    "visible_devices": "4,5,6,7",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "tokens_per_step": 262144,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "sparse_mla_backward_mode": "shared_kv",
+    "moe_comm_backend": "mori",
+    "moe_forward_mode": "aiter",
+    "moe_backward_mode": "routed",
+    "moe_local_vjp_mode": "padded",
+    "moe_dx_return_mode": "sync",
+    "li_kl_backend": "triton_tl_dot",
+    "steps": 6
+  },
+  "runs": {
+    "query_recompute": {
+      "run_id": "torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604",
+      "artifact": "run_artifacts/torchtitan_query_recompute_lowintrusion_profile4x_ep4_s4096_gbs64_20260604.json",
+      "profile_artifact": "run_artifacts/torchtitan_query_recompute_profile4x_ep4_s4096_gbs64_20260604.json",
+      "mori_skew_artifact": "run_artifacts/torchtitan_query_recompute_mori_skew4x_ep4_s4096_gbs64_20260604.json",
+      "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_lowintrusion_profile_4x_s4096_gbs64_ep4_steps6_20260604",
+      "status": "completed_6_steps_clean_teardown",
+      "sharedkv_backward_mode": "query_recompute",
+      "late_steps": [4, 5, 6],
+      "late_mean_tflops_per_gpu": 70.8567,
+      "late_mean_tps_per_gpu": 3745.0,
+      "peak_memory_gib": 146.99,
+      "step_tflops_per_gpu": {
+        "1": 25.50,
+        "2": 45.33,
+        "3": 73.41,
+        "4": 71.05,
+        "5": 70.61,
+        "6": 70.91
+      },
+      "profile": {
+        "sharedkv_query_recompute_stage_median_ms": 55.1125,
+        "sharedkv_query_recompute_rank_total_ms_median": 8163.0773,
+        "sharedkv_grad_attn_sink_rank_total_ms_median": 133.5925,
+        "loss_chunked_ce_rank_total_ms_median": 15768.0844,
+        "loss_lm_head_forward_rank_total_ms_median": 1374.7716,
+        "loss_cross_entropy_forward_rank_total_ms_median": 273.8826,
+        "loss_chunk_backward_rank_total_ms_median": 14133.7402,
+        "mori_record_median_local_vjp_ms": 81.3918,
+        "mori_record_median_combine_dx_ms": 9.3525
+      }
+    },
+    "explicit_pytorch_control": {
+      "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_control_4x_s4096_gbs64_ep4_steps6_20260604",
+      "profile_artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_control_profile4x_ep4_s4096_gbs64_20260604.json",
+      "mori_skew_artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_control_mori_skew4x_ep4_s4096_gbs64_20260604.json",
+      "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_control_4x_s4096_gbs64_ep4_steps6_20260604",
+      "status": "completed_6_steps_clean_teardown",
+      "sharedkv_backward_mode": "explicit_pytorch",
+      "late_steps": [4, 5, 6],
+      "late_mean_tflops_per_gpu": 73.73,
+      "late_mean_tps_per_gpu": 3896.33,
+      "peak_memory_gib": 148.04,
+      "step_tflops_per_gpu": {
+        "1": 47.08,
+        "2": 97.26,
+        "3": 80.12,
+        "4": 73.75,
+        "5": 73.74,
+        "6": 73.69
+      },
+      "profile": {
+        "sharedkv_gather_selected_kv_fp32_rank_total_ms_median": 401.4764,
+        "sharedkv_scores_qk_rank_total_ms_median": 277.9347,
+        "sharedkv_probs_rank_total_ms_median": 110.4320,
+        "sharedkv_grad_logits_terms_rank_total_ms_median": 452.1623,
+        "sharedkv_grad_q_rank_total_ms_median": 283.6098,
+        "sharedkv_dkv_math_rank_total_ms_median": 1101.7752,
+        "sharedkv_scatter_rank_total_ms_median": 2393.0148,
+        "sharedkv_grad_attn_sink_rank_total_ms_median": 134.6823,
+        "sharedkv_explicit_stage_total_ms_median_sum": 4171.8754,
+        "loss_chunked_ce_rank_total_ms_median": 7575.6629,
+        "loss_lm_head_forward_rank_total_ms_median": 940.3308,
+        "loss_cross_entropy_forward_rank_total_ms_median": 256.0992,
+        "loss_chunk_backward_rank_total_ms_median": 6379.4477,
+        "mori_record_median_local_vjp_ms": 71.4619,
+        "mori_record_median_combine_dx_ms": 5.4243
+      }
+    }
+  },
+  "delta": {
+    "explicit_minus_query_late_mean_tflops_per_gpu": 2.8733,
+    "explicit_over_query_late_tflops_ratio": 1.0405,
+    "explicit_minus_query_peak_memory_gib": 1.05,
+    "read": "The query-recompute path reduces saved selected-state style tensors in principle, but at this integrated EP4 no-AC shape it does not lower peak logged memory; the no-AC activation footprint dominates. Its fused Triton query-recompute stage is also slower than the current explicit PyTorch shared-KV decomposition in total runtime, so explicit_pytorch is the current better 4x EP4 materialized candidate."
+  },
+  "decision": {
+    "promoted_for_next_8x_ep4_e2e_check": "explicit_pytorch",
+    "demoted": "query_recompute",
+    "reason": "explicit_pytorch is about 4.0% faster late-step at the same EP4 shape with no meaningful memory penalty compared with query_recompute.",
+    "next_actions": [
+      "Run 8xMI350 FSDP8/EP4 no-AC explicit_pytorch at S4096 GBS128 for target-shape materialized TFLOPs and memory.",
+      "Keep query-recompute as a kernel-development direction only if the whole sparse-MLA backward boundary is fused enough to beat explicit_pytorch's current selected-state path.",
+      "Continue MoE/MORI optimization from the explicit control profile, where local VJP and combine_dx remain visible but less severe than in the query-recompute profile."
+    ]
+  },
+  "dependency_pin_changes": []
+}

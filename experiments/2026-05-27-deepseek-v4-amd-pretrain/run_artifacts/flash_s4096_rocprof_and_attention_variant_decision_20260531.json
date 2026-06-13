@@ -1,0 +1,187 @@
+{
+  "artifact": "flash_s4096_rocprof_and_attention_variant_decision",
+  "created": "2026-05-31",
+  "status": "baseline_profiled_variants_not_promoted",
+  "shape_contract": {
+    "model": "DeepSeek-V4-Flash",
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden_size": 4096,
+    "num_heads": 64,
+    "kv_dim": 512,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "moe_intermediate": 2048,
+    "num_experts": 256,
+    "routed_top_k": 6,
+    "shared_experts": 1,
+    "window_size": 128,
+    "csa_ratio": 4,
+    "hca_ratio": 128,
+    "dtype": "bfloat16"
+  },
+  "source_artifacts": {
+    "hf_shape_contract": "deepseek_v4_flash_hf_config_contract_20260531.json",
+    "bare_full_layer_baseline": "single_layer_flash_s4096_compact_reduce_20260531.json",
+    "torch_block_profile": "single_layer_flash_s4096_compact_reduce_blocks_20260531.json",
+    "retained_backward_profile": "sparse_mla_backward_flash_s4096_20260531.json",
+    "retained_vs_sinkgrad_correctness": "sparse_mla_backward_flash_retained_check_sinkgrad_20260531.json",
+    "sinkgrad_backward_profile": "sparse_mla_backward_flash_sinkgrad_20260531.json",
+    "no_triton_softmax_backward_profile": "sparse_mla_backward_flash_no_triton_softmax_20260531.json",
+    "rocprof_block_summary": "rocprof_flash_s4096_block_summary_20260531.json",
+    "rocprof_torch_summary": "rocprof_flash_s4096_torch_summary_20260531.json",
+    "rocprof_kernel_stats": "rocprof_flash_s4096_trace_kernel_stats_20260531.csv",
+    "rocprof_domain_stats": "rocprof_flash_s4096_trace_domain_stats_20260531.csv"
+  },
+  "remote_profile": {
+    "node": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "remote_trace_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/rocprof_flash_s4096_compact_reduce_20260531",
+    "raw_trace_policy": "large trace_results.json stayed outside repo under the remote trace dir",
+    "tool": "rocprofv3 --selected-regions --marker-trace --kernel-trace --memory-copy-trace --stats --summary"
+  },
+  "bare_full_layer_baseline": {
+    "source": "single_layer_flash_s4096_compact_reduce_20260531.json",
+    "avg_ms": 31.697463981496792,
+    "min_ms": 31.495711067691445,
+    "tokens_per_s": 129221.69427784556,
+    "estimated_tflops": 280.48244830910835,
+    "target_full_layer_ms": 24.9,
+    "time_ratio_to_target": 1.273,
+    "throughput_fraction_of_target": 0.786,
+    "read": "Use this non-profiled timing for pass/fail gap. The rocprof run below includes profiler overhead."
+  },
+  "rocprof_torch_summary": {
+    "phase_total_ms": 35.7728919479996,
+    "phase_ms": {
+      "forward": 14.717960031703115,
+      "loss": 0.10963890235871077,
+      "backward": 20.94529301393777
+    },
+    "tokens_per_s": 114500.10823709898,
+    "estimated_tflops": 248.5284755742863,
+    "forward_subsystem_ms": {
+      "attention": 7.0402780547738075,
+      "moe": 6.551651982590556,
+      "boundary": 0.6554990541189909
+    },
+    "read": "Profiler overhead inflates total time versus the bare baseline, but the block split is useful for prioritization."
+  },
+  "rocprof_kernel_summary": {
+    "total_kernel_duration_ms": 32.183825,
+    "attributed_kernel_duration_ms": 32.161225,
+    "unattributed_kernel_duration_ms": 0.0226,
+    "kernel_dispatch_count": 484,
+    "top_blocks_by_kernel_ms": [
+      {
+        "name": "phase.backward",
+        "marker_duration_ms": 20.941023,
+        "kernel_duration_ms": 20.679278,
+        "kernel_count": 264,
+        "largest_kernel_total_ms": 5.662775,
+        "largest_kernel_count": 3
+      },
+      {
+        "name": "forward.moe.routed_experts",
+        "marker_duration_ms": 5.199817,
+        "kernel_duration_ms": 4.650044,
+        "kernel_count": 52,
+        "largest_gemm_total_ms": 3.507033,
+        "index_reduce_add_ms": 0.557765
+      },
+      {
+        "name": "forward.attn.sparse_mla",
+        "marker_duration_ms": 3.83401,
+        "kernel_duration_ms": 3.714435,
+        "kernel_count": 14,
+        "masked_softmax_ms": 1.02433
+      },
+      {
+        "name": "forward.attn.q_proj",
+        "marker_duration_ms": 1.101537,
+        "kernel_duration_ms": 0.797007,
+        "kernel_count": 13
+      },
+      {
+        "name": "forward.attn.out_proj",
+        "marker_duration_ms": 0.720898,
+        "kernel_duration_ms": 0.595886,
+        "kernel_count": 3
+      }
+    ]
+  },
+  "attention_backward_variants": {
+    "retained": {
+      "source": "sparse_mla_backward_flash_retained_check_sinkgrad_20260531.json",
+      "median_ms": 5.055049896240234,
+      "mean_ms": 5.180037657419841,
+      "correctness_reference": true
+    },
+    "retained_with_primitive_profile": {
+      "source": "sparse_mla_backward_flash_s4096_20260531.json",
+      "median_ms": 5.068769931793213,
+      "modeled_primitive_median_sum_ms": 5.285250008106232,
+      "largest_primitive_medians_ms": {
+        "softmax_backward_scores": 1.2538520097732544,
+        "compressed_grad_probs": 0.7993280291557312,
+        "compressed_grad_from_probs": 0.7925670146942139,
+        "grad_compressed_q_add": 0.5521649718284607,
+        "grad_selected_q_add": 0.5058850049972534,
+        "grad_q_compressed_add": 0.5020449757575989
+      }
+    },
+    "retained_sinkgrad": {
+      "source": "sparse_mla_backward_flash_sinkgrad_20260531.json",
+      "median_ms": 6.769710063934326,
+      "delta_vs_retained_ms": 1.7146601676940918,
+      "ratio_vs_retained": 1.3391974763630712,
+      "correctness_vs_retained": {
+        "ok": true,
+        "max_abs_attn_sink": 3.2782554626464844e-7,
+        "max_abs_other_tensors": 0.0,
+        "tolerance": {
+          "atol": 0.02,
+          "rtol": 0.02
+        }
+      },
+      "largest_primitive_medians_ms": {
+        "softmax_backward_scores": 2.7849090099334717,
+        "compressed_grad_from_probs": 0.7994480133056641,
+        "compressed_grad_probs": 0.7746480107307434,
+        "grad_compressed_q_add": 0.5973259806632996,
+        "grad_q_compressed_add": 0.5383250117301941
+      }
+    },
+    "retained_no_triton_softmax": {
+      "source": "sparse_mla_backward_flash_no_triton_softmax_20260531.json",
+      "median_ms": 6.749107837677002,
+      "delta_vs_retained_ms": 1.6940579414367676,
+      "ratio_vs_retained": 1.33512190308878,
+      "largest_primitive_medians_ms": {
+        "softmax_backward_scores": 2.9628310203552246,
+        "compressed_grad_probs": 0.8618890047073364,
+        "compressed_grad_from_probs": 0.7692869901657104,
+        "grad_compressed_q_add": 0.5728060007095337,
+        "grad_q_compressed_add": 0.49040499329566956
+      }
+    }
+  },
+  "decision": {
+    "promote_attention_variant": "retained",
+    "do_not_promote": [
+      "retained-sinkgrad",
+      "retained-no-triton-softmax"
+    ],
+    "why": [
+      "The retained-sinkgrad path is correctness-compatible with retained at this shape, but it is about 1.34x slower.",
+      "The no-Triton-softmax path is also about 1.34x slower.",
+      "The remaining attention gap is not a selector choice; it needs a fused sparse MLA backward replacement that removes the high-cost softmax-score, compressed-gradient, dQ/dKV accumulation, and sink-gradient pieces."
+    ],
+    "next_optimization_priority": [
+      "Design/implement a fused Flash-shape sparse MLA backward kernel or smaller fused primitives around softmax_backward_scores, compressed_grad_probs, compressed_grad_from_probs, and q/selected/compressed accumulation.",
+      "Continue MoE work on compact grouped training kernels and route/dispatch/reduce integration; standalone M=12288 expert GEMM is already below the 1.3 ms target.",
+      "Keep rocprof captures compact: copy block summaries and stats CSVs into the repo, leave raw traces under /local/data."
+    ]
+  }
+}

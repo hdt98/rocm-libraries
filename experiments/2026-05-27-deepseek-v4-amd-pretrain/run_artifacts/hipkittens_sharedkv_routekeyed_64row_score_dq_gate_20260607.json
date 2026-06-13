@@ -1,0 +1,129 @@
+{
+  "schema": "dsv4_pretrain_run_artifact.v1",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_workdir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner",
+  "candidate": "hk_sharedkv_routekeyed_64row_score_dq",
+  "status": "gate_pass_not_promoted",
+  "timed_boundary": "64-row route-keyed HipKittens score/dQ producer slice only; not full SparseAttnSharedkvGrad",
+  "source_files": [
+    "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_routekeyed_64row_score_dq.cpp",
+    "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_score_dq.py",
+    "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/Makefile"
+  ],
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "kv_heads": 1,
+    "dim": 128,
+    "kv_tiles": 64,
+    "tile_rows": 64,
+    "dot_slice_qo": 16,
+    "dq_cols": 32,
+    "input_scale": 0.01
+  },
+  "compile": {
+    "command_shape": "make hk_sharedkv_routekeyed_64row_score_dq GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H_KV=1 ATTN_N=4096",
+    "target": "gfx950",
+    "sgprs": 86,
+    "vgprs": 94,
+    "agprs": 128,
+    "scratch_bytes_per_lane": 0,
+    "dynamic_stack": false,
+    "occupancy_waves_per_simd": 2,
+    "sgpr_spill": 0,
+    "vgpr_spill": 0,
+    "lds_size_reported_bytes_per_block": 0
+  },
+  "fix_applied": {
+    "before": "Generic rt dP transpose/store compiled but produced nonfinite dQ for any nonzero input.",
+    "after": "Q/K/V/dO, P, dP, and bf16 dP page use the HipKittens ART register contract; dP is stored with the reference transpose_2d row layout before dQ reads it.",
+    "diagnostic_scale_sweep_before_fix": [
+      {
+        "scale": 0.0,
+        "active_tiles": 16,
+        "dq_finite": true,
+        "dq_nonfinite": 0,
+        "median_ms": 0.0366005
+      },
+      {
+        "scale": 0.0001,
+        "active_tiles": 16,
+        "dq_finite": false,
+        "dq_nonfinite": 31232,
+        "median_ms": 0.04852
+      },
+      {
+        "scale": 0.01,
+        "active_tiles": 16,
+        "dq_finite": false,
+        "dq_nonfinite": 31232,
+        "median_ms": 0.03998
+      }
+    ]
+  },
+  "active_tile_sweep_after_fix": [
+    {
+      "active_tiles": 0,
+      "median_ms": 0.032099999487400055,
+      "mean_ms": 0.034194300137460235,
+      "min_ms": 0.03060000017285347,
+      "max_ms": 0.05028099939227104,
+      "dq_finite": true,
+      "dq_nonfinite": 0,
+      "dq_nonzero": 0
+    },
+    {
+      "active_tiles": 1,
+      "median_ms": 0.033220499753952026,
+      "mean_ms": 0.037690199166536334,
+      "min_ms": 0.032519999891519547,
+      "max_ms": 0.055319998413324356,
+      "dq_finite": true,
+      "dq_nonfinite": 0,
+      "dq_nonzero": 2048
+    },
+    {
+      "active_tiles": 8,
+      "median_ms": 0.034660499542951584,
+      "mean_ms": 0.03733420018106699,
+      "min_ms": 0.03328099846839905,
+      "max_ms": 0.05251999944448471,
+      "dq_finite": true,
+      "dq_nonfinite": 0,
+      "dq_nonzero": 16384
+    },
+    {
+      "active_tiles": 16,
+      "median_ms": 0.034600500017404556,
+      "mean_ms": 0.038958349637687205,
+      "min_ms": 0.03060000017285347,
+      "max_ms": 0.05212000012397766,
+      "dq_finite": true,
+      "dq_nonfinite": 0,
+      "dq_nonzero": 32768
+    },
+    {
+      "active_tiles": 64,
+      "median_ms": 0.033980000764131546,
+      "mean_ms": 0.037726300116628406,
+      "min_ms": 0.029680000618100166,
+      "max_ms": 0.054600998759269714,
+      "dq_finite": true,
+      "dq_nonfinite": 0,
+      "dq_nonzero": 131072
+    }
+  ],
+  "decision": {
+    "promote": false,
+    "reason": "This is a valid score/dQ producer slice, not a full source-boundary SharedKV backward kernel. It does not yet compute dOriKV, dCmpKV, dSinks, full-D dQ, or compressed-group accumulation.",
+    "baseline_gate_to_beat_ms": 11.02,
+    "baseline_gate_description": "Current Triton C4 D512 SparseAttnSharedkvGrad source-boundary gate."
+  },
+  "next": [
+    "Graft dOriKV/dCmpKV/dSinks onto this valid 64-row query-major score producer.",
+    "Keep route-keyed compressed-group ownership in the dCmpKV epilogue; do not revert to the older 256-row route-owned full kernel.",
+    "Only compare to Triton after a full dQ+dOriKV+dCmpKV+dSinks boundary is executable."
+  ]
+}

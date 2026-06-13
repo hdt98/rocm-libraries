@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-03",
+  "question": "After the MoE-routing analogy, why is the current pair-slot compressed-dKV reducer still too slow, and what exact primitive is missing?",
+  "short_answer": "The pair-slot route-grid kernel already uses compact route metadata and avoids the dense active_group x selected_K route matrix, but it still performs one local-table scalar accumulation per selected dKV contribution. It moves the 805M scalar many-to-one update from global atomics into a CTA-local group_acc table, then emits reduced global rows. The missing primitive is a register/lane/warp/block segmented reduction that combines selected contributions before they touch a dense local table.",
+  "source": {
+    "file": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+    "kernel": "compressed_dkv_route_grid_compact_pairslot_atomic_bf16_kernel",
+    "key_lines": {
+      "shared_local_table_init": "1113-1124",
+      "mfma_contribution_tile": "1140-1156",
+      "per_contribution_local_table_update": "1159-1169",
+      "reduced_global_atomic_emit": "1176-1185"
+    }
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk_groups_per_token": 512,
+    "valid_pairs": 1572352,
+    "raw_scalar_dkv_updates": 805044224
+  },
+  "measured_pairslot_evidence": {
+    "source_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t32k512_timing_20260603.json",
+    "token_block": 32,
+    "selected_block": 512,
+    "modeled_write_reduction_x": 23.813051840857806,
+    "contrib_sink_median_ms": 8.997262001037598,
+    "compact_pairslot_atomic_median_ms": 18.446964263916016,
+    "retained_sparse_atomic_wall_ms": 8.80629825592041,
+    "read": "The contribution math alone is already close to the retained sparse-atomic wall. Adding pair-slot local-table reduction doubles the S4096 dKV slice even though it cuts modeled global writes by 23.8x."
+  },
+  "mechanism": {
+    "what_it_fixed": [
+      "No dense active_group x selected_K route matrix.",
+      "No group-outer contribution ownership.",
+      "Reduced final global writes from raw selected rows to compact active groups per tile."
+    ],
+    "what_it_did_not_fix": [
+      "Every valid selected contribution still writes D16 scalars into group_acc.",
+      "The local table is initialized and emitted over active_count x D16 for every route tile and D block.",
+      "Duplicates are reduced only after scalar local-table updates, not before them."
+    ],
+    "why_moe_style_expert_major_is_not_enough": "MoE expert-major compute works because each routed expert owns heavy GEMMs. Sparse dKV has huge topk and thin per-route vector contributions; the fast reuse is token/query-major. The reducer ownership must be group-aware, but the contribution producer should remain query-major."
+  },
+  "decision": {
+    "reject": [
+      "Retrying compact pair-slot local tables with more block-shape sweeps.",
+      "Treating reduced global atomic count as sufficient if the kernel still performs one local-table update per selected contribution.",
+      "Moving compressed group to the outer contribution loop without preserving token-local Q/dO reuse."
+    ],
+    "retain": [
+      "Pair-slot or equivalent compact route metadata.",
+      "Query-major rocWMMA/MFMA contribution generation.",
+      "Compact final reduce-by-key or reduced global writeback."
+    ],
+    "next_kernel_contract": [
+      "Produce KxD contribution tiles in the current query-major selected-K schedule.",
+      "Within the producer, group selected rows by compressed group using sparse keys, not a dense active-group route matrix.",
+      "Use lane/warp/block segmented reduction to combine duplicate group rows before writing either global dKV or compact partial rows.",
+      "Avoid per-contribution local atomic/add into an active_group x D table."
+    ],
+    "promotion_gate": "At S4096 layer 2, producer plus segmented reduction plus final compact reducer must beat the 8.0-8.8 ms sparse-atomic dKV wall; otherwise it is not a sparse-attention backward speedup candidate."
+  },
+  "dependency_pin_changes": []
+}

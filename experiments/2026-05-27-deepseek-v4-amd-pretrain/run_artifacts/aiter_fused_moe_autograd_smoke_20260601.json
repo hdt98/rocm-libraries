@@ -1,0 +1,65 @@
+{
+  "probe": "aiter_fused_moe_autograd",
+  "shape": {
+    "tokens": 64,
+    "hidden": 1024,
+    "intermediate": 128,
+    "experts": 8,
+    "topk": 2,
+    "dtype": "torch.bfloat16"
+  },
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "forward": {
+    "ok": true,
+    "shape": [
+      64,
+      1024
+    ],
+    "dtype": "torch.bfloat16",
+    "requires_grad": true,
+    "grad_fn": "CppFunction",
+    "finite": true
+  },
+  "loss": 40886944.0,
+  "backward": {
+    "ok": true,
+    "warnings": [
+      "aiter::fused_moe_: an autograd kernel was not registered to the Autograd key(s) but we are trying to backprop through it. This may lead to silently incorrect behavior. This behavior is deprecated and will be removed in a future version of PyTorch. If your operator is differentiable, please ensure you have registered an autograd kernel to the correct Autograd key (e.g. DispatchKey::Autograd, DispatchKey::CompositeImplicitAutograd). If your operator is not differentiable, or to squash this warning and use the previous behavior, please register torch::CppFunction::makeFallthrough() to DispatchKey::Autograd. (Triggered internally at /pytorch/torch/csrc/autograd/autograd_not_implemented_fallback.cpp:62.)"
+    ],
+    "hidden_states": {
+      "requires_grad": true,
+      "grad_is_none": true,
+      "grad_norm": null,
+      "grad_finite": null
+    },
+    "w1": {
+      "requires_grad": true,
+      "grad_is_none": true,
+      "grad_norm": null,
+      "grad_finite": null
+    },
+    "w2": {
+      "requires_grad": true,
+      "grad_is_none": true,
+      "grad_norm": null,
+      "grad_finite": null
+    },
+    "topk_weight": {
+      "requires_grad": true,
+      "grad_is_none": true,
+      "grad_norm": null,
+      "grad_finite": null
+    }
+  },
+  "training_autograd_usable": false,
+  "forward_timing_ms": {
+    "median": 0.11568199843168259,
+    "min": 0.10412099957466125,
+    "max": 0.12672099471092224,
+    "iters": 5
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_dense_attention_backward_profile",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_dense_attention_profile_retry_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dense_attention_profile_retry_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+  "raw_timing_dirs": {
+    "dsv4_profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dense_attention_profile_retry_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/profile_timing",
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dense_attention_profile_retry_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/additive_timing",
+    "mori_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dense_attention_profile_retry_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_timing"
+  },
+  "failed_probe_before_fix": {
+    "run_id": "torchtitan_dsv4_flash12_dense_attention_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+    "failure": "profile wrapper passed tuple(sdpa_backends) to torch.nn.attention.sdpa_kernel; this PyTorch image requires a list or SDPBackend instance",
+    "resolution": "store and pass list(sdpa_backends)"
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "visible_devices": "0,1,2,3",
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "mori_local_vjp_mode": "expert_loop",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "xgrad_mode": "compact",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "profile_dense_attention_backward": true,
+    "profile_dense_linear_backward": false
+  },
+  "logged_step_metrics": {
+    "step1": {
+      "tokens_per_gpu_s_mean": 2394.25,
+      "node_tokens_s_mean": 9577.0,
+      "tflops_per_gpu_mean": 121.23,
+      "peak_logged_memory_gib": 173.78,
+      "loss": 12.18483,
+      "grad_norm": 12.5625
+    },
+    "step2": {
+      "tokens_per_gpu_s_mean": 3321.0,
+      "node_tokens_s_mean": 13284.0,
+      "tflops_per_gpu_mean": 168.13,
+      "peak_logged_memory_gib": 222.82,
+      "loss": 8.95925,
+      "grad_norm": 25.5,
+      "target_ratio_tokens_per_gpu": 0.2722
+    }
+  },
+  "step2_additive_rank_max_s": {
+    "step_train_step": 39.451,
+    "microbatch_forward_backward": 38.889,
+    "forward": 8.550,
+    "loss": 0.986,
+    "backward": 24.046,
+    "microbatch_wrapper_residual_derived": 5.325,
+    "accumulated_loss_reduce": 0.343,
+    "optimizer_step": 0.087,
+    "grad_clip": 0.057
+  },
+  "step2_dense_attention_backward": {
+    "records_per_rank": 192,
+    "attention_calls_per_rank_per_layer": 16,
+    "rank_total_s": {
+      "grad_median": 7.971,
+      "grad_max": 7.974,
+      "recompute_forward_median": 2.062,
+      "recompute_forward_max": 2.083,
+      "wrapper_total_median": 10.023,
+      "wrapper_total_max": 10.055
+    },
+    "per_call_median_ms": {
+      "grad": 41.51,
+      "recompute_forward": 10.75,
+      "wrapper_total": 52.25
+    },
+    "per_layer_median_total_ms_range": [832.46, 838.31],
+    "per_layer_median_grad_ms_range": [662.99, 664.60],
+    "per_layer_median_recompute_ms_range": [169.48, 173.78],
+    "read": "All 12 layers use dense fallback SDPA at S4096 in this guarded run, including C4 and C128 recipe layers, so compress_ratio does not change dense-attention latency here."
+  },
+  "step2_mori_rank_max_s": {
+    "owner_rank_local_vjp": 4.282,
+    "combine_dx": 1.590,
+    "dispatch_grad_output": 0.800,
+    "grad_output_align": 0.150,
+    "dtopk_or_topk_return": 0.154
+  },
+  "comparison_to_prior_mbs2_additive_profile": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606.json",
+    "prior_step2_tokens_per_gpu_s": 3619.0,
+    "prior_step2_tflops_per_gpu": 183.24,
+    "prior_step2_backward_s": 20.820,
+    "prior_step2_forward_s": 8.453,
+    "prior_step2_loss_s": 0.975,
+    "prior_step2_wrapper_residual_s": 5.370,
+    "diagnostic_step2_tokens_per_gpu_s": 3321.0,
+    "diagnostic_step2_tflops_per_gpu": 168.13,
+    "diagnostic_step2_backward_s": 24.046,
+    "diagnostic_overhead_read": "The custom autograd wrapper is diagnostic only. It adds recompute-forward and synchronization overhead, but it exposes the SDPA backward grad component that was otherwise hidden inside the non-MORI backward wall."
+  },
+  "decision": {
+    "promote_as_throughput_candidate": false,
+    "diagnostic_hook_valid": true,
+    "read": "Dense fallback attention backward is a first-order 12-layer wall: actual SDPA grad totals about 8.0s/rank on step 2, larger than the MORI owner-rank expert-loop VJP max of about 4.3s/rank. The active 12-layer optimization ladder should keep MoE/MORI owner backward work in parallel, but the non-MORI wall is no longer shadowy: the guarded dense fallback attention backward must be replaced by the final sparse MLA/LI path or another faster attention backward for compressed layers."
+  }
+}

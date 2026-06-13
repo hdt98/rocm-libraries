@@ -1,0 +1,87 @@
+{
+  "status": "migration_verified_inactive_dirs_moved_live_cache_left_in_place",
+  "checked_at": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "mounts_after_cleanup": {
+    "/": {
+      "filesystem": "/dev/vda1",
+      "type": "ext4",
+      "size": "2.0T",
+      "used": "621G",
+      "available": "1.4T",
+      "use_percent": 32
+    },
+    "/scratch": {
+      "filesystem": "/dev/vdc1",
+      "type": "ext4",
+      "size": "40T",
+      "used": "1009G",
+      "available": "37T",
+      "use_percent": 3
+    }
+  },
+  "experiment_root": {
+    "legacy_path": "/local/data/sonle5/dsv4_pretrain_canary_20260527",
+    "resolved_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "legacy_state": "symlink_to_scratch",
+    "scratch_payload_size": "959G",
+    "old_root_payload_remaining": false
+  },
+  "root_backed_local_data_sonle5_after_cleanup": {
+    "total": "294G",
+    "items": {
+      "hf_cache": "275G",
+      "dsv4_amd_sonle5_port_pr23882_20260510": "14G",
+      "cache": "4.9G"
+    }
+  },
+  "migrated_inactive_paths": {
+    "destination_root": "/scratch/sonle5/local_data_migrated_20260601",
+    "total_size": "2.6G",
+    "paths": [
+      {
+        "legacy_path": "/local/data/sonle5/dsv4_mori_tile_overlap_20260530",
+        "scratch_path": "/scratch/sonle5/local_data_migrated_20260601/dsv4_mori_tile_overlap_20260530",
+        "legacy_state": "symlink_to_scratch"
+      },
+      {
+        "legacy_path": "/local/data/sonle5/dsv4_mori_tbo_bridge_20260601",
+        "scratch_path": "/scratch/sonle5/local_data_migrated_20260601/dsv4_mori_tbo_bridge_20260601",
+        "legacy_state": "symlink_to_scratch"
+      },
+      {
+        "legacy_path": "/local/data/sonle5/dsv4_layer_microbench_fallback_20260531",
+        "scratch_path": "/scratch/sonle5/local_data_migrated_20260601/dsv4_layer_microbench_fallback_20260531",
+        "legacy_state": "symlink_to_scratch"
+      }
+    ]
+  },
+  "live_bind_mounts_preventing_large_cache_cleanup": {
+    "container_id": "d9578ea5f9e2",
+    "container_name": "dsv4_ep8_mori_notbo_force2stage_wipaiter_30158",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "gpu_pids": [
+      560686,
+      560687,
+      560688,
+      560689,
+      560690,
+      560691,
+      560692,
+      560693
+    ],
+    "binds": [
+      "/local/data/sonle5/hf_cache:/root/.cache/huggingface",
+      "/local/data/sonle5/cache:/root/.cache",
+      "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510:/exp",
+      "/scratch/sonle5/dsv4_ep_tbo_baseline_20260601/20260601_ep8_mori_notbo_force2stage_wipaiter_swafix_attnpad_rids:/exp/artifacts/20260601_ep8_mori_notbo_force2stage_wipaiter_swafix_attnpad_rids"
+    ],
+    "model_path": "/root/.cache/huggingface/hub/models--sgl-project--DeepSeek-V4-Flash-FP8/snapshots/ae01d80c06cdfe30581edfd0e1c5449dc7ed7f17"
+  },
+  "cleanup_decision": [
+    "No stale root-backed copy of /local/data/sonle5/dsv4_pretrain_canary_20260527 remains to remove.",
+    "Inactive DSv4 scratch-style directories totaling 2.6G were moved to /scratch and replaced with compatibility symlinks.",
+    "Do not move or delete /local/data/sonle5/hf_cache, /local/data/sonle5/cache, or /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510 while the active SGLang container bind-mounts them.",
+    "After that container stops, migrate the large cache paths to /scratch and replace the /local/data paths with symlinks or update launch binds before the next run."
+  ]
+}

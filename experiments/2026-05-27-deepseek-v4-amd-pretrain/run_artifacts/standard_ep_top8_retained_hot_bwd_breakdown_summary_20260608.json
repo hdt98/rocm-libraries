@@ -1,0 +1,184 @@
+{
+  "artifact": "standard_ep_hot_split_profile_summary",
+  "min_call_id_exclusive": 288,
+  "profile_dirs": [
+    "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_retained_hot_bwd_breakdown_8x_s4096_gbs128_mbs4_steps2_20260608.profile_timing"
+  ],
+  "summaries": [
+    {
+      "compact_row_materialization_read": {
+        "helper_grouped_mlp_rankmax_ms": 175.71391746401787,
+        "helper_scatter_rankmax_ms": 113.73459962010384,
+        "helper_stages_moved_by_materialized_compact_rows": [
+          "standard_ep.hot_split.gather_remote",
+          "standard_ep.hot_split.sort_offsets",
+          "standard_ep.hot_split.count_offsets",
+          "standard_ep.hot_split.inverse_order"
+        ],
+        "hot_weight_broadcast_rankmax_ms": 213.88134217262268,
+        "moved_helper_stage_rankmax_ms": 40.05269908346236,
+        "not_a_latency_prediction": true,
+        "read": "If compact rows are materialized in dispatch, this can remove or move gather/sort/count/inverse work from helper MLP, but it does not by itself remove hot-weight movement, grouped MLP, or token scatter. A real e2e gate is still required.",
+        "scope": "rankmax sums over selected hot-split records"
+      },
+      "dispatch_record_count": 544,
+      "dispatch_stage_sums": {
+        "standard_ep.dispatch.all_to_all": {
+          "rankmax_ms": 11.860444962978363,
+          "rankmean_ms": 10.745560102164745,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.build_hot_plan": {
+          "rankmax_ms": 31.048641949892044,
+          "rankmean_ms": 29.000311143696308,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "rankmax_ms": 149.1610006093979,
+          "rankmean_ms": 101.73562784865499,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.hot_count_all_to_all": {
+          "rankmax_ms": 27.129595801234245,
+          "rankmean_ms": 20.469055658672005,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.hot_local_reorder": {
+          "rankmax_ms": 41.03114575147629,
+          "rankmean_ms": 38.17444559559226,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.hot_mask": {
+          "rankmax_ms": 18.265141919255257,
+          "rankmean_ms": 16.284981633536518,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.hot_metadata": {
+          "rankmax_ms": 13.070737913250923,
+          "rankmean_ms": 11.934008130803704,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.hot_split_d2h": {
+          "rankmax_ms": 5.702823001891375,
+          "rankmean_ms": 3.6244965069927275,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.local_reorder": {
+          "rankmax_ms": 26.915789932012558,
+          "rankmean_ms": 26.48675936833024,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.permute": {
+          "rankmax_ms": 119.34817719459534,
+          "rankmean_ms": 115.9888376891613,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.record_hot_stats": {
+          "rankmax_ms": 1.2070899987593293,
+          "rankmean_ms": 1.0514520016149618,
+          "ranks": 8
+        },
+        "standard_ep.dispatch.split_d2h": {
+          "rankmax_ms": 6.628061078488827,
+          "rankmean_ms": 4.615976262371987,
+          "ranks": 8
+        }
+      },
+      "hot_split_meta": {
+        "hot_split_weight_layout_effective": {
+          "selected": 552
+        },
+        "max_owned_per_rank": {
+          "count": 552,
+          "max": 6,
+          "mean": 2.7246376811594204,
+          "min": 2
+        },
+        "records": 552,
+        "remote_hot_groups": {
+          "count": 552,
+          "max": 8,
+          "mean": 7.0,
+          "min": 2
+        },
+        "remote_offsets_presorted_by": {
+          "": 552
+        },
+        "remote_owner_compact_groups": {
+          "count": 552,
+          "max": 8,
+          "mean": 7.0,
+          "min": 2
+        },
+        "remote_rows": {
+          "count": 552,
+          "max": 64072,
+          "mean": 30035.5,
+          "min": 7228
+        },
+        "remote_rows_materialized_by": {
+          "": 552
+        }
+      },
+      "hot_split_stage_sums": {
+        "standard_ep.hot_split.allocate_out": {
+          "rankmax_ms": 2.332863999530673,
+          "rankmean_ms": 2.236308126244694,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "rankmax_ms": 213.88134217262268,
+          "rankmean_ms": 208.63327103853226,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.count_offsets": {
+          "rankmax_ms": 2.4876309987157583,
+          "rankmean_ms": 2.22379800141789,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.gather_remote": {
+          "rankmax_ms": 7.4417160004377365,
+          "rankmean_ms": 7.01571663049981,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.grouped_w1": {
+          "rankmax_ms": 63.012444227933884,
+          "rankmean_ms": 60.67325633764267,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "rankmax_ms": 58.46760022640228,
+          "rankmean_ms": 54.922496957704425,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.grouped_w3": {
+          "rankmax_ms": 54.2338730096817,
+          "rankmean_ms": 50.379914278164506,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.inverse_order": {
+          "rankmax_ms": 14.495472010225058,
+          "rankmean_ms": 11.553049380891025,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.participation": {
+          "rankmax_ms": 10.383502051234245,
+          "rankmean_ms": 10.265264503657818,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.sort_offsets": {
+          "rankmax_ms": 15.627880074083805,
+          "rankmean_ms": 12.980280884541571,
+          "ranks": 8
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "rankmax_ms": 113.73459962010384,
+          "rankmean_ms": 101.75152653828263,
+          "ranks": 8
+        }
+      },
+      "min_call_id_exclusive": 288,
+      "profile_dir": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_retained_hot_bwd_breakdown_8x_s4096_gbs128_mbs4_steps2_20260608.profile_timing"
+    }
+  ]
+}

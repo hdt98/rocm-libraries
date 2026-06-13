@@ -1,0 +1,59 @@
+{
+  "status": "source_indexed_selected_limit_tilelang_kernel_validated",
+  "scope": "TileLang selected-limit compressed-dKV kernel over real TorchTitan layer-2 LI route",
+  "artifacts": {
+    "s128_correctness": "run_artifacts/tilelang_selected_limit_source_actual_li_s128_layer2_gp32_rerun2_20260604.json",
+    "s4096_timing": "run_artifacts/tilelang_selected_limit_source_actual_li_s4096_layer2_gp512_rerun2_20260604.json"
+  },
+  "shape": {
+    "s4096": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 512,
+      "actual_li_valid_pairs": 1572352,
+      "compress_ratio": 4,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "packed_topk": 1024,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512,
+      "input_layout": "bshd"
+    }
+  },
+  "correctness": {
+    "s128_max_abs_diff": 7.62939453125e-06,
+    "s128_mean_abs_diff": 3.465812596914475e-07,
+    "s128_source_vs_packed_max_abs_diff": 0.0,
+    "s128_candidate_checksum": 1258.57568359375,
+    "s128_reference_checksum": 1258.57568359375
+  },
+  "s4096_route": {
+    "valid_pairs": 1572352,
+    "active_rows": 131543,
+    "max_active_groups": 512,
+    "write_reduction_x": 11.953140798066032,
+    "route_limit_modeled_chunk_fraction": 0.431396484375
+  },
+  "s4096_timing_ms": {
+    "packed_kernel_only": 6.188914775848389,
+    "source_indexed_kernel": 7.211327075958252,
+    "pack_only": 2.0013439655303955,
+    "pack_plus_kernel": 8.146858215332031,
+    "warmed_direct_device_plan": 10.209842681884766
+  },
+  "decision": {
+    "promote_tilelang_dkv_kernel_body": true,
+    "promote_materialized_pack_bridge_as_production": false,
+    "read": "The source-indexed selected-limit TileLang kernel is a real reduced-write compressed-dKV body: it consumes real TorchTitan layer-2 LI route/tensors, reduces selected contributions by compressed group inside the CTA, and writes final [groups,D] dKV after an 11.95x write reduction. The S4096 source-indexed body remains below the old 8.0-8.8 ms sparse-atomic dKV wall, but the surrounding materialized probs/scaled-dP and route-plan bridge are still diagnostic costs.",
+    "next_kernel_work": [
+      "Keep this selected-limit source-indexed TileLang body as the retained dKV accumulation branch.",
+      "Do not spend more time on group_filter, grouped-D full active tables, or two-kernel spill paths for latency.",
+      "Replace the materialized [S,topk,H] probs/scaled-dP inputs with fused or adjacent P/dP production that is consumed where the selected-limit dKV body uses it.",
+      "Connect final compressed dKV into compressor and LightningIndexer backward while preserving the no-selected-state saved-tensor contract."
+    ]
+  }
+}

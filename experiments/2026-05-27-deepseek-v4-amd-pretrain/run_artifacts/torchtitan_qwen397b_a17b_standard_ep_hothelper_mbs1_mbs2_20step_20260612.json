@@ -1,0 +1,192 @@
+{
+  "artifact": "torchtitan_qwen397b_a17b_standard_ep_hothelper_mbs1_mbs2_20step_20260612",
+  "created_at": "2026-06-12",
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": "8xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "model": "Qwen3.5-397B-A17B-reduced-8layer",
+  "model_parameters": {
+    "total": 53472206848,
+    "dense": 1815158784,
+    "sparse": 51657048064,
+    "active": 2939232256
+  },
+  "shape": {
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "chunked_ce_num_chunks": 8,
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "runtime": {
+    "moe_comm_backend": "standard",
+    "local_expert_backend": "grouped_mm",
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact",
+    "hot_split_weight_layout": "selected",
+    "weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_score_mode": "torch",
+    "optimizer": "AdamW",
+    "data": "c4_test"
+  },
+  "runs": [
+    {
+      "run_id": "qwen397b_a17b_mbs1_helper0_20step_20260612T0626",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_mbs1_helper0_20step_20260612T0626/logs/train.log",
+      "micro_batch_size": 1,
+      "gradient_accumulation_steps": 16,
+      "hot_helper_experts": 0,
+      "completed_steps": 20,
+      "window_steps_2_20": {
+        "tokens_per_gpu_s_mean": 7857.678,
+        "node_tokens_s_mean": 62861.421,
+        "tflops_per_gpu_mean": 134.544,
+        "mfu_pct_mean": 5.826,
+        "peak_logged_memory_gib": 137.96,
+        "loss_first": 9.01718,
+        "loss_last": 3.15262,
+        "grad_norm_last": 7.6597
+      },
+      "window_steps_13_20": {
+        "tokens_per_gpu_s_mean": 7900.734,
+        "node_tokens_s_mean": 63205.875,
+        "tflops_per_gpu_mean": 135.28,
+        "mfu_pct_mean": 5.857,
+        "peak_logged_memory_gib": 137.96,
+        "loss_first": 4.24785,
+        "loss_last": 3.15262,
+        "grad_norm_last": 7.6597
+      }
+    },
+    {
+      "run_id": "qwen397b_a17b_mbs1_helper8_20step_20260612T0626",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_mbs1_helper8_20step_20260612T0626/logs/train.log",
+      "micro_batch_size": 1,
+      "gradient_accumulation_steps": 16,
+      "hot_helper_experts": 8,
+      "completed_steps": 20,
+      "window_steps_2_20": {
+        "tokens_per_gpu_s_mean": 8379.572,
+        "node_tokens_s_mean": 67036.579,
+        "tflops_per_gpu_mean": 143.48,
+        "mfu_pct_mean": 6.213,
+        "peak_logged_memory_gib": 136.19,
+        "loss_first": 9.36942,
+        "loss_last": 3.36305,
+        "grad_norm_last": 8.8162
+      },
+      "window_steps_13_20": {
+        "tokens_per_gpu_s_mean": 8434.078,
+        "node_tokens_s_mean": 67472.625,
+        "tflops_per_gpu_mean": 144.412,
+        "mfu_pct_mean": 6.254,
+        "peak_logged_memory_gib": 136.19,
+        "loss_first": 3.63129,
+        "loss_last": 3.36305,
+        "grad_norm_last": 8.8162
+      }
+    },
+    {
+      "run_id": "qwen397b_a17b_mbs2_helper0_20step_20260612T0636",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_mbs2_helper0_20step_20260612T0636/logs/train.log",
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "hot_helper_experts": 0,
+      "completed_steps": 20,
+      "window_steps_2_20": {
+        "tokens_per_gpu_s_mean": 10058.388,
+        "node_tokens_s_mean": 80467.105,
+        "tflops_per_gpu_mean": 172.226,
+        "mfu_pct_mean": 7.457,
+        "peak_logged_memory_gib": 171.06,
+        "loss_first": 8.993,
+        "loss_last": 3.55858,
+        "grad_norm_last": 11.0997
+      },
+      "window_steps_13_20": {
+        "tokens_per_gpu_s_mean": 9923.469,
+        "node_tokens_s_mean": 79387.75,
+        "tflops_per_gpu_mean": 169.915,
+        "mfu_pct_mean": 7.359,
+        "peak_logged_memory_gib": 171.06,
+        "loss_first": 4.95191,
+        "loss_last": 3.55858,
+        "grad_norm_last": 11.0997
+      }
+    },
+    {
+      "run_id": "qwen397b_a17b_mbs2_helper8_20step_20260612T0636",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_mbs2_helper8_20step_20260612T0636/logs/train.log",
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "hot_helper_experts": 8,
+      "completed_steps": 20,
+      "window_steps_2_20": {
+        "tokens_per_gpu_s_mean": 11174.086,
+        "node_tokens_s_mean": 89392.684,
+        "tflops_per_gpu_mean": 191.329,
+        "mfu_pct_mean": 8.284,
+        "peak_logged_memory_gib": 148.93,
+        "loss_first": 7.97687,
+        "loss_last": 3.37178,
+        "grad_norm_last": 8.9136
+      },
+      "window_steps_13_20": {
+        "tokens_per_gpu_s_mean": 11166.188,
+        "node_tokens_s_mean": 89329.5,
+        "tflops_per_gpu_mean": 191.193,
+        "mfu_pct_mean": 8.279,
+        "peak_logged_memory_gib": 148.93,
+        "loss_first": 4.84469,
+        "loss_last": 3.37178,
+        "grad_norm_last": 8.9136
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "micro_batch_size": 1,
+      "window": "steps_2_20",
+      "no_helper_tokens_per_gpu_s": 7857.678,
+      "top8_helper_tokens_per_gpu_s": 8379.572,
+      "uplift_pct": 6.64,
+      "no_helper_peak_memory_gib": 137.96,
+      "top8_helper_peak_memory_gib": 136.19
+    },
+    {
+      "micro_batch_size": 1,
+      "window": "steps_13_20",
+      "no_helper_tokens_per_gpu_s": 7900.734,
+      "top8_helper_tokens_per_gpu_s": 8434.078,
+      "uplift_pct": 6.75,
+      "no_helper_peak_memory_gib": 137.96,
+      "top8_helper_peak_memory_gib": 136.19
+    },
+    {
+      "micro_batch_size": 2,
+      "window": "steps_2_20",
+      "no_helper_tokens_per_gpu_s": 10058.388,
+      "top8_helper_tokens_per_gpu_s": 11174.086,
+      "uplift_pct": 11.09,
+      "no_helper_peak_memory_gib": 171.06,
+      "top8_helper_peak_memory_gib": 148.93
+    },
+    {
+      "micro_batch_size": 2,
+      "window": "steps_13_20",
+      "no_helper_tokens_per_gpu_s": 9923.469,
+      "top8_helper_tokens_per_gpu_s": 11166.188,
+      "uplift_pct": 12.52,
+      "no_helper_peak_memory_gib": 171.06,
+      "top8_helper_peak_memory_gib": 148.93
+    }
+  ],
+  "notes": [
+    "Step 1 is excluded from retained windows because each run includes cold start and AITER JIT/import effects.",
+    "Kimi-K2.6 was not run because the active TorchTitan WIP has no Kimi training model/config surface; do not proxy Kimi with Qwen or DeepSeek."
+  ]
+}

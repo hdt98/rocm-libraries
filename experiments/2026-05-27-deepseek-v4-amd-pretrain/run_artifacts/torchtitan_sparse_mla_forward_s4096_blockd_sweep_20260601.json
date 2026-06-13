@@ -1,0 +1,154 @@
+{
+  "status": "measured",
+  "host": "do-sonle5-mi350-gpu",
+  "device": "MI350X",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "scope": "TorchTitan DeepSeek-V4 layer-2 compressed sparse MLA forward, S4096, B1, BF16, fused Triton-forward backend",
+  "source_change": {
+    "backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_triton_forward_backend.py",
+    "new_env": "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_D",
+    "old_defaults": {
+      "block_keys": 64,
+      "block_d": 64,
+      "block_v": 64
+    },
+    "new_defaults": {
+      "block_keys": 64,
+      "block_d": 128,
+      "block_v": 512
+    }
+  },
+  "baseline_previous_best": {
+    "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk64_blockv512_nograd_mi350_bf16_20260601.json",
+    "block_keys": 64,
+    "block_d": 64,
+    "block_v": 512,
+    "scope": "forward_only_no_grad",
+    "cuda_event_mean_ms": 88.04192810058593,
+    "target_ratio": 24.456091139051647
+  },
+  "retained_best": {
+    "artifact": "run_artifacts/blockd_sweep_20260601/s4096_default_blockk64_blockd128_blockv512_training_graph_repeat.json",
+    "block_keys": 64,
+    "block_d": 128,
+    "block_v": 512,
+    "scope": "forward_only_training_graph",
+    "cuda_event_mean_ms": 84.55410232543946,
+    "target_ratio": 23.487250645955406,
+    "improvement_vs_previous_best_percent": 3.9615508773975425
+  },
+  "correctness": {
+    "artifact": "run_artifacts/blockd_sweep_20260601/s4096_default_blockk64_blockd128_blockv512_correctness_nograd.json",
+    "status": "passed",
+    "reference_mode": "manual_stream",
+    "candidate_mode": "fused",
+    "max_output_abs_diff": 0.00390625,
+    "output_atol": 0.01
+  },
+  "measurements": [
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd32_blockv512_nograd.json",
+      "block_keys": 64,
+      "block_d": 32,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 99.08858489990234,
+      "target_ratio": 27.524606916639538
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd64_blockv512_nograd.json",
+      "block_keys": 64,
+      "block_d": 64,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 88.21385116577149,
+      "target_ratio": 24.503847546047634
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd128_blockv512_repeat_nograd.json",
+      "block_keys": 64,
+      "block_d": 128,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 84.7822265625,
+      "target_ratio": 23.550618489583332
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd256_blockv512_nograd.json",
+      "block_keys": 64,
+      "block_d": 256,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 123.00802001953124,
+      "target_ratio": 34.16889444986979
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk32_blockd128_blockv512_nograd.json",
+      "block_keys": 32,
+      "block_d": 128,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 115.69144897460937,
+      "target_ratio": 32.13651360405816
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk128_blockd128_blockv512_nograd.json",
+      "block_keys": 128,
+      "block_d": 128,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 91.93571395874024,
+      "target_ratio": 25.537698321872288
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk256_blockd128_blockv512_nograd.json",
+      "block_keys": 256,
+      "block_d": 128,
+      "block_v": 512,
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 147.79488372802734,
+      "target_ratio": 41.054134368896484
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_default_blockk64_blockd128_blockv512_nograd.json",
+      "block_keys": "default",
+      "block_d": "default",
+      "block_v": "default",
+      "scope": "forward_only_no_grad",
+      "cuda_event_mean_ms": 85.03003311157227,
+      "target_ratio": 23.619453642103405
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd64_blockv512_training_graph.json",
+      "block_keys": 64,
+      "block_d": 64,
+      "block_v": 512,
+      "scope": "forward_only_training_graph",
+      "cuda_event_mean_ms": 87.67312774658203,
+      "target_ratio": 24.353646596272785
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_blockk64_blockd128_blockv512_training_graph_repeat.json",
+      "block_keys": 64,
+      "block_d": 128,
+      "block_v": 512,
+      "scope": "forward_only_training_graph",
+      "cuda_event_mean_ms": 84.88749542236329,
+      "target_ratio": 23.579859839545357
+    },
+    {
+      "artifact": "run_artifacts/blockd_sweep_20260601/s4096_default_blockk64_blockd128_blockv512_training_graph_repeat.json",
+      "block_keys": "default",
+      "block_d": "default",
+      "block_v": "default",
+      "scope": "forward_only_training_graph",
+      "cuda_event_mean_ms": 84.55410232543946,
+      "target_ratio": 23.487250645955406
+    }
+  ],
+  "interpretation": [
+    "Exposing BLOCK_D confirmed the score-reduction head tile matters for the S4096 Triton-forward kernel.",
+    "BLOCK_D=128 with BLOCK_KEYS=64 and BLOCK_V=512 is the best retained point in this sweep. It lowers the best observed training-graph forward from the previous 88.04 ms no-grad anchor to 84.55 ms, about 3.96% faster.",
+    "The improvement is useful but small. The kernel remains about 23.49x slower than the 3.6 ms attention-forward target, so the larger remaining lever is still a different sparse MLA/LightningIndexer schedule with query/key reuse and a real backward kernel."
+  ]
+}

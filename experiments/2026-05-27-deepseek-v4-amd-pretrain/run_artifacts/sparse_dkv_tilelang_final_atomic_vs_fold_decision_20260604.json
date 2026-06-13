@@ -1,0 +1,57 @@
+{
+  "status": "retain_compact_partial_plus_fold_for_latency",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_final_output_contract",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "topk_workspace": 640,
+    "route_pattern": "panel_capacity_random",
+    "token_block": 64,
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "panel_count": 2,
+    "block_k": 64,
+    "block_d": 64
+  },
+  "compact_partial_plus_fold_retained": {
+    "threads": 512,
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.203559875488281,
+    "s4096_fold_only_median_ms": 0.11942100152373314,
+    "s4096_peak_memory_allocated_gib": 1.7624521255493164,
+    "compact_partial_stream_mib": 128.0,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+  },
+  "direct_reduced_atomic_final": {
+    "threads": 512,
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.787073135375977,
+    "s4096_peak_memory_allocated_gib": 1.636965274810791,
+    "compact_partial_stream_mib": 0.0,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s128_valid512_tb64_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json"
+  },
+  "threads_1024_check": {
+    "math_mode": "mfma_reduced",
+    "fold_final_dkv": true,
+    "s128_final_dkv_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 8.357729434967041,
+    "s4096_fold_only_median_ms": 0.11416099965572357,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb64_gps512_cap320_k64d64_thr1024_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb64_gps512_cap320_k64d64_thr1024_timing10_20260604.json"
+  },
+  "comparison": {
+    "final_atomic_minus_fold_ms": 0.5835132598876953,
+    "fold_path_speedup_over_final_atomic_x": 1.0711309159399229,
+    "final_atomic_peak_memory_saving_gib": 0.1254868507385254,
+    "threads1024_minus_threads512_ms": 0.15416955947875977
+  },
+  "read": "Direct reduced atomics into final [groups, D] dKV are correct and remove the 128 MiB compact partial stream, but they are slower at target shape: 8.787 ms versus 8.204 ms for compact partial rows plus the measured PyTorch fold. The fold itself is only about 0.119 ms, so the atomic overhead is larger than the HBM round trip saved by skipping compact partials. Raising the compact-fold launch to 1024 threads also loses at S4096. Keep tb64/gps512/cap320/k64/d64/threads512 with compact partials plus a small final reducer as the retained latency branch; direct final atomics remain a memory/integration branch if workspace pressure matters."
+}

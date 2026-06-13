@@ -1,0 +1,80 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_refcount_release_fixedcap3_8x_s4096_gbs128_20260610",
+  "date": "2026-06-10",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "env": {
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "true",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_ORDER": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_EXPORT_COMPACT_ROUTE_POSITIONS": "1",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_BLOCKS": "64",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WARPS": "8",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "false",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "1",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "false",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_GC_ON_RELEASE": "false",
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_CHUNKED_CE_NUM_CHUNKS": "8",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "48G",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "code_change_summary": {
+    "autograd_refcount": "Shared-forward native compact handles now get one retain per autograd node that will call the inverse collective, and one release after that inverse collective runs.",
+    "default_release_policy": "Released handles are removed from the cache by default. TORCHTITAN_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES=1 preserves the old persistent-handle behavior for perf A/Bs.",
+    "gc_policy": "Release does not force Python gc.collect() unless TORCHTITAN_STANDARD_EP_MORI_NATIVE_COMPACT_GC_ON_RELEASE=1 is set.",
+    "perf_intent": "Dictionary retain/release at autograd node boundaries only; no compact-row path work, no route-mask adapter, no row materialization, and no per-token refcounting."
+  },
+  "result": {
+    "status": "failed_after_finite_step1_not_promoted",
+    "completed_steps": 1,
+    "step1_loss": 12.23184,
+    "step1_grad_norm": 13.1875,
+    "step1_tps_per_rank_range": [
+      1082,
+      1083
+    ],
+    "step1_tflops_per_gpu_range": [
+      54.77,
+      54.82
+    ],
+    "step1_peak_logged_memory_gib_rank_min": 192.79,
+    "step1_peak_logged_memory_gib_rank_max": 196.28,
+    "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES in the next backward after step 1",
+    "failure_free_memory_mb_samples": [
+      60
+    ]
+  },
+  "comparison": {
+    "prior_rolehandle_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_rolehandles_fixedcap6_8x_s4096_gbs128_20260610.json",
+    "prior_step1_peak_logged_memory_gib_rank_max": 198.53,
+    "delta_peak_logged_memory_gib_rank_max": -2.25,
+    "read": "Reference-counted release lowers logged peak slightly but does not move the failure boundary; remaining memory pressure is not just stale shared forward handles."
+  },
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_refcount_release_fixedcap3_8x_s4096_gbs128_20260610/docker-run.log",
+  "read": "The reference-counted handle lifetime patch is correct and low-overhead, but it is not sufficient to make fixed-cap native compact MBS8 stable. The next source target should reduce active compact capacity/staging output residency or collapse the MORI staging/output ABI, rather than keep optimizing global handle-cache lifetime."
+}

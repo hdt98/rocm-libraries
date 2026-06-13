@@ -1,0 +1,84 @@
+{
+  "run_id": "contig_wgrad_lhs_probe_continuation_20260531",
+  "date": "2026-05-31",
+  "branch": "sonle5_dsv4_amd_pretrain",
+  "intent": "Make the existing compact-reduce contig-wgrad-lhs full-layer variant measurable in the isolated dynamic MoE op probe and include it in the next S2048 MoE sweep.",
+  "code_changes": [
+    {
+      "path": "tools/dsv4_layer_microbench/probe_dynamic_moe_bridge_ops.py",
+      "change": "Added probe variant compact-reduce-contig-wgrad-lhs with materialized W2/W1/W3 wgrad transpose operands before torch.bmm, plus a copy-only timing hook."
+    },
+    {
+      "path": "tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "change": "Added compact-reduce-contig-wgrad-lhs to probe-ops sweep and added the full-layer contig_wgrad_lhs MoE implementation to bench-moe-sweep."
+    }
+  ],
+  "local_static_validation": [
+    {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/probe_dynamic_moe_bridge_ops.py",
+      "result": "passed"
+    },
+    {
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "result": "passed"
+    },
+    {
+      "command": "git -C /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/probe_dynamic_moe_bridge_ops.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "result": "passed"
+    }
+  ],
+  "remote_cpu_validation": [
+    {
+      "host": "do-sonle-kernel",
+      "container": "b9d33e6e8227",
+      "command": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_dynamic_moe_bridge_ops.py --device cpu --tokens 8 --hidden 64 --intermediate 32 --experts 16 --topk 4 --dtype bfloat16 --variant compact-reduce-contig-wgrad-lhs --check-only --json",
+      "artifact": "run_artifacts/dynamic_moe_bridge_ops_contig_wgrad_lhs_cpu_20260531.json",
+      "result": "passed",
+      "check_ok": true,
+      "max_abs": {
+        "output_scale_reduce": 0.0,
+        "grad_y_build": 0.0,
+        "top_score_grad": 0.0,
+        "input_reduce_only": 0.0
+      }
+    },
+    {
+      "host": "do-sonle-kernel",
+      "container": "b9d33e6e8227",
+      "command": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/check_correctness.py --device cpu --dtype float64 --batch 1 --seqlen 4 --checks moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_contig_wgrad_lhs_dense_wgrad_match,moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_contig_wgrad_lhs_dense_wgrad_learned_router_match --json",
+      "result": "passed",
+      "ok": true,
+      "max_grad_rel_l2": 3.6501615255140047e-16,
+      "learned_router_gate_grad_rel_l2": 3.2798057843630187e-16
+    }
+  ],
+  "gpu_timing_status": {
+    "host": "do-sonle-kernel",
+    "status": "not_run_guarded_busy",
+    "wait_command": "WAIT_IDLE_SECONDS=120 WAIT_IDLE_INTERVAL_SECONDS=30 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh wait-idle",
+    "result": "timed_out_after_120s",
+    "observed_blockers": [
+      {
+        "pid": 3289657,
+        "process": "python3",
+        "vram_bytes": 60932452352
+      },
+      {
+        "pid": 3291359,
+        "process": "ninja",
+        "vram_bytes": 0
+      },
+      {
+        "process_family": "hipcc/clang++/clang-22",
+        "vram_bytes": 0,
+        "note": "Many active compiler workers were reported by rocm-smi --showpids during the wait."
+      }
+    ],
+    "action": "did_not_kill_or_coschedule"
+  },
+  "next_commands_when_idle": [
+    "env RUN_TAG=contig_wgrad_lhs_probe_gpu_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-ops-sweep-2048",
+    "env RUN_TAG=contig_wgrad_lhs_moe_sweep_s2048_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-moe-sweep-2048"
+  ],
+  "read": "This does not claim a new fastest path yet. It makes the slightly-positive contig-wgrad-lhs full-layer variant visible in the isolated MoE op probe and in the next MoE implementation sweep, so the next idle GPU run can decide whether materializing wgrad LHS operands is a real S2048 improvement or sampling noise."
+}

@@ -1,0 +1,130 @@
+{
+  "artifact": "torchtitan_mori_saved_dispatch_reuse_ab_20260605",
+  "created_at": "2026-06-05",
+  "purpose": "A/B whether MORI+AITER routed backward can reuse compact forward dispatch state from the fused AITER forward path without losing the 4xMI350 S4096 canary.",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350",
+    "model": "DeepSeek-V4-Flash 4-layer BF16 canary",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "optimizer": "AdamW",
+    "activation_checkpointing": "none",
+    "checkpointing": false
+  },
+  "candidate": {
+    "run_id": "torchtitan_dsv4_mori_saved_dispatch_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_20260605",
+    "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_saved_dispatch_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_20260605/docker-run.log",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "forward_mode": "aiter",
+    "backward_mode": "routed",
+    "local_vjp_mode": "expert_loop",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "xgrad_mode": "compact",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "steps": [
+      {
+        "step": 1,
+        "loss": 12.19829,
+        "grad_norm": 11.1875,
+        "tokens_per_gpu_s": 5109.25,
+        "tflops_per_gpu": 96.68,
+        "peak_logged_memory_gib": 86.05
+      },
+      {
+        "step": 2,
+        "loss": 9.46773,
+        "grad_norm": 21.5,
+        "tokens_per_gpu_s": 12244.0,
+        "tflops_per_gpu": 231.68,
+        "peak_logged_memory_gib": 112.16
+      },
+      {
+        "step": 3,
+        "loss": 13.6964,
+        "grad_norm": 24.875,
+        "tokens_per_gpu_s": 12456.0,
+        "tflops_per_gpu": 235.7,
+        "peak_logged_memory_gib": 112.29
+      },
+      {
+        "step": 4,
+        "loss": 9.84025,
+        "grad_norm": 59.75,
+        "tokens_per_gpu_s": 12437.0,
+        "tflops_per_gpu": 235.34,
+        "peak_logged_memory_gib": 112.66
+      },
+      {
+        "step": 5,
+        "loss": 8.05499,
+        "grad_norm": 38.25,
+        "tokens_per_gpu_s": 12671.0,
+        "tflops_per_gpu": 239.76,
+        "peak_logged_memory_gib": 114.63
+      },
+      {
+        "step": 6,
+        "loss": 6.62902,
+        "grad_norm": 29.125,
+        "tokens_per_gpu_s": 12603.0,
+        "tflops_per_gpu": 238.48,
+        "peak_logged_memory_gib": 115.04
+      }
+    ],
+    "late_step_summary": {
+      "window": "steps_4_to_6",
+      "tokens_per_gpu_s": 12570.33,
+      "node_tokens_s": 50281.32,
+      "tflops_per_gpu": 237.19,
+      "peak_logged_memory_gib": 115.04,
+      "passes_current_4x_target": true
+    }
+  },
+  "baseline_no_saved_dispatch": {
+    "artifact": "run_artifacts/torchtitan_mori_expert_loop_vjp_stability_20260605.json",
+    "run_id": "torchtitan_dsv4_mori_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_moriimg_20260605",
+    "save_forward_dispatch": false,
+    "late_step_summary": {
+      "window": "steps_4_to_6",
+      "tokens_per_gpu_s": 12006.67,
+      "node_tokens_s": 48026.68,
+      "tflops_per_gpu": 227.19,
+      "peak_logged_memory_gib": 111.25,
+      "passes_current_4x_target": true
+    }
+  },
+  "comparison": {
+    "late_step_tflops_uplift_percent": 4.4,
+    "late_step_tokens_per_gpu_uplift_percent": 4.69,
+    "late_step_node_tokens_uplift_percent": 4.69,
+    "peak_logged_memory_delta_gib": 3.79,
+    "decision": "promote_saved_forward_dispatch_expert_loop_as_current_4x_canary_anchor"
+  },
+  "forward_intermediate_reuse_read": {
+    "can_reuse_some_forward_intermediates": true,
+    "reused_state": [
+      "recv_count",
+      "src_pos",
+      "packed_x_local",
+      "packed_weight_local",
+      "packed_ids_local"
+    ],
+    "why_this_is_safe_enough_for_the_canary": "The saved state is compact routed dispatch state from the AITER forward boundary, not a huge padded per-expert activation slab. It lets backward skip rebuilding the dispatch input while preserving AITER fused forward.",
+    "remaining_not_final": "The retained local VJP is still Python/per-expert expert_loop. Production should make AITER expose the needed compact state and consume it in a fused compact grouped owner-rank training backward kernel."
+  },
+  "smoke": {
+    "run_id": "torchtitan_dsv4_mori_saved_dispatch_expert_loop_smoke_4x_s128_gbs64_20260605",
+    "result": "passed_two_steps",
+    "read": "Small-shape smoke showed saved-dispatch autograd contract is alive before the S4096 target-shape run."
+  }
+}

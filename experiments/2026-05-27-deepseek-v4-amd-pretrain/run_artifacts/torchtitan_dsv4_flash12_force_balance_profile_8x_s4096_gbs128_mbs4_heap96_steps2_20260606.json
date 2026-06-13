@@ -1,0 +1,135 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+  "date": "2026-06-06",
+  "status": "completed_two_step_force_balance_profile_mori_sidecar_missing",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+  "remote_paths": {
+    "log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+    "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/docker-run.log",
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/additive_timing.jsonl",
+    "dsv4_profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/dsv4_profile_timing.jsonl",
+    "mori_aiter_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/mori_aiter_timing.jsonl"
+  },
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "env_highlights": {
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "true",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_MATMUL_BACKEND": "ptgmm",
+    "CANARY_MORI_AITER_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_DTOPK_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_DX_RETURN_MODE": "sync",
+    "CANARY_MORI_AITER_TIMING_GRANULARITY": "expert_loop_detail",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "96G",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 11.79885,
+      "grad_norm": 21.0,
+      "tokens_per_gpu_s": 2062,
+      "tflops_per_gpu": 104.4,
+      "peak_logged_memory_gib_rankmax": 146.38,
+      "read": "warmup_compile_contaminated"
+    },
+    {
+      "step": 2,
+      "loss": 7.67915,
+      "grad_norm": 87.5,
+      "tokens_per_gpu_s": 6880,
+      "node_tokens_s": 55040,
+      "tflops_per_gpu": 348.33,
+      "mfu_pct_mi350": 15.08,
+      "peak_logged_memory_gib_rankmax": 183.92,
+      "read": "profiled_steady_step"
+    }
+  ],
+  "additive_timing_step_2_ms": {
+    "step_wall_rankmax": 7987.632,
+    "step_gpu_rankmax": 7987.585,
+    "train_step_rankmax": 7987.04,
+    "microbatch_forward_backward_rankmax": 7878.652,
+    "forward_backward_call_rankmax": 7878.322,
+    "model_forward_rankmax": 1965.43,
+    "loss_rankmax": 372.752,
+    "backward_rankmax": 5536.537,
+    "forward_backward_residual_rankmax": 9.338,
+    "forward_backward_residual_median": 8.681,
+    "grad_clip_rankmax": 26.696,
+    "optimizer_step_rankmax": 46.303,
+    "valid_tokens_all_reduce_rankmax": 5.462,
+    "accumulated_loss_reduce_rankmax": 1.691,
+    "collect_dist_metrics_rankmax": 2.918
+  },
+  "dsv4_profile_timing_call_1120_ms": {
+    "note": "The DSV4 profile file has nested stage lists and no top-level step field. Call 1120 is the final steady module-backward envelope; use it as a per-microbatch attribution signal, not a sum-to-step decomposition.",
+    "module_attention_rankmax_sum": 891.188,
+    "module_attention_median_rank_sum": 872.713,
+    "module_moe_rankmax_sum": 433.657,
+    "module_moe_median_rank_sum": 426.741,
+    "module_block_rankmax_sum": 1335.305,
+    "module_block_median_rank_sum": 1333.406
+  },
+  "profile_comparison_vs_natural_router_step_2": {
+    "natural_profile_artifact": "torchtitan_dsv4_flash12_reuse_forward_xop_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606.json",
+    "natural_tokens_per_gpu_s": 4778,
+    "natural_tflops_per_gpu": 241.94,
+    "natural_step_wall_rankmax_ms": 12147.43,
+    "natural_model_forward_rankmax_ms": 2540.04,
+    "natural_loss_rankmax_ms": 346.632,
+    "natural_backward_rankmax_ms": 7666.744,
+    "natural_forward_backward_residual_rankmax_ms": 1117.601,
+    "natural_accumulated_loss_reduce_rankmax_ms": 389.57,
+    "force_balance_tokens_per_gpu_s_delta_pct": 43.99,
+    "force_balance_tflops_per_gpu_delta_pct": 43.98,
+    "force_balance_step_wall_delta_pct": -34.25,
+    "force_balance_model_forward_delta_pct": -22.62,
+    "force_balance_loss_delta_pct": 7.54,
+    "force_balance_backward_delta_pct": -27.78,
+    "force_balance_forward_backward_residual_delta_pct": -99.16,
+    "force_balance_accumulated_loss_reduce_delta_pct": -99.57
+  },
+  "mori_sidecar_read": {
+    "expected_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_force_balance_profile_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/mori_aiter_timing.jsonl",
+    "materialized": false,
+    "read": "Additive and module timing prove the force-balanced profile wall shrinks, but this run cannot split the improvement into owner_local_vjp versus combine_dx because the MORI timing sidecar did not materialize. Treat this as a profiling gap to fix before claiming exact MORI-internal attribution for forced routing."
+  },
+  "source_mechanism_read": {
+    "router_balance": "NPU DSv4 Pro configs enable moe_force_load_balance for reported MoE perf rows. The common TorchTitan debug router is exact round-robin selected_experts_indices = arange(bs*slen*top_k).reshape(bs,slen,top_k) % num_experts, with top_scores gathered from original scores.",
+    "production_balance": "The non-debug path uses expert_bias for expert choice and keeps gate weights from original scores; NPU V4 Pro sets load_balance_coeff=0.02, while the current AMD WIP default is 1e-3.",
+    "communication_layout": "The NPU converter exchanges per-expert counts, computes input/output splits, all-to-alls routed_input and routed_scores, then locally permutes by expert and pads to grouped-matmul-friendly layout.",
+    "expert_math": "NPU grouped experts use npu_grouped_matmul in forward and autograd backward for dX and dW; this is the compact grouped VJP contract the AMD path still needs.",
+    "process_group_isolation": "The Ascend recipe documents a separate EP ProcessGroup to avoid FSDP AllGather/ReduceScatter serializing EP AllToAll; this is a communication-concurrency optimization, not the router load-balance mechanism itself."
+  },
+  "decision": {
+    "promote_throughput_baseline": false,
+    "read": "Force-balanced routing is a ceiling diagnostic. It improves the profiled 8x MBS4 step from 4,778 to 6,880 tok/GPU/s and shrinks additive backward from 7.667s to 5.537s, confirming MoE load skew is a major 12-layer scaling wall. It does not preserve natural training semantics, and the missing MORI sidecar means the next profiling step is to restore owner_vjp/combine_dx attribution under the force-balanced path."
+  }
+}

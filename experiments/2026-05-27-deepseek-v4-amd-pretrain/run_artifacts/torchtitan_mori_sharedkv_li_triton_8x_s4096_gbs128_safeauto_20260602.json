@@ -1,0 +1,113 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_li_triton_8x_s4096_gbs128_safeauto_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_two_step_8x_target_shape_safe_auto_scatter",
+  "purpose": "Record the first 8xMI350 S4096 GBS128 TorchTitan DeepSeek-V4 Flash sparse shared-KV + LI target-shape run with MORI+AITER routed padded MoE and safe-auto shared-KV scatter.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_8x_s4096_gbs128_steps2_safeauto_20260602T000000",
+  "command_shape": "RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_8x_s4096_gbs128_steps2_safeauto_20260602T000000 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29581 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_8x_s4096_gbs128_steps2_safeauto_20260602T000000/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_8x_s4096_gbs128_steps2_safeauto_20260602T000000",
+  "rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_8x_s4096_gbs128_steps2_safeauto_20260602T000000/structured_logs/training.global_rank_0.20260602-023055-C9Y9HP.jsonl",
+  "remote_sizes": {
+    "output_dir": "2.2M",
+    "log_dir": "64K"
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+    "distributed": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "gpus": 8,
+    "fsdp": 8,
+    "ep": 8,
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 524288,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false
+  },
+  "sparse_mla": {
+    "backward_mode": "shared_kv",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "li_kl_backend": "triton_tl_dot",
+    "max_seq_len": 4096,
+    "scatter_mode": "auto_post_fix_split_index_add_or_index_add_flat",
+    "scatter_ab_artifact": "run_artifacts/torchtitan_sparse_sharedkv_scatter_safeauto_4x_s4096_gbs64_20260602.json"
+  },
+  "moe": {
+    "comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G"
+  },
+  "results": {
+    "teardown": "process_groups_destroyed_cleanly",
+    "checkpoint_directory_created": false,
+    "loss_movement": [
+      12.18523,
+      8.48299
+    ],
+    "step1": {
+      "loss": 12.18523,
+      "grad_norm": 12.625,
+      "memory_gib_range": [
+        75.08,
+        87.20
+      ],
+      "tokens_per_gpu_s_range": [
+        1808,
+        1811
+      ],
+      "node_tokens_per_s_range": [
+        14464,
+        14488
+      ],
+      "tflops_per_gpu_range": [
+        34.20,
+        34.27
+      ],
+      "mfu_pct": 1.48,
+      "global_valid_tokens": 524288,
+      "structured_step_time_ms_rank0": 35872.49776907265,
+      "implied_step_time_s_from_console_tps_range": [
+        36.18,
+        36.25
+      ]
+    },
+    "step2": {
+      "loss": 8.48299,
+      "grad_norm": 25.875,
+      "memory_gib_range": [
+        86.24,
+        245.71
+      ],
+      "tokens_per_gpu_s": 2648,
+      "node_tokens_per_s": 21184,
+      "tflops_per_gpu": 50.10,
+      "mfu_pct": 2.17,
+      "global_valid_tokens": 524288,
+      "structured_step_time_ms_rank0": 24749.938644934446,
+      "implied_step_time_s_from_console_tps": 24.75,
+      "cuda_memory_allocation_retries": 1
+    }
+  },
+  "target_comparison": {
+    "normalized_8x_target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "normalized_8x_target_step_time_s_range": [
+      27,
+      30
+    ],
+    "step1": "below target throughput band",
+    "step2": "above target throughput band and faster than target step-time band"
+  },
+  "read": "This is the first retained 8xMI350 target-shape sparse shared-KV + LI systems pass. It proves the direct TorchTitan FSDP8/EP8 sparse path is multi-step stable with safe scatter and MORI+AITER routed padded MoE. It is not final kernel-performance proof: shared-KV backward remains a prototype explicit/Triton bridge, LI/compressor backward are not fused, and MoE backward still uses the padded PyTorch owner-rank VJP."
+}

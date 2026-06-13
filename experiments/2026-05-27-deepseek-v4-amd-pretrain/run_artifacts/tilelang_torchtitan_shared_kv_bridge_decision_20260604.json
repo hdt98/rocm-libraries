@@ -1,0 +1,48 @@
+{
+  "status": "ok",
+  "scope": "torchtitan_shared_kv_tilelang_compressed_dkv_bridge",
+  "decision": "Keep the opt-in TorchTitan backward bridge as the semantic integration path for the selected-limit TileLang compressed-dKV producer, but do not promote it as a performance path until route packing and probability/LI-derivative production are fused or moved to GPU.",
+  "backend_mode": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv",
+  "code": {
+    "backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "verifier": "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py"
+  },
+  "validated_contract": {
+    "local_kv_slice": "existing explicit/PyTorch scatter path",
+    "compressed_kv_slice": "TileLang selected-limit final [groups,D] compressed dKV producer",
+    "route_invariant": "LightningIndexer top-k compressed groups are unique per token; duplicate with-replacement synthetic routes are not a supported contract for this compact reducer",
+    "input_layout": "q and dO [S,H,D] bf16; probs and scaled grad logits [S,K,H] bf16 after materialized packing"
+  },
+  "key_results": {
+    "s128_h64_d512_k128_unique_tb16": {
+      "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_s128_h64_d512_k128_unique_tb16_20260604.json",
+      "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.00390625,
+      "dkv_compressed_vs_explicit_pytorch_max_abs": 0.03125,
+      "explicit_tilelang_dkv_backward_ms": 145.8093719482422
+    },
+    "s512_h64_d512_k128_unique_tb128": {
+      "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_s512_h64_d512_k128_unique_tb128_20260604.json",
+      "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.0009765625,
+      "dkv_compressed_vs_explicit_pytorch_max_abs": 0.03125,
+      "explicit_tilelang_dkv_backward_ms": 581.0192260742188
+    },
+    "standalone_kernel_s4096_h64_d512_k512": {
+      "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_20260604.json",
+      "kernel_only_ms": 6.180,
+      "pack_plus_kernel_ms": 8.178
+    }
+  },
+  "non_promotion_reasons": [
+    "Bridge materializes per-head probs and grad_logits before TileLang.",
+    "Bridge prepares selected-limit route metadata with Python/CPU loops inside backward.",
+    "Bridge does not yet connect compressed dKV to compressor/LightningIndexer backward consumers.",
+    "S512 bridge timing is therefore hundreds of ms despite the standalone S4096 kernel-only candidate being around 6.18-6.91 ms."
+  ],
+  "next": [
+    "Move unique-route selected-limit packing to GPU or reuse the existing cheap LI prepack path.",
+    "Fuse or adjacent-produce target probabilities and scaled LI derivative tensors instead of materializing them as large [S,K,H] intermediates.",
+    "Feed the final compressed dKV into compressor and LightningIndexer backward without re-expanding selected KV state.",
+    "Then rerun the S4096/H64/D512/topk512 bridge timing against the 8.0-8.8 ms sparse-atomic wall."
+  ]
+}

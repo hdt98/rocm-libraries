@@ -1,0 +1,82 @@
+{
+  "scope": "tilelang_grouped_d_source_dblock_sweep",
+  "date": "2026-06-04",
+  "reason": "Close the cheap hypothesis that the grouped-D direct-source TileLang kernel was slow only because it recomputed P/dP for too many D groups.",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "shape": {
+    "seq_len": 512,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 128,
+    "compressed_count": 128,
+    "selected": 256,
+    "group_count": 128,
+    "dtype": "bf16"
+  },
+  "common_env": {
+    "HIP_VISIBLE_DEVICES": "0",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND": "dblocked_grouped_source",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_D": "64",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_K": "16",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_PANEL_CAPACITY": "16"
+  },
+  "sweep": [
+    {
+      "d_blocks_per_kernel": 1,
+      "artifact": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s512_h64_d512_dpk1_20260604.json",
+      "median_ms": 50.35896301269531,
+      "times_ms": [
+        51.60036849975586,
+        50.35896301269531,
+        49.22991180419922
+      ],
+      "read": "Least shared-state pressure but most P/dP recompute; slowest point."
+    },
+    {
+      "d_blocks_per_kernel": 2,
+      "artifact": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s512_h64_d512_20260604.json",
+      "median_ms": 43.14042663574219,
+      "times_ms": [
+        43.022125244140625,
+        43.25872802734375
+      ],
+      "read": "Original grouped-D point."
+    },
+    {
+      "d_blocks_per_kernel": 4,
+      "artifact": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s512_h64_d512_dpk4_20260604.json",
+      "median_ms": 41.98959732055664,
+      "times_ms": [
+        42.14955520629883,
+        41.94655990600586,
+        41.98959732055664
+      ],
+      "read": "Best point, but only a 2.7% improvement over DPK2 and still far from useful."
+    },
+    {
+      "d_blocks_per_kernel": 8,
+      "artifact": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s512_h64_d512_dpk8_20260604.json",
+      "median_ms": 46.058895111083984,
+      "times_ms": [
+        46.058895111083984,
+        45.75031280517578,
+        46.33780288696289
+      ],
+      "read": "Full-D reuse regresses, likely from shared-state/register/LDS pressure and the unresolved group_acc race warning."
+    }
+  ],
+  "comparison_gates": {
+    "current_best_dpk_ms": 41.98959732055664,
+    "older_triton_sparse_atomic_wall_s4096_ms": "about 8.0-8.8",
+    "best_clean_tilelang_hsk_bf16_source_s4096_ms": 5.105,
+    "read": "Even the best S512 grouped-D direct-source point is slower than S4096-level gates from other branches, so it should not be run as an end-to-end TFLOPs candidate."
+  },
+  "decision": {
+    "promote_to_e2e": false,
+    "continue_tilelang_grouped_d_source": false,
+    "summary": "Increasing D-block reuse does not rescue the grouped-D direct-source TileLang schedule. The bottleneck is not just D-group recomputation; this lowering is schedule-bound and still carries TileLang group_acc data-race warnings.",
+    "next_branch": "Move back to the proven rocWMMA/HIP contribution-tile surface or CK-Tile/rocPRIM-style segmented reducer: preserve query-major MFMA contribution production, reduce only active touched groups, and avoid dense local tables or HSK materialization."
+  },
+  "dependency_pin_changes": []
+}

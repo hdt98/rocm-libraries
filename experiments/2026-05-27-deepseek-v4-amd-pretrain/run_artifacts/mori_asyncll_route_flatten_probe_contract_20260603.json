@@ -1,0 +1,76 @@
+{
+  "artifact": "mori_asyncll_route_flatten_probe_contract_20260603",
+  "date_utc": "2026-06-03",
+  "status": "route_flatten_4x_probe_passed_next_seeded_training_parity_pending",
+  "scope": "Route-identity contract for the next MORI AsyncLL staged dX overlap attempt.",
+  "source_inspection": {
+    "mori_common_hpp": "sources/references/mori/src/ops/dispatch_combine/common.hpp",
+    "mori_config_hpp": "sources/references/mori/include/mori/ops/dispatch_combine/dispatch_combine.hpp",
+    "finding": "MORI get_dispatch_src_token_pos is a flat source token index using FlatTokenIndex(pe, localTokId) with stride MaxNumTokensToSend(). MaxNumTokensToSend() is worldSize * maxNumInpTokenPerRank, so the metadata identifies the source input row, not the selected top-k route slot inside a token.",
+    "implication": "For normal [tokens, topk=6] routing, one source token can have multiple expert slots landing on the same destination rank. Source-position alignment can therefore be ambiguous, and (src_pos, full top-k ids) can still duplicate rows."
+  },
+  "prior_evidence": {
+    "normal_topk6_probe": "run_artifacts/mori_asyncll_route_order_s4096_h4096_topkh6_8x_decoded_20260603.json",
+    "integrated_routekey_failure": "run_artifacts/mori_asyncll_route_key_alignment_20260603.json",
+    "integrated_srcpos_failure": "run_artifacts/mori_asyncll_align_mode_srcpos_retry_20260603.json",
+    "read": "Independent AsyncLL handles conserve route multisets in the standalone probe, but normal topk=6 rows do not provide a unique per-route identity. Integrated learned-router S4096 then fails both route_key and src_pos alignment gates."
+  },
+  "code_change": {
+    "path": "tools/dsv4_runtime_probe/probe_mori_asyncll_route_order.py",
+    "changes": [
+      "Added --route-flatten to dispatch logical [tokens, topk] routes as [tokens * topk, 1].",
+      "Added route-flat payload fields for source row, source rank, logical token, and route slot.",
+      "Switched source-position decoding to MORI op.decode_send_flat_idx() instead of the older hand decode.",
+      "Added duplicate src_pos and duplicate route-key counts to the probe summary."
+    ]
+  },
+  "local_validation": {
+    "py_compile": "pass",
+    "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_mori_asyncll_route_order.py"
+  },
+  "remote_gate": {
+    "purpose": "Check whether flattened topk=1 routing removes duplicate source-position rows and lets independent x/grad/topk AsyncLL handles align by source row at S4096.",
+    "host": "do-sonle5-mi350-gpu",
+    "storage_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "shape": "8xMI350, tokens_per_rank=4096, logical_topk=6, dispatch_topk=1, experts=256, hidden=4096",
+    "expected_pass_signal": [
+      "all_multiset_src_pos_equal=true",
+      "all_route_keys_equal_after_src_pos_sort=true",
+      "duplicate_src_pos_rows_by_rank all zero",
+      "decoded_src_pos_equals_payload=true"
+    ],
+    "expected_reject_signal": [
+      "Any duplicate_src_pos rows remain in route_flatten mode",
+      "Independent handles do not align after source-position sort",
+      "Route-key multisets differ across x/grad/topk handles"
+    ],
+    "next_action_if_passes": "Prototype a flattened topk=1 backward dX-return path, then rerun seeded S4096 sync-vs-AsyncLL parity before any throughput A/B.",
+    "next_action_if_fails": "Reject independent-handle AsyncLL overlap until MORI exposes shared route/order metadata or a per-dispatched-row route id from the production dispatch handle."
+  },
+  "remote_result": {
+    "artifact": "run_artifacts/mori_asyncll_route_flatten_s4096_h4096_topk6_4x_20260603.json",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/mori_asyncll_route_flatten_s4096_h4096_topk6_4x_20260603/docker-run.log",
+    "host": "do-sonle5-mi350-gpu",
+    "visible_gpus": "0,1,2,3",
+    "world_size": 4,
+    "shape": {
+      "tokens_per_rank": 4096,
+      "dispatch_tokens_per_rank": 24576,
+      "hidden": 4096,
+      "experts": 256,
+      "logical_topk": 6,
+      "dispatch_topk": 1,
+      "route_flatten": true
+    },
+    "summary": {
+      "all_multiset_src_pos_equal": true,
+      "all_route_keys_equal_after_src_pos_sort": true,
+      "all_route_keys_equal_after_decoded_src_sort": true,
+      "all_decoded_src_pos_matches_payload": true,
+      "duplicate_src_pos_rows_by_rank": [0, 0, 0, 0],
+      "duplicate_route_key_rows_by_rank": [0, 0, 0, 0],
+      "recv_count_by_rank": [24395, 24556, 24728, 24625]
+    },
+    "read": "Flattened topk=1 routing gives independent AsyncLL handles a unique per-route source row and aligns after source-position sorting on the 4x S4096 probe. This does not prove the training bridge yet; it promotes flattened-route dX return to the next seeded sync-vs-AsyncLL parity branch."
+  }
+}

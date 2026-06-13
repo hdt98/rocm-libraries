@@ -1,0 +1,33 @@
+{
+  "expected_hot_counts": [
+    3,
+    2,
+    2
+  ],
+  "expected_normal_counts": [
+    5,
+    4
+  ],
+  "hidden_dim": 16,
+  "hot_counts": [
+    3,
+    2,
+    2
+  ],
+  "max_score_diff": 0.0,
+  "max_x_diff": 0.0,
+  "mismatches": [],
+  "mode": "wrapper_hotcold_standard_moe",
+  "mori_kernel_dir": "/workspace/sources/references/mori/python/mori",
+  "normal_checksum": 7.493776486492083e-37,
+  "normal_counts": [
+    0,
+    0
+  ],
+  "normal_src_checksum": 1020,
+  "passed": false,
+  "shmem_finalize_status": 0,
+  "shmem_init_status": 0,
+  "tokens": 8,
+  "topk": 2
+}

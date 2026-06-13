@@ -1,0 +1,71 @@
+{
+  "artifact": "hipkittens_sharedkv_routekeyed_64row_score_dq_dkv_gate_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "runtime_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "target": "hk_sharedkv_routekeyed_64row_score_dq_dkv",
+  "compile_shape": {
+    "ATTN_B": 4,
+    "ATTN_H_KV": 1,
+    "ATTN_N": 4096,
+    "ATTN_D": 128,
+    "warp_size_kv": 64,
+    "dot_slice_qo": 16
+  },
+  "compiler_resource_usage": {
+    "total_sgprs": 95,
+    "vgprs": 256,
+    "agprs": 256,
+    "scratch_bytes_per_lane": 0,
+    "occupancy_waves_per_simd": 1,
+    "sgpr_spill": 0,
+    "vgpr_spill": 0
+  },
+  "active_tiles_16": {
+    "latency_ms": {
+      "median": 0.052100999280810356,
+      "mean": 0.05370439998805523,
+      "min": 0.04464000090956688,
+      "max": 0.0769599974155426
+    },
+    "finite": {
+      "dq_scratch": true,
+      "dk_scratch": true,
+      "dv_scratch": true,
+      "sink": true
+    },
+    "nonzero": {
+      "dq_scratch": 32768,
+      "dk_scratch": 524288,
+      "dv_scratch": 524288,
+      "sink": 64
+    }
+  },
+  "active_tiles_64": {
+    "latency_ms": {
+      "median": 0.047020500525832176,
+      "mean": 0.05207244958728552,
+      "min": 0.0450810007750988,
+      "max": 0.08620099723339081
+    },
+    "finite": {
+      "dq_scratch": true,
+      "dk_scratch": true,
+      "dv_scratch": true,
+      "sink": true
+    },
+    "nonzero": {
+      "dq_scratch": 131072,
+      "dk_scratch": 2097152,
+      "dv_scratch": 2097152,
+      "sink": 256
+    }
+  },
+  "interpretation": {
+    "status": "slice_gate_passed_not_promoted",
+    "timed_boundary": "64-row route-keyed score/dQ+dK/dV producer slice only, not full SparseAttnSharedkvGrad",
+    "what_this_proves": "Local dK/dV math can be attached to the valid HipKittens route-keyed score producer without nonfinite output or spills.",
+    "what_it_does_not_prove": "This does not yet cover full D512, full-D dQ, true dSinks, dOriKV/dCmpKV routing, compressed-group many-to-one accumulation, or e2e TorchTitan TFLOPs."
+  }
+}

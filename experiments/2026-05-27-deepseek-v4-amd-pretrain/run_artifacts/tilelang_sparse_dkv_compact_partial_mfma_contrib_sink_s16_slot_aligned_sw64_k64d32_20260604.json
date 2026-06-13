@@ -1,0 +1,88 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "read": "TileLang query-major MFMA contribution-body diagnostic. Each CTA owns one route tile and D block, computes selected-row dKV contributions with the same materialized-prob TileLang GEMMs used by route_mfma_reduced, then reduces all selected rows into a small [route_tiles, D] sink. It intentionally ignores compressed group ownership, so correctness here isolates MFMA/staging from compact route reduction and dKV writeback.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 16,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "token_block": 16,
+    "selected_window": 64,
+    "block_k": 64,
+    "block_d": 32,
+    "row_block": 16,
+    "threads": 128,
+    "math_mode": "mfma_contrib_sink",
+    "route_pattern": "slot_aligned",
+    "cluster_width": 640,
+    "cluster_stride": 4,
+    "output_layout": "[route_tiles, D]"
+  },
+  "compact_route": {
+    "raw_selected_rows": 8192,
+    "active_partial_rows": 512,
+    "output_partial_rows": 8,
+    "padded_partial_rows": 512,
+    "write_reduction_x": 16.0,
+    "padded_write_reduction_x": 16.0,
+    "token_tiles": 1,
+    "selected_tiles": 8,
+    "route_tiles": 8,
+    "max_active_groups": 64,
+    "active_count_mean": 64.0,
+    "active_count_min": 64,
+    "active_count_max": 64,
+    "partials_bytes": 1048576,
+    "partials_mib": 1.0,
+    "output_partials_bytes": 16384,
+    "output_partials_mib": 0.015625,
+    "raw_selected_write_bytes_fp32": 16777216,
+    "raw_selected_write_mib_fp32": 16.0
+  },
+  "prepacked_pairs": null,
+  "correctness": {
+    "enabled": true,
+    "max_abs_diff": 1.7881393432617188e-07,
+    "mean_abs_diff": 2.5188406027609744e-08,
+    "candidate_checksum": 21.715084075927734,
+    "reference_checksum": 21.715084075927734
+  },
+  "timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        0.1994429975748062,
+        0.19316299259662628
+      ],
+      "mean_ms": 0.19630299508571625,
+      "median_ms": 0.19630299508571625,
+      "min_ms": 0.19316299259662628,
+      "max_ms": 0.1994429975748062,
+      "stdev_ms": 0.004440634105956306
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        0.3202400403097272,
+        0.2077099634334445
+      ],
+      "mean_ms": 0.26397500187158585,
+      "median_ms": 0.26397500187158585,
+      "min_ms": 0.2077099634334445,
+      "max_ms": 0.3202400403097272,
+      "stdev_ms": 0.07957078044666299
+    },
+    "median_ms": 0.19630299508571625,
+    "min_ms": 0.19316299259662628,
+    "max_ms": 0.1994429975748062,
+    "mean_ms": 0.19630299508571625,
+    "peak_memory_allocated_bytes": 6390784,
+    "peak_memory_allocated_gib": 0.005951881408691406,
+    "checksum": 21.715084075927734
+  }
+}

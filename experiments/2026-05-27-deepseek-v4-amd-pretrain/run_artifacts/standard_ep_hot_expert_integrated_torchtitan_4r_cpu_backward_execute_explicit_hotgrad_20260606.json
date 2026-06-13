@@ -1,0 +1,348 @@
+{
+  "args": {
+    "atol": 0.0025,
+    "backend": "gloo",
+    "balanced_mode": "execute",
+    "device": "cpu",
+    "experts_per_rank": 4,
+    "forward_only": false,
+    "hidden": 32,
+    "hot_experts": 2,
+    "intermediate": 16,
+    "output": "/workspace/dsv4/outputs/standard_ep_hot_expert_integrated_torchtitan_4r_cpu_backward_execute_explicit_hotgrad_20260606.json",
+    "rtol": 0.0025,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 8,
+    "topk": 2
+  },
+  "artifact": "standard_ep_hot_expert_integrated_torchtitan",
+  "passed": true,
+  "rank_results": [
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 4.190951585769653e-09,
+          "mean_abs": 2.0662405120219773e-10,
+          "rel_l2": 0.0022395277582041473,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 4.423782229423523e-09,
+          "mean_abs": 2.3382823455264656e-10,
+          "rel_l2": 0.0024378951628448446,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.7225406635552645e-09,
+          "mean_abs": 2.3486051992094303e-10,
+          "rel_l2": 0.0022325576548616268,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 7.916241884231567e-09,
+          "mean_abs": 1.5899104255368002e-09,
+          "rel_l2": 0.0016882072913967968,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 0,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 8.381903171539307e-09,
+          "mean_abs": 2.734879545052138e-10,
+          "rel_l2": 0.002476600058229221,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.490154191851616e-09,
+          "mean_abs": 2.751145700141677e-10,
+          "rel_l2": 0.0022345680150423377,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 4.889443516731262e-09,
+          "mean_abs": 2.423793388217632e-10,
+          "rel_l2": 0.0022444517969332136,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4435499906539917e-08,
+          "mean_abs": 2.0589947524740637e-09,
+          "rel_l2": 0.0019435363348871033,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 1,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 7.566995918750763e-09,
+          "mean_abs": 2.574430946200579e-10,
+          "rel_l2": 0.0022901051108507094,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 8.745701052248478e-09,
+          "mean_abs": 2.668614773604361e-10,
+          "rel_l2": 0.002396801695875447,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.3256794773042202e-08,
+          "mean_abs": 3.399701353767881e-10,
+          "rel_l2": 0.0023166008471006993,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4901161193847656e-08,
+          "mean_abs": 1.8515109445615963e-09,
+          "rel_l2": 0.0018163275611525012,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 2,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 2.5705958250910044e-08,
+          "mean_abs": 8.578580623641585e-10,
+          "rel_l2": 0.0024693513843558985,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 2.0712832338176668e-08,
+          "mean_abs": 9.345839657726174e-10,
+          "rel_l2": 0.002298456745871616,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.2493273970903829e-08,
+          "mean_abs": 8.97688756662518e-10,
+          "rel_l2": 0.0023238736215751,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.5832483768463135e-08,
+          "mean_abs": 2.0883774709545833e-09,
+          "rel_l2": 0.0020986203449399987,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 3,
+      "world": 4
+    }
+  ],
+  "scope": "Integrated TorchTitan AllToAllTokenDispatcher + GroupedExperts execute-mode hot-row split."
+}

@@ -1,0 +1,553 @@
+{
+  "artifact": "actual_li_inproducer_window_reduction_plan_20260603",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "decision_fields": {
+    "full_segment_reduction_x": "This is the upper bound for a true local grouped/segmented accumulator before global writes.",
+    "same_slot_reduction_x": "If this is near 1, a cheap per-K-column accumulator will not move the wall.",
+    "same_slot_rows_over_full_rows_x": "How much extra row work a cheap same-slot reducer keeps versus true segmented reduction."
+  },
+  "producer_k64_windows": [
+    {
+      "full_segment_reduction_x": 2.084076027887496,
+      "full_segment_rows": 754460,
+      "full_segment_rows_per_tile": {
+        "max": 679,
+        "mean": 368.388671875,
+        "p50": 450.0,
+        "p90": 628.0,
+        "p99": 662.0
+      },
+      "full_segment_write_elements": 386283520,
+      "nonempty_tiles": 1600,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 1024,
+        "mean": 767.75,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 13.703125,
+        "mean": 2.3987042903900146,
+        "p50": 1.9297244548797607,
+        "p90": 3.535400390625,
+        "p99": 10.840274810791016
+      },
+      "same_slot_reduction_x": 1.016477865202025,
+      "same_slot_rows": 1546863,
+      "same_slot_rows_over_full_rows_x": 2.050291599289558,
+      "same_slot_rows_per_tile": {
+        "max": 1022,
+        "mean": 755.30419921875,
+        "p50": 1008.0,
+        "p90": 1017.0,
+        "p99": 1020.0
+      },
+      "same_slot_write_elements": 791993856,
+      "selected_block": 64,
+      "tiles": 2048,
+      "token_window": 16
+    },
+    {
+      "full_segment_reduction_x": 3.428225069715621,
+      "full_segment_rows": 458649,
+      "full_segment_rows_per_tile": {
+        "max": 908,
+        "mean": 447.8994140625,
+        "p50": 506.5,
+        "p90": 830.0,
+        "p99": 887.5400390625
+      },
+      "full_segment_write_elements": 234828288,
+      "nonempty_tiles": 800,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 2048,
+        "mean": 1535.5,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 23.59375,
+        "mean": 4.091585159301758,
+        "p50": 3.1839170455932617,
+        "p90": 6.627597808837891,
+        "p99": 17.939584732055664
+      },
+      "same_slot_reduction_x": 1.0335921117502054,
+      "same_slot_rows": 1521250,
+      "same_slot_rows_over_full_rows_x": 3.3168065339726023,
+      "same_slot_rows_per_tile": {
+        "max": 2031,
+        "mean": 1485.595703125,
+        "p50": 1985.5,
+        "p90": 2014.0,
+        "p99": 2023.77001953125
+      },
+      "same_slot_write_elements": 778880000,
+      "selected_block": 64,
+      "tiles": 1024,
+      "token_window": 32
+    }
+  ],
+  "ranked_by_full_segment_top10": [
+    {
+      "full_segment_reduction_x": 23.813051840857806,
+      "full_segment_rows": 66029,
+      "full_segment_rows_per_tile": {
+        "max": 1024,
+        "mean": 515.8515625,
+        "p50": 516.0,
+        "p90": 921.3999633789062,
+        "p99": 1012.8400268554688
+      },
+      "full_segment_write_elements": 33806848,
+      "nonempty_tiles": 128,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 16384,
+        "mean": 12284.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 30.778225806451612,
+        "mean": 24.657987594604492,
+        "p50": 26.207786560058594,
+        "p90": 30.48562240600586,
+        "p99": 30.7549991607666
+      },
+      "same_slot_reduction_x": 1.0335921117502054,
+      "same_slot_rows": 1521250,
+      "same_slot_rows_over_full_rows_x": 23.039119174907995,
+      "same_slot_rows_per_tile": {
+        "max": 16161,
+        "mean": 11884.765625,
+        "p50": 15804.5,
+        "p90": 16100.900390625,
+        "p99": 16141.4599609375
+      },
+      "same_slot_write_elements": 778880000,
+      "selected_block": 512,
+      "tiles": 128,
+      "token_window": 32
+    },
+    {
+      "full_segment_reduction_x": 11.952959063438367,
+      "full_segment_rows": 131545,
+      "full_segment_rows_per_tile": {
+        "max": 1024,
+        "mean": 513.84765625,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.7999877929688
+      },
+      "full_segment_write_elements": 67351040,
+      "nonempty_tiles": 256,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 8192,
+        "mean": 6142.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 15.716269841269842,
+        "mean": 12.839563369750977,
+        "p50": 13.843132019042969,
+        "p90": 15.622615814208984,
+        "p99": 15.696897506713867
+      },
+      "same_slot_reduction_x": 1.016477865202025,
+      "same_slot_rows": 1546863,
+      "same_slot_rows_over_full_rows_x": 11.7591926717093,
+      "same_slot_rows_per_tile": {
+        "max": 8144,
+        "mean": 6042.43359375,
+        "p50": 8051.0,
+        "p90": 8125.5,
+        "p99": 8136.4501953125
+      },
+      "same_slot_write_elements": 791993856,
+      "selected_block": 512,
+      "tiles": 256,
+      "token_window": 16
+    },
+    {
+      "full_segment_reduction_x": 3.428225069715621,
+      "full_segment_rows": 458649,
+      "full_segment_rows_per_tile": {
+        "max": 908,
+        "mean": 447.8994140625,
+        "p50": 506.5,
+        "p90": 830.0,
+        "p99": 887.5400390625
+      },
+      "full_segment_write_elements": 234828288,
+      "nonempty_tiles": 800,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 2048,
+        "mean": 1535.5,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 23.59375,
+        "mean": 4.091585159301758,
+        "p50": 3.1839170455932617,
+        "p90": 6.627597808837891,
+        "p99": 17.939584732055664
+      },
+      "same_slot_reduction_x": 1.0335921117502054,
+      "same_slot_rows": 1521250,
+      "same_slot_rows_over_full_rows_x": 3.3168065339726023,
+      "same_slot_rows_per_tile": {
+        "max": 2031,
+        "mean": 1485.595703125,
+        "p50": 1985.5,
+        "p90": 2014.0,
+        "p99": 2023.77001953125
+      },
+      "same_slot_write_elements": 778880000,
+      "selected_block": 64,
+      "tiles": 1024,
+      "token_window": 32
+    },
+    {
+      "full_segment_reduction_x": 2.084076027887496,
+      "full_segment_rows": 754460,
+      "full_segment_rows_per_tile": {
+        "max": 679,
+        "mean": 368.388671875,
+        "p50": 450.0,
+        "p90": 628.0,
+        "p99": 662.0
+      },
+      "full_segment_write_elements": 386283520,
+      "nonempty_tiles": 1600,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 1024,
+        "mean": 767.75,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 13.703125,
+        "mean": 2.3987042903900146,
+        "p50": 1.9297244548797607,
+        "p90": 3.535400390625,
+        "p99": 10.840274810791016
+      },
+      "same_slot_reduction_x": 1.016477865202025,
+      "same_slot_rows": 1546863,
+      "same_slot_rows_over_full_rows_x": 2.050291599289558,
+      "same_slot_rows_per_tile": {
+        "max": 1022,
+        "mean": 755.30419921875,
+        "p50": 1008.0,
+        "p90": 1017.0,
+        "p99": 1020.0
+      },
+      "same_slot_write_elements": 791993856,
+      "selected_block": 64,
+      "tiles": 2048,
+      "token_window": 16
+    }
+  ],
+  "ranked_by_same_slot_top10": [
+    {
+      "full_segment_reduction_x": 3.428225069715621,
+      "full_segment_rows": 458649,
+      "full_segment_rows_per_tile": {
+        "max": 908,
+        "mean": 447.8994140625,
+        "p50": 506.5,
+        "p90": 830.0,
+        "p99": 887.5400390625
+      },
+      "full_segment_write_elements": 234828288,
+      "nonempty_tiles": 800,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 2048,
+        "mean": 1535.5,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 23.59375,
+        "mean": 4.091585159301758,
+        "p50": 3.1839170455932617,
+        "p90": 6.627597808837891,
+        "p99": 17.939584732055664
+      },
+      "same_slot_reduction_x": 1.0335921117502054,
+      "same_slot_rows": 1521250,
+      "same_slot_rows_over_full_rows_x": 3.3168065339726023,
+      "same_slot_rows_per_tile": {
+        "max": 2031,
+        "mean": 1485.595703125,
+        "p50": 1985.5,
+        "p90": 2014.0,
+        "p99": 2023.77001953125
+      },
+      "same_slot_write_elements": 778880000,
+      "selected_block": 64,
+      "tiles": 1024,
+      "token_window": 32
+    },
+    {
+      "full_segment_reduction_x": 23.813051840857806,
+      "full_segment_rows": 66029,
+      "full_segment_rows_per_tile": {
+        "max": 1024,
+        "mean": 515.8515625,
+        "p50": 516.0,
+        "p90": 921.3999633789062,
+        "p99": 1012.8400268554688
+      },
+      "full_segment_write_elements": 33806848,
+      "nonempty_tiles": 128,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 16384,
+        "mean": 12284.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 30.778225806451612,
+        "mean": 24.657987594604492,
+        "p50": 26.207786560058594,
+        "p90": 30.48562240600586,
+        "p99": 30.7549991607666
+      },
+      "same_slot_reduction_x": 1.0335921117502054,
+      "same_slot_rows": 1521250,
+      "same_slot_rows_over_full_rows_x": 23.039119174907995,
+      "same_slot_rows_per_tile": {
+        "max": 16161,
+        "mean": 11884.765625,
+        "p50": 15804.5,
+        "p90": 16100.900390625,
+        "p99": 16141.4599609375
+      },
+      "same_slot_write_elements": 778880000,
+      "selected_block": 512,
+      "tiles": 128,
+      "token_window": 32
+    },
+    {
+      "full_segment_reduction_x": 2.084076027887496,
+      "full_segment_rows": 754460,
+      "full_segment_rows_per_tile": {
+        "max": 679,
+        "mean": 368.388671875,
+        "p50": 450.0,
+        "p90": 628.0,
+        "p99": 662.0
+      },
+      "full_segment_write_elements": 386283520,
+      "nonempty_tiles": 1600,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 1024,
+        "mean": 767.75,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 13.703125,
+        "mean": 2.3987042903900146,
+        "p50": 1.9297244548797607,
+        "p90": 3.535400390625,
+        "p99": 10.840274810791016
+      },
+      "same_slot_reduction_x": 1.016477865202025,
+      "same_slot_rows": 1546863,
+      "same_slot_rows_over_full_rows_x": 2.050291599289558,
+      "same_slot_rows_per_tile": {
+        "max": 1022,
+        "mean": 755.30419921875,
+        "p50": 1008.0,
+        "p90": 1017.0,
+        "p99": 1020.0
+      },
+      "same_slot_write_elements": 791993856,
+      "selected_block": 64,
+      "tiles": 2048,
+      "token_window": 16
+    },
+    {
+      "full_segment_reduction_x": 11.952959063438367,
+      "full_segment_rows": 131545,
+      "full_segment_rows_per_tile": {
+        "max": 1024,
+        "mean": 513.84765625,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.7999877929688
+      },
+      "full_segment_write_elements": 67351040,
+      "nonempty_tiles": 256,
+      "raw_pairs": 1572352,
+      "raw_pairs_per_tile": {
+        "max": 8192,
+        "mean": 6142.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "raw_write_elements": 805044224,
+      "read": "same_slot rows model a cheap per-topk-column reduction across tokens. full_segment rows model a true local grouped/segmented reduction inside the producer tile.",
+      "same_slot_over_full_rows_per_tile": {
+        "max": 15.716269841269842,
+        "mean": 12.839563369750977,
+        "p50": 13.843132019042969,
+        "p90": 15.622615814208984,
+        "p99": 15.696897506713867
+      },
+      "same_slot_reduction_x": 1.016477865202025,
+      "same_slot_rows": 1546863,
+      "same_slot_rows_over_full_rows_x": 11.7591926717093,
+      "same_slot_rows_per_tile": {
+        "max": 8144,
+        "mean": 6042.43359375,
+        "p50": 8051.0,
+        "p90": 8125.5,
+        "p99": 8136.4501953125
+      },
+      "same_slot_write_elements": 791993856,
+      "selected_block": 512,
+      "tiles": 256,
+      "token_window": 16
+    }
+  ],
+  "read": "This measures route duplication only. It does not predict compute latency, but it tells whether a cheap same-slot loop change can capture the modeled dKV write reduction or whether the kernel needs a true local segmented/grouped accumulator.",
+  "scope": "metadata-only plan for tiny in-producer compressed-dKV reductions",
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "planned"
+}

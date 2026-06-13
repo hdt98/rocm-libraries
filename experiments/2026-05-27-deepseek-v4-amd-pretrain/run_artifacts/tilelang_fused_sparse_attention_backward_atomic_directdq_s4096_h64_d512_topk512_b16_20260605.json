@@ -1,0 +1,170 @@
+{
+  "status": "ok",
+  "scope": "tilelang_dsv4_sparse_mqa_source_boundary_backward_gate",
+  "read": "TileLang DSv4 sparse-MQA backward timing. The reference variant uses the vendored atomic dKV path. Diagnostic variants test direct source-boundary schedules; export_hsk_directdq recomputes QK, probabilities, scaled dP, and dQ from q/dO/kv/indices/lse/delta and exports BF16 HSK tensors for the selected-limit compressed-dKV reducer. atomic_dkv_directdq recomputes the same source-boundary state inside TileLang and emits dQ/dKV directly without exporting HSK/probability slabs. These source-boundary variants avoid PyTorch selected-KV and fp32 probability/logit materialization at the backward boundary.",
+  "reference_kernel_dir": "sources/references/miles-deepseek-v4-pr1045/miles_plugins/models/deepseek_v4/ops/kernel",
+  "diagnostic_kernel_path": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+  "bwd_variant": "atomic_dkv_directdq",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "dtype": "bfloat16",
+  "seed": 20260604,
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "kv_len": 1024,
+    "compress_ratio": 4,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "sm_scale": 0.04419417382415922,
+    "forward_state": "synthetic",
+    "head_split": 0,
+    "kernel_heads": 64
+  },
+  "blocks": {
+    "fwd_block_i": 64,
+    "fwd_threads": 256,
+    "bwd_block_size": 16,
+    "bwd_threads": 256
+  },
+  "route_stats": {
+    "assignments": 2097152,
+    "kv_len": 1024,
+    "touched_kv_rows": 1024,
+    "mean_assignments_per_touched_row": 2048.0,
+    "max_assignments_per_row": 2196,
+    "p50_assignments_per_touched_row": 2047.0,
+    "p99_assignments_per_touched_row": 2148.31005859375
+  },
+  "atomic_write_model": {
+    "selected_rows": 2097152,
+    "scalar_dkv_atomic_add_elements": 1073741824,
+    "atomic_addx4_calls_modeled": 268435456
+  },
+  "hsk_export_model": {
+    "enabled": false,
+    "probs_hsk_bf16_mib": null,
+    "grad_logits_scaled_hsk_bf16_mib": null,
+    "check": {
+      "enabled": false
+    }
+  },
+  "timing": {
+    "tilelang_preprocess_delta": {
+      "label": "tilelang_preprocess_delta",
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.1838809996843338,
+          0.19144199788570404,
+          0.12448100000619888
+        ],
+        "mean_ms": 0.16660133252541223,
+        "median_ms": 0.1838809996843338,
+        "min_ms": 0.12448100000619888,
+        "max_ms": 0.19144199788570404,
+        "stdev_ms": 0.03667265987213237
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.25896914303302765,
+          0.22950884886085987,
+          0.14754990115761757
+        ],
+        "mean_ms": 0.21200929768383503,
+        "median_ms": 0.22950884886085987,
+        "min_ms": 0.14754990115761757,
+        "max_ms": 0.25896914303302765,
+        "stdev_ms": 0.05773419769573981
+      },
+      "median_ms": 0.1838809996843338,
+      "min_ms": 0.12448100000619888,
+      "max_ms": 0.19144199788570404,
+      "mean_ms": 0.16660133252541223,
+      "peak_memory_allocated_bytes": 828377600,
+      "peak_memory_allocated_gib": 0.771486759185791,
+      "checksum": -3026.898681640625
+    },
+    "tilelang_core_backward_kernel": {
+      "label": "tilelang_core_backward_kernel",
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          1319.55322265625,
+          1465.0335693359375,
+          220.1064453125
+        ],
+        "mean_ms": 1001.5644124348959,
+        "median_ms": 1319.55322265625,
+        "min_ms": 220.1064453125,
+        "max_ms": 1465.0335693359375,
+        "stdev_ms": 680.6603768413519
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          1319.7281761094928,
+          1465.1821958832443,
+          220.19198117777705
+        ],
+        "mean_ms": 1001.7007843901714,
+        "median_ms": 1319.7281761094928,
+        "min_ms": 220.19198117777705,
+        "max_ms": 1465.1821958832443,
+        "stdev_ms": 680.7027435606069
+      },
+      "median_ms": 1319.55322265625,
+      "min_ms": 220.1064453125,
+      "max_ms": 1465.0335693359375,
+      "mean_ms": 1001.5644124348959,
+      "peak_memory_allocated_bytes": 1632635904,
+      "peak_memory_allocated_gib": 1.5205106735229492,
+      "checksum": -2132.5231018066406
+    },
+    "tilelang_postprocess_dkv_cast": {
+      "label": "tilelang_postprocess_dkv_cast",
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          0.09156099706888199,
+          0.03308099880814552,
+          0.030000999569892883
+        ],
+        "mean_ms": 0.051547665148973465,
+        "median_ms": 0.03308099880814552,
+        "min_ms": 0.030000999569892883,
+        "max_ms": 0.09156099706888199,
+        "stdev_ms": 0.03468676472844487
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          0.12284005060791969,
+          0.05910918116569519,
+          0.0437998678535223
+        ],
+        "mean_ms": 0.0752496998757124,
+        "median_ms": 0.05910918116569519,
+        "min_ms": 0.0437998678535223,
+        "max_ms": 0.12284005060791969,
+        "stdev_ms": 0.041919266222507356
+      },
+      "median_ms": 0.03308099880814552,
+      "min_ms": 0.030000999569892883,
+      "max_ms": 0.09156099706888199,
+      "mean_ms": 0.051547665148973465,
+      "peak_memory_allocated_bytes": 830474752,
+      "peak_memory_allocated_gib": 0.773439884185791,
+      "checksum": -2142.043212890625
+    }
+  }
+}

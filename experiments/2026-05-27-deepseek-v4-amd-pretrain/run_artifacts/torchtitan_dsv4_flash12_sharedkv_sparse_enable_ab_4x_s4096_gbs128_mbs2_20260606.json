@@ -1,0 +1,129 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_sparse_sharedkv_enable_ab",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "common_runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "local_vjp_mode": "expert_loop",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "xgrad_mode": "compact",
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend"
+  },
+  "baseline_retained_dense_fallback": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_mbs2_heap_sweep_4x_s4096_gbs128_20260606.json",
+    "run_id": "torchtitan_dsv4_flash12_materialized_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+    "window": "steps_2_to_4",
+    "tokens_per_gpu_s": 3696.0,
+    "node_tokens_s": 14784.0,
+    "tflops_per_gpu": 187.12,
+    "peak_logged_memory_gib": 225.73
+  },
+  "attempts": {
+    "sharedkv_pytorch_li_kl": {
+      "run_id": "torchtitan_dsv4_flash12_sharedkv_enable_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_sharedkv_enable_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+      "status": "completed_rejected",
+      "li_kl_backend": "pytorch",
+      "step2": {
+        "tokens_per_gpu_s": 707.0,
+        "node_tokens_s": 2828.0,
+        "tflops_per_gpu": 35.81,
+        "peak_logged_memory_gib": 214.23,
+        "loss": 8.86769,
+        "grad_norm": 56.75,
+        "target_ratio_tokens_per_gpu": 0.058
+      },
+      "step2_additive_wall_s": {
+        "step_train_step": 185.298,
+        "microbatch_forward_backward": 184.722,
+        "forward": 7.386,
+        "loss": 0.994,
+        "backward": 171.096,
+        "microbatch_wrapper_residual": 5.247
+      },
+      "sharedkv_profile_rank_median_over_two_steps_s": {
+        "total_query_recompute": 23.188,
+        "c4": 17.695,
+        "c128": 5.494
+      },
+      "sharedkv_profile_call_median_ms": {
+        "c4": 110.55,
+        "c128": 32.27
+      },
+      "read": "Rejected. Enabling all compressed layers at S4096 exposes the default PyTorch LI/KL path and drives backward to about 171s on step 2."
+    },
+    "sharedkv_triton_li_kl": {
+      "run_id": "torchtitan_dsv4_flash12_sharedkv_likltriton_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_sharedkv_likltriton_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+      "status": "completed_rejected",
+      "li_kl_backend": "triton_tl_dot",
+      "step2": {
+        "tokens_per_gpu_s": 3132.0,
+        "node_tokens_s": 12528.0,
+        "tflops_per_gpu": 158.56,
+        "peak_logged_memory_gib": 213.94,
+        "loss": 8.71506,
+        "grad_norm": 47.25,
+        "target_ratio_tokens_per_gpu": 0.257,
+        "retained_dense_fallback_ratio_tokens_per_gpu": 0.847
+      },
+      "step2_additive_wall_s": {
+        "step_train_step": 41.835,
+        "microbatch_forward_backward": 41.24,
+        "forward": 7.402,
+        "loss": 0.983,
+        "backward": 27.503,
+        "microbatch_wrapper_residual": 5.351
+      },
+      "sharedkv_profile_rank_median_over_two_steps_s": {
+        "total_query_recompute": 23.599,
+        "c4": 18.066,
+        "c128": 5.534
+      },
+      "sharedkv_profile_call_median_ms": {
+        "c4": 110.549,
+        "c128": 32.278
+      },
+      "mori_profile_rank_median_over_two_steps_s": {
+        "owner_rank_local_vjp": 9.569,
+        "combine_dx": 2.066,
+        "dispatch_grad_output": 1.521
+      },
+      "read": "Triton LI/KL removes the huge PyTorch LI/KL wall and recovers most throughput, but the all-compressed sparse path still trails the retained guarded dense-fallback MBS2 candidate."
+    }
+  },
+  "decision": {
+    "promote_as_current_12layer_candidate": false,
+    "read": "Do not globally enable shared-KV sparse MLA at S4096 yet. C4 query-recompute is about 110ms/call and dominates the sparse attention regression. C128 is lighter at about 32ms/call, so the next materialized test should enable sparse MLA only for compress_ratio=128 while keeping C4 guarded to dense fallback.",
+    "followup_completed": "run_artifacts/torchtitan_dsv4_flash12_c128_sparse_likltriton_4x_s4096_gbs128_mbs2_20260606.json",
+    "next_action": "Profile the promoted C128-only path with low-intrusion additive/MORI/shared-KV timing, while keeping C4 on the sparse-attention backward rewrite track."
+  }
+}

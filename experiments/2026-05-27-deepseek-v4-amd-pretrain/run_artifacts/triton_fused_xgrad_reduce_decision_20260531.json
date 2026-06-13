@@ -1,0 +1,89 @@
+{
+  "artifact": "triton_fused_xgrad_reduce_decision_20260531",
+  "date": "2026-05-31",
+  "scope": "compact routed-MoE W1/W3 xgrad fused with token input-gradient reduction",
+  "probe": {
+    "script": "tools/dsv4_layer_microbench/probe_triton_fused_xgrad_reduce.py",
+    "contract": "dgate_compact/dup_compact [assignments, intermediate] x w1/w3 [experts, intermediate, hidden] with direct token reduction -> dX [tokens, hidden]",
+    "store": "tl.atomic_add into dX",
+    "out_dtype": "float32",
+    "reason_for_float32_out": "The first viability probe tests the direct-reduction contract with FP32 atomic accumulation before deciding whether a production BF16 accumulation path is worth pursuing."
+  },
+  "commands": {
+    "stage": "RUN_TAG=triton_fused_xgrad_reduce_smoke_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh stage",
+    "tiny_smoke": "python3 dsv4_layer_microbench/probe_triton_fused_xgrad_reduce.py --tokens 128 --hidden 1024 --intermediate 512 --experts 32 --topk 4 --dtype bfloat16 --out-dtype float32 --warmup 1 --iters 2 --init randn --check --check-atol 1.0 --check-rtol 0.025 --block-m 4 8 --block-n 32 64 --block-k 64 --num-warps 4 --json",
+    "s2048_probe": "python3 dsv4_layer_microbench/probe_triton_fused_xgrad_reduce.py --tokens 2048 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --dtype bfloat16 --out-dtype float32 --warmup 1 --iters 1 --init randn --check --check-atol 1.0 --check-rtol 0.025 --block-m 8 --block-n 64 --block-k 64 --num-warps 4 --json"
+  },
+  "source_artifacts": {
+    "tiny_smoke": "run_artifacts/triton_fused_xgrad_reduce_smoke_20260531.json",
+    "s2048": "run_artifacts/triton_fused_xgrad_reduce_s2048_20260531.json"
+  },
+  "measurements": {
+    "tiny_smoke": {
+      "tokens": 128,
+      "assignments": 512,
+      "hidden": 1024,
+      "intermediate": 512,
+      "experts": 32,
+      "topk": 4,
+      "padding_multiplier_global_max": 1.625,
+      "torch_padded_xgrad_reduce_median_ms": 0.06730050034821033,
+      "best_triton_median_ms": 0.1796015053987503,
+      "speedup_vs_torch_padded_xgrad_reduce_median": 0.37472124857077405,
+      "best_tile": {
+        "block_m": 8,
+        "block_n": 64,
+        "block_k": 64,
+        "num_warps": 4
+      },
+      "check": {
+        "ok": true,
+        "max_abs": 0.007802605628967285,
+        "rel_l2": 0.002015409264392964,
+        "pct_close": 100.0,
+        "atol": 1.0,
+        "rtol": 0.025
+      }
+    },
+    "s2048": {
+      "tokens": 2048,
+      "assignments": 12288,
+      "hidden": 7168,
+      "intermediate": 3072,
+      "experts": 384,
+      "topk": 6,
+      "padding_multiplier_global_max": 1.46875,
+      "torch_padded_xgrad_only_median_ms": 7.155371189117432,
+      "torch_input_reduce_only_median_ms": 0.6358450055122375,
+      "torch_padded_xgrad_reduce_median_ms": 7.7075018882751465,
+      "best_triton_median_ms": 40.31300354003906,
+      "speedup_vs_torch_padded_xgrad_reduce_median": 0.1911914571341731,
+      "best_tile": {
+        "block_m": 8,
+        "block_n": 64,
+        "block_k": 64,
+        "num_warps": 4
+      },
+      "check": {
+        "ok": true,
+        "max_abs": 0.028054237365722656,
+        "rel_l2": 0.0020298643908643155,
+        "pct_close": 100.0,
+        "atol": 1.0,
+        "rtol": 0.025
+      }
+    }
+  },
+  "decision": {
+    "promote": [
+      "the fused W1/W3 xgrad plus input-reduce tensor contract as a correctness oracle",
+      "the standalone S2048 probe for future CK/TileLang comparisons"
+    ],
+    "demote": [
+      "direct atomic Triton fused xgrad+reduce for DSv4 full-size MoE",
+      "FP32 atomic accumulation as a near-term full-layer integration path"
+    ],
+    "reason": "The direct atomic Triton kernel is numerically correct at tiny and S2048 shapes, but the S2048 probe is 40.31 ms versus 7.71 ms for padded torch W1/W3 xgrad plus input index_add. The atomic direct-reduction schedule loses the MFMA efficiency and launch shape benefits needed to close the MoE backward gap.",
+    "next": "Keep the retained compact-reduce padded torch.bmm path as baseline. Future compact-native work should target CK/CK-Tile or TileLang grouped GEMM schedules for tiny per-expert M, and should avoid direct atomics to the token gradient unless a split/reduce design demonstrates higher utilization."
+  }
+}

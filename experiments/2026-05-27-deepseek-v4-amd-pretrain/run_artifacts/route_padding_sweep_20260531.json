@@ -1,0 +1,138 @@
+{
+  "artifact": "route_padding_sweep_20260531",
+  "purpose": "Quantify whether S=2048 learned-router gap is from route build/gate gradients, max-count expert padding, or simple expert chunking.",
+  "run": {
+    "date": "2026-05-31",
+    "host": "do-sonle-kernel",
+    "device": "1xMI350",
+    "container": "b9d33e6e8227",
+    "run_tag": "retained_route_padding_20260531T190000Z",
+    "remote_profile_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_route_padding_20260531T190000Z/route_padding_s2048",
+    "local_result_dir": "run_artifacts/single_layer_route_padding_sweep_20260531",
+    "command": "RUN_TAG=retained_route_padding_20260531T190000Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-route-padding-2048"
+  },
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "impl": "fp4-packed-sim",
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "boundary_impl": "separate",
+    "rmsnorm_save_policy": "saved-accum"
+  },
+  "results": [
+    {
+      "label": "learned_compact_reduce",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 52.85290904187908,
+      "min_ms": 52.38756805192679,
+      "tokens_per_s": 38749.04971412691,
+      "estimated_tflops": 184.2122631585966,
+      "local_json": "run_artifacts/single_layer_route_padding_sweep_20260531/learned_compact_reduce.json"
+    },
+    {
+      "label": "learned_bucket16",
+      "moe_impl": "grouped-expert-batches-dynamic-bucket16-compact-reduce-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 167.5676287850365,
+      "min_ms": 165.16768501605839,
+      "tokens_per_s": 12221.931018832218,
+      "estimated_tflops": 58.10283322448865,
+      "local_json": "run_artifacts/bucket16_full_layer_s2048_20260531.json"
+    },
+    {
+      "label": "learned_aiter_bwd",
+      "moe_impl": "grouped-expert-batches-dynamic-aiter-bwd-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 65.43023199774325,
+      "min_ms": 65.13769796583802,
+      "tokens_per_s": 31300.51564039445,
+      "estimated_tflops": 148.8020704168649,
+      "local_json": "run_artifacts/aiter_bwd_full_layer_s2048_20260531.json"
+    },
+    {
+      "label": "learned_aiter_np_bwd",
+      "moe_impl": "grouped-expert-batches-dynamic-aiter-np-bwd-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 64.61787016596645,
+      "min_ms": 64.16566297411919,
+      "tokens_per_s": 31694.0189260317,
+      "estimated_tflops": 150.67277773336343,
+      "local_json": "run_artifacts/aiter_np_bwd_full_layer_s2048_20260531.json"
+    },
+    {
+      "label": "learned_aiter_fwd_bwd",
+      "moe_impl": "grouped-expert-batches-dynamic-aiter-fwd-bwd-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 76.26900838222355,
+      "min_ms": 75.91068895999342,
+      "tokens_per_s": 26852.32237105287,
+      "estimated_tflops": 127.65544217288212,
+      "local_json": "run_artifacts/aiter_fwd_bwd_full_layer_s2048_20260531.json"
+    },
+    {
+      "label": "learned_chunk128",
+      "moe_impl": "grouped-expert-batches-dynamic-chunk128-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 81.83089829981327,
+      "min_ms": 81.60351996775717,
+      "tokens_per_s": 25027.221288669065,
+      "estimated_tflops": 118.97894550110563,
+      "local_json": "run_artifacts/single_layer_route_padding_sweep_20260531/learned_chunk128.json"
+    },
+    {
+      "label": "learned_chunk32",
+      "moe_impl": "grouped-expert-batches-dynamic-chunk32-dense-wgrad",
+      "router_override_mode": "learned",
+      "avg_ms": 82.45854172855616,
+      "min_ms": 81.9972570752725,
+      "tokens_per_s": 24836.7234863524,
+      "estimated_tflops": 118.07332248453139,
+      "local_json": "run_artifacts/single_layer_route_padding_sweep_20260531/learned_chunk32.json"
+    },
+    {
+      "label": "cached_learned_compact_reduce",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "router_override_mode": "cached_learned",
+      "avg_ms": 51.67925734228144,
+      "min_ms": 51.356339012272656,
+      "tokens_per_s": 39629.05245397996,
+      "estimated_tflops": 188.39577985100718,
+      "padding_multiplier_32": 1.4713541666666667,
+      "local_json": "run_artifacts/single_layer_route_padding_sweep_20260531/cached_learned_compact_reduce.json"
+    },
+    {
+      "label": "fixed_balanced_compact_reduce",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "router_override_mode": "fixed_balanced",
+      "avg_ms": 46.732044662348926,
+      "min_ms": 46.40716197900474,
+      "tokens_per_s": 43824.31829801859,
+      "estimated_tflops": 208.33999580943274,
+      "padding_multiplier_32": 1.0,
+      "local_json": "run_artifacts/single_layer_route_padding_sweep_20260531/fixed_balanced_compact_reduce.json"
+    }
+  ],
+  "interpretation": {
+    "learned_vs_cached_learned_delta_ms": 1.1736516995976418,
+    "learned_vs_fixed_balanced_delta_ms": 6.120864379530151,
+    "bucket16_vs_learned_compact_delta_ms": 114.71471974315742,
+    "aiter_bwd_vs_learned_compact_delta_ms": 12.577322955864169,
+    "aiter_np_bwd_vs_learned_compact_delta_ms": 11.76496112408737,
+    "aiter_fwd_bwd_vs_learned_compact_delta_ms": 23.41609934034447,
+    "chunk128_vs_learned_compact_delta_ms": 28.977989257934194,
+    "chunk32_vs_learned_compact_delta_ms": 29.60563268667708,
+    "conclusion": "Simple positive expert chunking is much slower than the large-batch compact-reduce path. The Python-level bucket16 count-bucket path passes correctness but is far slower because bucket index/copy overhead dominates. The existing AITER persistent and non-persistent grouped-GEMM backward paths and compact AITER fwd+bwd path pass small BF16 correctness but are slower in the full-layer S=2048 integration. Route build and gate-gradient removal only saves about 1.17 ms; the larger 6.12 ms learned-vs-fixed gap points to learned route imbalance/padded work or a need for a custom compact grouped GEMM/kernel path that preserves large-kernel efficiency without Python-side bucket materialization or current AITER overheads."
+  },
+  "validation": {
+    "aiter_bwd_cuda_correctness": "passed",
+    "aiter_fwd_bwd_cuda_correctness": "passed",
+    "aiter_np_bwd_cuda_correctness": "passed",
+    "bucket16_cuda_correctness": "passed",
+    "bash_n_launcher": "passed",
+    "git_diff_check_launcher": "passed",
+    "json_tool_result_files": "passed"
+  }
+}

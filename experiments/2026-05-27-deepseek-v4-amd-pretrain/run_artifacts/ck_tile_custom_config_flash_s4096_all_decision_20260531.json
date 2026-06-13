@@ -1,0 +1,49 @@
+{
+  "created_at": "2026-05-31",
+  "decision": "do_not_promote_ck_tile_custom_config_for_flash_w2_dgrad",
+  "scope": "DeepSeek-V4-Flash S=4096 MoE W2 dgrad grouped GEMM probe",
+  "shape": {
+    "tokens": 4096,
+    "assignments": 24576,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "experts": 256,
+    "topk": 6,
+    "dtype": "bf16"
+  },
+  "summary_artifacts": {
+    "local": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/ck_tile_custom_config_flash_s4096_all_20260531.json",
+    "remote": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/ck_tile_custom_config_flash_s4096_20260531/ck_tile_custom_config_flash_s4096_all/summary.json"
+  },
+  "torch_padded_bmm_out_baseline": {
+    "median_ms": 1.0687299966812134,
+    "source": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_config_flash_s4096_20260531.json"
+  },
+  "aiter_best_reference": {
+    "median_ms": 1.48185396194458,
+    "source": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_config_flash_s4096_20260531.json"
+  },
+  "ck_tile_sweep_result": {
+    "candidate_set": "all",
+    "compile_success_count": 8,
+    "run_success_count": 8,
+    "best_candidate": "m64n128_v3_padm_true",
+    "best_ms": 2.18577,
+    "best_tflops": 188.637,
+    "best_speedup_vs_torch_padded_bmm_out": 0.48894897298490386,
+    "best_speedup_vs_aiter_best": 0.6779532968805418,
+    "route_stats": {
+      "min_per_expert": 73,
+      "max_per_expert": 130,
+      "mean_per_expert": 96.0,
+      "padded_rows": 24576,
+      "padding_multiplier_vs_compact": 1.0
+    }
+  },
+  "read": "The CK-Tile custom-config wrapper can run the Flash compact W2 dgrad shape, but every tested custom tile is slower than both padded torch.bmm(out=) and the best AITER compact GMM config. This keeps the current MoE bottleneck classified as small/ragged grouped GEMM efficiency rather than dispatch-only glue, but CK-Tile example wrapping is not the next promotion path.",
+  "next_actions": [
+    "Keep padded torch.bmm(out=) as the retained Flash W2 dgrad baseline for now.",
+    "Pursue a shape-specialized compact grouped training GEMM path only if it improves MFMA utilization beyond the example CK-Tile wrapper.",
+    "Prioritize fused MoE backward/TileLang or CK-Tile work that also reduces layout traffic instead of only swapping the grouped-GEMM backend."
+  ]
+}

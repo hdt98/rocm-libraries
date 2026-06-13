@@ -1,0 +1,115 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_hot_plan_replan8_mori_timing_8x_s4096_gbs128_mbs2_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "raw_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_hot_plan_replan8_mori_timing_8x_s4096_gbs128_mbs2_20260607/mori_timing.jsonl",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_aiter_hot_plan_replan8_mori_timing_8x_s4096_gbs128_mbs2_20260607/docker-run.log",
+  "shape": {
+    "gpus": 8,
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation": 8,
+    "dp_shard": 8,
+    "expert_parallel": 8,
+    "layers": 12
+  },
+  "mode": {
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "expert_loop",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 2,
+    "balanced_moe_plan_backend": "cached_cpu_topk",
+    "balanced_moe_plan_replan_interval": 8,
+    "balanced_moe_execute_impl": "route_mask",
+    "timing_granularity": "all"
+  },
+  "step_metrics_deduped": [
+    {
+      "step": 1,
+      "loss": 12.16585,
+      "grad_norm": 19.125,
+      "memory_gib": 84.29,
+      "tok_per_gpu_s": 543.0,
+      "tflops_per_gpu": 27.52,
+      "mfu_pct": 1.19
+    },
+    {
+      "step": 2,
+      "loss": 8.33779,
+      "grad_norm": 41.75,
+      "memory_gib": 123.28,
+      "tok_per_gpu_s": 696.0,
+      "tflops_per_gpu": 35.25,
+      "mfu_pct": 1.53
+    }
+  ],
+  "timing_records": 3072,
+  "cache_hit_counts": {
+    "false": 384,
+    "true": 2688
+  },
+  "replan_due_counts": {
+    "false": 2880,
+    "true": 192
+  },
+  "call_index_counts": {
+    "0": 192,
+    "1": 192,
+    "2": 192,
+    "3": 192,
+    "4": 192,
+    "5": 192,
+    "6": 192,
+    "7": 192,
+    "8": 192,
+    "9": 192,
+    "10": 192,
+    "11": 192,
+    "12": 192,
+    "13": 192,
+    "14": 192,
+    "15": 192
+  },
+  "remote_rows_local": {
+    "n": 3072,
+    "median_rows": 2728.5,
+    "mean_rows": 4414.82487,
+    "p90_rows": 9616,
+    "max_rows": 12370
+  },
+  "modeled_load_reduction_pct": {
+    "n": 3072,
+    "median_pct": 0.0,
+    "mean_pct": 2.225079,
+    "p90_pct": 7.061046,
+    "max_pct": 47.172252
+  },
+  "selected_stage_medians_ms": {
+    "forward.balanced_moe.execute.plan.gpu": 0.00516,
+    "forward.balanced_moe.execute.plan.wall_issue": 0.052364,
+    "forward.balanced_moe.execute.remote_mask.gpu": 0.338744,
+    "forward.balanced_moe.execute.remote_mask.wall_issue": 11.26991,
+    "forward.balanced_moe.execute.hot_split.sort_counts.gpu": 0.193882,
+    "forward.balanced_moe.execute.hot_split.sort_counts.wall_issue": 0.999239,
+    "forward.balanced_moe.execute.hot_split.grouped_rows.gpu": 0.679747,
+    "forward.balanced_moe.execute.hot_split.grouped_rows.wall_issue": 0.646713,
+    "backward.local_vjp.expert_loop.gpu": 27.074685,
+    "backward.local_vjp.expert_loop.wall_issue": 26.284932,
+    "backward.local_vjp.expert_loop.sort_counts.gpu": 0.324263,
+    "backward.local_vjp.expert_loop.sort_counts.wall_issue": 0.330902,
+    "backward.combine_dx.call.gpu": 4.847809,
+    "backward.combine_dx.call.wall_issue": 0.121208,
+    "backward.dtopk_dense_allreduce.prepare.gpu": 0.148422,
+    "backward.dtopk_dense_allreduce.prepare.wall_issue": 5.485814
+  },
+  "decision": "diagnostic_only_not_promoted",
+  "notes": [
+    "Throughput is not a clean e2e candidate because TORCHTITAN_MORI_AITER_TIMING_GRANULARITY=all instruments thousands of tiny expert-loop stages.",
+    "Bounded replan cache behaved as configured: call indices 0 and 8 are replan/miss points; the other 14 call indices are cache hits.",
+    "The route-mask helper implementation is still outside the viable fused MORI/AITER fast path. The profile shows route-mask/control and Python-style expert-loop VJP costs before helper-load benefits can materialize."
+  ]
+}

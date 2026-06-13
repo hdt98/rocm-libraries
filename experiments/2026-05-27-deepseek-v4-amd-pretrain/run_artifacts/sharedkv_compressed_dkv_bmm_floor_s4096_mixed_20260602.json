@@ -1,0 +1,70 @@
+{
+  "backend_path": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "bmm_input_dtype": "bfloat16",
+  "correctness": {
+    "candidate_norm": null,
+    "dkv_atol": 0.2,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "math_dtype": "float32",
+  "read": "This is a diagnostic lower-bound for the compressed prefix route, not a production sparse MLA backward. It materializes [B,H,S,K] scores/probs and computes the two compressed dKV terms as batched KxS @ SxD GEMMs over heads, then sums the head-local gradients. The goal is to test whether MFMA-friendly accumulation can beat the query-major per-row atomic dKV path before writing a fused streaming/bucketed kernel.",
+  "scope": "sparse_mla_shared_latent_kv_compressed_prefix_dkv_bmm_floor_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 0,
+    "materialized_scores_or_probs_fp32_gib": 0.5,
+    "materialized_shared_selected_kv_fp32_gib": 4.0,
+    "selected_count": 512,
+    "seq_len": 4096
+  },
+  "status": "not_checked",
+  "timing": {
+    "compressed_prefix_dkv_bmm_floor": {
+      "checksum_norm": 1848.885986328125,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.346646785736084,
+        "mean_ms": 6.985588645935058,
+        "median_ms": 7.065645217895508,
+        "min_ms": 6.574202060699463,
+        "samples_ms": [
+          7.346646785736084,
+          7.115324974060059,
+          7.065645217895508,
+          6.82612419128418,
+          6.574202060699463
+        ],
+        "stdev_ms": 0.295072611688589
+      },
+      "label": "compressed_prefix_dkv_bmm_floor",
+      "peak_memory_allocated_bytes": 6283067904,
+      "peak_memory_allocated_gib": 5.851562976837158,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.403691997751594,
+        "mean_ms": 7.018426991999149,
+        "median_ms": 7.089616032317281,
+        "min_ms": 6.596377934329212,
+        "samples_ms": [
+          7.403691997751594,
+          7.1536339819431305,
+          7.089616032317281,
+          6.84881501365453,
+          6.596377934329212
+        ],
+        "stdev_ms": 0.3076814767444643
+      }
+    }
+  }
+}

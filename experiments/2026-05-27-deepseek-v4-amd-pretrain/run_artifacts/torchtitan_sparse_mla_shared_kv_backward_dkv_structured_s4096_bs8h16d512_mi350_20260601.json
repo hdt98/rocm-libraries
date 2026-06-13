@@ -1,0 +1,72 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 1378.19921875,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 5.14984130859375e-05,
+    "mean_abs_diff": 3.3706868407534785e-07,
+    "passed": true,
+    "reference_norm": 1378.19921875
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This diagnostic uses the benchmark's structured local-window plus prefix-compressed routing formula, writes per-key partials, then reduces them without hot-path atomics. It is not a generic LI top-k backend; it tests whether an inverse-route reduction shape is promising enough to justify building the real LI inverse map.",
+  "scope": "sparse_mla_shared_latent_kv_backward_dkv_structured_two_pass_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "csa_partial_blocks": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "local_partial_blocks": 16,
+    "materialized_probs_fp32_gib": 0.625,
+    "materialized_shared_selected_kv_fp32_gib": 5.0,
+    "partial_buffer_fp32_gib": 0.625,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "total_partial_rows": 327680
+  },
+  "status": "passed",
+  "tile": {
+    "atomic_compare_block_d": 512,
+    "atomic_compare_block_h": 64,
+    "atomic_compare_block_m": 16,
+    "block_d": 512,
+    "block_h": 16,
+    "block_s": 8
+  },
+  "timing": {
+    "triton_dkv_structured_recompute": {
+      "checksum_norm": 1378.19921875,
+      "event": {
+        "enabled": true,
+        "max_ms": 294.41741943359375,
+        "mean_ms": 294.41741943359375,
+        "median_ms": 294.41741943359375,
+        "min_ms": 294.41741943359375,
+        "samples_ms": [
+          294.41741943359375
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "triton_dkv_structured_recompute",
+      "peak_memory_allocated_bytes": 1593836032,
+      "peak_memory_allocated_gib": 1.4843754768371582,
+      "wall": {
+        "enabled": true,
+        "max_ms": 294.55904802307487,
+        "mean_ms": 294.55904802307487,
+        "median_ms": 294.55904802307487,
+        "min_ms": 294.55904802307487,
+        "samples_ms": [
+          294.55904802307487
+        ],
+        "stdev_ms": 0.0
+      }
+    }
+  }
+}

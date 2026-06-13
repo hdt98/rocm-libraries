@@ -1,0 +1,45 @@
+{
+  "artifact": "chunked_ce2_retained_8x_target_shape_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Promote CE2 as the launcher-selected chunked loss setting for the retained 8xMI350 target-shape canary only.",
+  "shape_gate": {
+    "gpu": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8"
+  },
+  "launcher_change": {
+    "path": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "behavior": "If CANARY_CHUNKED_CE_NUM_CHUNKS is unset and the exact retained 8x target shape is selected, the launcher exports TORCHTITAN_DSV4_CHUNKED_CE_NUM_CHUNKS=2. Other shapes keep the TorchTitan ChunkedCELoss default of 8 unless explicitly overridden."
+  },
+  "evidence": {
+    "retained_ce8_registered_combine_step2_tok_per_gpu_s": 3026,
+    "retained_ce8_step2_loss": 7.21987,
+    "retained_ce8_step2_grad_norm": 25.125,
+    "ce2_run_id": "torchtitan_dsv4_chunked_ce2_ep8_s4096_gbs128_20260603",
+    "ce2_step2_tok_per_gpu_s_range": [
+      3136,
+      3137
+    ],
+    "ce2_step2_loss": 8.02047,
+    "ce2_step2_grad_norm": 45.0,
+    "ce2_peak_logged_memory_gib": 139.57,
+    "ce2_uplift_percent_vs_ce8_step2": 3.6,
+    "ce4_step2_tok_per_gpu_s": 2989,
+    "ce1_step2_tok_per_gpu_s": 3002,
+    "default_validation_run_id": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+    "default_validation_step2_tok_per_gpu_s": 3103,
+    "default_validation_step2_loss": 8.75234,
+    "default_validation_step2_grad_norm": 20.75,
+    "default_validation_peak_logged_memory_gib": 166.47,
+    "default_validation_uplift_percent_vs_ce8_step2": 2.5
+  },
+  "read": [
+    "CE2 is a positive no-profile target-shape A/B and lowers peak logged memory versus the retained CE8 run.",
+    "The follow-up launcher-default validation left CANARY_CHUNKED_CE_NUM_CHUNKS unset, observed chunked_ce_num_chunks=2 in the run header, and passed two steps at 3103 tok/GPU/s.",
+    "CE4 and CE1 both passed but regressed on step-2 throughput, so they are not retained.",
+    "This is a near-term canary lever for the loss/lm-head bucket; it does not replace the larger MoE overlap/VJP or final sparse-MLA/LI work."
+  ]
+}

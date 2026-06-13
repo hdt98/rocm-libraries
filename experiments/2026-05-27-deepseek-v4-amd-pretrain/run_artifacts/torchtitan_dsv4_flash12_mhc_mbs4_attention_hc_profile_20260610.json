@@ -1,0 +1,234 @@
+{
+  "additive_step_2_rankmax_ms": {
+    "forward_backward_backward": 7998.955,
+    "forward_backward_loss": 374.513,
+    "forward_backward_model_forward": 3029.831,
+    "same_scope_forward_backward_residual_ms": 3.336,
+    "same_scope_forward_backward_residual_pct": 0.029,
+    "step_train_step": 11521.933,
+    "train_step_collect_dist_metrics": 4.59,
+    "train_step_fetch_microbatches": 28.582,
+    "train_step_forward_backward_call": 11406.634,
+    "train_step_grad_clip": 28.189,
+    "train_step_microbatch_forward_backward": 11406.994,
+    "train_step_optimizer_step": 48.14,
+    "train_step_valid_tokens_all_reduce": 4.424
+  },
+  "comparisons": {
+    "backward_ms_delta_vs_nomhc_profile": 2039.559,
+    "clean_mhc_mbs4_vs_nomhc_nodecheck_steps_2_to_6_tok_ratio": 0.732,
+    "clean_mhc_mbs4_vs_target_12200_ratio": 0.494,
+    "model_forward_ms_delta_vs_nomhc_profile": 983.043,
+    "profile_step2_tflops_vs_nomhc_profile_pct": -12.58,
+    "profile_step2_tokens_vs_nomhc_profile_pct": -12.669,
+    "sparse_sharedkv_ms_delta_vs_nomhc_profile": 4.064
+  },
+  "config": {
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_and_hyper_connections",
+    "balanced_moe_hot_experts": 8,
+    "balanced_moe_mode": "execute",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "optimizer": "adamw",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_d": 128,
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sparse_mla_backward_mode": "shared_kv",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "use_hyper_connections": true
+  },
+  "created_at": "2026-06-10",
+  "decision": {
+    "promoted": false,
+    "read": [
+      "The matched no-mHC baseline is node-valid; mHC changes the memory-fit problem rather than exposing a broken node.",
+      "At corrected mHC MBS4/GA4, the additive step-2 profile is dominated by backward and the per-step cost is worse than the no-mHC MBS8/GA2 profile because the same GBS is split into twice as many microbatches and hyper-connections add checkpointed work.",
+      "The sparse SharedKV bucket is not worse than the no-mHC profile at step scope; the main new visible increases are model forward/backward wall from mHC plus GA4, while standard-EP helper/dispatch/combine remains a material optimization target.",
+      "Next useful mHC work is memory-lifetime reduction to recover MBS8 or checkpoint-safe transformer-block selective scope, while the general perf track remains first-class compact-row MORI/helper VJP and C4 SharedKV rewrite."
+    ],
+    "reason": "diagnostic_profile_only; corrected mHC throughput baseline is the six-step clean MBS4 run, not this instrumented two-step profile"
+  },
+  "host": "do-sonle5-mi350-gpu",
+  "hot_expert_stats_step_2": {
+    "balanced_moe_topk_remote_share_mean": 0.828,
+    "hot_experts_selected_mean": 8.0,
+    "modeled_owner_load_reduction_pct_max": 42.419,
+    "modeled_owner_load_reduction_pct_mean": 27.348,
+    "owner_load_after_max_over_mean_max": 1.282,
+    "owner_load_after_max_over_mean_mean": 1.166,
+    "owner_load_before_max_over_mean_max": 2.143,
+    "owner_load_before_max_over_mean_mean": 1.625,
+    "records_used": 384
+  },
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "observed_metrics": {
+    "step_1": {
+      "grad_norm": 20.25,
+      "loss": 12.31884,
+      "mfu_pct": 3.16,
+      "peak_logged_memory_gib_rankmax": 150.13,
+      "tflops_per_gpu": 73.03,
+      "tflops_per_gpu_range": [
+        72.83,
+        73.03
+      ],
+      "tokens_per_gpu_s": 1441.0,
+      "tokens_per_gpu_s_range": [
+        1437.0,
+        1441.0
+      ]
+    },
+    "step_2": {
+      "grad_norm": 51.25,
+      "loss": 7.64458,
+      "mfu_pct": 12.48,
+      "peak_logged_memory_gib_rankmax": 184.81,
+      "tflops_per_gpu": 288.24,
+      "tflops_per_gpu_range": [
+        288.24,
+        288.24
+      ],
+      "tokens_per_gpu_s": 5687.0,
+      "tokens_per_gpu_s_range": [
+        5687.0,
+        5687.0
+      ]
+    }
+  },
+  "profile_step_2_approx_rankmax_ms": {
+    "chunked_ce_loss": 369.926,
+    "dense_attention_backward": {
+      "layer0_cr0": 409.836,
+      "layer1_cr0": 408.268,
+      "total": 818.104
+    },
+    "dense_linear_backward": {
+      "attention.wkv_a": 15.884,
+      "attention.wkv_b": 17.538,
+      "attention.wo": 420.303,
+      "attention.wq_a": 21.48,
+      "attention.wq_b": 95.975,
+      "indexer.weights_proj": 1.991,
+      "indexer.wk": 2.511,
+      "indexer.wq": 15.567,
+      "moe.router_gate": 11.249,
+      "moe.shared_experts.w1": 33.86,
+      "moe.shared_experts.w2": 45.766,
+      "moe.shared_experts.w3": 35.965,
+      "total": 709.895
+    },
+    "module_backward_roles": {
+      "attention": 4208.47,
+      "attention_norm": 20.776,
+      "embedding": 0.03,
+      "ffn_norm": 18.256,
+      "final_norm": 1.617,
+      "moe": 1980.211,
+      "transformer_block": 7788.437
+    },
+    "sparse_mla_sharedkv_backward": {
+      "c128_grad_attn_sink": 100.017,
+      "c128_query_recompute": 348.182,
+      "c128_total": 447.755,
+      "c4_grad_attn_sink": 101.217,
+      "c4_query_recompute": 1156.305,
+      "c4_total": 1257.522,
+      "records_used": 320,
+      "step_selection": "records omitted step id; used second half of per-rank sparse SharedKV call order as step 2",
+      "total": 1705.277
+    },
+    "standard_ep_combine": {
+      "all_to_all": 0.631,
+      "all_to_all_wait": 168.075,
+      "allocate_out": 1.078,
+      "total": 308.684,
+      "unpermute": 52.493,
+      "weighted_scatter_add": 113.274
+    },
+    "standard_ep_dispatch": {
+      "build_hot_plan": 15.089,
+      "count_all_to_all": 128.659,
+      "hot_local_reorder": 29.692,
+      "hot_mask": 10.746,
+      "hot_metadata": 39.107,
+      "local_reorder": 28.975,
+      "permute": 85.109,
+      "record_hot_stats": 29.368,
+      "total": 375.198
+    },
+    "standard_ep_hot_split_backward": {
+      "helper_mlp_vjp_to_sorted_x": 284.794,
+      "scatter_to_remote_y": 15.697,
+      "total": 299.591
+    },
+    "standard_ep_hot_split_compact_return": {
+      "index_add": 33.007,
+      "total": 33.007
+    },
+    "standard_ep_hot_split_forward": {
+      "allocate_out": 1.577,
+      "broadcast_hot_weights": 159.572,
+      "build_index": 2.697,
+      "grouped_w1": 40.919,
+      "grouped_w2": 37.278,
+      "grouped_w3": 38.777,
+      "participation": 7.348,
+      "total": 370.782,
+      "use_materialized_rows": 2.086,
+      "w1": 6.78,
+      "w2": 5.866,
+      "w3": 5.706,
+      "weighted_scatter_tokens": 64.557
+    },
+    "standard_ep_hot_weight": {
+      "all_reduce_grad_hot_weight": 201.973,
+      "all_reduce_hot_weight": 137.765,
+      "copy_owner": 3.083,
+      "scatter_owner_grad": 2.204,
+      "total": 337.38
+    }
+  },
+  "raw_additive_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_mbs4_attention_hc_profile_steps2_8x_s4096_gbs128_20260610/additive_timing",
+  "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_mbs4_attention_hc_profile_steps2_8x_s4096_gbs128_20260610/docker-run.log",
+  "raw_mori_timing_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mhc_mbs4_attention_hc_profile_steps2_8x_s4096_gbs128_20260610/mori_timing.jsonl",
+  "raw_profile_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mhc_mbs4_attention_hc_profile_steps2_8x_s4096_gbs128_20260610/dsv4_timing",
+  "references": {
+    "mhc_clean_mbs4_steps_2_to_6_tflops_per_gpu": 305.224,
+    "mhc_clean_mbs4_steps_2_to_6_tokens_per_gpu_s": 6021.6,
+    "nomhc_clean_nodecheck_steps_2_to_6_tokens_per_gpu_s": 8228.0,
+    "nomhc_profile_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608.json",
+    "nomhc_profile_backward_ms": 5959.396,
+    "nomhc_profile_model_forward_ms": 2046.788,
+    "nomhc_profile_shape": "MBS8_GA2_GBS128_S4096_FSDP8_EP8_attention_only_no_mHC",
+    "nomhc_profile_sparse_sharedkv_ms": 1701.213,
+    "nomhc_profile_standard_ep_combine_ms": 315.697,
+    "nomhc_profile_standard_ep_dispatch_ms": 252.493,
+    "nomhc_profile_standard_ep_hot_split_backward_ms": 311.243,
+    "nomhc_profile_standard_ep_hot_split_forward_ms": 327.043,
+    "nomhc_profile_step2_peak_logged_memory_gib_rankmax": 245.6,
+    "nomhc_profile_step2_tflops_per_gpu": 329.72,
+    "nomhc_profile_step2_tokens_per_gpu_s": 6512
+  },
+  "result": "completed_two_steps_diagnostic_profile_only",
+  "run_id": "torchtitan_dsv4_flash12_mhc_mbs4_attention_hc_profile_steps2_8x_s4096_gbs128_20260610",
+  "schema_version": 1,
+  "shape": {
+    "context_parallel": 1,
+    "expert_parallel": 8,
+    "fsdp": 8,
+    "global_batch_size": 128,
+    "gpus": 8,
+    "gradient_accumulation_steps": 4,
+    "micro_batch_size": 4,
+    "pipeline_parallel": 1,
+    "sequence_length": 4096,
+    "tensor_parallel": 1
+  }
+}

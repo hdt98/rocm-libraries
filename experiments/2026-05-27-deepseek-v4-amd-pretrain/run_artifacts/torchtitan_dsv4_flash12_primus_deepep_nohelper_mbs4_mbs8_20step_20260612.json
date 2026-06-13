@@ -1,0 +1,119 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_mbs8_20step_20260612",
+  "created_utc": "2026-06-12T13:08:00Z",
+  "question": "Were the retained no-helper standard-EP rows using DeepEP, and can the no-helper baseline run with Primus-Turbo DeepEP/TurboEP backend?",
+  "answer": {
+    "retained_no_helper_rows_were_deepep": false,
+    "primus_turbo_no_helper_runs_completed": true,
+    "read": "The retained no-helper ladder was plain standard EP. The new no-helper Primus-Turbo normal top-k EP path completed DeepSeek-V4 Flash 12-layer MBS4 and MBS8 20-step runs. It changes the no-helper MBS8 fit boundary versus plain standard EP, but it still trails the retained standard-EP top-8 hot-helper MBS8 throughput."
+  },
+  "model": "DeepSeek-V4 Flash reduced 12-layer ceiling probe",
+  "node": "do-sonle5-mi350-gpu",
+  "hardware": "8xMI350",
+  "surface": {
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "data": "tests/assets/c4_test",
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "steps": 20,
+    "warmup_steps_excluded_from_retained_windows": 1,
+    "hot_helper": false
+  },
+  "backend": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "off",
+    "standard_ep_backend_normal_topk_dispatch_tensors": true,
+    "standard_ep_backend_normal_topk_dispatch_validate": false,
+    "standard_ep_backend_normal_topk_dispatch_permute": true,
+    "balanced_moe_plan_backend": "primus_turbo",
+    "implementation_read": "For this no-helper path all top-k routes are normal/cold. TorchTitan hands token-major top-k ids/weights to primus_turbo.pytorch.ops.moe.balanced_moe, which calls Primus-Turbo moe_dispatch, moe_permute, moe_unpermute, and moe_combine. This is the Primus-Turbo normal top-k EP transport/permute path, not the hot-helper owner-compact transport."
+  },
+  "primus_turbo_build": {
+    "source": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/primus-turbo",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "build_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "build_env": {
+      "GPU_ARCHS": "gfx950",
+      "PRIMUS_TURBO_FRAMEWORK": "PYTORCH",
+      "PRIMUS_TURBO_DISABLE_COMPILER_LAUNCHER": "1",
+      "CXX": "/opt/rocm/bin/hipcc",
+      "CMAKE_CXX_COMPILER": "/opt/rocm/bin/hipcc",
+      "CMAKE_HIP_COMPILER": "/opt/rocm/bin/hipcc"
+    },
+    "result": "Built mounted primus_turbo/lib/libprimus_turbo_kernels.so and primus_turbo/pytorch/_C.cpython-310-x86_64-linux-gnu.so; fresh runtime image import of primus_turbo.pytorch._C and balanced_moe hooks passed.",
+    "caveat": "rocSHMEM/MPI were not present during build, so internode DeepEP is disabled. These runs are single-node/intranode 8xMI350."
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_steps20_20260612/docker-run.log",
+      "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_steps20_20260612",
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "completed_steps": 20,
+      "steps_2_20": {
+        "tokens_per_gpu_s": 6720.9474,
+        "node_tokens_per_s": 53767.5792,
+        "tflops_per_gpu": 332.7305
+      },
+      "steps_13_20": {
+        "tokens_per_gpu_s": 6638.375,
+        "node_tokens_per_s": 53107.0,
+        "tflops_per_gpu": 328.6363
+      },
+      "peak_rank_max_memory_gib": 178.08,
+      "loss": {
+        "step_1": 16.00367,
+        "step_20": 4.71222
+      },
+      "comparison": {
+        "plain_standard_ep_no_helper_steps_2_20_tokens_per_gpu_s": 5058.13,
+        "plain_standard_ep_no_helper_delta_pct": 32.8732,
+        "standard_ep_top8_helper_steps_2_20_tokens_per_gpu_s": 6550.0,
+        "standard_ep_top8_helper_delta_pct": 2.6095
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs8_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs8_steps20_20260612/docker-run.log",
+      "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs8_steps20_20260612",
+      "micro_batch_size": 8,
+      "gradient_accumulation_steps": 2,
+      "completed_steps": 20,
+      "steps_2_20": {
+        "tokens_per_gpu_s": 6910.7368,
+        "node_tokens_per_s": 55285.8944,
+        "tflops_per_gpu": 342.1295
+      },
+      "steps_13_20": {
+        "tokens_per_gpu_s": 6837.125,
+        "node_tokens_per_s": 54697.0,
+        "tflops_per_gpu": 338.4887
+      },
+      "peak_rank_max_memory_gib": 264.76,
+      "loss": {
+        "step_1": 15.97713,
+        "step_20": 4.37063
+      },
+      "comparison": {
+        "plain_standard_ep_no_helper_result": "fails_before_first_metric",
+        "standard_ep_top8_helper_steps_2_20_tokens_per_gpu_s": 8632.78,
+        "standard_ep_top8_helper_delta_pct": -19.9477,
+        "standard_ep_top8_helper_peak_logged_memory_gib": 256.19
+      }
+    }
+  ],
+  "decision": {
+    "promote_as_no_helper_deepep_baseline": true,
+    "promote_over_hot_helper_current_best": false,
+    "next_actions": [
+      "Run the same no-helper Primus-Turbo backend on the Qwen3.5-397B-A17B reduced 8-layer retained surface.",
+      "Profile DeepSeek MBS8 Primus-Turbo no-helper against standard-EP top-8 helper to identify why fitting MBS8 is not enough to recover hot-helper throughput.",
+      "Keep native MORI/Primus hot-helper work focused on preserving the hot/cold/helper partition while replacing the normal/cold EP transport without reintroducing adapter overhead."
+    ]
+  }
+}

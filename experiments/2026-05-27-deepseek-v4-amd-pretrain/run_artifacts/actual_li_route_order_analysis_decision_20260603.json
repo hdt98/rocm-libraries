@@ -1,0 +1,54 @@
+{
+  "artifact": "actual_li_route_order_analysis_decision",
+  "created_at": "2026-06-03",
+  "status": "natural_emission_order_rejected_for_dkv_scatter_reduce",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512
+  },
+  "source_artifact": "run_artifacts/actual_li_route_order_analysis_s4096_layer2_tb16-64_sb128-512_20260603.json",
+  "scatter_add_math": {
+    "operator_type": "indexed_many_to_one_vector_reduction_not_gemm",
+    "formula": "dKV[g, d] = sum_{r: group_id[r] = g} partial[r, d]",
+    "equivalent_linear_algebra_view": "A^T P, where A is a sparse 0/1 route matrix with one nonzero per partial row",
+    "elementwise_read": "Each partial row is vector-added across D/head dims into the destination compressed group; the expensive part is the indexed reduction/atomic accumulation, not per-element arithmetic.",
+    "order_dependency": "Mathematically order independent. GPU floating-point atomics are not bitwise order deterministic, but any order is valid within the numeric tolerance contract after the producer has generated the required partial rows."
+  },
+  "retained_tile_results": [
+    {
+      "token_block": 32,
+      "selected_block": 256,
+      "total_valid_pairs": 1572352,
+      "total_unique_groups_after_tile_reduce": 127436,
+      "ideal_tile_local_reduction_x": 12.338365924856399,
+      "token_major_natural_order_reduction_x": 1.0000228961608226,
+      "selected_major_natural_order_reduction_x": 1.0022647898169237
+    },
+    {
+      "token_block": 32,
+      "selected_block": 512,
+      "total_valid_pairs": 1572352,
+      "total_unique_groups_after_tile_reduce": 66029,
+      "ideal_tile_local_reduction_x": 23.813051840857806,
+      "token_major_natural_order_reduction_x": 1.0000178080344764,
+      "selected_major_natural_order_reduction_x": 1.0022647898169237
+    }
+  ],
+  "read": [
+    "The dKV ScatterAdd is not raw matrix multiply; it is the backward of a gather/routing operation, equivalent to multiplying compact partial rows by the transpose of a sparse route matrix.",
+    "For the retained 32x512 candidate, tile-local grouping could in theory reduce global dKV writes by 23.813x, but the natural producer order has nearly no adjacent same-group runs.",
+    "A run-length-only detached ScatterAdd or simple reorder-free consumer cannot recover the coalescing target.",
+    "The next kernel rewrite should preserve the query-major MFMA/dot schedule while adding explicit tile-local hash, segmented, or sorted grouping before global dKV writes."
+  ],
+  "commands": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_route_order.py tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py",
+    "rsync -a tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_route_order.py tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_route_order.py --seq-len 4096 --layer-id 2 --token-blocks 16,32,64 --selected-blocks 128,256,512 --summary-path /workspace/run_artifacts/actual_li_route_order_analysis_s4096_layer2_tb16-64_sb128-512_20260603.json --json",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_route_order_analysis_s4096_layer2_tb16-64_sb128-512_20260603.json run_artifacts/"
+  ],
+  "dependency_pin_changes": []
+}

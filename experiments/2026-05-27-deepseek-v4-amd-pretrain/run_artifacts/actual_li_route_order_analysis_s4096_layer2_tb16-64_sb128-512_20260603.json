@@ -1,0 +1,1786 @@
+{
+  "all_tiles": [
+    {
+      "ideal_tile_reduction_x": {
+        "count": 832,
+        "max": 15.71875,
+        "mean": 4.234760618843127,
+        "min": 1.0769230769230769,
+        "p50": 3.2226613182786115,
+        "p90": 7.133410762679055,
+        "p99": 15.61994565217391
+      },
+      "nonempty_tiles": 832,
+      "overall_ideal_reduction_x": 3.3692655488294854,
+      "overall_selected_major_order_reduction_x": 1.002246262815299,
+      "overall_selected_major_run_over_unique_x": 3.3617142551025876,
+      "overall_token_major_order_reduction_x": 1.000036252738831,
+      "overall_token_major_run_over_unique_x": 3.369143408153426,
+      "selected_block": 128,
+      "selected_major_descents": {
+        "count": 832,
+        "max": 1071.0,
+        "mean": 941.8774038461538,
+        "min": 8.0,
+        "p50": 1018.0,
+        "p90": 1037.0,
+        "p99": 1051.69
+      },
+      "selected_major_descents_total": 783642,
+      "selected_major_order_reduction_x": {
+        "count": 832,
+        "max": 1.4736842105263157,
+        "mean": 1.0036274178770417,
+        "min": 1.0,
+        "p50": 1.0019308545335943,
+        "p90": 1.0049067713444553,
+        "p99": 1.0297043740573146
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 832,
+        "max": 15.59375,
+        "mean": 4.209062543088961,
+        "min": 1.0769230769230769,
+        "p50": 3.2163658198385576,
+        "p90": 7.095862369337979,
+        "p99": 15.478885869565216
+      },
+      "selected_major_runs": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1885.610576923077,
+        "min": 19.0,
+        "p50": 2044.0,
+        "p90": 2047.0,
+        "p99": 2048.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 832,
+        "max": 23.0,
+        "mean": 4.235576923076923,
+        "min": 0.0,
+        "p50": 3.0,
+        "p90": 8.0,
+        "p99": 17.68999999999994
+      },
+      "selected_major_same_adjacent_pairs_total": 3524,
+      "tile_unique_groups": {
+        "count": 832,
+        "max": 920.0,
+        "mean": 560.9074519230769,
+        "min": 4.0,
+        "p50": 595.0,
+        "p90": 849.0,
+        "p99": 902.6899999999999
+      },
+      "tile_valid_pairs": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1889.8461538461538,
+        "min": 28.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "tiles": 1024,
+      "token_block": 16,
+      "token_major_descents": {
+        "count": 832,
+        "max": 1021.0,
+        "mean": 828.390625,
+        "min": 10.0,
+        "p50": 883.0,
+        "p90": 956.0,
+        "p99": 994.0
+      },
+      "token_major_descents_total": 689221,
+      "token_major_order_reduction_x": {
+        "count": 832,
+        "max": 1.2727272727272727,
+        "mean": 1.0004412853106042,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0033315343020948
+      },
+      "token_major_run_over_unique_x": {
+        "count": 832,
+        "max": 15.71875,
+        "mean": 4.231986260373674,
+        "min": 1.0769230769230769,
+        "p50": 3.2226613182786115,
+        "p90": 7.133410762679055,
+        "p99": 15.61994565217391
+      },
+      "token_major_runs": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1889.7776442307693,
+        "min": 22.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 832,
+        "max": 6.0,
+        "mean": 0.06850961538461539,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 1.0
+      },
+      "token_major_same_adjacent_pairs_total": 57,
+      "total_selected_major_runs": 1568828,
+      "total_token_major_runs": 1572295,
+      "total_unique_groups_after_tile_reduce": 466675,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 448,
+        "max": 15.859375,
+        "mean": 7.651187171094084,
+        "min": 1.0769230769230769,
+        "p50": 6.210769301512853,
+        "p90": 15.556428571428572,
+        "p99": 15.848805084745763
+      },
+      "nonempty_tiles": 448,
+      "overall_ideal_reduction_x": 6.221961932650073,
+      "overall_selected_major_order_reduction_x": 1.0022469016660218,
+      "overall_selected_major_run_over_unique_x": 6.20801313758854,
+      "overall_token_major_order_reduction_x": 1.000021624124382,
+      "overall_token_major_run_over_unique_x": 6.221827391080685,
+      "selected_block": 256,
+      "selected_major_descents": {
+        "count": 448,
+        "max": 2095.0,
+        "mean": 1749.622767857143,
+        "min": 8.0,
+        "p50": 2033.0,
+        "p90": 2064.0,
+        "p99": 2081.5299999999997
+      },
+      "selected_major_descents_total": 783831,
+      "selected_major_order_reduction_x": {
+        "count": 448,
+        "max": 1.4736842105263157,
+        "mean": 1.0049558383280446,
+        "min": 1.0,
+        "p50": 1.0017119100024456,
+        "p90": 1.0063959501623252,
+        "p99": 1.0395941173254606
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 448,
+        "max": 15.80859375,
+        "mean": 7.6038403435683835,
+        "min": 1.0769230769230769,
+        "p50": 6.181441107911697,
+        "p90": 15.404545454545454,
+        "p99": 15.782310344827586
+      },
+      "selected_major_runs": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3501.8459821428573,
+        "min": 19.0,
+        "p50": 4088.0,
+        "p90": 4093.0,
+        "p99": 4095.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 448,
+        "max": 26.0,
+        "mean": 7.868303571428571,
+        "min": 0.0,
+        "p50": 7.0,
+        "p90": 15.300000000000011,
+        "p99": 23.0
+      },
+      "selected_major_same_adjacent_pairs_total": 3525,
+      "tile_unique_groups": {
+        "count": 448,
+        "max": 1016.0,
+        "mean": 564.0848214285714,
+        "min": 4.0,
+        "p50": 577.5,
+        "p90": 930.0,
+        "p99": 1004.0
+      },
+      "tile_valid_pairs": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3509.714285714286,
+        "min": 28.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "tiles": 512,
+      "token_block": 16,
+      "token_major_descents": {
+        "count": 448,
+        "max": 1976.0,
+        "mean": 1537.939732142857,
+        "min": 10.0,
+        "p50": 1726.0,
+        "p90": 1876.3,
+        "p99": 1952.6499999999999
+      },
+      "token_major_descents_total": 688997,
+      "token_major_order_reduction_x": {
+        "count": 448,
+        "max": 1.2727272727272727,
+        "mean": 1.0007372346920036,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0036310376082072
+      },
+      "token_major_run_over_unique_x": {
+        "count": 448,
+        "max": 15.857142857142858,
+        "mean": 7.646269919542284,
+        "min": 1.0769230769230769,
+        "p50": 6.192019744960922,
+        "p90": 15.556428571428572,
+        "p99": 15.848805084745763
+      },
+      "token_major_runs": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3509.6383928571427,
+        "min": 22.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 448,
+        "max": 6.0,
+        "mean": 0.07589285714285714,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 1.0
+      },
+      "token_major_same_adjacent_pairs_total": 34,
+      "total_selected_major_runs": 1568827,
+      "total_token_major_runs": 1572318,
+      "total_unique_groups_after_tile_reduce": 252710,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 256,
+        "max": 15.9296875,
+        "mean": 13.340381458371867,
+        "min": 7.0,
+        "p50": 14.974452554744525,
+        "p90": 15.912193032552828,
+        "p99": 15.928257142857143
+      },
+      "nonempty_tiles": 256,
+      "overall_ideal_reduction_x": 11.952959063438367,
+      "overall_selected_major_order_reduction_x": 1.002247540517559,
+      "overall_selected_major_run_over_unique_x": 11.92615454787335,
+      "overall_token_major_order_reduction_x": 1.0000171720223237,
+      "overall_token_major_run_over_unique_x": 11.952753810483104,
+      "selected_block": 512,
+      "selected_major_descents": {
+        "count": 256,
+        "max": 4148.0,
+        "mean": 3062.21875,
+        "min": 8.0,
+        "p50": 4037.5,
+        "p90": 4112.0,
+        "p99": 4140.450000000001
+      },
+      "selected_major_descents_total": 783928,
+      "selected_major_order_reduction_x": {
+        "count": 256,
+        "max": 1.4736842105263157,
+        "mean": 1.0072767565752943,
+        "min": 1.0002442002442002,
+        "p50": 1.0019569471624266,
+        "p90": 1.0098671034698983,
+        "p99": 1.0956521739130427
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 256,
+        "max": 15.906746031746032,
+        "mean": 13.257654054873953,
+        "min": 4.75,
+        "p50": 14.76914555312272,
+        "p90": 15.87380791722897,
+        "p99": 15.89643817204301
+      },
+      "selected_major_runs": {
+        "count": 256,
+        "max": 8190.0,
+        "mean": 6128.2265625,
+        "min": 19.0,
+        "p50": 8155.0,
+        "p90": 8183.0,
+        "p99": 8187.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 256,
+        "max": 26.0,
+        "mean": 13.7734375,
+        "min": 2.0,
+        "p50": 13.0,
+        "p90": 20.0,
+        "p99": 25.0
+      },
+      "selected_major_same_adjacent_pairs_total": 3526,
+      "tile_unique_groups": {
+        "count": 256,
+        "max": 1024.0,
+        "mean": 513.84765625,
+        "min": 4.0,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.8
+      },
+      "tile_valid_pairs": {
+        "count": 256,
+        "max": 8192.0,
+        "mean": 6142.0,
+        "min": 28.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 16,
+      "token_major_descents": {
+        "count": 256,
+        "max": 3685.0,
+        "mean": 2691.1640625,
+        "min": 10.0,
+        "p50": 3285.0,
+        "p90": 3611.0,
+        "p99": 3670.8
+      },
+      "token_major_descents_total": 688938,
+      "token_major_order_reduction_x": {
+        "count": 256,
+        "max": 1.2727272727272727,
+        "mean": 1.0012752160711753,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0083555713692698
+      },
+      "token_major_run_over_unique_x": {
+        "count": 256,
+        "max": 15.9296875,
+        "mean": 13.331840938754535,
+        "min": 5.5,
+        "p50": 14.946674776966749,
+        "p90": 15.912193032552828,
+        "p99": 15.928257142857143
+      },
+      "token_major_runs": {
+        "count": 256,
+        "max": 8192.0,
+        "mean": 6141.89453125,
+        "min": 22.0,
+        "p50": 8173.5,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 256,
+        "max": 6.0,
+        "mean": 0.10546875,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 2.0
+      },
+      "token_major_same_adjacent_pairs_total": 27,
+      "total_selected_major_runs": 1568826,
+      "total_token_major_runs": 1572325,
+      "total_unique_groups_after_tile_reduce": 131545,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 416,
+        "max": 30.9375,
+        "mean": 8.164290089017666,
+        "min": 1.2121212121212122,
+        "p50": 6.225053412017415,
+        "p90": 14.246999612853271,
+        "p99": 30.56401515151515
+      },
+      "nonempty_tiles": 416,
+      "overall_ideal_reduction_x": 6.368246896579656,
+      "overall_selected_major_order_reduction_x": 1.0022647898169237,
+      "overall_selected_major_run_over_unique_x": 6.3538567465219415,
+      "overall_token_major_order_reduction_x": 1.000036252738831,
+      "overall_token_major_run_over_unique_x": 6.368016038557339,
+      "selected_block": 128,
+      "selected_major_descents": {
+        "count": 416,
+        "max": 2088.0,
+        "mean": 1884.545673076923,
+        "min": 43.0,
+        "p50": 2039.5,
+        "p90": 2064.0,
+        "p99": 2083.0
+      },
+      "selected_major_descents_total": 783971,
+      "selected_major_order_reduction_x": {
+        "count": 416,
+        "max": 1.2121212121212122,
+        "mean": 1.0034278246407693,
+        "min": 1.0,
+        "p50": 1.0017975745869103,
+        "p90": 1.0049067713444553,
+        "p99": 1.0256623805591603
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 416,
+        "max": 30.7109375,
+        "mean": 8.117099544131657,
+        "min": 1.1919191919191918,
+        "p50": 6.215164393528196,
+        "p90": 14.010699152542372,
+        "p99": 30.28063446969697
+      },
+      "selected_major_runs": {
+        "count": 416,
+        "max": 4095.0,
+        "mean": 3771.1514423076924,
+        "min": 99.0,
+        "p50": 4088.0,
+        "p90": 4093.0,
+        "p99": 4094.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 416,
+        "max": 42.0,
+        "mean": 8.540865384615385,
+        "min": 0.0,
+        "p50": 7.0,
+        "p90": 16.0,
+        "p99": 34.85000000000002
+      },
+      "selected_major_same_adjacent_pairs_total": 3553,
+      "tile_unique_groups": {
+        "count": 416,
+        "max": 1015.0,
+        "mean": 593.5216346153846,
+        "min": 8.0,
+        "p50": 610.5,
+        "p90": 932.5,
+        "p99": 1000.0
+      },
+      "tile_valid_pairs": {
+        "count": 416,
+        "max": 4096.0,
+        "mean": 3779.6923076923076,
+        "min": 120.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "tiles": 512,
+      "token_block": 32,
+      "token_major_descents": {
+        "count": 416,
+        "max": 2016.0,
+        "mean": 1657.2836538461538,
+        "min": 52.0,
+        "p50": 1765.0,
+        "p90": 1911.0,
+        "p99": 1980.85
+      },
+      "token_major_descents_total": 689430,
+      "token_major_order_reduction_x": {
+        "count": 416,
+        "max": 1.0714285714285714,
+        "mean": 1.0002628729331469,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0002442002442002,
+        "p99": 1.0017263343704292
+      },
+      "token_major_run_over_unique_x": {
+        "count": 416,
+        "max": 30.9375,
+        "mean": 8.160708617190004,
+        "min": 1.2121212121212122,
+        "p50": 6.225053412017415,
+        "p90": 14.11111111111111,
+        "p99": 30.56401515151515
+      },
+      "token_major_runs": {
+        "count": 416,
+        "max": 4096.0,
+        "mean": 3779.5552884615386,
+        "min": 112.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 416,
+        "max": 8.0,
+        "mean": 0.13701923076923078,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.0
+      },
+      "token_major_same_adjacent_pairs_total": 57,
+      "total_selected_major_runs": 1568799,
+      "total_token_major_runs": 1572295,
+      "total_unique_groups_after_tile_reduce": 246905,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 224,
+        "max": 31.46875,
+        "mean": 15.104945155989254,
+        "min": 1.2371134020618557,
+        "p50": 12.371832311757217,
+        "p90": 30.408181818181816,
+        "p99": 31.428839080459774
+      },
+      "nonempty_tiles": 224,
+      "overall_ideal_reduction_x": 12.338365924856399,
+      "overall_selected_major_order_reduction_x": 1.0022647898169237,
+      "overall_selected_major_run_over_unique_x": 12.310485263190936,
+      "overall_token_major_order_reduction_x": 1.0000228961608226,
+      "overall_token_major_run_over_unique_x": 12.33808343011394,
+      "selected_block": 256,
+      "selected_major_descents": {
+        "count": 224,
+        "max": 4153.0,
+        "mean": 3500.2678571428573,
+        "min": 43.0,
+        "p50": 4071.0,
+        "p90": 4120.0,
+        "p99": 4135.7699999999995
+      },
+      "selected_major_descents_total": 784060,
+      "selected_major_order_reduction_x": {
+        "count": 224,
+        "max": 1.2121212121212122,
+        "mean": 1.004546218338411,
+        "min": 1.0006107243190423,
+        "p50": 1.0018344135991195,
+        "p90": 1.0059842481288213,
+        "p99": 1.0426969696969697
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 224,
+        "max": 31.36328125,
+        "mean": 15.017491617679411,
+        "min": 1.2268041237113403,
+        "p50": 12.348924403367459,
+        "p90": 30.109157754010695,
+        "p99": 31.27042816091954
+      },
+      "selected_major_runs": {
+        "count": 224,
+        "max": 8187.0,
+        "mean": 7003.566964285715,
+        "min": 99.0,
+        "p50": 8176.0,
+        "p90": 8184.0,
+        "p99": 8187.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 224,
+        "max": 50.0,
+        "mean": 15.861607142857142,
+        "min": 1.0,
+        "p50": 13.0,
+        "p90": 29.700000000000017,
+        "p99": 41.54000000000002
+      },
+      "selected_major_same_adjacent_pairs_total": 3553,
+      "tile_unique_groups": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "tile_valid_pairs": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "token_major_descents": {
+        "count": 224,
+        "max": 3894.0,
+        "mean": 3076.4285714285716,
+        "min": 52.0,
+        "p50": 3442.0,
+        "p90": 3749.8,
+        "p99": 3870.62
+      },
+      "token_major_descents_total": 689120,
+      "token_major_order_reduction_x": {
+        "count": 224,
+        "max": 1.0714285714285714,
+        "mean": 1.0003941173383755,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0001220852154804,
+        "p99": 1.0017130121759308
+      },
+      "token_major_run_over_unique_x": {
+        "count": 224,
+        "max": 31.46484375,
+        "mean": 15.098691848719978,
+        "min": 1.2371134020618557,
+        "p50": 12.370650278660293,
+        "p90": 30.408181818181816,
+        "p99": 31.428839080459774
+      },
+      "token_major_runs": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.267857142857,
+        "min": 112.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 224,
+        "max": 8.0,
+        "mean": 0.16071428571428573,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.0
+      },
+      "token_major_same_adjacent_pairs_total": 36,
+      "total_selected_major_runs": 1568799,
+      "total_token_major_runs": 1572316,
+      "total_unique_groups_after_tile_reduce": 127436,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 128,
+        "max": 31.734375,
+        "mean": 26.401306813680858,
+        "min": 15.0,
+        "p50": 29.211904761904762,
+        "p90": 31.66858974358974,
+        "p99": 31.72898361495136
+      },
+      "nonempty_tiles": 128,
+      "overall_ideal_reduction_x": 23.813051840857806,
+      "overall_selected_major_order_reduction_x": 1.0022647898169237,
+      "overall_selected_major_run_over_unique_x": 23.759242151176,
+      "overall_token_major_order_reduction_x": 1.0000178080344764,
+      "overall_token_major_run_over_unique_x": 23.81262778476124,
+      "selected_block": 512,
+      "selected_major_descents": {
+        "count": 128,
+        "max": 8269.0,
+        "mean": 6125.8359375,
+        "min": 43.0,
+        "p50": 8095.5,
+        "p90": 8210.3,
+        "p99": 8239.73
+      },
+      "selected_major_descents_total": 784107,
+      "selected_major_order_reduction_x": {
+        "count": 128,
+        "max": 1.2121212121212122,
+        "mean": 1.0065239634023164,
+        "min": 1.0007329587099927,
+        "p50": 1.001958105588435,
+        "p90": 1.009102151545124,
+        "p99": 1.0869762729938683
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 128,
+        "max": 31.669921875,
+        "mean": 26.248377469577157,
+        "min": 12.375,
+        "p50": 28.882922535211268,
+        "p90": 31.587555493895675,
+        "p99": 31.664822404371588
+      },
+      "selected_major_runs": {
+        "count": 128,
+        "max": 16372.0,
+        "mean": 12256.2421875,
+        "min": 99.0,
+        "p50": 16277.0,
+        "p90": 16367.0,
+        "p99": 16370.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 128,
+        "max": 50.0,
+        "mean": 27.7578125,
+        "min": 12.0,
+        "p50": 28.0,
+        "p90": 38.0,
+        "p99": 44.730000000000004
+      },
+      "selected_major_same_adjacent_pairs_total": 3553,
+      "tile_unique_groups": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "tile_valid_pairs": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "token_major_descents": {
+        "count": 128,
+        "max": 7336.0,
+        "mean": 5382.8671875,
+        "min": 53.0,
+        "p50": 6607.0,
+        "p90": 7221.9,
+        "p99": 7304.03
+      },
+      "token_major_descents_total": 689007,
+      "token_major_order_reduction_x": {
+        "count": 128,
+        "max": 1.0714285714285714,
+        "mean": 1.0006739600981143,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0000738954721107,
+        "p99": 1.006344168313903
+      },
+      "token_major_run_over_unique_x": {
+        "count": 128,
+        "max": 31.734375,
+        "mean": 26.390514799508313,
+        "min": 14.0,
+        "p50": 29.191071428571426,
+        "p90": 31.66858974358974,
+        "p99": 31.72898361495136
+      },
+      "token_major_runs": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12283.78125,
+        "min": 112.0,
+        "p50": 16315.5,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 128,
+        "max": 8.0,
+        "mean": 0.21875,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.730000000000004
+      },
+      "token_major_same_adjacent_pairs_total": 28,
+      "total_selected_major_runs": 1568799,
+      "total_token_major_runs": 1572324,
+      "total_unique_groups_after_tile_reduce": 66029,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 208,
+        "max": 59.875,
+        "mean": 15.990376031705853,
+        "min": 1.7282229965156795,
+        "p50": 12.366867950324712,
+        "p90": 28.062745098039223,
+        "p99": 58.42300000000001
+      },
+      "nonempty_tiles": 208,
+      "overall_ideal_reduction_x": 12.568057742572359,
+      "overall_selected_major_order_reduction_x": 1.0022507347874614,
+      "overall_selected_major_run_over_unique_x": 12.539833902179733,
+      "overall_token_major_order_reduction_x": 1.000036252738831,
+      "overall_token_major_run_over_unique_x": 12.567602132574516,
+      "selected_block": 128,
+      "selected_major_descents": {
+        "count": 208,
+        "max": 4152.0,
+        "mean": 3769.543269230769,
+        "min": 219.0,
+        "p50": 4081.5,
+        "p90": 4115.3,
+        "p99": 4141.93
+      },
+      "selected_major_descents_total": 784065,
+      "selected_major_order_reduction_x": {
+        "count": 208,
+        "max": 1.1272727272727272,
+        "mean": 1.0032254397711207,
+        "min": 1.0003663450970814,
+        "p50": 1.0017119100024456,
+        "p90": 1.0046984177506126,
+        "p99": 1.0257652269921873
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 208,
+        "max": 59.3203125,
+        "mean": 15.906738435415516,
+        "min": 1.7177700348432057,
+        "p50": 12.347971972200067,
+        "p90": 27.57310924369748,
+        "p99": 57.863063811188816
+      },
+      "selected_major_runs": {
+        "count": 208,
+        "max": 8189.0,
+        "mean": 7542.408653846154,
+        "min": 440.0,
+        "p50": 8178.0,
+        "p90": 8184.0,
+        "p99": 8187.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 208,
+        "max": 71.0,
+        "mean": 16.97596153846154,
+        "min": 2.0,
+        "p50": 13.0,
+        "p90": 30.0,
+        "p99": 65.93
+      },
+      "selected_major_same_adjacent_pairs_total": 3531,
+      "tile_unique_groups": {
+        "count": 208,
+        "max": 1023.0,
+        "mean": 601.4759615384615,
+        "min": 16.0,
+        "p50": 614.5,
+        "p90": 942.0,
+        "p99": 1022.0
+      },
+      "tile_valid_pairs": {
+        "count": 208,
+        "max": 8192.0,
+        "mean": 7559.384615384615,
+        "min": 496.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 64,
+      "token_major_descents": {
+        "count": 208,
+        "max": 3965.0,
+        "mean": 3315.0721153846152,
+        "min": 240.0,
+        "p50": 3528.5,
+        "p90": 3821.3,
+        "p99": 3957.3
+      },
+      "token_major_descents_total": 689535,
+      "token_major_order_reduction_x": {
+        "count": 208,
+        "max": 1.022680412371134,
+        "mean": 1.0001755831338455,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0001220852154804,
+        "p99": 1.0015106498784427
+      },
+      "token_major_run_over_unique_x": {
+        "count": 208,
+        "max": 59.8671875,
+        "mean": 15.985761753675913,
+        "min": 1.7282229965156795,
+        "p50": 12.366867950324712,
+        "p90": 28.062745098039223,
+        "p99": 58.42300000000001
+      },
+      "token_major_runs": {
+        "count": 208,
+        "max": 8192.0,
+        "mean": 7559.110576923077,
+        "min": 485.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 208,
+        "max": 11.0,
+        "mean": 0.27403846153846156,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.930000000000007
+      },
+      "token_major_same_adjacent_pairs_total": 57,
+      "total_selected_major_runs": 1568821,
+      "total_token_major_runs": 1572295,
+      "total_unique_groups_after_tile_reduce": 125107,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 112,
+        "max": 61.9375,
+        "mean": 29.650063986522955,
+        "min": 2.234234234234234,
+        "p50": 24.681622052152232,
+        "p90": 58.39000000000001,
+        "p99": 61.782714285714285
+      },
+      "nonempty_tiles": 112,
+      "overall_ideal_reduction_x": 24.468215558425793,
+      "overall_selected_major_order_reduction_x": 1.0022507347874614,
+      "overall_selected_major_run_over_unique_x": 24.413267767386127,
+      "overall_token_major_order_reduction_x": 1.0000228961608226,
+      "overall_token_major_run_over_unique_x": 24.46765534305411,
+      "selected_block": 256,
+      "selected_major_descents": {
+        "count": 112,
+        "max": 8249.0,
+        "mean": 7000.982142857143,
+        "min": 219.0,
+        "p50": 8150.0,
+        "p90": 8218.9,
+        "p99": 8243.449999999999
+      },
+      "selected_major_descents_total": 784110,
+      "selected_major_order_reduction_x": {
+        "count": 112,
+        "max": 1.1272727272727272,
+        "mean": 1.0042035884223741,
+        "min": 1.0007329587099927,
+        "p50": 1.0018956766342566,
+        "p90": 1.0059198303172543,
+        "p99": 1.0319059666415278
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 112,
+        "max": 61.7109375,
+        "mean": 29.49491154952283,
+        "min": 2.225225225225225,
+        "p50": 24.638935831284414,
+        "p90": 57.81493055555556,
+        "p99": 61.46432142857143
+      },
+      "selected_major_runs": {
+        "count": 112,
+        "max": 16372.0,
+        "mean": 14007.330357142857,
+        "min": 440.0,
+        "p50": 16353.0,
+        "p90": 16366.0,
+        "p99": 16370.89
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 112,
+        "max": 82.0,
+        "mean": 31.526785714285715,
+        "min": 2.0,
+        "p50": 26.0,
+        "p90": 58.0,
+        "p99": 80.34
+      },
+      "selected_major_same_adjacent_pairs_total": 3531,
+      "tile_unique_groups": {
+        "count": 112,
+        "max": 1024.0,
+        "mean": 573.7589285714286,
+        "min": 16.0,
+        "p50": 583.5,
+        "p90": 940.4000000000001,
+        "p99": 1021.24
+      },
+      "tile_valid_pairs": {
+        "count": 112,
+        "max": 16384.0,
+        "mean": 14038.857142857143,
+        "min": 496.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "tiles": 128,
+      "token_block": 64,
+      "token_major_descents": {
+        "count": 112,
+        "max": 7759.0,
+        "mean": 6153.392857142857,
+        "min": 240.0,
+        "p50": 6877.5,
+        "p90": 7499.0,
+        "p99": 7726.36
+      },
+      "token_major_descents_total": 689180,
+      "token_major_order_reduction_x": {
+        "count": 112,
+        "max": 1.022680412371134,
+        "mean": 1.0002402065875735,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.000083279754176,
+        "p99": 1.001473990866349
+      },
+      "token_major_run_over_unique_x": {
+        "count": 112,
+        "max": 61.9296875,
+        "mean": 29.642219908242907,
+        "min": 2.234234234234234,
+        "p50": 24.680461959344807,
+        "p90": 58.39000000000001,
+        "p99": 61.782714285714285
+      },
+      "token_major_runs": {
+        "count": 112,
+        "max": 16384.0,
+        "mean": 14038.535714285714,
+        "min": 485.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 112,
+        "max": 11.0,
+        "mean": 0.32142857142857145,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 3.780000000000001
+      },
+      "token_major_same_adjacent_pairs_total": 36,
+      "total_selected_major_runs": 1568821,
+      "total_token_major_runs": 1572316,
+      "total_unique_groups_after_tile_reduce": 64261,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 64,
+        "max": 62.96875,
+        "mean": 51.84377883634761,
+        "min": 31.0,
+        "p50": 56.31944444444444,
+        "p90": 62.71553846153846,
+        "p99": 62.947792338709675
+      },
+      "nonempty_tiles": 64,
+      "overall_ideal_reduction_x": 47.254673318506946,
+      "overall_selected_major_order_reduction_x": 1.0022507347874614,
+      "overall_selected_major_run_over_unique_x": 47.14855442687985,
+      "overall_token_major_order_reduction_x": 1.0000178080344764,
+      "overall_token_major_run_over_unique_x": 47.25383182064074,
+      "selected_block": 512,
+      "selected_major_descents": {
+        "count": 64,
+        "max": 16452.0,
+        "mean": 12252.046875,
+        "min": 219.0,
+        "p50": 16144.5,
+        "p90": 16390.8,
+        "p99": 16442.55
+      },
+      "selected_major_descents_total": 784131,
+      "selected_major_order_reduction_x": {
+        "count": 64,
+        "max": 1.1272727272727272,
+        "mean": 1.0059630730466076,
+        "min": 1.0009469407703822,
+        "p50": 1.0020988683960876,
+        "p90": 1.0089134441486585,
+        "p99": 1.0676343873517782
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 64,
+        "max": 62.84375,
+        "mean": 51.57236298215827,
+        "min": 27.5,
+        "p50": 55.92601351351351,
+        "p90": 62.5665576923077,
+        "p99": 62.81009072580645
+      },
+      "selected_major_runs": {
+        "count": 64,
+        "max": 32737.0,
+        "mean": 24512.828125,
+        "min": 440.0,
+        "p50": 32431.5,
+        "p90": 32731.699999999997,
+        "p99": 32735.739999999998
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 64,
+        "max": 82.0,
+        "mean": 55.171875,
+        "min": 31.0,
+        "p50": 55.5,
+        "p90": 73.0,
+        "p99": 81.37
+      },
+      "selected_major_same_adjacent_pairs_total": 3531,
+      "tile_unique_groups": {
+        "count": 64,
+        "max": 1024.0,
+        "mean": 519.90625,
+        "min": 16.0,
+        "p50": 520.0,
+        "p90": 922.5,
+        "p99": 1013.29
+      },
+      "tile_valid_pairs": {
+        "count": 64,
+        "max": 32768.0,
+        "mean": 24568.0,
+        "min": 496.0,
+        "p50": 32504.0,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "tiles": 64,
+      "token_block": 64,
+      "token_major_descents": {
+        "count": 64,
+        "max": 14617.0,
+        "mean": 10766.296875,
+        "min": 240.0,
+        "p50": 13284.0,
+        "p90": 14408.599999999999,
+        "p99": 14599.99
+      },
+      "token_major_descents_total": 689043,
+      "token_major_order_reduction_x": {
+        "count": 64,
+        "max": 1.022680412371134,
+        "mean": 1.0004047814890815,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.000113818163838,
+        "p99": 1.0093838785615716
+      },
+      "token_major_run_over_unique_x": {
+        "count": 64,
+        "max": 62.96875,
+        "mean": 51.830349845096514,
+        "min": 30.3125,
+        "p50": 56.31163194444444,
+        "p90": 62.71478846153846,
+        "p99": 62.947792338709675
+      },
+      "token_major_runs": {
+        "count": 64,
+        "max": 32768.0,
+        "mean": 24567.5625,
+        "min": 485.0,
+        "p50": 32503.5,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 64,
+        "max": 11.0,
+        "mean": 0.4375,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 6.589999999999982
+      },
+      "token_major_same_adjacent_pairs_total": 28,
+      "total_selected_major_runs": 1568821,
+      "total_token_major_runs": 1572324,
+      "total_unique_groups_after_tile_reduce": 33274,
+      "total_valid_pairs": 1572352
+    }
+  ],
+  "artifact": "actual_li_route_order_analysis",
+  "best_selected_major_order_tile": {
+    "ideal_tile_reduction_x": {
+      "count": 416,
+      "max": 30.9375,
+      "mean": 8.164290089017666,
+      "min": 1.2121212121212122,
+      "p50": 6.225053412017415,
+      "p90": 14.246999612853271,
+      "p99": 30.56401515151515
+    },
+    "nonempty_tiles": 416,
+    "overall_ideal_reduction_x": 6.368246896579656,
+    "overall_selected_major_order_reduction_x": 1.0022647898169237,
+    "overall_selected_major_run_over_unique_x": 6.3538567465219415,
+    "overall_token_major_order_reduction_x": 1.000036252738831,
+    "overall_token_major_run_over_unique_x": 6.368016038557339,
+    "selected_block": 128,
+    "selected_major_descents": {
+      "count": 416,
+      "max": 2088.0,
+      "mean": 1884.545673076923,
+      "min": 43.0,
+      "p50": 2039.5,
+      "p90": 2064.0,
+      "p99": 2083.0
+    },
+    "selected_major_descents_total": 783971,
+    "selected_major_order_reduction_x": {
+      "count": 416,
+      "max": 1.2121212121212122,
+      "mean": 1.0034278246407693,
+      "min": 1.0,
+      "p50": 1.0017975745869103,
+      "p90": 1.0049067713444553,
+      "p99": 1.0256623805591603
+    },
+    "selected_major_run_over_unique_x": {
+      "count": 416,
+      "max": 30.7109375,
+      "mean": 8.117099544131657,
+      "min": 1.1919191919191918,
+      "p50": 6.215164393528196,
+      "p90": 14.010699152542372,
+      "p99": 30.28063446969697
+    },
+    "selected_major_runs": {
+      "count": 416,
+      "max": 4095.0,
+      "mean": 3771.1514423076924,
+      "min": 99.0,
+      "p50": 4088.0,
+      "p90": 4093.0,
+      "p99": 4094.0
+    },
+    "selected_major_same_adjacent_pairs": {
+      "count": 416,
+      "max": 42.0,
+      "mean": 8.540865384615385,
+      "min": 0.0,
+      "p50": 7.0,
+      "p90": 16.0,
+      "p99": 34.85000000000002
+    },
+    "selected_major_same_adjacent_pairs_total": 3553,
+    "tile_unique_groups": {
+      "count": 416,
+      "max": 1015.0,
+      "mean": 593.5216346153846,
+      "min": 8.0,
+      "p50": 610.5,
+      "p90": 932.5,
+      "p99": 1000.0
+    },
+    "tile_valid_pairs": {
+      "count": 416,
+      "max": 4096.0,
+      "mean": 3779.6923076923076,
+      "min": 120.0,
+      "p50": 4096.0,
+      "p90": 4096.0,
+      "p99": 4096.0
+    },
+    "tiles": 512,
+    "token_block": 32,
+    "token_major_descents": {
+      "count": 416,
+      "max": 2016.0,
+      "mean": 1657.2836538461538,
+      "min": 52.0,
+      "p50": 1765.0,
+      "p90": 1911.0,
+      "p99": 1980.85
+    },
+    "token_major_descents_total": 689430,
+    "token_major_order_reduction_x": {
+      "count": 416,
+      "max": 1.0714285714285714,
+      "mean": 1.0002628729331469,
+      "min": 1.0,
+      "p50": 1.0,
+      "p90": 1.0002442002442002,
+      "p99": 1.0017263343704292
+    },
+    "token_major_run_over_unique_x": {
+      "count": 416,
+      "max": 30.9375,
+      "mean": 8.160708617190004,
+      "min": 1.2121212121212122,
+      "p50": 6.225053412017415,
+      "p90": 14.11111111111111,
+      "p99": 30.56401515151515
+    },
+    "token_major_runs": {
+      "count": 416,
+      "max": 4096.0,
+      "mean": 3779.5552884615386,
+      "min": 112.0,
+      "p50": 4096.0,
+      "p90": 4096.0,
+      "p99": 4096.0
+    },
+    "token_major_same_adjacent_pairs": {
+      "count": 416,
+      "max": 8.0,
+      "mean": 0.13701923076923078,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 1.0,
+      "p99": 2.0
+    },
+    "token_major_same_adjacent_pairs_total": 57,
+    "total_selected_major_runs": 1568799,
+    "total_token_major_runs": 1572295,
+    "total_unique_groups_after_tile_reduce": 246905,
+    "total_valid_pairs": 1572352
+  },
+  "best_token_major_order_tile": {
+    "ideal_tile_reduction_x": {
+      "count": 832,
+      "max": 15.71875,
+      "mean": 4.234760618843127,
+      "min": 1.0769230769230769,
+      "p50": 3.2226613182786115,
+      "p90": 7.133410762679055,
+      "p99": 15.61994565217391
+    },
+    "nonempty_tiles": 832,
+    "overall_ideal_reduction_x": 3.3692655488294854,
+    "overall_selected_major_order_reduction_x": 1.002246262815299,
+    "overall_selected_major_run_over_unique_x": 3.3617142551025876,
+    "overall_token_major_order_reduction_x": 1.000036252738831,
+    "overall_token_major_run_over_unique_x": 3.369143408153426,
+    "selected_block": 128,
+    "selected_major_descents": {
+      "count": 832,
+      "max": 1071.0,
+      "mean": 941.8774038461538,
+      "min": 8.0,
+      "p50": 1018.0,
+      "p90": 1037.0,
+      "p99": 1051.69
+    },
+    "selected_major_descents_total": 783642,
+    "selected_major_order_reduction_x": {
+      "count": 832,
+      "max": 1.4736842105263157,
+      "mean": 1.0036274178770417,
+      "min": 1.0,
+      "p50": 1.0019308545335943,
+      "p90": 1.0049067713444553,
+      "p99": 1.0297043740573146
+    },
+    "selected_major_run_over_unique_x": {
+      "count": 832,
+      "max": 15.59375,
+      "mean": 4.209062543088961,
+      "min": 1.0769230769230769,
+      "p50": 3.2163658198385576,
+      "p90": 7.095862369337979,
+      "p99": 15.478885869565216
+    },
+    "selected_major_runs": {
+      "count": 832,
+      "max": 2048.0,
+      "mean": 1885.610576923077,
+      "min": 19.0,
+      "p50": 2044.0,
+      "p90": 2047.0,
+      "p99": 2048.0
+    },
+    "selected_major_same_adjacent_pairs": {
+      "count": 832,
+      "max": 23.0,
+      "mean": 4.235576923076923,
+      "min": 0.0,
+      "p50": 3.0,
+      "p90": 8.0,
+      "p99": 17.68999999999994
+    },
+    "selected_major_same_adjacent_pairs_total": 3524,
+    "tile_unique_groups": {
+      "count": 832,
+      "max": 920.0,
+      "mean": 560.9074519230769,
+      "min": 4.0,
+      "p50": 595.0,
+      "p90": 849.0,
+      "p99": 902.6899999999999
+    },
+    "tile_valid_pairs": {
+      "count": 832,
+      "max": 2048.0,
+      "mean": 1889.8461538461538,
+      "min": 28.0,
+      "p50": 2048.0,
+      "p90": 2048.0,
+      "p99": 2048.0
+    },
+    "tiles": 1024,
+    "token_block": 16,
+    "token_major_descents": {
+      "count": 832,
+      "max": 1021.0,
+      "mean": 828.390625,
+      "min": 10.0,
+      "p50": 883.0,
+      "p90": 956.0,
+      "p99": 994.0
+    },
+    "token_major_descents_total": 689221,
+    "token_major_order_reduction_x": {
+      "count": 832,
+      "max": 1.2727272727272727,
+      "mean": 1.0004412853106042,
+      "min": 1.0,
+      "p50": 1.0,
+      "p90": 1.0,
+      "p99": 1.0033315343020948
+    },
+    "token_major_run_over_unique_x": {
+      "count": 832,
+      "max": 15.71875,
+      "mean": 4.231986260373674,
+      "min": 1.0769230769230769,
+      "p50": 3.2226613182786115,
+      "p90": 7.133410762679055,
+      "p99": 15.61994565217391
+    },
+    "token_major_runs": {
+      "count": 832,
+      "max": 2048.0,
+      "mean": 1889.7776442307693,
+      "min": 22.0,
+      "p50": 2048.0,
+      "p90": 2048.0,
+      "p99": 2048.0
+    },
+    "token_major_same_adjacent_pairs": {
+      "count": 832,
+      "max": 6.0,
+      "mean": 0.06850961538461539,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p99": 1.0
+    },
+    "token_major_same_adjacent_pairs_total": 57,
+    "total_selected_major_runs": 1568828,
+    "total_token_major_runs": 1572295,
+    "total_unique_groups_after_tile_reduce": 466675,
+    "total_valid_pairs": 1572352
+  },
+  "read": "order_reduction_x is the reduction available to a reduce-by-key consumer if the producer emits keys in the natural loop order and does not sort or hash inside the tile. ideal_reduction_x is the tile-local unique-group reduction target. If runs greatly exceed unique groups, compact partial rows need explicit local hashing, segmentation, or sorting; current emission order alone is not enough.",
+  "retained_tiles": [
+    {
+      "ideal_tile_reduction_x": {
+        "count": 224,
+        "max": 31.46875,
+        "mean": 15.104945155989254,
+        "min": 1.2371134020618557,
+        "p50": 12.371832311757217,
+        "p90": 30.408181818181816,
+        "p99": 31.428839080459774
+      },
+      "nonempty_tiles": 224,
+      "overall_ideal_reduction_x": 12.338365924856399,
+      "overall_selected_major_order_reduction_x": 1.0022647898169237,
+      "overall_selected_major_run_over_unique_x": 12.310485263190936,
+      "overall_token_major_order_reduction_x": 1.0000228961608226,
+      "overall_token_major_run_over_unique_x": 12.33808343011394,
+      "selected_block": 256,
+      "selected_major_descents": {
+        "count": 224,
+        "max": 4153.0,
+        "mean": 3500.2678571428573,
+        "min": 43.0,
+        "p50": 4071.0,
+        "p90": 4120.0,
+        "p99": 4135.7699999999995
+      },
+      "selected_major_descents_total": 784060,
+      "selected_major_order_reduction_x": {
+        "count": 224,
+        "max": 1.2121212121212122,
+        "mean": 1.004546218338411,
+        "min": 1.0006107243190423,
+        "p50": 1.0018344135991195,
+        "p90": 1.0059842481288213,
+        "p99": 1.0426969696969697
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 224,
+        "max": 31.36328125,
+        "mean": 15.017491617679411,
+        "min": 1.2268041237113403,
+        "p50": 12.348924403367459,
+        "p90": 30.109157754010695,
+        "p99": 31.27042816091954
+      },
+      "selected_major_runs": {
+        "count": 224,
+        "max": 8187.0,
+        "mean": 7003.566964285715,
+        "min": 99.0,
+        "p50": 8176.0,
+        "p90": 8184.0,
+        "p99": 8187.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 224,
+        "max": 50.0,
+        "mean": 15.861607142857142,
+        "min": 1.0,
+        "p50": 13.0,
+        "p90": 29.700000000000017,
+        "p99": 41.54000000000002
+      },
+      "selected_major_same_adjacent_pairs_total": 3553,
+      "tile_unique_groups": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "tile_valid_pairs": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "token_major_descents": {
+        "count": 224,
+        "max": 3894.0,
+        "mean": 3076.4285714285716,
+        "min": 52.0,
+        "p50": 3442.0,
+        "p90": 3749.8,
+        "p99": 3870.62
+      },
+      "token_major_descents_total": 689120,
+      "token_major_order_reduction_x": {
+        "count": 224,
+        "max": 1.0714285714285714,
+        "mean": 1.0003941173383755,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0001220852154804,
+        "p99": 1.0017130121759308
+      },
+      "token_major_run_over_unique_x": {
+        "count": 224,
+        "max": 31.46484375,
+        "mean": 15.098691848719978,
+        "min": 1.2371134020618557,
+        "p50": 12.370650278660293,
+        "p90": 30.408181818181816,
+        "p99": 31.428839080459774
+      },
+      "token_major_runs": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.267857142857,
+        "min": 112.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 224,
+        "max": 8.0,
+        "mean": 0.16071428571428573,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.0
+      },
+      "token_major_same_adjacent_pairs_total": 36,
+      "total_selected_major_runs": 1568799,
+      "total_token_major_runs": 1572316,
+      "total_unique_groups_after_tile_reduce": 127436,
+      "total_valid_pairs": 1572352
+    },
+    {
+      "ideal_tile_reduction_x": {
+        "count": 128,
+        "max": 31.734375,
+        "mean": 26.401306813680858,
+        "min": 15.0,
+        "p50": 29.211904761904762,
+        "p90": 31.66858974358974,
+        "p99": 31.72898361495136
+      },
+      "nonempty_tiles": 128,
+      "overall_ideal_reduction_x": 23.813051840857806,
+      "overall_selected_major_order_reduction_x": 1.0022647898169237,
+      "overall_selected_major_run_over_unique_x": 23.759242151176,
+      "overall_token_major_order_reduction_x": 1.0000178080344764,
+      "overall_token_major_run_over_unique_x": 23.81262778476124,
+      "selected_block": 512,
+      "selected_major_descents": {
+        "count": 128,
+        "max": 8269.0,
+        "mean": 6125.8359375,
+        "min": 43.0,
+        "p50": 8095.5,
+        "p90": 8210.3,
+        "p99": 8239.73
+      },
+      "selected_major_descents_total": 784107,
+      "selected_major_order_reduction_x": {
+        "count": 128,
+        "max": 1.2121212121212122,
+        "mean": 1.0065239634023164,
+        "min": 1.0007329587099927,
+        "p50": 1.001958105588435,
+        "p90": 1.009102151545124,
+        "p99": 1.0869762729938683
+      },
+      "selected_major_run_over_unique_x": {
+        "count": 128,
+        "max": 31.669921875,
+        "mean": 26.248377469577157,
+        "min": 12.375,
+        "p50": 28.882922535211268,
+        "p90": 31.587555493895675,
+        "p99": 31.664822404371588
+      },
+      "selected_major_runs": {
+        "count": 128,
+        "max": 16372.0,
+        "mean": 12256.2421875,
+        "min": 99.0,
+        "p50": 16277.0,
+        "p90": 16367.0,
+        "p99": 16370.0
+      },
+      "selected_major_same_adjacent_pairs": {
+        "count": 128,
+        "max": 50.0,
+        "mean": 27.7578125,
+        "min": 12.0,
+        "p50": 28.0,
+        "p90": 38.0,
+        "p99": 44.730000000000004
+      },
+      "selected_major_same_adjacent_pairs_total": 3553,
+      "tile_unique_groups": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "tile_valid_pairs": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "token_major_descents": {
+        "count": 128,
+        "max": 7336.0,
+        "mean": 5382.8671875,
+        "min": 53.0,
+        "p50": 6607.0,
+        "p90": 7221.9,
+        "p99": 7304.03
+      },
+      "token_major_descents_total": 689007,
+      "token_major_order_reduction_x": {
+        "count": 128,
+        "max": 1.0714285714285714,
+        "mean": 1.0006739600981143,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0000738954721107,
+        "p99": 1.006344168313903
+      },
+      "token_major_run_over_unique_x": {
+        "count": 128,
+        "max": 31.734375,
+        "mean": 26.390514799508313,
+        "min": 14.0,
+        "p50": 29.191071428571426,
+        "p90": 31.66858974358974,
+        "p99": 31.72898361495136
+      },
+      "token_major_runs": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12283.78125,
+        "min": 112.0,
+        "p50": 16315.5,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "token_major_same_adjacent_pairs": {
+        "count": 128,
+        "max": 8.0,
+        "mean": 0.21875,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p99": 2.730000000000004
+      },
+      "token_major_same_adjacent_pairs_total": 28,
+      "total_selected_major_runs": 1568799,
+      "total_token_major_runs": 1572324,
+      "total_unique_groups_after_tile_reduce": 66029,
+      "total_valid_pairs": 1572352
+    }
+  ],
+  "scope": "Route key ordering for compact grouped-partial compressed-dKV reducers.",
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "current_emission_order_not_reusable_hash_or_segment_required"
+}

@@ -1,0 +1,303 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": null,
+    "checked": false,
+    "dkv_atol": 1.0,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": false,
+    "candidate_full_ms": 25.837600708007812,
+    "candidate_vs_retained_speedup_x": 0.4309494571819526,
+    "dkv_only_full_ms": 11.752104759216309,
+    "dkv_only_global_accum_ms": 5.883312702178955,
+    "dkv_only_sink_ms": 5.8687920570373535,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "measured_split_beats_retained_gate": null,
+    "measured_split_selected_dq_union_dkv_ms": null,
+    "measured_split_vs_retained_speedup_x": null,
+    "retained_single_token_full_ms": 11.1347,
+    "split_schedule_beats_matched_single_token": false,
+    "split_schedule_candidate_ms": 13.742396712303162,
+    "split_schedule_vs_matched_single_token_speedup_x": 0.8060270934889517
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 64,
+    "known_limitations": [
+      "BLOCK_T=4 implements same-kernel selected-slot dQ plus grouped dKV timing modes",
+      "route reduction is dense N-by-N inside the epilogue",
+      "does not reduce duplicates within a token because LI topk is expected unique",
+      "promotion gate is the same-kernel full source-boundary dQ+dKV latency versus the retained 11.13 ms sparse-attention backward boundary"
+    ],
+    "local_grouping": "exact adjacent-token group-id sidecar reduction inside each selected window; later-token rows whose group appears in an earlier token in the tile are folded before global dKV atomic_add",
+    "same_kernel_selected_dq_grouped_dkv": true,
+    "token_block": 4,
+    "union_operand": false
+  },
+  "read": "Actual LI source-boundary Triton BLOCK_T=4 same-kernel full-boundary gate. This keeps the selected-slot query-major QK/P/scaled-dP/dQ path and attaches exact compressed-group folding only as the dKV epilogue before final global atomics.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_query_recompute_token4_profile",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "not_checked",
+  "tile_write_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "timing": {
+    "dkv_only_full": {
+      "checksum_norm": 960.2518920898438,
+      "event": {
+        "enabled": true,
+        "max_ms": 61.81310272216797,
+        "mean_ms": 23.922596795218332,
+        "median_ms": 11.752104759216309,
+        "min_ms": 11.05837631225586,
+        "samples_ms": [
+          19.39927864074707,
+          11.062775611877441,
+          11.058895111083984,
+          11.05837631225586,
+          41.31364440917969,
+          61.81310272216797,
+          11.752104759216309
+        ],
+        "stdev_ms": 20.01273865381918
+      },
+      "label": "query_recompute_token4_dkv_only_full",
+      "peak_memory_allocated_bytes": 1679823872,
+      "peak_memory_allocated_gib": 1.564457893371582,
+      "wall": {
+        "enabled": true,
+        "max_ms": 61.82949594222009,
+        "mean_ms": 23.98036456932979,
+        "median_ms": 11.880852980539203,
+        "min_ms": 11.073627043515444,
+        "samples_ms": [
+          19.525067880749702,
+          11.082048062235117,
+          11.075348127633333,
+          11.073627043515444,
+          41.39611194841564,
+          61.82949594222009,
+          11.880852980539203
+        ],
+        "stdev_ms": 20.00667698279296
+      }
+    },
+    "dkv_only_sink": {
+      "checksum_norm": 5594.482421875,
+      "event": {
+        "enabled": true,
+        "max_ms": 14.46541690826416,
+        "mean_ms": 7.116115570068359,
+        "median_ms": 5.8687920570373535,
+        "min_ms": 5.847270965576172,
+        "samples_ms": [
+          5.94487190246582,
+          14.46541690826416,
+          5.969633102416992,
+          5.85695219039917,
+          5.859871864318848,
+          5.847270965576172,
+          5.8687920570373535
+        ],
+        "stdev_ms": 3.241087450701841
+      },
+      "label": "query_recompute_token4_dkv_only_sink",
+      "peak_memory_allocated_bytes": 1669468160,
+      "peak_memory_allocated_gib": 1.5548133850097656,
+      "wall": {
+        "enabled": true,
+        "max_ms": 14.48694197461009,
+        "mean_ms": 7.149237407637494,
+        "median_ms": 5.885181948542595,
+        "min_ms": 5.864090984687209,
+        "samples_ms": [
+          6.072832969948649,
+          14.48694197461009,
+          5.9869911056011915,
+          5.873430985957384,
+          5.875191884115338,
+          5.864090984687209,
+          5.885181948542595
+        ],
+        "stdev_ms": 3.2365537959878554
+      }
+    },
+    "full": {
+      "checksum_norm": 1199.3506774902344,
+      "event": {
+        "enabled": true,
+        "max_ms": 112.12142181396484,
+        "mean_ms": 43.55249622889927,
+        "median_ms": 25.837600708007812,
+        "min_ms": 22.773080825805664,
+        "samples_ms": [
+          112.12142181396484,
+          24.20297622680664,
+          32.3093376159668,
+          22.79136085510254,
+          22.773080825805664,
+          64.83169555664062,
+          25.837600708007812
+        ],
+        "stdev_ms": 33.74398906878697
+      },
+      "label": "query_recompute_token4_full",
+      "peak_memory_allocated_bytes": 2216698368,
+      "peak_memory_allocated_gib": 2.0644612312316895,
+      "wall": {
+        "enabled": true,
+        "max_ms": 112.26505204103887,
+        "mean_ms": 43.63644169643521,
+        "median_ms": 25.87548177689314,
+        "min_ms": 22.811820032075047,
+        "samples_ms": [
+          112.26505204103887,
+          24.36984214000404,
+          32.34094800427556,
+          22.811820032075047,
+          22.863989928737283,
+          64.92795795202255,
+          25.87548177689314
+        ],
+        "stdev_ms": 33.77034245132734
+      }
+    }
+  },
+  "timing_deltas": {
+    "enabled": false
+  },
+  "union_route_stats": null,
+  "union_workspace": null
+}

@@ -1,0 +1,99 @@
+{
+  "artifact": "ck_tile_custom_config_sweep_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "S=4096 DeepSeek V4-Pro routed MoE W2 dgrad grouped GEMM custom CK-Tile config sweep on one MI350/CDNA4.",
+  "source_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/ck_tile_custom_config_sweep_s4096_20260531.json",
+  "remote_summary_source": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/ck_tile_custom_configs_s4096_20260531/ck_tile_custom_config_sweep_s4096/summary.json",
+  "operator_contract": {
+    "dtype": "bf16",
+    "tokens": 4096,
+    "topk": 6,
+    "assignments": 24576,
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "shape": "384 ragged grouped GEMMs, A[M_e,7168] x B[7168,3072] -> C[M_e,3072]",
+    "route_stats": {
+      "min_per_expert": 45,
+      "mean_per_expert": 64.0,
+      "max_per_expert": 88,
+      "padding_multiplier_vs_compact": 1.0,
+      "uses_ck_kPadM": true
+    }
+  },
+  "baseline": {
+    "name": "torch_padded_bmm_out",
+    "median_ms": 4.304213047027588,
+    "read": "Retained PyTorch padded bmm(out=) baseline for the same W2 dgrad problem family."
+  },
+  "candidates": [
+    {
+      "name": "m32n128_v4_padm_true",
+      "pipeline": "COMPUTE_V4",
+      "m_tile": 32,
+      "n_tile": 128,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.97522,
+      "tflops": 155.168,
+      "gb_per_s": 2496.66,
+      "speedup_vs_torch_padded_bmm_out": 0.6170720130730769
+    },
+    {
+      "name": "m64n128_v4_padm_true",
+      "pipeline": "COMPUTE_V4",
+      "m_tile": 64,
+      "n_tile": 128,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.23931,
+      "tflops": 173.47,
+      "gb_per_s": 2791.13,
+      "speedup_vs_torch_padded_bmm_out": 0.6898540138296684
+    },
+    {
+      "name": "m32n128_v3_padm_true",
+      "pipeline": "COMPUTE_V3",
+      "m_tile": 32,
+      "n_tile": 128,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 6.458,
+      "tflops": 167.595,
+      "gb_per_s": 2696.61,
+      "speedup_vs_torch_padded_bmm_out": 0.6664931940271892
+    },
+    {
+      "name": "m64n128_v3_padm_true",
+      "pipeline": "COMPUTE_V3",
+      "m_tile": 64,
+      "n_tile": 128,
+      "compile_returncode": 0,
+      "run_returncode": 0,
+      "best_ms": 5.87867,
+      "tflops": 184.112,
+      "gb_per_s": 2962.36,
+      "speedup_vs_torch_padded_bmm_out": 0.7321746325321183,
+      "kernel": "gemm_grouped_bf16_64x128x64_8x8x1_1x0x0_Persistent_NoMultiD_SingleSmemBuffer"
+    }
+  ],
+  "decision": {
+    "status": "demote_for_s4096_w2_dgrad",
+    "best_candidate": "m64n128_v3_padm_true",
+    "best_ms": 5.87867,
+    "torch_padded_bmm_out_ms": 4.304213047027588,
+    "best_speedup_vs_torch_padded_bmm_out": 0.7321746325321183,
+    "read": "The custom CK-Tile kPadM=true path proves the ragged-M contract can avoid host row padding, but it still trails the retained PyTorch padded bmm(out=) baseline by about 27%. Row padding is therefore not the dominant remaining issue for this W2 dgrad shape; the gap is CK scheduling/kernel efficiency on small-M many-group BF16 GEMMs."
+  },
+  "next_actions": [
+    "Do not promote these M32/M64 N128 CK-Tile configs into the PyTorch microbench path.",
+    "Only continue CK-Tile W2 dgrad work if trying materially different scheduling, wider N tiling, split persistent scheduling, or a fusion that removes surrounding gather/reduce costs.",
+    "For immediate single-layer progress, shift attention back to block-level MoE routed backward and sparse MLA attribution unless a new grouped GEMM candidate can beat 4.304 ms at this exact S4096 contract."
+  ],
+  "commands": {
+    "staged_to_remote": "rsync/scp experiment-local dsv4_layer_microbench tools to do-sonle-kernel retained workspace",
+    "remote_probe": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_ck_tile_custom_config_sweep.py --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --warmup 1 --repeat 3 --validate 0 --torch-baseline-ms 4.304213047027588 --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/ck_tile_custom_configs_s4096_20260531/ck_tile_custom_config_sweep_s4096/summary.json",
+    "local_validation": "jq empty run_artifacts/ck_tile_custom_config_sweep_s4096_20260531.json"
+  },
+  "dependency_pin_changes": []
+}

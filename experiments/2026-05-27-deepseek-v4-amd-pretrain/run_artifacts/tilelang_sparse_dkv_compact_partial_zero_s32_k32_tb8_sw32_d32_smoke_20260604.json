@@ -1,0 +1,78 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "read": "TileLang query-major compact partial producer. This is a concrete reduced-write dKV kernel: it accumulates by precomputed active compressed-group slot inside the CTA, and writes compact partial rows instead of one selected row per token/topk pair. scalar_reduced is the working compact-row/writeback gate; mfma_reduced is the intended TileLang GEMM contribution body and currently tests the MI350 lowering path. It uses diagnostic materialized probs and grad_logits; QK/PV recompute is intentionally outside this gate.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 32,
+    "compressed_groups": 64,
+    "heads": 64,
+    "dim": 512,
+    "topk": 32,
+    "token_block": 8,
+    "selected_window": 32,
+    "block_k": 32,
+    "block_d": 32,
+    "threads": 256,
+    "math_mode": "zero_compact",
+    "route_pattern": "clustered_unique",
+    "cluster_width": 48,
+    "cluster_stride": 2
+  },
+  "compact_route": {
+    "raw_selected_rows": 1024,
+    "active_partial_rows": 240,
+    "write_reduction_x": 4.266666666666667,
+    "token_tiles": 4,
+    "selected_tiles": 1,
+    "route_tiles": 4,
+    "max_active_groups": 62,
+    "active_count_mean": 60.0,
+    "active_count_min": 58,
+    "active_count_max": 62,
+    "partials_bytes": 491520,
+    "partials_mib": 0.46875,
+    "raw_selected_write_bytes_fp32": 2097152,
+    "raw_selected_write_mib_fp32": 2.0
+  },
+  "correctness": {
+    "enabled": false
+  },
+  "timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        0.04196000099182129,
+        0.12216199934482574,
+        0.027921000495553017
+      ],
+      "mean_ms": 0.06401433361073335,
+      "median_ms": 0.04196000099182129,
+      "min_ms": 0.027921000495553017,
+      "max_ms": 0.12216199934482574,
+      "stdev_ms": 0.05084423916705178
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        0.09454996325075626,
+        0.16091996803879738,
+        0.04309008363634348
+      ],
+      "mean_ms": 0.09952000497529905,
+      "median_ms": 0.09454996325075626,
+      "min_ms": 0.04309008363634348,
+      "max_ms": 0.16091996803879738,
+      "stdev_ms": 0.059071959512375115
+    },
+    "median_ms": 0.04196000099182129,
+    "min_ms": 0.027921000495553017,
+    "max_ms": 0.12216199934482574,
+    "mean_ms": 0.06401433361073335,
+    "peak_memory_allocated_bytes": 9147392,
+    "peak_memory_allocated_gib": 0.008519172668457031,
+    "checksum": 0.0
+  }
+}

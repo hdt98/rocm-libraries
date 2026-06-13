@@ -1,0 +1,69 @@
+{
+  "artifact": "actual_li_group_owned_sparse_dkv_schedule_plan_decision",
+  "date": "2026-06-03",
+  "source_artifact": "run_artifacts/actual_li_group_owned_sparse_dkv_schedule_plan_s4096_layer2_20260603.json",
+  "source_script": "tools/dsv4_runtime_probe/plan_sparse_dkv_group_owned_schedule.py",
+  "status": "metadata_envelope_positive_runtime_unproven",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "valid_pairs": 1572352
+  },
+  "baseline_gate": {
+    "sparse_atomic_gate_ms": 8.006924390792847,
+    "raw_dkv_scalar_atomic_add_elements": 805044224,
+    "raw_value_stream_mib": 3071.0
+  },
+  "kernel_read": {
+    "positive": "Group-owned accumulation has enough K16 fill at realistic group panels and can model 23.81x to 47.25x write reduction for token_block 32 or 64.",
+    "negative": "A naive panel-owned kernel would rescan top-k once per group panel; group_panel 128/256/512 imply 8x/4x/2x rescan unless routes are prepacked or filtered inside the producer.",
+    "decision": "Do not build a naive panel-rescan kernel. The next runtime kernel should use prepacked route ownership plus a group-owned K16 accumulator, or an equivalent in-producer segmented path."
+  },
+  "recommended_first_runtime_rungs": [
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "write_reduction_x": 23.813051840857806,
+      "traffic_vs_raw_x": 22.391856999048525,
+      "k16_fill_x": 0.9579007905176867,
+      "active_stream_mib": 137.1480712890625,
+      "naive_panel_rescan_amplification_x": 4,
+      "reason": "Lower-risk first S128/S512 bring-up; keeps token window aligned with the existing production target and avoids the wide-tile serialization seen in earlier reducers."
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "write_reduction_x": 47.254673318506946,
+      "traffic_vs_raw_x": 44.39461991028478,
+      "k16_fill_x": 0.9579007905176867,
+      "active_stream_mib": 69.175048828125,
+      "naive_panel_rescan_amplification_x": 4,
+      "reason": "Higher write-reduction follow-up once the prepacked route-list and group-owned accumulator body work at smaller shapes."
+    },
+    {
+      "token_block": 32,
+      "group_panel": 128,
+      "write_reduction_x": 23.813051840857806,
+      "traffic_vs_raw_x": 22.391856999048525,
+      "k16_fill_x": 0.9321066110215309,
+      "active_stream_mib": 137.1480712890625,
+      "naive_panel_rescan_amplification_x": 8,
+      "reason": "Narrower group panel if accumulator pressure needs to drop, but only after route prepacking prevents 8x top-k rescans."
+    }
+  ],
+  "rejected_shortcuts": [
+    "Do not interpret token_block=128/group_panel=1024 as a production target; it is an upper-envelope metadata point and risks repeating the wide-tile serialization failure.",
+    "Do not detach raw ScatterAdd again; it pays a full HBM partial round trip and already lost to the sparse-atomic gate.",
+    "Do not retry dense route materialization or group-major row-wise recompute; those branches were already slower by one to three orders of magnitude."
+  ],
+  "validation_gate": [
+    "S128 parity against the current shared-KV dKV reference.",
+    "S512 timing against the active-list sparse-atomic gate before S4096.",
+    "S4096 timing must beat the 8.0-8.8 ms sparse-atomic dKV slice without materializing selected K/V, selected probabilities, dense route matrices, or multi-GiB partial slabs."
+  ]
+}

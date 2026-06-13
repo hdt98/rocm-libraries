@@ -1,0 +1,315 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_paneldense_rocprof_bottleneck",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 640,
+    "valid_topk": 512,
+    "actual_li_topk": null,
+    "actual_li_valid_pairs": null,
+    "actual_li_compress_ratio": null,
+    "token_block": 64,
+    "selected_window": 320,
+    "group_panel_size": 512,
+    "block_k": 64,
+    "block_d": 64,
+    "d_blocks_per_kernel": 1,
+    "row_block": 8,
+    "threads": 512,
+    "math_mode": "mfma_reduced",
+    "route_pattern": "panel_capacity_random",
+    "cluster_width": 640,
+    "cluster_stride": 4,
+    "weight_source": "input",
+    "actual_li_input_source": "random",
+    "output_layout": "[groups, D]",
+    "fold_final_dkv": true,
+    "fold_backend": "tilelang_panel_dense"
+  },
+  "baseline_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb64_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+  "baseline_timing_ms": {
+    "full_final_dkv_median": 8.1296706199646,
+    "full_final_dkv_samples": [
+      8.189070701599121,
+      8.321432113647461,
+      8.12975025177002,
+      8.148791313171387,
+      8.130351066589355,
+      8.124311447143555,
+      8.12959098815918,
+      8.120230674743652,
+      8.112030029296875,
+      8.12814998626709
+    ],
+    "fold_only_median": 0.048500001430511475,
+    "producer_estimated_from_baseline": 8.081170618534088
+  },
+  "trace_artifacts": {
+    "remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_wide_panel_paneldense_trace_20260604T0625",
+    "local_tmp_raw_dir": "/tmp/tilelang_wide_panel_paneldense_trace_20260604T0625",
+    "timed_summary": "run_artifacts/tilelang_wide_panel_paneldense_rocprof_trace_timed_20260604T0625.json"
+  },
+  "trace_dispatch_ms": {
+    "producer_all": [
+      241.936251,
+      8.054311,
+      8.130352,
+      8.053071
+    ],
+    "producer_steady_state": [
+      8.054311,
+      8.130352,
+      8.053071
+    ],
+    "producer_steady_state_median": 8.054311,
+    "fold_all": [
+      0.053,
+      0.05348,
+      0.05412,
+      0.0532,
+      0.0406,
+      0.04028
+    ],
+    "fold_steady_state_median": 0.053099999999999994,
+    "note": "First compact_partial_prim_kernel dispatch is cold and excluded from steady-state median."
+  },
+  "kernel_launch_shape": {
+    "producer_workgroup_size": 512,
+    "producer_grid_size_xyz_reported": [
+      4096,
+      64,
+      2
+    ],
+    "producer_vgpr_count": 92,
+    "producer_sgpr_count": 64,
+    "producer_dynamic_shared_memory_bytes_from_generated_source": 163840,
+    "profiler_static_lds_block_size_reports_zero_because_kernel_uses_extern_dynamic_shared_memory": true
+  },
+  "compact_route": {
+    "raw_selected_rows": 2097152,
+    "padded_selected_rows": 2621440,
+    "panel_valid_pairs_before_overflow": 2097152,
+    "panel_overflow_count": 0,
+    "panel_overflow_fraction": 0.0,
+    "panel_capacity": 320,
+    "panel_count": 2,
+    "spill_overflow_enabled": false,
+    "spill_mode": null,
+    "spill_pair_count": 0,
+    "spill_pair_fraction": 0.0,
+    "spill_block": 32,
+    "spill_panel_capacity": null,
+    "spill_panel_topk": null,
+    "spill_panel_extra_overflow_count": 0,
+    "spill_panel_active_rows": null,
+    "spill_panel_kernel_active_rows": null,
+    "spill_panel_write_reduction_x": null,
+    "spill_panel_max_active_groups": null,
+    "spill_panel_kernel_max_active_groups": null,
+    "active_partial_rows": 65536,
+    "output_partial_rows": 1024,
+    "padded_partial_rows": 65536,
+    "write_reduction_x": 32.0,
+    "padded_write_reduction_x": 32.0,
+    "token_tiles": 64,
+    "selected_tiles": 2,
+    "route_tiles": 128,
+    "route_limit_mean": 274.5625,
+    "route_limit_nonzero_mean": 274.5625,
+    "route_limit_min": 268,
+    "route_limit_max": 283,
+    "route_limit_zero_count": 0,
+    "route_limit_full_count": 0,
+    "route_limit_modeled_chunk_fraction": 1.0,
+    "max_active_groups": 512,
+    "active_count_mean": 512.0,
+    "active_count_min": 512,
+    "active_count_max": 512,
+    "partials_bytes": 134217728,
+    "partials_mib": 128.0,
+    "output_partials_bytes": 2097152,
+    "output_partials_mib": 2.0,
+    "final_dkv_bytes": 2097152,
+    "final_dkv_mib": 2.0,
+    "raw_selected_write_bytes_fp32": 4294967296,
+    "raw_selected_write_mib_fp32": 4096.0,
+    "padded_selected_write_bytes_fp32": 5368709120,
+    "padded_selected_write_mib_fp32": 5120.0
+  },
+  "pmc_artifacts": {
+    "primary_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_wide_panel_compact_pmc_primary_20260604T0630",
+    "valu_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_wide_panel_compact_pmc_valu_20260604T0635",
+    "ldsconf_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_wide_panel_compact_pmc_ldsconf_20260604T0637",
+    "primary_timed_summary": "run_artifacts/tilelang_wide_panel_paneldense_pmc_primary_timed_20260604T0630.json",
+    "valu_timed_summary": "run_artifacts/tilelang_wide_panel_paneldense_pmc_valu_timed_20260604T0635.json",
+    "ldsconf_timed_summary": "run_artifacts/tilelang_wide_panel_paneldense_pmc_ldsconf_timed_20260604T0637.json",
+    "iteration_filter": "[2-3]",
+    "kernel_include_regex": "compact_partial_prim_kernel",
+    "prewarm_required": "Yes. Without same-container prewarm, rocprofv3 instruments TileLang compilation and the adapter may fall back to gfx900."
+  },
+  "pmc_per_dispatch": {
+    "primary": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 8.100989,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS": 928540592.0,
+          "SQ_INSTS_MFMA": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+          "SQ_INSTS_VMEM": 51316736.0,
+          "SQ_INSTS_VMEM_RD": 51185664.0,
+          "SQ_INSTS_VMEM_WR": 131072.0,
+          "SQ_WAVES": 8192.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.131149,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS": 928540592.0,
+          "SQ_INSTS_MFMA": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+          "SQ_INSTS_VMEM": 51316736.0,
+          "SQ_INSTS_VMEM_RD": 51185664.0,
+          "SQ_INSTS_VMEM_WR": 131072.0,
+          "SQ_WAVES": 8192.0
+        }
+      }
+    ],
+    "valu_lanes": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 8.04205,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS_BRANCH": 45633008.0,
+          "SQ_INSTS_LDS": 318886720.0,
+          "SQ_INSTS_SALU": 96559104.0,
+          "SQ_INSTS_VALU": 272679952.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.123331,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS_BRANCH": 45633008.0,
+          "SQ_INSTS_LDS": 318886720.0,
+          "SQ_INSTS_SALU": 96559104.0,
+          "SQ_INSTS_VALU": 272679952.0
+        }
+      }
+    ],
+    "lds_conflict": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 8.052934,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_LDS_ADDR_CONFLICT": 0.0,
+          "SQ_LDS_BANK_CONFLICT": 352425472.0,
+          "SQ_LDS_IDX_ACTIVE": 1025788288.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.125814,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 524288,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_LDS_ADDR_CONFLICT": 0.0,
+          "SQ_LDS_BANK_CONFLICT": 352425472.0,
+          "SQ_LDS_IDX_ACTIVE": 1025788288.0
+        }
+      }
+    ]
+  },
+  "pmc_median_counters": {
+    "SQ_INSTS": 928540592.0,
+    "SQ_INSTS_BRANCH": 45633008.0,
+    "SQ_INSTS_LDS": 318886720.0,
+    "SQ_INSTS_MFMA": 41943040.0,
+    "SQ_INSTS_SALU": 96559104.0,
+    "SQ_INSTS_VALU": 272679952.0,
+    "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+    "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+    "SQ_INSTS_VMEM": 51316736.0,
+    "SQ_INSTS_VMEM_RD": 51185664.0,
+    "SQ_INSTS_VMEM_WR": 131072.0,
+    "SQ_LDS_ADDR_CONFLICT": 0.0,
+    "SQ_LDS_BANK_CONFLICT": 352425472.0,
+    "SQ_LDS_IDX_ACTIVE": 1025788288.0,
+    "SQ_WAVES": 8192.0
+  },
+  "pmc_counter_percent_of_sq_insts": {
+    "SQ_INSTS": 100.0,
+    "SQ_INSTS_BRANCH": 4.914487141774843,
+    "SQ_INSTS_LDS": 34.34278724564365,
+    "SQ_INSTS_MFMA": 4.517092775627412,
+    "SQ_INSTS_SALU": 10.399018075453185,
+    "SQ_INSTS_VALU": 29.366508513394102,
+    "SQ_INSTS_VALU_MFMA_BF16": 4.517092775627412,
+    "SQ_INSTS_VALU_MFMA_MOPS_BF16": 72.27348441003859,
+    "SQ_INSTS_VMEM": 5.526601253852347,
+    "SQ_INSTS_VMEM_RD": 5.512485338928511,
+    "SQ_INSTS_VMEM_WR": 0.014115914923835661,
+    "SQ_LDS_ADDR_CONFLICT": 0.0,
+    "SQ_LDS_BANK_CONFLICT": 37.95477279468252,
+    "SQ_LDS_IDX_ACTIVE": 110.47317659969356,
+    "SQ_WAVES": 0.0008822446827397288
+  },
+  "derived": {
+    "steady_producer_ms": 8.054311,
+    "steady_fold_ms": 0.053099999999999994,
+    "fold_fraction_of_full_path_percent": 0.6531629937084857,
+    "vmem_read_fraction_of_vmem_insts": 0.997445823522369,
+    "vmem_write_fraction_of_vmem_insts": 0.002554176477631001,
+    "lds_bank_conflict_per_lds_idx_active": 0.3435655057898263,
+    "sq_insts_per_dispatch": 928540592.0,
+    "sq_waves_per_dispatch": 8192.0,
+    "mfma_insts_per_dispatch": 41943040.0,
+    "bf16_mfma_mops_counter_per_dispatch": 671088640.0
+  },
+  "read": "TileLang remains promising because it replaced the original many-to-one global atomic pattern with a compact reduced-row contract: raw selected FP32 write volume is modeled at 4 GiB, while the retained compact partial stream is 128 MiB and final dKV is 2 MiB. However, rocprof shows the current retained 8.13 ms path is not blocked by the TileLang panel-dense final fold, which is only about 0.05-0.07 ms. The bottleneck is compact_partial_prim_kernel itself. Its steady dispatches are about 8.05-8.13 ms and issue roughly 928.5M instructions, with LDS (~318.9M), VALU (~272.7M), SALU (~96.6M), branch (~45.6M), and VMEM read (~51.2M) instruction streams surrounding only ~41.9M BF16 MFMA instructions. The generated kernel uses a 160 KiB dynamic shared-memory table per CTA, and the profile reports substantial LDS bank conflict pressure (~0.344 bank conflicts per LDS active index). So the next speed lever is not the final ScatterAdd/fold; it is reducing the producer-side LDS staging, slot/index scalar work, and local active-group accumulation traffic while preserving query-major MFMA reuse.",
+  "decision": "keep_tilelang_branch_promoted_for_contract_but_rewrite_producer_layout",
+  "next_kernel_targets": [
+    "Reduce or eliminate the 512x64 FP32 LDS active-group table per CTA; use smaller row-block/register-owned accumulators or two-level micro reducers.",
+    "Keep query-major q/dO reuse, but make selected-slot accumulation less LDS-heavy than the current dynamic PairSlots -> 160KiB LDS table path.",
+    "Fuse or stream LI/probability production later for correctness/memory; do not expect that alone to close the measured 8 ms producer wall.",
+    "Treat panel-dense fold as solved for now; optimizing it further has sub-0.1 ms upside."
+  ],
+  "rocprof_docs": "https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/how-to/using-rocprofv3.html"
+}

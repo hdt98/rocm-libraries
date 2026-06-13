@@ -1,0 +1,76 @@
+{
+  "artifact": "sharedkv_compressed_dkv_bmm_floor_chunk_sweep_20260602",
+  "created_date": "2026-06-02",
+  "status": "chunked_mfma_floor_preserves_speed_at_1024_2048_but_python_bmm_chunks_bend_smaller",
+  "scope": "DeepSeek-V4 shared latent-KV sparse MLA backward compressed-prefix dKV accumulation",
+  "source_probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py",
+  "remote_workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 0,
+    "csa_count": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "kv_len": 5120
+  },
+  "reference_context": {
+    "query_major_atomic_compressed_only_ms": 11.017240524291992,
+    "query_major_atomic_best_tile_ms": 10.997425079345703,
+    "full_materialized_mixed_bmm_floor_ms": 7.065645217895508,
+    "full_materialized_mixed_bmm_peak_gib": 5.851562976837158,
+    "full_materialized_bf16_bmm_floor_ms": 4.756993770599365,
+    "full_materialized_bf16_bmm_peak_gib": 4.319336414337158
+  },
+  "s128_correctness": {
+    "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_mixed_chunk32_20260602.json",
+    "status": "passed",
+    "math_dtype": "float32",
+    "bmm_input_dtype": "bfloat16",
+    "seq_chunk": 32,
+    "max_abs_diff": 0.1124725341796875,
+    "median_ms": 0.9334880113601685,
+    "peak_gib": 0.18503236770629883
+  },
+  "s4096_mixed_chunk_sweep": [
+    {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk2048_20260602.json",
+      "seq_chunk": 2048,
+      "active_chunk_scores_or_probs_fp32_gib": 0.25,
+      "median_ms": 7.6910271644592285,
+      "peak_gib": 4.507812976837158,
+      "checksum_norm": 1848.9022216796875
+    },
+    {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk1024_20260602.json",
+      "seq_chunk": 1024,
+      "active_chunk_scores_or_probs_fp32_gib": 0.125,
+      "median_ms": 7.71589994430542,
+      "peak_gib": 3.882812976837158,
+      "checksum_norm": 1848.931640625
+    },
+    {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk512_20260602.json",
+      "seq_chunk": 512,
+      "active_chunk_scores_or_probs_fp32_gib": 0.0625,
+      "median_ms": 8.112430572509766,
+      "peak_gib": 3.602539539337158,
+      "checksum_norm": 1848.880126953125
+    },
+    {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_chunk256_20260602.json",
+      "seq_chunk": 256,
+      "active_chunk_scores_or_probs_fp32_gib": 0.03125,
+      "median_ms": 9.507842063903809,
+      "peak_gib": 3.477539539337158,
+      "checksum_norm": 1848.9173583984375
+    }
+  ],
+  "commands": {
+    "s128_mixed_chunk32": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 128 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --seq-chunk 32 --warmup-iters 1 --timed-iters 3 --json",
+    "s4096_mixed_chunk_sweep": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 4096 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --seq-chunk {2048,1024,512,256} --warmup-iters 1 --timed-iters 5 --skip-correctness --skip-reference-timing --json"
+  },
+  "read": "Chunking the materialized BMM floor separates two concerns. The full mixed BMM floor is 7.07 ms but peaks at 5.85 GiB. Streaming 2048-token and 1024-token chunks keeps latency in the same band, 7.69-7.72 ms, while reducing peak allocation to 4.51 and 3.88 GiB and shrinking the active score/probability slab to 0.25 and 0.125 GiB. Smaller chunks bend upward: chunk512 is 8.11 ms and chunk256 is 9.51 ms, which exposes repeated BMM launch/packing overhead rather than the original atomic wall. The production design should preserve MFMA-friendly KxS @ SxD accumulation inside a fused streaming schedule, not call many external BMMs and not materialize the full [B,H,S,K] slab."
+}

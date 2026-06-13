@@ -1,0 +1,33 @@
+{
+  "scope": "actual_li_dotk_compact_micro_merged_partial_store",
+  "status": "closed_rejected_as_latency_promotion",
+  "read": "The new two-stage compact-micro path preserves the query-major dot-K producer, writes compact micro rows, then explicitly merges micro rows into seq-tile compact rows before the final fold. It passes S128/S512 parity and proves the micro-to-seq merge itself is feasible, but it is not a speed path: at S4096 the producer still writes one update per valid selected KxD contribution before the merge, so the added reducer only adds latency.",
+  "artifacts": {
+    "s128": "actual_li_active_list_dotk_compact_micro_merged_partial_store_s128_layer2_sc16_sb128_d16h64k32_20260604.json",
+    "s512": "actual_li_active_list_dotk_compact_micro_merged_partial_store_s512_layer2_sc32_sb128_d16h64k64_20260604.json",
+    "s4096": "actual_li_active_list_dotk_compact_micro_merged_partial_store_s4096_layer2_sc32_sb128_d16h64k64_timing_20260604.json",
+    "baseline_s4096": "actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb128_d16h64k64_timing10_20260603.json"
+  },
+  "correctness": {
+    "s128_max_abs_diff": 0.06964731216430664,
+    "s128_passed": true,
+    "s512_max_abs_diff": 0.07168817520141602,
+    "s512_passed": true
+  },
+  "s4096_timing_ms": {
+    "merged_full": 10.788481712341309,
+    "merged_emit_only": 8.948858261108398,
+    "merged_micro_to_seq_merge_only": 0.9136459827423096,
+    "baseline_compact_micro_full": 9.346345901489258,
+    "baseline_compact_micro_emit_only": 8.823959350585938
+  },
+  "s4096_accounting": {
+    "raw_kxd_write_elements": 805044224,
+    "micro_compact_partial_elements": 126415360,
+    "seq_compact_partial_elements": 33806848,
+    "micro_compact_over_raw_x": 0.15702908763432108,
+    "seq_compact_over_raw_x": 0.04199377747476392
+  },
+  "decision": "Do not pursue a separate compact micro-to-seq merge as the next sparse dKV optimization. The merge is under 1 ms at S4096, but it sits after the same raw producer/writeback wall and makes the full path slower than the retained compact-micro partial-store baseline.",
+  "next_action": "Move the reducer inside the query-major producer itself: lane/warp/block segmented accumulation before micro partial global writes, or fuse LI/compressor dKV so the producer never emits one update per valid selected KxD contribution."
+}

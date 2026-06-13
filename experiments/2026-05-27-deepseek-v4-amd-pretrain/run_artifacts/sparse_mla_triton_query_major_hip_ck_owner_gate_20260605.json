@@ -1,0 +1,76 @@
+{
+  "artifact": "sparse_mla_triton_query_major_hip_ck_owner_gate",
+  "status": "implemented_and_rejected_for_latency",
+  "created_at": "2026-06-05",
+  "scope": "Concrete HIP/CK/rocWMMA owner gate for the user-requested branch: keep the Triton query-major source-boundary decomposition, but move the owner into HIP/CK so dKV epilogue control is available before global memory.",
+  "source": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip",
+    "python_probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352,
+    "dtype": "bf16_source_fp32_accum"
+  },
+  "implemented_owner": {
+    "grid": "(seq_len, batch)",
+    "cta_contract": "one CTA owns one query token and the full H64 head block",
+    "selected_loop": "selected slots looped internally as N64 tiles",
+    "mfma_layout": "16 wavefronts cover the H64 x N64 score/grad-prob tile using CK MFMA M16N16K32",
+    "dkv_contribution": "four D16 wave groups per D64 step compute dKV contributions from source q, grad_output, output, lse, kv, and LI route",
+    "epilogue_control": "full mode emits HIP-side atomicAdd to dKV; contribution-sink mode keeps the same producer without final atomics"
+  },
+  "baseline_triton_query_major_actual_li": {
+    "artifact": "actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+    "no_dkv_dq_recompute_ms": 1.974266,
+    "dkv_reduce_sink_ms": 2.79503,
+    "full_dq_dkv_atomic_ms": 11.08092,
+    "global_dkv_accumulation_estimate_ms": 8.28589
+  },
+  "hip_ck_owner_results_ms": {
+    "mode0_score_prob_recompute": {
+      "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode0_20260605.json",
+      "event_median_ms": 23.012451171875,
+      "read": "source tensors to score/prob/scaled-dP state, no dKV contribution or final atomics"
+    },
+    "mode1_dkv_contribution_sink": {
+      "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode1_20260605.json",
+      "event_median_ms": 45.60773849487305,
+      "delta_vs_mode0_ms": 22.595287322998047,
+      "read": "adds CK dKV contribution math but sinks the result, so final global atomics are disabled"
+    },
+    "mode2_full_dkv_atomic": {
+      "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode2_20260605.json",
+      "event_median_ms": 46.52796936035156,
+      "delta_vs_mode1_ms": 0.9202308654785156,
+      "read": "adds final dKV atomic writes"
+    }
+  },
+  "decision": {
+    "passes_triton_11p13_ms_gate": false,
+    "passes_dkv_atomic_wall_gate": false,
+    "root_cause": "This implementation preserves the high-level query-major loop ownership but not Triton's fast execution shape. The 16-wave H64xN64 CK owner is already 23 ms before dKV contribution writes, and the CK contribution path adds another 22.6 ms. Final atomics add only about 0.92 ms in this implementation, so optimizing this epilogue would chase the wrong wall.",
+    "rejected": [
+      "replace Triton's producer wholesale with a single 16-wave H64xN64 CK CTA owner",
+      "tune final atomics for this owner before fixing producer/contribution schedule"
+    ],
+    "next_code_step": "Keep the proven fast query-major producer shape as the schedule contract. Add HIP/CK epilogue control at the contribution/write boundary without moving the score/prob producer into this slower 16-wave CTA shape; the next owner should either wrap the existing 4-wave query-major score path or use a persistent producer-consumer design where the CK epilogue consumes the fast producer's tile immediately."
+  },
+  "commands": [
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 64 --block-d 16 --threads 1024 --warmup-iters 1 --timed-iters 3 --skip-correctness --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip --hip-define SCOREPAGE_THREADS=1024 --hip-define TRITON_QM_DKV_MODE=0 --extension-dir /workspace/torch_extensions_triton_qm_h64n64_mode0_20260605 --summary-path run_artifacts/sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode0_20260605.json --json",
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 64 --block-d 16 --threads 1024 --warmup-iters 1 --timed-iters 3 --skip-correctness --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip --hip-define SCOREPAGE_THREADS=1024 --hip-define TRITON_QM_DKV_MODE=1 --extension-dir /workspace/torch_extensions_triton_qm_h64n64_mode1_20260605 --summary-path run_artifacts/sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode1_20260605.json --json",
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 64 --block-d 16 --threads 1024 --warmup-iters 1 --timed-iters 3 --skip-correctness --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip --hip-define SCOREPAGE_THREADS=1024 --hip-define TRITON_QM_DKV_MODE=2 --extension-dir /workspace/torch_extensions_triton_qm_h64n64_mode2_20260605 --summary-path run_artifacts/sparse_mla_source_boundary_triton_qm_h64n64_s4096_layer2_mode2_20260605.json --json"
+  ],
+  "dependency_pin_changes": []
+}

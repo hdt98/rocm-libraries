@@ -1,0 +1,118 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_ppvis_mbs8_step2_summary_20260608",
+  "date": "2026-06-08",
+  "kind": "pp_vis_schema_summary",
+  "source_run": {
+    "run_id": "torchtitan_dsv4_flash12_ppvis_mbs8_steps2_manual_loop_20260608",
+    "host": "do-sonle5-mi350-gpu",
+    "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS8_GBS128_S4096",
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_split_backward_mode": "manual_loop",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "step2_tokens_per_gpu_s": 4830,
+    "step2_tflops_per_gpu": 244.56
+  },
+  "pp_vis_input": {
+    "tool": "sources/wip/primus/tools/visualization/pp_vis",
+    "schema": "config.json plus pp_rank_N.json",
+    "timeline_mode": "global_rank_rows",
+    "note": "The active DSv4 canary is PP=1. The exporter maps global ranks to pp_vis rows for F/B timeline visualization and rank-skew inspection; the pp_vis bubble formula is a F/B residual unless loss and other scheduled work share the same active-block scope."
+  },
+  "step2_pp_vis_formula": {
+    "iter_time_ms": 12082.216,
+    "wgrad_ms": 0.0,
+    "rank_rows": [
+      {
+        "rank": 0,
+        "forward_ms": 3343.014,
+        "backward_ms": 8041.93,
+        "active_ms": 11384.944,
+        "bubble_pct": 5.7711
+      },
+      {
+        "rank": 1,
+        "forward_ms": 3380.22,
+        "backward_ms": 8041.944,
+        "active_ms": 11422.164,
+        "bubble_pct": 5.463
+      },
+      {
+        "rank": 2,
+        "forward_ms": 3353.996,
+        "backward_ms": 8041.917,
+        "active_ms": 11395.913,
+        "bubble_pct": 5.6803
+      },
+      {
+        "rank": 3,
+        "forward_ms": 3338.77,
+        "backward_ms": 8041.878,
+        "active_ms": 11380.648,
+        "bubble_pct": 5.8066
+      },
+      {
+        "rank": 4,
+        "forward_ms": 3364.746,
+        "backward_ms": 8041.911,
+        "active_ms": 11406.657,
+        "bubble_pct": 5.5914
+      },
+      {
+        "rank": 5,
+        "forward_ms": 3340.444,
+        "backward_ms": 8041.949,
+        "active_ms": 11382.393,
+        "bubble_pct": 5.7922
+      },
+      {
+        "rank": 6,
+        "forward_ms": 3350.265,
+        "backward_ms": 8041.903,
+        "active_ms": 11392.168,
+        "bubble_pct": 5.7113
+      },
+      {
+        "rank": 7,
+        "forward_ms": 3343.566,
+        "backward_ms": 8041.87,
+        "active_ms": 11385.436,
+        "bubble_pct": 5.767
+      }
+    ],
+    "summary": {
+      "forward_ms_mean": 3351.8776,
+      "forward_ms_min": 3338.77,
+      "forward_ms_max": 3380.22,
+      "backward_ms_mean": 8041.9128,
+      "backward_ms_min": 8041.87,
+      "backward_ms_max": 8041.949,
+      "bubble_pct_mean": 5.6978,
+      "bubble_pct_min": 5.463,
+      "bubble_pct_max": 5.8066
+    }
+  },
+  "raw_scope_audit": {
+    "status": "arithmetically_correct_but_not_true_pp_bubble",
+    "reason": "The PP=1/global-rank exporter used full train-step wall time as pp_vis total, but marked only model_forward and backward as active F/B spans. Loss and step-level bookkeeping were outside active spans, so the pp_vis bubble number is a F/B-only residual, not a validated pipeline bubble.",
+    "step2_rank_step_filter": "kind=rank_step and relative_step=2",
+    "rankmax_iter_time_ms": 12082.216,
+    "mean_forward_ms": 3351.8207,
+    "mean_loss_ms": 574.7719,
+    "mean_backward_ms": 8041.8364,
+    "mean_fb_only_residual_ms": 688.3866,
+    "mean_fb_only_residual_pct": 5.6976,
+    "mean_full_step_residual_after_forward_loss_backward_ms": 113.6147,
+    "mean_forward_backward_call_residual_after_forward_loss_backward_ms": 4.5626,
+    "mean_microbatch_forward_backward_residual_after_forward_loss_backward_ms": 4.7522,
+    "optimizer_step_ms_mean": 45.9453,
+    "grad_clip_ms_mean": 26.6452,
+    "corrected_read": "Do not report the 5.70% value as true pipeline bubble. It is mainly loss plus non-F/B step bookkeeping. The useful conclusion is narrower: the current PP=1 diagnostic does not show a large coarse GA wrapper gap inside the forward/backward call, but it also does not validate pipeline-bubble health."
+  },
+  "read": "Corrected scope: the 5.70% pp_vis-formula number is a F/B-only residual from a PP=1 visualization adapter, not a true PP bubble. The actual forward/backward-call residual after including loss is about 4.6 ms mean; the remaining full-step residual is mostly loss, grad clipping, optimizer, and bookkeeping. The relevant 1F1B A2A opportunity remains inside the MoE/attention backward structure, where dispatch/combine and dgrad/wgrad are still hidden behind one autograd boundary."
+}

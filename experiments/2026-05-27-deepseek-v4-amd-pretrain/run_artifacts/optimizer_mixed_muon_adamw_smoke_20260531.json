@@ -1,0 +1,65 @@
+{
+  "status": "passed",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "torch_version": "2.10.0a0+git449b176",
+  "source_under_test": "sources/wip/torchtitan",
+  "remote_temp_copy": "/tmp/dsv4_optimizer_smoke/local_torchtitan",
+  "commands": [
+    "PYTHONPATH=/workspace/smoke/local_torchtitan python3 /workspace/smoke/smoke_mixed_optimizer.py --mode toy",
+    "PYTHONPATH=/workspace/smoke/local_torchtitan python3 /workspace/smoke/smoke_mixed_optimizer.py --mode deepseek-debugmodel",
+    "PYTHONPATH=/workspace/smoke/local_torchtitan python3 -m unittest /workspace/smoke/test_optimizer_param_groups.py"
+  ],
+  "toy_smoke_result": {
+    "status": "passed",
+    "mode": "toy",
+    "optimizer_types": [
+      "AdamW",
+      "Muon"
+    ],
+    "muon_params": [
+      "expert_weight",
+      "proj.weight"
+    ],
+    "state_dict_keys": 56
+  },
+  "deepseek_debugmodel_smoke_result": {
+    "status": "passed",
+    "mode": "deepseek-v3-debugmodel",
+    "optimizer_types": [
+      "AdamW",
+      "Muon"
+    ],
+    "param_counts": {
+      "AdamW": 21,
+      "Muon": 62
+    },
+    "muon_sample": [
+      "layers.0.attention.wkv_a.weight",
+      "layers.0.attention.wkv_b.weight",
+      "layers.0.attention.wo.weight",
+      "layers.0.attention.wq.weight",
+      "layers.0.feed_forward.w1.weight",
+      "layers.0.feed_forward.w2.weight",
+      "layers.0.feed_forward.w3.weight",
+      "layers.1.attention.wkv_a.weight"
+    ],
+    "stepped_params": [
+      "tok_embeddings.weight",
+      "layers.1.moe.router.gate.weight",
+      "layers.1.moe.experts.w1"
+    ],
+    "state_dict_keys": 2
+  },
+  "unit_result": {
+    "tests_run": 14,
+    "status": "OK"
+  },
+  "caveats": [
+    "The Muon class is a slow PyTorch reference for bring-up and checkpoint wiring.",
+    "Mixed optimizer-class containers use native per-inner optimizer state dictionaries instead of TorchTitan's DCP flattened optimizer format because DCP rehydration mixed states incorrectly when several optimizers shared the same model object.",
+    "For FSDP-sharded matrices this reference orthogonalizes local shards, not the global matrix; a distributed Muon update remains required for faithful DeepSeek-V4 pretraining.",
+    "Validation used a temp copy of the local TorchTitan WIP package because the image-bundled TorchTitan snapshot has a different config API."
+  ]
+}

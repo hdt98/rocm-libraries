@@ -1,0 +1,113 @@
+{
+  "date": "2026-06-12",
+  "purpose": "Two-step smoke for the new TorchTitan native owner-compact needed hot-weight exchange selector on the retained DeepSeek-V4 Flash 12-layer MBS8 hot-helper surface.",
+  "decision": "smoke_pass_not_promoted",
+  "host": "do-sonle5-mi350-gpu",
+  "hardware": {
+    "gpu_count": 8,
+    "gpu": "AMD Instinct MI350X VF",
+    "logged_capacity_gib": 287.69,
+    "post_run_rocm_smi": "all 8 GPUs idle; only lighthouse PID reported with 0 DRM devices"
+  },
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "mtp": false,
+    "mhc": false,
+    "dataset": "tests/assets/c4_test via tokenizer.json"
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "chunked_ce_num_chunks": 8,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_split_weight_layout": "needed",
+    "standard_ep_needed_weight_exchange_impl": "native",
+    "standard_ep_needed_weight_exchange_transport": "native",
+    "standard_ep_needed_weight_max_density": 1.0,
+    "standard_ep_hot_split_weight_order": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_bwd_score_mode": "torch",
+    "mori_shmem_heap_size": "32G",
+    "mori_import_mode": "remote",
+    "mori_rebuild_remote": "auto"
+  },
+  "result": {
+    "status": "completed_two_steps",
+    "run_id": "torchtitan_dsv4_flash12_native_needed_exchange_smoke_mbs8_8x_steps2_20260612",
+    "step1": {
+      "loss": 12.28324,
+      "grad_norm": 10.5,
+      "tokens_per_gpu_s_range": [2039, 2047],
+      "tflops_per_gpu_range": [93.40, 93.75],
+      "peak_logged_memory_gib": 214.58
+    },
+    "step2": {
+      "loss": 10.29871,
+      "grad_norm": 23.375,
+      "tokens_per_gpu_s": 6728,
+      "tflops_per_gpu": 308.15,
+      "mfu_pct": 13.34,
+      "peak_logged_memory_gib": 253.79
+    },
+    "remote_logs": {
+      "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_native_needed_exchange_smoke_mbs8_8x_steps2_20260612/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_native_needed_exchange_smoke_mbs8_8x_steps2_20260612"
+    }
+  },
+  "comparisons": {
+    "retained_selected_layout_hothelper_20step": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 8579.4605,
+      "steps_2_to_20_tflops_per_gpu_mean": 392.9355,
+      "steps_13_to_20_tokens_per_gpu_s_mean": 8632.7813,
+      "steps_13_to_20_tflops_per_gpu_mean": 395.3734,
+      "peak_logged_memory_gib": 256.19
+    },
+    "older_needed_mori_exchange_20step": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_needed_mori_exchange_mbs8_8x_20step_20260612.json",
+      "standard_ep_needed_weight_exchange_impl": "mori",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 6270.3684,
+      "steps_2_to_20_tflops_per_gpu_mean": 310.4279,
+      "steps_13_to_20_tokens_per_gpu_s_mean": 6334.5156,
+      "steps_13_to_20_tflops_per_gpu_mean": 313.6092,
+      "peak_logged_memory_gib": 274.15
+    }
+  },
+  "read": {
+    "what_worked": "The launcher and TorchTitan selector now activate the native MORI owner-compact needed-exchange path: the run log records exchange_impl=native, transport=native, and MORI_SHMEM_HEAP_SIZE=32G; MORI rebuilt and the two-step training gate completed with finite loss/grad.",
+    "what_failed": "The smoke is not a promotion signal. Step 2 reaches only 6728 tok/GPU/s, far below the retained selected-layout hot-helper late-window 8632.78 tok/GPU/s. This lines up with the older 20-step needed-layout MORI wrapper rejection rather than proving a new native balanced-MoE uplift.",
+    "decision": "Do not run a full 20-step promotion gate for this wrapper shape until the native backend removes more of the selected-layout/needed-layout adapter graph. Continue with the first-class hot/cold/helper compact ABI and compact helper VJP/return work for MORI and the equivalent compact ABI for Primus-Turbo."
+  },
+  "validation": {
+    "commands": [
+      "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "env TARGET_HOST=do-sonle5-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_DP_SHARD=-1 CANARY_MBS=8 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=selective CANARY_ACTIVATION_CHECKPOINT_SCOPE=attention_only CANARY_CHUNKED_CE_NUM_CHUNKS=8 CANARY_MOE_COMM_BACKEND=standard CANARY_MOE_BALANCED_MOE_MODE=execute CANARY_MOE_BALANCED_MOE_HOT_EXPERTS=8 CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT=needed CANARY_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL=native CANARY_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_TRANSPORT=native CANARY_STANDARD_EP_NEEDED_WEIGHT_MAX_DENSITY=1.0 ... launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "ssh do-sonle5-mi350-gpu 'grep -E \"run_id=|standard_ep_needed_weight_exchange|mori_shmem_heap_size|step:|Training completed|Process group destroyed\" /scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_native_needed_exchange_smoke_mbs8_8x_steps2_20260612/docker-run.log | tail -80'",
+      "ssh do-sonle5-mi350-gpu 'rocm-smi --showpidgpus'"
+    ],
+    "dependency_pin_changes": "none"
+  }
+}

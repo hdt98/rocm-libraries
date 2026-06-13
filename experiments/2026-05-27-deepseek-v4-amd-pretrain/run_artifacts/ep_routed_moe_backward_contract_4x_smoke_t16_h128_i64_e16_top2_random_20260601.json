@@ -1,0 +1,599 @@
+{
+  "probe": "ep_routed_moe_backward_contract",
+  "created_unix": 1780330718.1242483,
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device": "cuda:0",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "world_size": 4,
+  "shape": {
+    "tokens_per_rank": 16,
+    "hidden": 128,
+    "intermediate": 64,
+    "experts": 16,
+    "num_local_experts": 4,
+    "topk": 2,
+    "topk_pattern": "random",
+    "storage_dtype": "torch.bfloat16 on CUDA, torch.float32 on CPU",
+    "reference_math_dtype": "torch.float32",
+    "weight_scale": 0.05,
+    "warmup": 1,
+    "iters": 2
+  },
+  "contract": {
+    "forward_source": "MORI dispatch -> local AITER fused_moe -> MORI combine can be used for forward once wrapped",
+    "backward_target": "combine backward produces route-output grads and top-k weight grads; expert backward aggregates local-owner dW across all ranks; dispatch backward returns accumulated dX to original token order",
+    "reference_a": "full global TorchTitan-style routed SwiGLU autograd on each rank, then all-reduced dW",
+    "reference_b": "route-decomposed VJP with scatter-add dX/dTopkWeight and all-reduced expert dW owner slices",
+    "production_note": "No MORI or AITER kernels are used here; this defines the exact VJP semantics the training-safe MORI+AITER custom autograd path must match."
+  },
+  "thresholds": {
+    "atol": 1e-05
+  },
+  "summary": {
+    "all_ranks_pass": true,
+    "max_abs_diff_across_ranks": 0.0,
+    "full_reference_ms_rank_median": 8.354307006811723,
+    "route_decomposed_ms_rank_median": 11.07644900912419
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "expert_owner_range": [
+        0,
+        4
+      ],
+      "local_routes": 32,
+      "owner_routes_from_this_rank": 7,
+      "passes_atol": true,
+      "max_abs_diff": 0.0,
+      "local_token_gradient_compare": {
+        "dX": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "dTopkWeight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW1_gate": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW3_up": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW2_down": {
+          "shape": [
+            16,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "owner_allreduced_gradient_compare": {
+        "owner_dW1_gate": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW3_up": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW2_down": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "timing_ms": {
+        "full_global_autograd_reference": {
+          "median": 7.594530936330557,
+          "min": 7.414649939164519,
+          "max": 7.774411933496594
+        },
+        "route_decomposed_reference": {
+          "median": 9.916439012158662,
+          "min": 9.813828044570982,
+          "max": 10.019049979746342
+        },
+        "read": "Reference-only Python/autograd timing for small correctness smoke; not a performance target."
+      }
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "expert_owner_range": [
+        4,
+        8
+      ],
+      "local_routes": 32,
+      "owner_routes_from_this_rank": 6,
+      "passes_atol": true,
+      "max_abs_diff": 0.0,
+      "local_token_gradient_compare": {
+        "dX": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "dTopkWeight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW1_gate": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW3_up": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW2_down": {
+          "shape": [
+            16,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "owner_allreduced_gradient_compare": {
+        "owner_dW1_gate": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW3_up": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW2_down": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "timing_ms": {
+        "full_global_autograd_reference": {
+          "median": 8.687639492563903,
+          "min": 8.470367989502847,
+          "max": 8.90491099562496
+        },
+        "route_decomposed_reference": {
+          "median": 11.230630043428391,
+          "min": 11.108709033578634,
+          "max": 11.352551053278148
+        },
+        "read": "Reference-only Python/autograd timing for small correctness smoke; not a performance target."
+      }
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "expert_owner_range": [
+        8,
+        12
+      ],
+      "local_routes": 32,
+      "owner_routes_from_this_rank": 8,
+      "passes_atol": true,
+      "max_abs_diff": 0.0,
+      "local_token_gradient_compare": {
+        "dX": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "dTopkWeight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW1_gate": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW3_up": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW2_down": {
+          "shape": [
+            16,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "owner_allreduced_gradient_compare": {
+        "owner_dW1_gate": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW3_up": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW2_down": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "timing_ms": {
+        "full_global_autograd_reference": {
+          "median": 9.238178958185017,
+          "min": 8.9619419304654,
+          "max": 9.514415985904634
+        },
+        "route_decomposed_reference": {
+          "median": 12.248623534105718,
+          "min": 12.185798026621342,
+          "max": 12.311449041590095
+        },
+        "read": "Reference-only Python/autograd timing for small correctness smoke; not a performance target."
+      }
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "expert_owner_range": [
+        12,
+        16
+      ],
+      "local_routes": 32,
+      "owner_routes_from_this_rank": 7,
+      "passes_atol": true,
+      "max_abs_diff": 0.0,
+      "local_token_gradient_compare": {
+        "dX": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "dTopkWeight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW1_gate": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW3_up": {
+          "shape": [
+            16,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "local_contribution_dW2_down": {
+          "shape": [
+            16,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "owner_allreduced_gradient_compare": {
+        "owner_dW1_gate": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW3_up": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "owner_dW2_down": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "timing_ms": {
+        "full_global_autograd_reference": {
+          "median": 8.020974521059543,
+          "min": 7.70473200827837,
+          "max": 8.337217033840716
+        },
+        "route_decomposed_reference": {
+          "median": 10.922267974819988,
+          "min": 10.738516924902797,
+          "max": 11.10601902473718
+        },
+        "read": "Reference-only Python/autograd timing for small correctness smoke; not a performance target."
+      }
+    }
+  ]
+}

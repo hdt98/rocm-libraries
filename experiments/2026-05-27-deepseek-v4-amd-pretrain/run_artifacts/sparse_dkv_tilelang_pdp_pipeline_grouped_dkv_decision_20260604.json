@@ -1,0 +1,99 @@
+{
+  "status": "negative_with_working_tilelang_kernels",
+  "scope": "TileLang sparse-MLA compressed dKV backward follow-up after P/dP recompute-once gate",
+  "updated_at": "2026-06-04",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "new_modes": [
+      "recompute_pdp_store_then_dkv_limited",
+      "recompute_pdp_grouped_dkv_limited"
+    ],
+    "read": "The probe now has a concrete two-kernel P/dP slab pipeline and a fused grouped-D recompute+dKV mode that keeps P/dP on chip and reuses it across multiple output D blocks when shared memory allows."
+  },
+  "baseline_context": {
+    "materialized_input_selected_limit_final_dkv_ms": 6.91,
+    "pdp_store_only_s4096_ms": 8.689,
+    "projected_detached_slab_pipeline_ms_before_measurement": 15.599,
+    "current_sparse_atomic_wall_ms_range": "8.0-8.8",
+    "read": "The promotion gate is beating the current sparse-atomic compressed-dKV wall while avoiding materialized [S, topk, H] probability and grad-logit slabs."
+  },
+  "two_kernel_pdp_store_then_dkv": {
+    "mode": "recompute_pdp_store_then_dkv_limited",
+    "artifacts": {
+      "s128": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_s128_tb16_cap32_20260604.json",
+      "s512": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_s512_tb16_cap128_k64d64_20260604.json",
+      "s4096_full_no_overflow": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+      "s4096_topk512_split_panel_overflow": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_s4096_topk512_gp512_tb16_cap256_k64d64_thr512_20260604.json"
+    },
+    "results": {
+      "s128_ms": 1.894577980041504,
+      "s128_max_abs_diff": 0.014758467674255371,
+      "s512_ms": 3.438554048538208,
+      "s512_max_abs_diff": 3.584268569946289,
+      "s4096_full_no_overflow_ms": 16.238040924072266,
+      "s4096_full_no_overflow_shape": {
+        "seq_len": 4096,
+        "groups": 1024,
+        "topk": 1024,
+        "actual_li_topk": 512,
+        "group_panel_size": 512,
+        "selected_window": 512,
+        "block_k": 64,
+        "block_d": 64,
+        "panel_overflow_count": 0
+      },
+      "s4096_topk512_split_panel_ms": 12.868367195129395,
+      "s4096_topk512_split_panel_caveat": "This lower number drops 333843 panel-overflow pairs because recompute modes do not support spill-overflow yet, so it is not the full actual-LI route."
+    },
+    "failed_or_rejected_shapes": [
+      {
+        "shape": "S4096 topk1024 cap512 block_k128 block_d64",
+        "reason": "TileLang dKV consumer requested 180224 bytes dynamic shared memory, above the MI350 limit of 163840 bytes."
+      },
+      {
+        "shape": "S4096 topk512 single 1024-group panel",
+        "reason": "TileLang layout inference failed with no available layout for the final-dKV consumer."
+      }
+    ],
+    "decision": "Rejected as a speed path. The full no-overflow route is 16.24 ms, worse than the existing sparse-atomic wall and almost exactly the expected detached producer+consumer cost."
+  },
+  "grouped_d_recompute_dkv": {
+    "mode": "recompute_pdp_grouped_dkv_limited",
+    "artifacts": {
+      "s128": "run_artifacts/tilelang_sparse_grouped_dkv_recompute_s128_tb16_cap32_k32d64x2_thr512_20260604.json",
+      "s512": "run_artifacts/tilelang_sparse_grouped_dkv_recompute_s512_tb16_cap128_k64d64x2_thr512_20260604.json",
+      "s4096_topk512_d32x2": "run_artifacts/tilelang_sparse_grouped_dkv_recompute_s4096_topk512_gp512_tb16_cap256_k64d32x2_thr512_20260604.json"
+    },
+    "results": {
+      "s128_d64x2_ms": 1.928115963935852,
+      "s128_d64x2_max_abs_diff": 0.014758110046386719,
+      "s512_d64x2_ms": 3.382354974746704,
+      "s512_d64x2_max_abs_diff": 0.01452779769897461,
+      "s4096_topk512_d32x2_ms": 61.64236068725586,
+      "s4096_topk512_d32x2_caveat": "This legal production-shape run uses split panels with 333843 overflow pairs dropped, so it is a fit/performance check rather than full-route correctness."
+    },
+    "failed_or_rejected_shapes": [
+      {
+        "shape": "S128 block_d16 d_blocks_per_kernel8",
+        "reason": "TileLang MFMA layout inference hit a divide-by-zero; block_d16 is not viable through this lowering path."
+      },
+      {
+        "shape": "S4096 topk512 block_d64 d_blocks_per_kernel2",
+        "reason": "TileLang generated 303104 bytes dynamic shared memory, above the MI350 limit of 163840 bytes."
+      },
+      {
+        "shape": "S4096 topk512 block_d32 d_blocks_per_kernel4",
+        "reason": "TileLang generated 290816 bytes dynamic shared memory, above the MI350 limit of 163840 bytes."
+      }
+    ],
+    "decision": "Keep as a source-level prototype only. It proves the on-chip P/dP reuse contract works at S128/S512, but the only S4096 shape that fits is 61.64 ms and the useful reuse shapes exceed shared memory."
+  },
+  "next_kernel_contract": {
+    "read": "The next TileLang attempt should not use a full max_active_groups x D grouped accumulator and should not write P/dP slabs. It needs a smaller warp/block segmented reducer keyed by PairSlots, or a multi-CTA compact partial scheme with a cheap reducer, so P/dP stays near the producer while global writes are reduced without blowing shared memory.",
+    "specific_next_steps": [
+      "Replace the dense [max_active_groups, D] group_acc table with a small keyed/segmented accumulator for only groups touched by the current K tile.",
+      "Keep the no-overflow cap512 route as the full-route gate; treat split cap256 topk512 runs as fit checks until recompute spill-overflow exists.",
+      "If TileLang cannot express the segmented reducer without excessive shared memory or layout failures, move this exact contract to HIP/CK-Tile/rocWMMA rather than another detached slab pipeline."
+    ]
+  }
+}

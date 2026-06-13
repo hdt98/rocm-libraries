@@ -1,0 +1,455 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_torchprof_deep_ops_readout_4x_s4096_step1_20260606",
+  "caveat": "Exact op/kernel timings are from torch-profiler step-1 traces. They are cumulative profiler event times and should be used for attribution/ranking, not promoted throughput.",
+  "cpu_op_rank_summary_s": {
+    "MmBackward0": {
+      "max_s": 5.657,
+      "median_s": 5.61,
+      "min_s": 5.191,
+      "n": 4
+    },
+    "RegisterPostBackwardFunctionBackward": {
+      "max_s": 6.283,
+      "median_s": 5.972,
+      "min_s": 5.721,
+      "n": 4
+    },
+    "_MoriAiterForwardBackwardBackward": {
+      "max_s": 32.978,
+      "median_s": 32.495,
+      "min_s": 32.137,
+      "n": 4
+    },
+    "aten::_chunk_cat": {
+      "max_s": 4.564,
+      "median_s": 4.258,
+      "min_s": 4.102,
+      "n": 4
+    },
+    "aten::_local_scalar_dense": {
+      "max_s": 13.832,
+      "median_s": 11.961,
+      "min_s": 9.805,
+      "n": 4
+    },
+    "aten::_to_copy": {
+      "max_s": 2.418,
+      "median_s": 2.243,
+      "min_s": 2.043,
+      "n": 4
+    },
+    "aten::argsort": {
+      "max_s": 1.076,
+      "median_s": 0.936,
+      "min_s": 0.881,
+      "n": 4
+    },
+    "aten::copy_": {
+      "max_s": 3.115,
+      "median_s": 2.899,
+      "min_s": 2.648,
+      "n": 4
+    },
+    "aten::item": {
+      "max_s": 13.74,
+      "median_s": 11.95,
+      "min_s": 9.801,
+      "n": 4
+    },
+    "aten::mm": {
+      "max_s": 17.115,
+      "median_s": 16.38,
+      "min_s": 15.496,
+      "n": 4
+    },
+    "aten::sort": {
+      "max_s": 2.139,
+      "median_s": 1.86,
+      "min_s": 1.751,
+      "n": 4
+    },
+    "autograd::engine::evaluate_function: MmBackward0": {
+      "max_s": 5.675,
+      "median_s": 5.628,
+      "min_s": 5.208,
+      "n": 4
+    },
+    "autograd::engine::evaluate_function: RegisterPostBackwardFunctionBackward": {
+      "max_s": 6.291,
+      "median_s": 5.982,
+      "min_s": 5.729,
+      "n": 4
+    },
+    "autograd::engine::evaluate_function: _MoriAiterForwardBackwardBackward": {
+      "max_s": 32.984,
+      "median_s": 32.502,
+      "min_s": 32.144,
+      "n": 4
+    },
+    "c10d::barrier": {
+      "max_s": 3.822,
+      "median_s": 3.688,
+      "min_s": 3.535,
+      "n": 4
+    },
+    "fsdp::chunk_cat": {
+      "max_s": 4.583,
+      "median_s": 4.277,
+      "min_s": 4.117,
+      "n": 4
+    },
+    "record_param_comms": {
+      "max_s": 7.002,
+      "median_s": 6.866,
+      "min_s": 6.498,
+      "n": 4
+    }
+  },
+  "kernel_rank_summary_s": {
+    "EpCombineIntraNodeKernel_bf16": {
+      "max_s": 4.826,
+      "median_s": 2.79,
+      "min_s": 1.239,
+      "n": 4
+    },
+    "EpDispatchIntraNodeKernel_bf16": {
+      "max_s": 1.538,
+      "median_s": 1.106,
+      "min_s": 1.089,
+      "n": 4
+    },
+    "__amd_rocclr_copyBuffer.kd": {
+      "max_s": 4.109,
+      "median_s": 4.043,
+      "min_s": 3.992,
+      "n": 4
+    },
+    "attn_fwd.kd": {
+      "max_s": 2.059,
+      "median_s": 2.03,
+      "min_s": 2.025,
+      "n": 4
+    },
+    "bwd_kernel_dk_dv.kd": {
+      "max_s": 5.756,
+      "median_s": 5.736,
+      "min_s": 5.656,
+      "n": 4
+    },
+    "bwd_kernel_dq.kd": {
+      "max_s": 2.683,
+      "median_s": 2.678,
+      "min_s": 2.668,
+      "n": 4
+    },
+    "bwd_preprocess.kd": {
+      "max_s": 0.0,
+      "median_s": 0.0,
+      "min_s": 0.0,
+      "n": 4
+    },
+    "chunk_cat_cuda_kernel": {
+      "max_s": 1.21,
+      "median_s": 1.204,
+      "min_s": 1.187,
+      "n": 4
+    },
+    "ck::kernel_moe_gemm_2lds": {
+      "max_s": 0.879,
+      "median_s": 0.872,
+      "min_s": 0.849,
+      "n": 4
+    },
+    "ncclDevKernel": {
+      "max_s": 6.102,
+      "median_s": 5.272,
+      "min_s": 5.196,
+      "n": 4
+    }
+  },
+  "next_actions": [
+    "Add low-intrusion backward record_function scopes around DSv4 attention backward or custom autograd boundaries so bwd_kernel_dk_dv/dq are attributed per layer/compress-ratio.",
+    "Measure whether guarded dense fallback is causing FlashAttention bwd_kernel_dk_dv/dq for all 12 layers; if yes, restoring final sparse MLA/LI backward for C4/C128 layers becomes a direct e2e target, not just a single-layer microbench task.",
+    "Continue MoE path in parallel: replace Python expert_loop VJP with compact/AITER-owned fused grouped training backward and reduce dX return skew.",
+    "Keep FSDP/autograd buckets on the ladder after attention+MoE: record_param_comms, RegisterPostBackwardFunctionBackward, fsdp::chunk_cat, and c10d::barrier are visible but smaller in this trace."
+  ],
+  "read": [
+    "The biggest exact kernels outside MORI are FlashAttention-style backward kernels: bwd_kernel_dk_dv is about 5.74s median and bwd_kernel_dq is about 2.68s median per rank in the valid step-1 trace.",
+    "This explains a major chunk of backward-minus-MORI: backward attention kernels were not owned by the forward dsv4.attention record_function scopes, so prior scoped summaries undercounted attention backward.",
+    "MORI remains large: _MoriAiterForwardBackwardBackward CPU scope is about 32.49s median, and MORI backward scoped GPU families include copy/RCCL/GEMM/other work.",
+    "FSDP/autograd overhead is visible but below the attention+MORI branches in this trace: record_param_comms 6.87s median, RegisterPostBackwardFunctionBackward 5.97s, MmBackward0 5.61s, fsdp::chunk_cat 4.28s, and c10d::barrier 3.69s.",
+    "The next optimization ladder should therefore keep fused owner-rank MoE backward first, but put dense-fallback attention backward replacement/avoidance next, ahead of broad FSDP wrapper surgery."
+  ],
+  "selected_kernel_call_counts": {
+    "EpCombineIntraNodeKernel_bf16": {
+      "max": 768,
+      "median": 768,
+      "rank_counts": [
+        768,
+        768,
+        768,
+        768
+      ]
+    },
+    "EpDispatchIntraNodeKernel_bf16": {
+      "max": 768,
+      "median": 768,
+      "rank_counts": [
+        768,
+        768,
+        768,
+        768
+      ]
+    },
+    "attn_fwd.kd": {
+      "max": 384,
+      "median": 384,
+      "rank_counts": [
+        384,
+        384,
+        384,
+        384
+      ]
+    },
+    "bwd_kernel_dk_dv.kd": {
+      "max": 384,
+      "median": 384,
+      "rank_counts": [
+        384,
+        384,
+        384,
+        384
+      ]
+    },
+    "bwd_kernel_dq.kd": {
+      "max": 384,
+      "median": 384,
+      "rank_counts": [
+        384,
+        384,
+        384,
+        384
+      ]
+    },
+    "ncclDevKernel": {
+      "max": 2580,
+      "median": 2580,
+      "rank_counts": [
+        2580,
+        2580,
+        2580,
+        2580
+      ]
+    }
+  },
+  "selected_scope_kernel_family_rank_summary_s": {
+    "block_attention": {
+      "copy": {
+        "max_s": 0.015,
+        "median_s": 0.01,
+        "min_s": 0.005,
+        "n": 4
+      },
+      "gemm_cijk": {
+        "max_s": 0.04,
+        "median_s": 0.033,
+        "min_s": 0.026,
+        "n": 4
+      },
+      "other": {
+        "max_s": 0.451,
+        "median_s": 0.419,
+        "min_s": 0.39,
+        "n": 4
+      }
+    },
+    "loss": {
+      "copy": {
+        "max_s": 0.027,
+        "median_s": 0.026,
+        "min_s": 0.026,
+        "n": 4
+      },
+      "fill": {
+        "max_s": 0.004,
+        "median_s": 0.004,
+        "min_s": 0.004,
+        "n": 4
+      },
+      "gemm_cijk": {
+        "max_s": 0.061,
+        "median_s": 0.056,
+        "min_s": 0.048,
+        "n": 4
+      },
+      "other": {
+        "max_s": 0.059,
+        "median_s": 0.05,
+        "min_s": 0.042,
+        "n": 4
+      }
+    },
+    "moe_mori_aiter_bridge": {
+      "copy": {
+        "max_s": 1.693,
+        "median_s": 1.637,
+        "min_s": 1.567,
+        "n": 4
+      },
+      "fill": {
+        "max_s": 0.256,
+        "median_s": 0.199,
+        "min_s": 0.181,
+        "n": 4
+      },
+      "gemm_cijk": {
+        "max_s": 0.683,
+        "median_s": 0.655,
+        "min_s": 0.652,
+        "n": 4
+      },
+      "other": {
+        "max_s": 2.117,
+        "median_s": 2.09,
+        "min_s": 2.067,
+        "n": 4
+      },
+      "rccl_nccl": {
+        "max_s": 1.385,
+        "median_s": 1.248,
+        "min_s": 1.117,
+        "n": 4
+      }
+    },
+    "mori_backward": {
+      "copy": {
+        "max_s": 3.64,
+        "median_s": 3.592,
+        "min_s": 3.535,
+        "n": 4
+      },
+      "fill": {
+        "max_s": 0.205,
+        "median_s": 0.203,
+        "min_s": 0.203,
+        "n": 4
+      },
+      "gemm_cijk": {
+        "max_s": 1.799,
+        "median_s": 1.732,
+        "min_s": 1.683,
+        "n": 4
+      },
+      "other": {
+        "max_s": 9.506,
+        "median_s": 7.343,
+        "min_s": 5.236,
+        "n": 4
+      },
+      "rccl_nccl": {
+        "max_s": 2.909,
+        "median_s": 2.629,
+        "min_s": 2.554,
+        "n": 4
+      }
+    },
+    "mori_local_vjp": {
+      "copy": {
+        "max_s": 0.911,
+        "median_s": 0.878,
+        "min_s": 0.874,
+        "n": 4
+      },
+      "fill": {
+        "max_s": 0.004,
+        "median_s": 0.003,
+        "min_s": 0.003,
+        "n": 4
+      },
+      "gemm_cijk": {
+        "max_s": 4.624,
+        "median_s": 4.598,
+        "min_s": 4.589,
+        "n": 4
+      },
+      "other": {
+        "max_s": 1.014,
+        "median_s": 0.979,
+        "min_s": 0.966,
+        "n": 4
+      },
+      "triton": {
+        "max_s": 0.194,
+        "median_s": 0.183,
+        "min_s": 0.173,
+        "n": 4
+      }
+    }
+  },
+  "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS128 S4096 flash_12layer_ceiling_probe",
+  "source_artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_torchprof_deep_ops_allranks_step1_20260606.json",
+  "trace_count": 4,
+  "trace_iteration": 1,
+  "unscoped_kernel_rank_summary_s": {
+    "EpCombineIntraNodeKernel_bf16": {
+      "max_s": 0.594,
+      "median_s": 0.129,
+      "min_s": 0.078,
+      "n": 4
+    },
+    "EpDispatchIntraNodeKernel_bf16": {
+      "max_s": 0.0,
+      "median_s": 0.0,
+      "min_s": 0.0,
+      "n": 4
+    },
+    "__amd_rocclr_copyBuffer.kd": {
+      "max_s": 0.292,
+      "median_s": 0.264,
+      "min_s": 0.223,
+      "n": 4
+    },
+    "attn_fwd.kd": {
+      "max_s": 0.0,
+      "median_s": 0.0,
+      "min_s": 0.0,
+      "n": 4
+    },
+    "bwd_kernel_dk_dv.kd": {
+      "max_s": 5.756,
+      "median_s": 5.736,
+      "min_s": 5.656,
+      "n": 4
+    },
+    "bwd_kernel_dq.kd": {
+      "max_s": 2.508,
+      "median_s": 2.126,
+      "min_s": 1.383,
+      "n": 4
+    },
+    "bwd_preprocess.kd": {
+      "max_s": 0.115,
+      "median_s": 0.115,
+      "min_s": 0.113,
+      "n": 4
+    },
+    "chunk_cat_cuda_kernel": {
+      "max_s": 0.217,
+      "median_s": 0.194,
+      "min_s": 0.189,
+      "n": 4
+    },
+    "ck::kernel_moe_gemm_2lds": {
+      "max_s": 0.877,
+      "median_s": 0.869,
+      "min_s": 0.846,
+      "n": 4
+    },
+    "ncclDevKernel": {
+      "max_s": 1.775,
+      "median_s": 1.385,
+      "min_s": 1.35,
+      "n": 4
+    }
+  }
+}

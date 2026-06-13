@@ -1,0 +1,86 @@
+{
+  "artifact": "single_layer_control_ablation",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_control_ablation_20260531T0320Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_control_ablation_20260531T0320Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16"
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "rmsnorm_save_policy": "saved-accum"
+  },
+  "commands": {
+    "control_ablation": "RUN_TAG=retained_control_ablation_20260531T0320Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh control-ablation-2048"
+  },
+  "raw_artifacts": {
+    "boundary_correctness": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_control_ablation_20260531T0320Z/boundary_impl_checks/boundary_impl_match.json",
+    "timing_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_control_ablation_20260531T0320Z/control_ablation_s2048"
+  },
+  "correctness_gate": {
+    "check": "boundary_impl_match",
+    "seqlen": 16,
+    "reference": "separate",
+    "candidate": "fused-attn-residual-moe-norm",
+    "dtype": "bfloat16",
+    "ok": true,
+    "output_max_abs": 0.0,
+    "max_grad_rel_l2": 0.0,
+    "thresholds": {
+      "output_atol": 0.005,
+      "grad_rtol": 0.05
+    }
+  },
+  "timing_sweep": {
+    "note": "Quick ranking run uses warmup=1 and iters=3. Fixed-router variants bypass learned router gradients and are ablations, not valid full-training results.",
+    "target_ms": 43.3,
+    "variants": {
+      "learned_separate": {
+        "boundary_impl": "separate",
+        "fixed_router": false,
+        "avg_ms": 52.88984401461979,
+        "min_ms": 52.24948807153851,
+        "tokens_per_s": 38721.98979134619,
+        "estimated_tflops": 184.08362078792928,
+        "moe_gate_grad_present": true
+      },
+      "learned_fused_boundary": {
+        "boundary_impl": "fused-attn-residual-moe-norm",
+        "fixed_router": false,
+        "avg_ms": 52.91945363084475,
+        "min_ms": 52.35113692469895,
+        "tokens_per_s": 38700.32397322973,
+        "estimated_tflops": 183.98062189072118,
+        "moe_gate_grad_present": true
+      },
+      "fixed_router_separate": {
+        "boundary_impl": "separate",
+        "fixed_router": true,
+        "avg_ms": 46.625944009671606,
+        "min_ms": 46.532281092368066,
+        "tokens_per_s": 43924.04365207456,
+        "estimated_tflops": 208.8140882917123,
+        "moe_gate_grad_present": false
+      },
+      "fixed_router_fused_boundary": {
+        "boundary_impl": "fused-attn-residual-moe-norm",
+        "fixed_router": true,
+        "avg_ms": 46.55553101717184,
+        "min_ms": 46.41773202456534,
+        "tokens_per_s": 43990.47664700898,
+        "estimated_tflops": 209.12990951663411,
+        "moe_gate_grad_present": false
+      }
+    },
+    "learned_boundary_delta_ms_fused_minus_separate": 0.029609616224959374,
+    "fixed_router_delta_ms_vs_learned_separate": -6.263900004948184,
+    "fixed_router_best_gap_to_target_ms": 3.2555310171718366
+  },
+  "conclusion": "The fused residual+RMSNorm boundary is numerically exact against the separate boundary at the tiny BF16 gate, but it is timing-neutral at B=1 S=2048. Fixed-router ablation removes about 6.3 ms from the retained learned-router path and lands near 46.6 ms, leaving roughly 3.3 ms to the 43.3 ms development target. Because fixed-router bypasses the learned router and gate gradients, this is not a valid full-training benchmark; it points the next optimization target at learned routing, dynamic token dispatch/build, and associated launch overhead rather than boundary fusion."
+}

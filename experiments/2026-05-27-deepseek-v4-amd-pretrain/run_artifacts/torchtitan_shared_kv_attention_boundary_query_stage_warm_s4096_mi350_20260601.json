@@ -1,0 +1,120 @@
+{
+  "attention_dims": {
+    "compress_ratio": 4,
+    "dsa_indexer_topk": 512,
+    "kv_lora_rank": 512,
+    "n_heads": 64,
+    "qk_head_dim": 512,
+    "qk_nope_head_dim": 448,
+    "qk_rope_head_dim": 64,
+    "v_head_dim": 512,
+    "window_size": 128
+  },
+  "backend": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_path": "sparse_mla_shared_kv_triton_forward_backend.py",
+    "module": null
+  },
+  "backward": {
+    "enabled": false
+  },
+  "backward_timing": {
+    "enabled": false
+  },
+  "batch": 1,
+  "boundary": {
+    "aux_loss": null,
+    "compressed_x_shape": [
+      1,
+      1024,
+      4096
+    ],
+    "index_scores_shape": [
+      1,
+      4096,
+      1024
+    ],
+    "indices_shape": [
+      1,
+      4096,
+      640
+    ],
+    "kv_bank_shape": [
+      1,
+      5120,
+      512
+    ],
+    "kv_compressed_shape": [
+      1,
+      1024,
+      512
+    ],
+    "kv_shared_shape": [
+      1,
+      4096,
+      512
+    ],
+    "q_shape": [
+      1,
+      4096,
+      64,
+      512
+    ],
+    "selected_count": 640,
+    "stage_records": [
+      {
+        "stage": "q_projection_rope",
+        "wall_ms": 0.8542770519852638
+      },
+      {
+        "stage": "shared_kv_projection_rope",
+        "wall_ms": 0.13224000576883554
+      },
+      {
+        "stage": "lightning_indexer_topk",
+        "wall_ms": 1.2314770137891173
+      },
+      {
+        "stage": "shared_kv_compress_indices",
+        "wall_ms": 0.26046892162412405
+      },
+      {
+        "stage": "sparse_mla_shared_kv_forward",
+        "wall_ms": 1.1802270309999585
+      },
+      {
+        "stage": "output_projection",
+        "wall_ms": 0.8127369219437242
+      }
+    ],
+    "stage_total_wall_ms": 4.471426946111023,
+    "top_scores_shape": [
+      1,
+      4096,
+      512
+    ],
+    "topk": 512,
+    "window": 128
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "model_dim": 4096,
+  "output_checksum": 0.00012211676221340895,
+  "output_shape": [
+    1,
+    4096,
+    4096
+  ],
+  "projection_mode": "Self-contained TorchTitan-shape q path plus shared kv_norm(wkv_a(x)[:kv_lora_rank]) with the final qk_rope_head_dim positions replaced by rotated k_pe; wkv_b is intentionally bypassed because it expands to per-head K/V.",
+  "promotion_read": "This is a boundary/integration probe, not a production model path. It measures the TorchTitan-shape q/wkv_a/RoPE/LightningIndexer/compression/shared-KV sparse MLA/wo overhead without importing the full TorchTitan package stack in the older SGLang image. The real model still needs an explicit shared latent-KV projection contract, attn_sink parameter, and fused backward.",
+  "scope": "torchtitan_dsv4_sparse_mla_shared_kv_attention_boundary_probe",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "timing": {
+    "enabled": false
+  }
+}

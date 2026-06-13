@@ -1,0 +1,92 @@
+{
+  "artifact": "torchtitan_mori_cached_tensor_plan_needed_exchange_smoke_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Validate the cached MORI owner-compact tensor-plan handoff in TorchTitan's standard-EP hot-helper needed-weight exchange path.",
+  "code_change": {
+    "summary": "Dispatch now carries owner_compact_exchange_tensor_plan from MORI's as_tensors ABI, and the MoE hot-helper needed layout calls mori.ops.exchange_owner_compact_needed_rows with that cached tensor plan instead of tuple metadata per hot-weight bank.",
+    "default_behavior_changed": false,
+    "active_when": {
+      "TORCHTITAN_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "needed",
+      "TORCHTITAN_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL": "auto|mori"
+    }
+  },
+  "local_validation": {
+    "py_compile": [
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/moe.py",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/balanced_moe.py"
+    ],
+    "git_diff_check": "passed"
+  },
+  "remote_import_smoke": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "result": "passed",
+    "message": "remote cached tensor-plan smoke ok True"
+  },
+  "training_smoke": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "run_id": "torchtitan_dsv4_flash12_cached_tensor_plan_needed_mori_smoke_mbs1_steps2_8x_s4096_gbs128_20260612",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_cached_tensor_plan_needed_mori_smoke_mbs1_steps2_8x_s4096_gbs128_20260612/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_cached_tensor_plan_needed_mori_smoke_mbs1_steps2_8x_s4096_gbs128_20260612",
+    "shape": {
+      "gpus": 8,
+      "sequence_length": 4096,
+      "global_batch_size": 128,
+      "micro_batch_size": 1,
+      "gradient_accumulation_steps": 16,
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "fsdp": 8,
+      "ep": 8,
+      "model": "deepseek_v4 flash_12layer_ceiling_probe"
+    },
+    "key_env": {
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "needed",
+      "CANARY_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL": "mori",
+      "CANARY_STANDARD_EP_NEEDED_WEIGHT_MAX_DENSITY": "1.0",
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+      "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+      "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+      "CANARY_CHECKPOINT_ENABLE": "false"
+    },
+    "status": "pass",
+    "completed": true,
+    "step_summaries": {
+      "step1": {
+        "loss": 15.88819,
+        "grad_norm": 15.125,
+        "tok_per_gpu_s_mean": 1605.5,
+        "tflops_per_gpu_mean": 79.4875,
+        "peak_logged_memory_gib": 115.88
+      },
+      "step2": {
+        "loss": 11.33733,
+        "grad_norm": 39.0,
+        "tok_per_gpu_s_mean": 3828.0,
+        "tflops_per_gpu_mean": 189.5125,
+        "peak_logged_memory_gib": 128.78
+      }
+    },
+    "read": "This is a two-step runtime/autograd smoke, not a throughput promotion. It proves the forced needed-layout MORI exchange path reaches finite loss/grad through optimizer step on the flash-12 S4096 8xMI350 graph."
+  },
+  "node_after_run": {
+    "note": "The DSv4 smoke cleaned up, but an unrelated nexus_titan two-rank job was visible afterward on do-vunguyen-mi350-gpu using cards 0/1. It was not touched."
+  },
+  "next_gate": {
+    "recommendation": "Run an apples-to-apples 20-step or at least 6-step A/B once the node is free: needed+mori cached tensor plan versus needed+local and the retained selected owner-compact baseline, all on the same MBS ladder surface.",
+    "promotion_requires": [
+      "materialized tok/GPU/s uplift",
+      "TFLOPs/GPU uplift",
+      "peak memory not worse enough to hurt fit",
+      "low-intrusion timing showing metadata exchange work actually reduced"
+    ]
+  },
+  "dependency_pin_changes": "none"
+}

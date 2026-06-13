@@ -1,0 +1,62 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_keepreleased_default_kernelmodule_steps20_8x_s4096_gbs128_20260610",
+  "created_at": "2026-06-10",
+  "status": "failed_after_step1_next_backward_hsa_out_of_resources",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_keepreleased_default_kernelmodule_steps20_8x_s4096_gbs128_20260610/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_keepreleased_default_kernelmodule_steps20_8x_s4096_gbs128_20260610",
+  "shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "optimizer": "AdamW",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "env_highlights": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "false",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "false",
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.28871,
+      "grad_norm": 18.875,
+      "tokens_per_gpu_s_range": [1048, 1050],
+      "tflops_per_gpu_range": [53.07, 53.18],
+      "rank_memory_gib_range": [190.37, 195.05]
+    }
+  ],
+  "failure": {
+    "phase": "next_backward_after_step1",
+    "root_rank": 6,
+    "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "reported_available_free_mem_mb": 0,
+    "trace_boundary": "torch.autograd.backward inside torchtitan/trainer.py forward_backward_step"
+  },
+  "read": {
+    "backend_env_fixed": true,
+    "module_import_failure_resolved": true,
+    "perf_safety": "KEEP_RELEASED_HANDLES=true avoids normal-path MORI C++ handle destruction and its hipDeviceSynchronize destructor cost.",
+    "not_promoted": "The run reaches a finite step 1 but still fails in the next backward, so this is memory/residency evidence only, not a throughput result.",
+    "next_source_target": "Reduce active native compact capacity/staging-output residency or collapse the MORI staging/output ABI. Do not add route-mask adapters, per-row Python bookkeeping, or destructor-synchronized release to the perf path."
+  }
+}

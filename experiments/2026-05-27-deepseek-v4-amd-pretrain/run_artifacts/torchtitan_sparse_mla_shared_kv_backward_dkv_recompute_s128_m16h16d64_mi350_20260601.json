@@ -1,0 +1,101 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 623.9058227539062,
+    "dkv_atol": 0.02,
+    "max_abs_diff": 0.04783916473388672,
+    "mean_abs_diff": 0.002211668761447072,
+    "passed": false,
+    "reference_norm": 623.9187622070312
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This isolates the hard dKV side of sparse MLA backward. The candidate recomputes QK, dO.V, probabilities, and grad logits inside the tile, then atomic-adds directly into shared latent KV gradients. It intentionally avoids materialized selected KV, probs, grad_logits, and grad_selected tensors.",
+  "scope": "sparse_mla_shared_latent_kv_backward_dkv_recompute_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.0048828125,
+    "materialized_shared_selected_kv_fp32_gib": 0.0390625,
+    "selected_count": 160,
+    "seq_len": 128
+  },
+  "status": "failed",
+  "tile": {
+    "block_d": 64,
+    "block_h": 16,
+    "block_m": 16
+  },
+  "timing": {
+    "pytorch_reference_dkv": {
+      "checksum_norm": 623.9188232421875,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.1792069673538208,
+        "mean_ms": 0.8383916616439819,
+        "median_ms": 0.6749240159988403,
+        "min_ms": 0.6610440015792847,
+        "samples_ms": [
+          1.1792069673538208,
+          0.6749240159988403,
+          0.6610440015792847
+        ],
+        "stdev_ms": 0.29523629206897983
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 370188800,
+      "peak_memory_allocated_gib": 0.34476518630981445,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.2137549929320812,
+        "mean_ms": 0.8656497035796443,
+        "median_ms": 0.7000870537012815,
+        "min_ms": 0.6831070641055703,
+        "samples_ms": [
+          1.2137549929320812,
+          0.7000870537012815,
+          0.6831070641055703
+        ],
+        "stdev_ms": 0.301587548430013
+      }
+    },
+    "triton_dkv_recompute": {
+      "checksum_norm": 623.9058227539062,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.6410830020904541,
+        "mean_ms": 0.6363236705462137,
+        "median_ms": 0.639244019985199,
+        "min_ms": 0.6286439895629883,
+        "samples_ms": [
+          0.6286439895629883,
+          0.639244019985199,
+          0.6410830020904541
+        ],
+        "stdev_ms": 0.006714059040472368
+      },
+      "label": "triton_dkv_recompute",
+      "peak_memory_allocated_bytes": 105546752,
+      "peak_memory_allocated_gib": 0.0982980728149414,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.6647569825872779,
+        "mean_ms": 0.6592406813676158,
+        "median_ms": 0.6567479576915503,
+        "min_ms": 0.6562171038240194,
+        "samples_ms": [
+          0.6647569825872779,
+          0.6567479576915503,
+          0.6562171038240194
+        ],
+        "stdev_ms": 0.004784624940024214
+      }
+    }
+  }
+}

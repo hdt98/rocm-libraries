@@ -1,0 +1,214 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elementwise_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does replacing Muon source-update and param-add tensor plumbing with Triton elementwise kernels materialize into 8xMI350 e2e throughput?",
+  "selector_failure": {
+    "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elem_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elem_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+    "result": "failed_before_training",
+    "root_cause": "CANARY_OPTIMIZER_IMPLEMENTATION=muon_adamw was passed to --optimizer.implementation, but TorchTitan implementation is an enum and mixed experts-on-Muon is selected by CANARY_DSV4_EXPERTS_ON_MUON=1 plus parameter-group routing.",
+    "error": "invalid choice 'muon_adamw' for argument '--optimizer.implementation'"
+  },
+  "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elem_mbs8_attention_ac_8x_s4096_gbs128_steps6_retry_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elem_mbs8_attention_ac_8x_s4096_gbs128_steps6_retry_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_expert_muon_prealloc_triton_elem_mbs8_attention_ac_8x_s4096_gbs128_steps6_retry_20260608",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "selective_attention_only",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+    "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+    "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+    "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+    "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_WORKSPACE_MODE": "prealloc",
+    "CANARY_OPTIMIZER_MUON_ELEMENTWISE_BACKEND": "triton",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "isolated_optimizer_slice_ab": {
+    "host": "do-sonle5-mi350-gpu",
+    "device": "1xMI350",
+    "probe": "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+    "shape": "12-layer expert-bank NS=1 prealloc chunk4 BF16",
+    "torch_elementwise_step2_ms": 219.1196,
+    "torch_elementwise_step3_ms": 219.619,
+    "triton_elementwise_step2_ms": 212.1552,
+    "triton_elementwise_step3_ms": 212.4654,
+    "steady_step_delta_ms": -7.1536,
+    "steady_step_delta_pct": -3.2584,
+    "peak_allocated_gib": 55.574
+  },
+  "step_metrics": {
+    "1": {
+      "loss": 12.2448,
+      "grad_norm": 20.25,
+      "tokens_per_gpu_s": 1634.0,
+      "node_tokens_s": 13072.0,
+      "tflops_per_gpu": 82.74,
+      "mfu_pct": 3.58,
+      "memory_gib_min": 213.84,
+      "memory_gib_max": 220.46
+    },
+    "2": {
+      "loss": 9.66069,
+      "grad_norm": 88.0,
+      "tokens_per_gpu_s": 7852.0,
+      "node_tokens_s": 62816.0,
+      "tflops_per_gpu": 397.54,
+      "mfu_pct": 17.21,
+      "memory_gib_min": 236.16,
+      "memory_gib_max": 239.66
+    },
+    "3": {
+      "loss": 6.67763,
+      "grad_norm": 52.25,
+      "tokens_per_gpu_s": 8028.0,
+      "node_tokens_s": 64224.0,
+      "tflops_per_gpu": 406.48,
+      "mfu_pct": 17.6,
+      "memory_gib_min": 236.19,
+      "memory_gib_max": 239.98
+    },
+    "4": {
+      "loss": 33.86698,
+      "grad_norm": 69.5,
+      "tokens_per_gpu_s": 8118.0,
+      "node_tokens_s": 64944.0,
+      "tflops_per_gpu": 411.01,
+      "mfu_pct": 17.8,
+      "memory_gib_min": 237.18,
+      "memory_gib_max": 240.69
+    },
+    "5": {
+      "loss": 17.13563,
+      "grad_norm": 25.25,
+      "tokens_per_gpu_s": 8104.0,
+      "node_tokens_s": 64832.0,
+      "tflops_per_gpu": 410.33,
+      "mfu_pct": 17.77,
+      "memory_gib_min": 237.18,
+      "memory_gib_max": 240.69
+    },
+    "6": {
+      "loss": 12.83478,
+      "grad_norm": 23.625,
+      "tokens_per_gpu_s": 8093.0,
+      "node_tokens_s": 64744.0,
+      "tflops_per_gpu": 409.77,
+      "mfu_pct": 17.74,
+      "memory_gib_min": 237.18,
+      "memory_gib_max": 240.69
+    }
+  },
+  "summary": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8039.0,
+    "steps_2_to_6_node_tokens_s_mean": 64312.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 407.026,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8105.0,
+    "steps_4_to_6_node_tokens_s_mean": 64840.0,
+    "steps_4_to_6_tflops_per_gpu_mean": 410.37,
+    "peak_logged_memory_gib": 240.69,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_steps_2_to_6": 0.6589,
+    "delta_vs_muon_prealloc_steps_2_to_6_tokens_per_gpu_pct": -1.3765,
+    "delta_vs_muon_prealloc_steps_2_to_6_tflops_pct": -1.3768,
+    "delta_vs_muon_prealloc_peak_memory_gib": 0.38,
+    "delta_vs_muon_20step_steps_2_to_20_tokens_per_gpu_pct": -3.2851,
+    "delta_vs_adamw_20step_steps_2_to_20_tokens_per_gpu_pct": -5.123
+  },
+  "comparisons": {
+    "muon_prealloc_mbs8_attention_only_steps6": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8151.2,
+      "steps_2_to_6_tflops_per_gpu_mean": 412.7072,
+      "peak_logged_memory_gib": 240.31
+    },
+    "muon_prealloc_ns1_quality20_mbs8_attention_only": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_quality20_mbs8_attention_ac_8x_s4096_gbs128_20260608.json",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 8271.8355,
+      "steps_13_to_20_tokens_per_gpu_s_mean": 8321.0938,
+      "peak_logged_memory_gib": 240.49
+    },
+    "adamw_quality20_mbs8_attention_only": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_8x_s4096_gbs128_20260608.json",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 8431.8684,
+      "steps_13_to_20_tokens_per_gpu_s_mean": 8514.625,
+      "peak_logged_memory_gib": 259.82
+    }
+  },
+  "decision": {
+    "promote_as_throughput_best": false,
+    "promote_as_best_muon_mbs8": false,
+    "read": "The Triton elementwise source-update/param-add kernels improve the isolated expert-Muon optimizer slice by about 3.26%, but do not materialize into e2e throughput. The corrected 8x MBS8 attention-only run is about 1.38% slower than the same Muon prealloc baseline and about 5.12% below the current 20-step AdamW throughput baseline. Keep the code path as an opt-in diagnostic, not a promoted runtime default.",
+    "next_action": "Do not spend more time on small PyTorch/Triton elementwise swaps for Muon. A material Muon speedup needs a lower-level fused full expert-bank update covering source update, Newton-Schulz BMM/polynomial, orientation, and param add, or else return the main e2e ladder to MoE/EP compact helper VJP and sparse SharedKV backward."
+  },
+  "validation": {
+    "local_launcher_bash_n": "passed",
+    "local_optimizer_py_compile": "passed",
+    "remote_launcher_bash_n": "passed",
+    "remote_optimizer_py_compile_in_image": "passed",
+    "remote_correctness_smoke": "MI350 BF16 strict relative parity fails near zero, max_abs 2.441e-4 within the retained 5e-4 envelope",
+    "remote_e2e": "completed 6 steps on 8xMI350"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "artifact": "torchtitan_mori_aiter_bridge_wip_static_20260601",
+  "created_date": "2026-06-01",
+  "status": "guarded_opt_in_overlay_image_normal_gbs64_li_aux_and_acfull_passed_fused_backward_pending",
+  "purpose": "Record the TorchTitan WIP integration surface that borrows the SGLang-style MORI dispatch + AITER fused_moe + MORI combine forward path for MoE training.",
+  "activation": {
+    "comm_backend": "mori",
+    "env": "TORCHTITAN_EXPERIMENTAL_MORI_AITER_MOE=1",
+    "scope": "EP mesh wired, TP/SP size 1, BF16 tensors, score_before_experts=false"
+  },
+  "wip_files": [
+    "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py"
+  ],
+  "forward_contract": "MORI dispatch -> local AITER fused_moe with w13=cat(w1_gate,w3_up), AITER shuffle_weight(layout=(16,16)), gate_mode='separated' -> MORI combine.",
+  "backward_contract": "Temporary PyTorch reference VJP: all-gather local expert shards, recompute routed SwiGLU for local tokens, all-reduce global dW, return local owner-shard dW, dX, and dTopkWeight.",
+  "source_evidence": {
+    "forward_floor_artifact": "run_artifacts/mori_aiter_moe_forward_floor_dsv4_t4096_h4096_i2048_e256_top6_random_preshuffled_20260601.json",
+    "forward_parity_random_artifact": "run_artifacts/mori_aiter_moe_forward_parity_smoke_t64_h1024_i128_e64_top2_random_20260601.json",
+    "backward_contract_artifact": "run_artifacts/ep_routed_moe_backward_contract_4x_smoke_t16_h128_i64_e16_top2_random_20260601.json",
+    "autograd_bridge_4x_artifact": "run_artifacts/mori_aiter_moe_autograd_bridge_4x_smoke_t16_h128_i64_e16_top2_random_20260601.json",
+    "autograd_bridge_8x_artifact": "run_artifacts/mori_aiter_moe_autograd_bridge_8x_smoke_t8_h128_i64_e32_top2_random_20260601.json",
+    "overlay_image_artifact": "run_artifacts/torchtitan_mori_overlay_image_build_20260601.json",
+    "overlay_bridge_artifact": "run_artifacts/mori_aiter_autograd_bridge_overlay_4x_smoke_20260601_v2.json",
+    "integrated_torchtitan_smoke_artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602.json",
+    "integrated_torchtitan_gbs64_li_aux_artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602.json",
+    "integrated_torchtitan_gbs64_li_aux_acfull_artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602.json"
+  },
+  "validation": [
+    {
+      "command": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py sources/wip/torchtitan/torchtitan/models/common/moe.py sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "result": "pass"
+    },
+    {
+      "command": "PYTHONPATH=sources/wip/torchtitan python3 -c 'from torchtitan.models.common.mori_aiter_moe import mori_aiter_grouped_experts_forward'",
+      "result": "not_executed_in_local_host_env",
+      "reason": "The local macOS Python used by Codex does not have torch installed."
+    },
+    {
+      "command": "docker run on do-sonle5-mi350-gpu with onenexus/nexus-titan:rocm722-pytorch-nightly, PYTHONPATH pointing at the staged TorchTitan WIP, import mori_aiter_grouped_experts_forward",
+      "result": "pass",
+      "stdout": "mori_aiter_grouped_experts_forward"
+    },
+    {
+      "command": "CANARY_MOE_COMM_BACKEND=mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_STEPS=1 .../torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "pass",
+      "summary": {
+        "model_spec": "deepseek_v4 flash_4layer",
+        "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+        "moe_score_before_experts": false,
+        "router_score_func": "sqrtsoftplus",
+        "attention_compress_ratio_by_layer": [
+          0,
+          0,
+          4,
+          128
+        ]
+      }
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_mori_overlay_image_build_20260601.json",
+      "result": "pass",
+      "summary": "Derived onenexus/nexus-titan:rocm722-pytorch-nightly-mori image was built on do-sonle5-mi350-gpu with MORI commit 5dd02d6815e9113381a72f6de6b22034fc09b5a3."
+    },
+    {
+      "artifact": "run_artifacts/mori_aiter_autograd_bridge_overlay_4x_smoke_20260601_v2.json",
+      "result": "pass",
+      "summary": {
+        "all_ranks_pass": true,
+        "max_forward_abs_diff_across_ranks": 0.000003814697265625,
+        "max_grad_abs_diff_across_ranks": 0.0,
+        "bridge_fwd_bwd_ms_rank_median": 8.484003067016602
+      }
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs4_noaux_20260602.json",
+      "result": "pass",
+      "summary": {
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+        "dsa_indexer_loss_coeff": 0,
+        "loss": 12.21064,
+        "grad_norm": 12.1875,
+        "memory_gib": 129.33,
+        "process_group_destroyed": true
+      }
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602.json",
+      "result": "pass",
+      "summary": {
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S128",
+        "dsa_indexer_loss_coeff": 0.001,
+        "activation_checkpoint_mode": "none",
+        "loss": 12.24433,
+        "grad_norm": 9.5625,
+        "memory_gib": 136.32,
+        "checkpoint_dir_present": false,
+        "process_group_destroyed": true
+      }
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_acfull_20260602.json",
+      "result": "pass",
+      "summary": {
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S128",
+        "dsa_indexer_loss_coeff": 0.001,
+        "activation_checkpoint_mode": "full",
+        "loss": 12.25618,
+        "grad_norm": 9.5,
+        "memory_gib": 132.27,
+        "checkpoint_dir_present": false,
+        "process_group_destroyed": true
+      }
+    }
+  ],
+  "limitations": [
+    "This is not yet the final fused backward path.",
+    "The bridge currently assumes the EP mesh covers the full process group, matching the current 4x/8x MI350 canary shape.",
+    "The bridge requires BF16 and score_before_experts=false, matching DeepSeek-V4.",
+    "AITER weight shuffling is still done inside the forward bridge; production training should replace this with an update-safe preshuffled/cached weight path or a native training kernel contract.",
+    "The integrated TorchTitan smoke now passes S128/GBS64 with LI aux enabled and with full activation checkpointing, but throughput is not meaningful because first-run timing rebuilds AITER and backward remains reference recompute."
+  ]
+}

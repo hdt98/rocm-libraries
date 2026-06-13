@@ -1,0 +1,671 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_lbcoeff002_mori_8x_s4096_gbs128_mbs4_heap96_steps4_20260606",
+  "date": "2026-06-06",
+  "status": "completed_4step_load_balance_coeff_diagnostic_not_promoted",
+  "run_id": "torchtitan_dsv4_flash12_lbcoeff002_mori_8x_s4096_gbs128_mbs4_heap96_steps4_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_paths": {
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_lbcoeff002_mori_8x_s4096_gbs128_mbs4_heap96_steps4_20260606/docker-run.log",
+    "mori_aiter_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_lbcoeff002_mori_8x_s4096_gbs128_mbs4_heap96_steps4_20260606/mori_aiter_timing.jsonl",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_lbcoeff002_mori_8x_s4096_gbs128_mbs4_heap96_steps4_20260606"
+  },
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "env_overrides": {
+    "CANARY_MOE_LOAD_BALANCE_COEFF": 0.02,
+    "TORCHTITAN_DSV4_MOE_LOAD_BALANCE_COEFF": 0.02,
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": 1,
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": 1,
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.15514,
+      "grad_norm": 18.0,
+      "tokens_per_gpu_s": 1696,
+      "tflops_per_gpu": 85.85,
+      "peak_logged_memory_gib_rankmax": 125.16
+    },
+    {
+      "step": 2,
+      "loss": 10.81613,
+      "grad_norm": 79.5,
+      "tokens_per_gpu_s": 4898,
+      "tflops_per_gpu": 247.99,
+      "peak_logged_memory_gib_rankmax": 165.46
+    },
+    {
+      "step": 3,
+      "loss": 29.91857,
+      "grad_norm": 91.0,
+      "tokens_per_gpu_s": 5223,
+      "tflops_per_gpu": 264.44,
+      "peak_logged_memory_gib_rankmax": 165.46
+    },
+    {
+      "step": 4,
+      "loss": 18.4474,
+      "grad_norm": 22.75,
+      "tokens_per_gpu_s": 4490,
+      "tflops_per_gpu": 227.33,
+      "peak_logged_memory_gib_rankmax": 166.81
+    }
+  ],
+  "summary_metrics": {
+    "steps_2_to_4_tokens_per_gpu_s_mean": 4870.33,
+    "steps_2_to_4_node_tokens_s_mean": 38962.67,
+    "steps_2_to_4_tflops_per_gpu_mean": 246.587,
+    "peak_logged_memory_gib": 166.81,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_steps_2_to_4": 0.3992,
+    "baseline_current_best_steps_2_to_6_tokens_per_gpu_s_mean": 4896.0,
+    "baseline_current_best_steps_2_to_6_tflops_per_gpu_mean": 248.284,
+    "delta_vs_current_best_steps_2_to_6_tokens_per_gpu_s": -25.67,
+    "delta_vs_current_best_steps_2_to_6_tflops_per_gpu": -1.697
+  },
+  "mori_timing_compact": {
+    "rows": 3072,
+    "max_call_id": 384,
+    "forward_calls_by_rank": {
+      "0": 192,
+      "1": 192,
+      "2": 192,
+      "3": 192,
+      "4": 192,
+      "5": 192,
+      "6": 192,
+      "7": 192
+    },
+    "backward_calls_by_rank": {
+      "0": 192,
+      "1": 192,
+      "2": 192,
+      "3": 192,
+      "4": 192,
+      "5": 192,
+      "6": 192,
+      "7": 192
+    },
+    "route_stats": {
+      "grad_recv_count": {
+        "count": 1536,
+        "min": 0.0,
+        "p50": 71965.0,
+        "mean": 71773.50260416667,
+        "p95": 130996.5,
+        "max": 131072.0
+      },
+      "local_vjp_assignments": {
+        "count": 1533,
+        "min": 1.0,
+        "p50": 95915.0,
+        "mean": 98496.37573385518,
+        "p95": 213874.8,
+        "max": 439043.0
+      },
+      "local_vjp_max_count": {
+        "count": 1533,
+        "min": 1.0,
+        "p50": 29245.0,
+        "mean": 45289.896934116114,
+        "p95": 129638.4,
+        "max": 131072.0
+      },
+      "local_vjp_mean_count_per_expert": {
+        "count": 1533,
+        "min": 0.03125,
+        "p50": 2997.34375,
+        "mean": 3078.0117416829744,
+        "p95": 6683.5875,
+        "max": 13720.09375
+      },
+      "local_vjp_nonempty_experts": {
+        "count": 1533,
+        "min": 1.0,
+        "p50": 15.0,
+        "mean": 17.326810176125246,
+        "p95": 32.0,
+        "max": 32.0
+      },
+      "local_vjp_padding_multiplier": {
+        "count": 1533,
+        "min": 2.696358783016503,
+        "p50": 15.05017012958807,
+        "mean": 15.85682030112033,
+        "p95": 31.862621747224622,
+        "max": 32.0
+      },
+      "recv_count": {
+        "count": 3072,
+        "min": 0.0,
+        "p50": 71965.0,
+        "mean": 71773.50260416667,
+        "p95": 130996.9,
+        "max": 131072.0
+      }
+    },
+    "stage_rank_totals_ms": {
+      "backward.align_grad_output": {
+        "count": 8,
+        "min": 37.2738569076173,
+        "p50": 42.84808193217032,
+        "mean": 43.870795234281104,
+        "p95": 49.897288848692554,
+        "max": 49.89917607512325
+      },
+      "backward.combine_dx.call": {
+        "count": 8,
+        "min": 7177.019763946533,
+        "p50": 8945.486114144325,
+        "mean": 9070.646975308657,
+        "p95": 10161.050295972824,
+        "max": 10176.196408987045
+      },
+      "backward.combine_dx.prepare_full": {
+        "count": 8,
+        "min": 69.16314879059792,
+        "p50": 75.57522351294756,
+        "mean": 76.23535616695881,
+        "p95": 82.60561938434839,
+        "max": 82.8293998837471
+      },
+      "backward.combine_dx.slice_contiguous": {
+        "count": 8,
+        "min": 0.8808849952183664,
+        "p50": 0.9102579928003252,
+        "mean": 0.9250924935331568,
+        "p95": 0.9839286928996444,
+        "max": 0.9946099938824773
+      },
+      "backward.dispatch_grad_output.call": {
+        "count": 8,
+        "min": 839.5980718135834,
+        "p50": 1007.5123146772385,
+        "mean": 984.1373566687107,
+        "p95": 1063.9521054625511,
+        "max": 1064.4922726154327
+      },
+      "backward.dtopk_dense_allreduce.all_reduce": {
+        "count": 8,
+        "min": 37.78445702791214,
+        "p50": 40.22225270792842,
+        "mean": 40.4756049932912,
+        "p95": 42.62467476688325,
+        "max": 43.24234177172184
+      },
+      "backward.dtopk_dense_allreduce.prepare": {
+        "count": 8,
+        "min": 31.884575113654137,
+        "p50": 33.55071496218443,
+        "mean": 33.78594528045505,
+        "p95": 35.61951048374176,
+        "max": 36.327797055244446
+      },
+      "backward.dtopk_dense_allreduce.slice": {
+        "count": 8,
+        "min": 0.876333998516202,
+        "p50": 0.9871274924371392,
+        "mean": 0.990548366913572,
+        "p95": 1.095039588632062,
+        "max": 1.125448985490948
+      },
+      "backward.local_vjp.aiter_compact": {
+        "count": 8,
+        "min": 7859.875448122621,
+        "p50": 9073.747144818306,
+        "mean": 8951.845374690369,
+        "p95": 10399.28455904722,
+        "max": 10833.848241090775
+      },
+      "backward.return_casts": {
+        "count": 8,
+        "min": 1.0418919986113906,
+        "p50": 1.4774939941707999,
+        "mean": 1.524817870638799,
+        "p95": 1.937174993404187,
+        "max": 2.1180549920536578
+      },
+      "backward.reuse_forward_dispatch": {
+        "count": 8,
+        "min": 1.0627310001291335,
+        "p50": 1.0923094984609634,
+        "mean": 1.0986960000009276,
+        "p95": 1.1420523014152422,
+        "max": 1.1566130011342466
+      },
+      "forward.aiter.save_dispatch_for_backward": {
+        "count": 8,
+        "min": 68.02880325913429,
+        "p50": 71.06142212823033,
+        "mean": 73.17636027187109,
+        "p95": 79.43169703111053,
+        "max": 79.6183639317751
+      },
+      "local_aiter_compact_vjp.dgrad_swiglu": {
+        "count": 8,
+        "min": 707.6580204665661,
+        "p50": 846.1958873271942,
+        "mean": 882.212510984391,
+        "p95": 1098.6632359191776,
+        "max": 1154.6550008654594
+      },
+      "local_aiter_compact_vjp.dtopk_weight": {
+        "count": 8,
+        "min": 349.9680210724473,
+        "p50": 416.6630698144436,
+        "mean": 413.13182213995606,
+        "p95": 488.5524037443101,
+        "max": 505.53643803298473
+      },
+      "local_aiter_compact_vjp.forward_recompute": {
+        "count": 8,
+        "min": 1225.5222517251968,
+        "p50": 1399.2950816750526,
+        "mean": 1413.243009738624,
+        "p95": 1616.4851552844048,
+        "max": 1665.9219489097595
+      },
+      "local_aiter_compact_vjp.gather_scale": {
+        "count": 8,
+        "min": 325.1155111938715,
+        "p50": 391.07232788950205,
+        "mean": 387.33742852229625,
+        "p95": 460.2632452372461,
+        "max": 477.25549663603306
+      },
+      "local_aiter_compact_vjp.prepare_ops": {
+        "count": 8,
+        "min": 6.249934789724648,
+        "p50": 6.549741917522624,
+        "mean": 6.552840567135718,
+        "p95": 6.943565287580713,
+        "max": 7.0646919487044215
+      },
+      "local_aiter_compact_vjp.route_pack": {
+        "count": 8,
+        "min": 293.50941575318575,
+        "p50": 313.9408489242196,
+        "mean": 313.22825568169355,
+        "p95": 323.103705804795,
+        "max": 323.338854059577
+      },
+      "local_aiter_compact_vjp.sort_counts": {
+        "count": 8,
+        "min": 1278.2374044656754,
+        "p50": 1320.6246300935745,
+        "mean": 1329.0702156238258,
+        "p95": 1387.184988297522,
+        "max": 1393.5776019096375
+      },
+      "local_aiter_compact_vjp.wgrad": {
+        "count": 8,
+        "min": 2223.6617627739906,
+        "p50": 2682.703852891922,
+        "mean": 2704.401919491589,
+        "p95": 3337.7844396561386,
+        "max": 3466.824693799019
+      },
+      "local_aiter_compact_vjp.xgrad": {
+        "count": 8,
+        "min": 1231.004823744297,
+        "p50": 1472.0316524356604,
+        "mean": 1482.3302074223757,
+        "p95": 1832.2333997398614,
+        "max": 1945.583116441965
+      }
+    },
+    "local_vjp_detail_rank_totals_ms": {
+      "local_aiter_compact_vjp.dgrad_swiglu": {
+        "count": 8,
+        "min": 707.6580204665661,
+        "p50": 846.1958873271942,
+        "mean": 882.212510984391,
+        "p95": 1098.6632359191776,
+        "max": 1154.6550008654594
+      },
+      "local_aiter_compact_vjp.dtopk_weight": {
+        "count": 8,
+        "min": 349.9680210724473,
+        "p50": 416.6630698144436,
+        "mean": 413.13182213995606,
+        "p95": 488.5524037443101,
+        "max": 505.53643803298473
+      },
+      "local_aiter_compact_vjp.forward_recompute": {
+        "count": 8,
+        "min": 1225.5222517251968,
+        "p50": 1399.2950816750526,
+        "mean": 1413.243009738624,
+        "p95": 1616.4851552844048,
+        "max": 1665.9219489097595
+      },
+      "local_aiter_compact_vjp.gather_scale": {
+        "count": 8,
+        "min": 325.1155111938715,
+        "p50": 391.07232788950205,
+        "mean": 387.33742852229625,
+        "p95": 460.2632452372461,
+        "max": 477.25549663603306
+      },
+      "local_aiter_compact_vjp.prepare_ops": {
+        "count": 8,
+        "min": 6.249934789724648,
+        "p50": 6.549741917522624,
+        "mean": 6.552840567135718,
+        "p95": 6.943565287580713,
+        "max": 7.0646919487044215
+      },
+      "local_aiter_compact_vjp.route_pack": {
+        "count": 8,
+        "min": 293.50941575318575,
+        "p50": 313.9408489242196,
+        "mean": 313.22825568169355,
+        "p95": 323.103705804795,
+        "max": 323.338854059577
+      },
+      "local_aiter_compact_vjp.sort_counts": {
+        "count": 8,
+        "min": 1278.2374044656754,
+        "p50": 1320.6246300935745,
+        "mean": 1329.0702156238258,
+        "p95": 1387.184988297522,
+        "max": 1393.5776019096375
+      },
+      "local_aiter_compact_vjp.wgrad": {
+        "count": 8,
+        "min": 2223.6617627739906,
+        "p50": 2682.703852891922,
+        "mean": 2704.401919491589,
+        "p95": 3337.7844396561386,
+        "max": 3466.824693799019
+      },
+      "local_aiter_compact_vjp.xgrad": {
+        "count": 8,
+        "min": 1231.004823744297,
+        "p50": 1472.0316524356604,
+        "mean": 1482.3302074223757,
+        "p95": 1832.2333997398614,
+        "max": 1945.583116441965
+      }
+    },
+    "call_level_skew": {
+      "combine_dx_max_ms": {
+        "n": 192,
+        "min": 12.26966667175293,
+        "median": 58.08652877807617,
+        "p90": 99.0624885559082,
+        "max": 1065.1412353515625
+      },
+      "combine_dx_spread_ms": {
+        "n": 192,
+        "min": 9.43088173866272,
+        "median": 54.27927529811859,
+        "p90": 95.0595974445343,
+        "max": 1059.0615181922913
+      },
+      "local_vjp_max_ms": {
+        "n": 192,
+        "min": 37.04172134399414,
+        "median": 62.161184310913086,
+        "p90": 104.27637481689455,
+        "max": 2116.986083984375
+      },
+      "local_vjp_spread_ms": {
+        "n": 192,
+        "min": 9.302959442138672,
+        "median": 53.69872856140137,
+        "p90": 94.38098039627076,
+        "max": 1058.2111802101135
+      },
+      "recv_count_max_over_median": {
+        "n": 192,
+        "min": 1.0570150529949653,
+        "median": 1.556539952923316,
+        "p90": 2.1200679593316165,
+        "max": 4.5270265602873625
+      },
+      "recv_count_spread": {
+        "n": 192,
+        "min": 21264.0,
+        "median": 104794.5,
+        "p90": 130912.0,
+        "max": 131072.0
+      }
+    },
+    "record_summaries": {
+      "recv_count": {
+        "n": 1536,
+        "min": 0.0,
+        "median": 71965.0,
+        "p90": 124532.0,
+        "max": 131072.0
+      },
+      "local_vjp_ms": {
+        "n": 1536,
+        "min": 0.22832299768924713,
+        "median": 33.471107482910156,
+        "p90": 59.023983001708984,
+        "max": 2116.986083984375
+      },
+      "combine_dx_ms": {
+        "n": 1536,
+        "min": 0.8391280174255371,
+        "median": 26.360572814941406,
+        "p90": 80.60855102539062,
+        "max": 1065.1412353515625
+      },
+      "dispatch_x_ms": {
+        "n": 1536,
+        "min": 0.0,
+        "median": 0.0,
+        "p90": 0.0,
+        "max": 0.0
+      },
+      "local_vjp_parts_ms": {
+        "dtopk_weight": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 2.0988980531692505,
+          "p90": 3.731274962425232,
+          "max": 9.370372772216797
+        },
+        "gather": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 1.9514569640159607,
+          "p90": 3.4529099464416504,
+          "max": 9.07097339630127
+        },
+        "prepare_ops": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 0.006399999838322401,
+          "p90": 0.008220000192523003,
+          "max": 5.522120952606201
+        },
+        "recompute_forward": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 7.642761468887329,
+          "p90": 11.065664768218994,
+          "max": 41.43382263183594
+        },
+        "route_pack": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 0.17010100185871124,
+          "p90": 0.2135619968175888,
+          "max": 288.6143798828125
+        },
+        "sort_counts": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 0.5412645041942596,
+          "p90": 0.6153459846973419,
+          "max": 1296.5965576171875
+        },
+        "w2_dgrad_swiglu": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 2.8808029890060425,
+          "p90": 5.0660669803619385,
+          "max": 245.79620361328125
+        },
+        "wgrad": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 10.530882358551025,
+          "p90": 21.676241874694824,
+          "max": 576.3167114257812
+        },
+        "xgrad_reduce": {
+          "n": 1536,
+          "min": 0.0,
+          "median": 7.303663015365601,
+          "p90": 12.69584035873413,
+          "max": 237.28977966308594
+        }
+      }
+    },
+    "rank_totals": {
+      "0": {
+        "calls": 192,
+        "recv_count_sum": 11794274,
+        "recv_count_median": 58554.5,
+        "local_vjp_ms_sum": 7859.875448122621,
+        "combine_dx_ms_sum": 10176.196408987045,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 929.305650472641
+      },
+      "1": {
+        "calls": 192,
+        "recv_count_sum": 12485843,
+        "recv_count_median": 68816.0,
+        "local_vjp_ms_sum": 8022.204333782196,
+        "combine_dx_ms_sum": 10007.691007852554,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 1064.4922726154327
+      },
+      "2": {
+        "calls": 192,
+        "recv_count_sum": 15709931,
+        "recv_count_median": 84776.5,
+        "local_vjp_ms_sum": 9264.045870542526,
+        "combine_dx_ms_sum": 8745.95826792717,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 1004.2452623844147
+      },
+      "3": {
+        "calls": 192,
+        "recv_count_sum": 12805894,
+        "recv_count_median": 66491.5,
+        "local_vjp_ms_sum": 7895.057093381882,
+        "combine_dx_ms_sum": 10132.921800374985,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 839.5980718135834
+      },
+      "4": {
+        "calls": 192,
+        "recv_count_sum": 13199218,
+        "recv_count_median": 70657.5,
+        "local_vjp_ms_sum": 9592.23772096634,
+        "combine_dx_ms_sum": 8434.416325092316,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 1010.7793669700623
+      },
+      "5": {
+        "calls": 192,
+        "recv_count_sum": 14721949,
+        "recv_count_median": 81220.5,
+        "local_vjp_ms_sum": 9256.85008263588,
+        "combine_dx_ms_sum": 8759.755395889282,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 1017.9733850955963
+      },
+      "6": {
+        "calls": 192,
+        "recv_count_sum": 13847692,
+        "recv_count_median": 71825.0,
+        "local_vjp_ms_sum": 8890.644207000732,
+        "combine_dx_ms_sum": 9131.216832399368,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 943.7559061050415
+      },
+      "7": {
+        "calls": 192,
+        "recv_count_sum": 15679299,
+        "recv_count_median": 78774.0,
+        "local_vjp_ms_sum": 10833.848241090775,
+        "combine_dx_ms_sum": 7177.019763946533,
+        "dispatch_x_ms_sum": 0.0,
+        "dispatch_grad_output_ms_sum": 1062.9489378929138
+      }
+    },
+    "top_call_ids": {
+      "by_local_vjp_max": [
+        13,
+        312,
+        111
+      ],
+      "by_combine_dx_max": [
+        111,
+        312,
+        303
+      ],
+      "by_recv_spread": [
+        349,
+        303,
+        301
+      ]
+    }
+  },
+  "read": {
+    "throughput": "steps 2-4 average is essentially flat versus the current best six-step natural-routing MBS4 baseline; coefficient 0.02 is not promoted from this 4-step diagnostic.",
+    "load_balance": "expert-bias coefficient 0.02 did not collapse routing skew the way exact force-balance does. Per-call recv-count max/median median remains about 1.56 and route padding multiplier p95 remains high.",
+    "mechanism": "This supports the source-code read: production expert_bias can steer but does not replace compact grouped owner VJP and dX-return overlap. Exact force-balance is still a useful ceiling but changes routing semantics."
+  }
+}

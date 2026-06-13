@@ -1,0 +1,41 @@
+{
+  "deferred_forward_loss": null,
+  "deferred_grad_norms": {},
+  "device": "cuda",
+  "direct_grad_norms": {},
+  "direct_loss": null,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {},
+  "max_grad_diff": null,
+  "parity_skipped": true,
+  "read": "Parity was skipped for long-sequence timing. The timing block below measures the current public Ascend-style wrapper; no correctness claim is made by this run.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 512,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 2048,
+    "topk": 512
+  },
+  "status": "failed",
+  "timing": {
+    "enabled": true,
+    "error": "HIP out of memory. Tried to allocate 128.00 GiB. GPU 0 has a total capacity of 287.69 GiB of which 105.78 GiB is free. Of the allocated memory 64.45 GiB is allocated by PyTorch, and 14.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+    "error_type": "OutOfMemoryError",
+    "read": "Timing failed inside the current PyTorch-recompute public wrapper. This is useful evidence if the long-sequence shape OOMs while materializing selected main-K tensors.",
+    "status": "failed"
+  },
+  "top_indices_equal": null,
+  "top_indices_shape": [
+    1,
+    2048,
+    512
+  ]
+}

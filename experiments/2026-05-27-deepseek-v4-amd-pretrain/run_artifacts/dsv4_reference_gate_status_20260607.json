@@ -1,0 +1,415 @@
+{
+  "artifact": "dsv4_reference_gate_status",
+  "date_utc": "2026-06-07",
+  "scope": "Reference-first completion audit for the DeepSeek-V4-Flash AMD pretraining canary. This separates local PyTorch reference evidence, HF shape-contract evidence, short-shape parity, and missing HF numerical full-layer validation.",
+  "overall_status": "incomplete_reference_first_gate",
+  "inputs": {
+    "hf_flash_config_contract": "run_artifacts/deepseek_v4_flash_hf_config_contract_20260531.json",
+    "local_reference_layer_source": "tools/dsv4_layer_microbench/reference_layer.py",
+    "retained_mi350_suite": "tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+    "li_attention_layer_gradcheck": "run_artifacts/lightning_indexer_integrated_attention_layer_cpu_gradcheck_20260601.json",
+    "sparse_mla_preflight_cpu": "run_artifacts/torchtitan_sparse_mla_reference_backend_preflight_s4096_cpu_20260601.json",
+    "sparse_mla_preflight_mi350": "run_artifacts/torchtitan_sparse_mla_reference_backend_preflight_s4096_mi350_bf16_20260601.json",
+    "sparse_mla_mode_parity": "run_artifacts/torchtitan_sparse_mla_mode_parity_s128_mi350_bf16_20260601.json",
+    "moe_backward_contract": "run_artifacts/ep_routed_moe_backward_contract_4x_smoke_t16_h128_i64_e16_top2_random_20260601.json",
+    "mori_aiter_bridge_reference_regression": "run_artifacts/mori_aiter_autograd_bridge_reference_regression_4x_smoke_t16_h128_i64_e16_top2_random_20260602.json",
+    "flash_reference_oracle_config": "run_artifacts/dsv4_flash_reference_oracle_config_20260603.json",
+    "flash_reference_oracle_layer": "run_artifacts/dsv4_flash_reference_oracle_layer_20260603.json",
+    "flash_hyperconnection_reference_oracle_layer": "run_artifacts/dsv4_flash_hyperconnection_layer_oracle_20260603.json",
+    "hf_reference_parity_preflight": "run_artifacts/dsv4_hf_reference_parity_preflight_20260607.json",
+    "hyperconnection_reference_smoke": "run_artifacts/dsv4_hyperconnection_reference_smoke_20260603.json"
+  },
+  "gates": {
+    "hf_flash_shape_contract": {
+      "status": "passed_config_only",
+      "evidence": "run_artifacts/deepseek_v4_flash_hf_config_contract_20260531.json",
+      "checked_at": "2026-05-31",
+      "hf_config_url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash/raw/main/config.json",
+      "shape": {
+        "hidden_size": 4096,
+        "num_hidden_layers": 43,
+        "num_attention_heads": 64,
+        "head_dim": 512,
+        "q_lora_rank": 1024,
+        "o_lora_rank": 1024,
+        "moe_intermediate_size": 2048,
+        "n_routed_experts": 256,
+        "n_shared_experts": 1,
+        "num_experts_per_tok": 6,
+        "index_topk": 512,
+        "target_sequence_length": 4096
+      },
+      "caveat": "This proves the active Flash shape contract, not numerical parity against an HF model implementation or checkpoint."
+    },
+    "local_pytorch_reference_harness": {
+      "status": "present",
+      "evidence": "tools/dsv4_layer_microbench/reference_layer.py",
+      "surfaces": [
+        "DeepSeekV4ProLayerRef",
+        "DeepSeekV4HyperConnectionLayerRef",
+        "SparseMLAAttentionRef",
+        "RoutedMoERef"
+      ],
+      "default_full_preset": {
+        "name": "full",
+        "read": "preset_config('full') returns DSV4LayerConfig() and the dataclass default remains Pro-sized hidden=7168. Flash shape should use preset_config('flash') when available; older evidence may still record explicit HF contract overrides.",
+        "has_first_class_flash_preset": true
+      }
+    },
+    "flash_shape_binding_for_local_runs": {
+      "status": "present_first_class",
+      "evidence": "tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "uses_flash_preset": true,
+      "uses_hf_contract_overrides": false,
+      "read": "Flash-shape local runs are supported through the local flash preset when available; older retained evidence may still record the equivalent explicit HF contract overrides."
+    },
+    "flash_preset_hf_config_consistency": {
+      "status": "passed",
+      "evidence": "run_artifacts/dsv4_flash_reference_oracle_config_20260603.json",
+      "hf_config_compare_status": "passed",
+      "ratio_check": {
+        "local_csa_ratio": 4,
+        "local_hca_ratio": 128,
+        "hf_nonzero_ratios": [
+          4,
+          128
+        ],
+        "passed": true
+      },
+      "read": "Config-only oracle proves preset_config('flash') matches the HF Flash config fields. It does not run the full layer unless the optional --run-layer MI350 gate is executed."
+    },
+    "flash_full_layer_local_oracle_smoke": {
+      "status": "passed",
+      "evidence": "run_artifacts/dsv4_flash_reference_oracle_layer_20260603.json",
+      "device": "cuda",
+      "results": [
+        {
+          "dtype": "float32",
+          "batch": 1,
+          "seqlen": 1,
+          "router": "balanced",
+          "attention_impl": "dense-mask",
+          "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+          "output_shape": [
+            1,
+            1,
+            4096
+          ],
+          "loss": 1.011379,
+          "elapsed_ms": 4642.875922,
+          "input_grad_finite": true,
+          "param_grad_count": 24,
+          "finite_param_grad_count": 24,
+          "nonzero_param_grad_count": 20,
+          "peak_memory_allocated_gib": 63.199354
+        },
+        {
+          "dtype": "bfloat16",
+          "batch": 1,
+          "seqlen": 1,
+          "router": "balanced",
+          "attention_impl": "dense-mask",
+          "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+          "output_shape": [
+            1,
+            1,
+            4096
+          ],
+          "loss": 1.011453,
+          "elapsed_ms": 7351.992707,
+          "input_grad_finite": true,
+          "param_grad_count": 24,
+          "finite_param_grad_count": 24,
+          "nonzero_param_grad_count": 20,
+          "peak_memory_allocated_gib": 34.673903
+        }
+      ],
+      "read": "Full Flash-dimension local PyTorch layer smoke passed on MI350 for FP32 and BF16 at B=1, S=1 with balanced routing and dense-mask attention. This proves a local clean-oracle forward/backward surface can execute with finite gradients; it is not HF numerical parity, S4096 performance evidence, or final sparse-MLA/LI production-kernel evidence."
+    },
+    "flash_hyperconnection_full_layer_local_oracle_smoke": {
+      "status": "passed",
+      "evidence": "run_artifacts/dsv4_flash_hyperconnection_layer_oracle_20260603.json",
+      "device": "cuda",
+      "results": [
+        {
+          "dtype": "float32",
+          "batch": 1,
+          "seqlen": 1,
+          "router": "balanced",
+          "uses_hyperconnection": true,
+          "attention_impl": "dense-mask",
+          "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+          "input_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "output_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "loss": 0.479573,
+          "elapsed_ms": 5313.222518,
+          "input_grad_finite": true,
+          "param_grad_count": 30,
+          "finite_param_grad_count": 30,
+          "nonzero_param_grad_count": 26,
+          "peak_memory_allocated_gib": 63.207307
+        },
+        {
+          "dtype": "bfloat16",
+          "batch": 1,
+          "seqlen": 1,
+          "router": "balanced",
+          "uses_hyperconnection": true,
+          "attention_impl": "dense-mask",
+          "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+          "input_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "output_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "loss": 0.478702,
+          "elapsed_ms": 8169.059393,
+          "input_grad_finite": true,
+          "param_grad_count": 30,
+          "finite_param_grad_count": 30,
+          "nonzero_param_grad_count": 26,
+          "peak_memory_allocated_gib": 34.677393
+        }
+      ],
+      "read": "Full Flash-dimension Hyper-Connection local PyTorch layer smoke passed on MI350 for FP32 and BF16 at B=1, S=1. It exercises the rank-4 HC boundary around attention and MoE with input/output shape [1,1,4,4096]. This removes the local full-block HC smoke blocker, but it is not matched-weight HF numerical parity, S4096 coverage, or TorchTitan production-kernel evidence."
+    },
+    "local_li_attention_and_layer_gradcheck": {
+      "status": "passed",
+      "evidence": "run_artifacts/lightning_indexer_integrated_attention_layer_cpu_gradcheck_20260601.json",
+      "device": "cpu",
+      "dtype": "float64",
+      "seqlen": 4,
+      "attention_impl": "sparse-gather-lightning-indexer",
+      "results": {
+        "attention": {
+          "ok": true,
+          "gradcheck": true,
+          "input_shape": [
+            1,
+            4,
+            8
+          ],
+          "parameter_count": 462
+        },
+        "layer": {
+          "ok": true,
+          "gradcheck": true,
+          "input_shape": [
+            1,
+            4,
+            8
+          ],
+          "parameter_count": 990
+        }
+      },
+      "caveat": "This is a tiny float64 CPU gradcheck gate. It is strong local autograd evidence for the reference path, but it is not full S4096 BF16/FP32 Flash numerical validation."
+    },
+    "local_hyperconnection_reference_smoke": {
+      "status": "passed",
+      "evidence": "run_artifacts/dsv4_hyperconnection_reference_smoke_20260603.json",
+      "contract": {
+        "hc_pre": "[B,S,hc_mult,D] -> [B,S,D] plus post [B,S,hc_mult] and comb [B,S,hc_mult,hc_mult]",
+        "hc_post": "[B,S,D] plus residual [B,S,hc_mult,D] -> [B,S,hc_mult,D]",
+        "hc_mult": 4,
+        "sinkhorn_iters": 20
+      },
+      "gradcheck_status": "passed",
+      "flash_shape_smoke": [
+        {
+          "dtype": "float32",
+          "status": "passed",
+          "input_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "output_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "loss": 1.330067,
+          "input_grad_finite": true,
+          "finite_param_grad_count": 6,
+          "param_grad_count": 6
+        },
+        {
+          "dtype": "bfloat16",
+          "status": "passed",
+          "input_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "output_shape": [
+            1,
+            1,
+            4,
+            4096
+          ],
+          "loss": 1.065255,
+          "input_grad_finite": true,
+          "finite_param_grad_count": 6,
+          "param_grad_count": 6
+        }
+      ],
+      "read": "The local pure-PyTorch HC primitive now passes split/shape, small gradcheck, and Flash hidden-size FP32/BF16 backward smokes. The separate Flash HC full-layer oracle now also threads HC around the local attention and MoE block at B=1, S=1. Matched HF parity still requires an HF training adapter or matched HF-vs-local numerical harness."
+    },
+    "sparse_mla_reference_backend_preflight": {
+      "status": "passed_abi_but_not_promotable",
+      "preflights": {
+        "cpu": {
+          "artifact": "run_artifacts/torchtitan_sparse_mla_reference_backend_preflight_s4096_cpu_20260601.json",
+          "status": "failed_production_preflight",
+          "smoke_status": "passed_backend_abi",
+          "promotable_for_s4096": false,
+          "materializes_selected_state": false,
+          "supports_backward": true,
+          "supports_long_sequence": false,
+          "max_promoted_seq_len": 128,
+          "promotion_blockers": [
+            "module marks itself as a reference backend",
+            "module does not mark IS_PRODUCTION_BACKEND=True",
+            "module does not mark SUPPORTS_LONG_SEQUENCE=True",
+            "MAX_PROMOTED_SEQ_LEN=128 is below 4096",
+            "Delegates to the Python/PyTorch manual_stream bridge.",
+            "Intended for ABI and parity checks only.",
+            "Not a fused ROCm kernel and not a performance backend."
+          ]
+        },
+        "mi350_bf16": {
+          "artifact": "run_artifacts/torchtitan_sparse_mla_reference_backend_preflight_s4096_mi350_bf16_20260601.json",
+          "status": "failed_production_preflight",
+          "smoke_status": "passed_backend_abi",
+          "promotable_for_s4096": false,
+          "materializes_selected_state": false,
+          "supports_backward": true,
+          "supports_long_sequence": false,
+          "max_promoted_seq_len": 128,
+          "promotion_blockers": [
+            "module marks itself as a reference backend",
+            "module does not mark IS_PRODUCTION_BACKEND=True",
+            "module does not mark SUPPORTS_LONG_SEQUENCE=True",
+            "MAX_PROMOTED_SEQ_LEN=128 is below 4096",
+            "Delegates to the Python/PyTorch manual_stream bridge.",
+            "Intended for ABI and parity checks only.",
+            "Not a fused ROCm kernel and not a performance backend."
+          ]
+        }
+      },
+      "read": "The manual_stream reference backend passes ABI smokes and supports backward without selected-state materialization, but it correctly fails production S4096 preflight because it is a reference/PyTorch bridge capped at seq_len 128."
+    },
+    "sparse_mla_short_shape_mode_parity": {
+      "status": "passed",
+      "evidence": "run_artifacts/torchtitan_sparse_mla_mode_parity_s128_mi350_bf16_20260601.json",
+      "device": "cuda",
+      "dtype": "bfloat16",
+      "seq_len": 128,
+      "reference_mode": "manual_split",
+      "candidate_mode": "manual_stream",
+      "max_output_abs_diff": 0.003906,
+      "max_input_grad_abs_diff": 0.0,
+      "max_param_grad_abs_diff": 1e-06,
+      "grad_none_mismatches": []
+    },
+    "ep_moe_backward_reference_contract": {
+      "status": "passed",
+      "evidence": "run_artifacts/ep_routed_moe_backward_contract_4x_smoke_t16_h128_i64_e16_top2_random_20260601.json",
+      "world_size": 4,
+      "shape": {
+        "tokens_per_rank": 16,
+        "hidden": 128,
+        "intermediate": 64,
+        "experts": 16,
+        "num_local_experts": 4,
+        "topk": 2,
+        "topk_pattern": "random",
+        "storage_dtype": "torch.bfloat16 on CUDA, torch.float32 on CPU",
+        "reference_math_dtype": "torch.float32",
+        "weight_scale": 0.05,
+        "warmup": 1,
+        "iters": 2
+      },
+      "max_abs_diff_across_ranks": 0.0,
+      "read": "No MORI or AITER kernels are used here; this defines the exact VJP semantics the training-safe MORI+AITER custom autograd path must match."
+    },
+    "mori_aiter_forward_plus_reference_backward_bridge": {
+      "status": "passed",
+      "evidence": "run_artifacts/mori_aiter_autograd_bridge_reference_regression_4x_smoke_t16_h128_i64_e16_top2_random_20260602.json",
+      "world_size": 4,
+      "backward_mode": "reference",
+      "max_forward_abs_diff_across_ranks": 3.814697265625e-06,
+      "max_grad_abs_diff_across_ranks": 0.0,
+      "read": "training API semantics probe; routed mode is an intermediate contract, not the final fused MoE backward kernel"
+    },
+    "hf_architecture_parity_preflight": {
+      "status": "not_ready_missing_hf_training_layer_adapter_and_matched_weight_parity",
+      "evidence": "run_artifacts/dsv4_hf_reference_parity_preflight_20260607.json",
+      "hf_uses_hyper_connections": true,
+      "ascend_uses_hyper_connections": true,
+      "local_reference_uses_hyper_connections": false,
+      "torchtitan_wip_uses_hyper_connections": true,
+      "transformers_has_standard_deepseek_v4_module": false,
+      "blockers": [
+        "The configured Transformers tag does not expose a standard deepseek_v4 modeling/configuration module, so there is no drop-in HF training-layer parity class at that version.",
+        "HF's published repo source is inference-oriented and uses quantized runtime kernels; matched gradient parity still needs a BF16/FP32 training adapter or local HC oracle."
+      ],
+      "read": "The source-contract preflight shows HF and Ascend use Hyper-Connections with rank-4 hidden state; the local clean reference now has an HC full-layer smoke, while matched-weight HF numerical parity remains incomplete. Matched HF numerical parity is still not persisted."
+    },
+    "hf_numerical_full_layer_parity": {
+      "status": "missing_hf_numerical_parity_hc_local_oracle_available",
+      "candidate_artifacts_found": [
+        "run_artifacts/dsv4_hf_reference_parity_preflight_20260603.json",
+        "run_artifacts/dsv4_hf_reference_parity_preflight_20260604.json",
+        "run_artifacts/dsv4_hf_reference_parity_preflight_20260607.json"
+      ],
+      "required_evidence": "A deterministic one-layer DeepSeek-V4-Flash HF-vs-local numerical parity run, ideally FP32 for oracle comparison and BF16 for training contract comparison, with matched config, weights, inputs, router/indexer controls, and explicit output and gradient tolerances.",
+      "read": "The current HF evidence is a config/shape contract plus an architecture preflight. No artifact found in run_artifacts proves local full-layer numerical parity against the HF implementation or checkpoint. The local HC full-layer oracle removes the local rank-4 boundary smoke blocker, but matched weights, inputs, router/indexer controls, and HF output/gradient tolerances still need to be recorded."
+    }
+  },
+  "requirements_audit": {
+    "clean_pytorch_reference_full_layer_bf16_fp32_ground_truth": {
+      "status": "local_flash_hc_s1_oracle_passed_hf_missing",
+      "reason": "The local full-layer PyTorch harness and first-class Flash preset exist, the Flash preset matches the HF config contract, and full Flash-dimension B=1 S=1 MI350 local oracle smokes passed for FP32 and BF16. The newer oracle includes rank-4 HC around attention and MoE. This is still a local smoke, not deterministic HF matched-weight numerical parity or S4096 reference coverage."
+    },
+    "validate_against_hf": {
+      "status": "missing_matched_weight_numerical_parity",
+      "reason": "HF config was checked on 2026-05-31. The HF architecture preflight shows HF and Ascend use Hyper-Connections. The local clean reference now has both a primitive HC smoke and an HC full-layer B=1 S=1 MI350 smoke, but implementation/checkpoint-level HF matched-weight numerical parity is still not persisted, and the TorchTitan production block still needs its HC parity gate."
+    },
+    "production_sparse_mla_reference_gate": {
+      "status": "not_ready",
+      "reason": "Reference backend passes ABI smoke but intentionally fails S4096 production preflight; fused long-sequence sparse MLA/LI remains the needed production path."
+    },
+    "moe_training_semantics_gate": {
+      "status": "passed_smoke_not_final_kernel",
+      "reason": "EP routed backward and MORI+AITER bridge smokes pass exact/near exact gradients on small shapes, but final fused MoE backward is still pending."
+    }
+  },
+  "next_actions": [
+    "Keep the first-class Flash preset aligned with the HF config contract artifact.",
+    "Use the persisted MI350 S=1 FP32/BF16 local oracle as a smoke gate, then extend the reference harness toward matched HF numerical parity.",
+    "Use the new local Hyper-Connection full-layer oracle as the clean reference smoke, then build or record an HF numerical parity harness for one Flash layer with matched weights and inputs; until then, do not claim HF validation.",
+    "Keep current 4x/8x canary perf reporting separate from final fused sparse MLA/LI and fused MoE backward readiness."
+  ],
+  "bottom_line": "The reference story is usable for local development but not complete against the original reference-first goal. We have an HF Flash config contract, a matching local Flash preset, an MI350 full Flash-dimension S=1 FP32/BF16 local layer-oracle smoke, local PyTorch autograd/parity smokes, MoE training semantics smokes, a local Hyper-Connection primitive smoke, a local HC full-layer Flash smoke, and a source-contract preflight showing the remaining HF/TorchTitan adapter work; we do not yet have persisted HF numerical full-layer parity or S4096 reference coverage."
+}

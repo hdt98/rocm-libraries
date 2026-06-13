@@ -1,0 +1,89 @@
+{
+  "backend": {
+    "ascend_shared_kv_abi": "sparse_attn_sharedkv(query, ori_kv, cmp_kv, cmp_sparse_indices, sinks, softmax_scale, cmp_ratio, ...)",
+    "kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "path": "sparse_mla_shared_kv_triton_forward_backend.py",
+    "shared_kv_backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "supports_ascend_sparse_attn_sharedkv_abi": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "parity": {
+    "backward": {
+      "enabled": false
+    },
+    "cmp_indices_shape": [
+      1,
+      4096,
+      512
+    ],
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "grad_atol": 1e-06,
+    "legacy_indices_shape": [
+      1,
+      4096,
+      640
+    ],
+    "local_count": 128,
+    "max_output_abs_diff": 0.0,
+    "output_atol": 0.0,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "status": "passed"
+  },
+  "read": "The Ascend-style wrapper is compared against the legacy concatenated-bank shared-KV ABI. Backward comparison splits the legacy dKV bank into dOriKv and dCmpKv.",
+  "scope": "sparse_attn_sharedkv_ascend_abi_verifier",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 18.447664260864258,
+      "mean_ms": 18.09144465128581,
+      "median_ms": 17.946456909179688,
+      "min_ms": 17.880212783813477,
+      "samples_ms": [
+        18.447664260864258,
+        17.946456909179688,
+        17.880212783813477
+      ],
+      "stdev_ms": 0.3102682367284014
+    },
+    "enabled": true,
+    "grad_norms": {
+      "cmp_kv": 0.00011177411943208426,
+      "ori_kv": 6.007811316521838e-05,
+      "q": 2.0397515982040204e-05,
+      "sinks": 2.9542588890763e-05
+    },
+    "loss": 0.009398136287927628,
+    "peak_memory_allocated_bytes": 3270510080,
+    "peak_memory_allocated_gib": 3.0458998680114746,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 18.49397807382047,
+      "mean_ms": 18.122307024896145,
+      "median_ms": 17.967341002076864,
+      "min_ms": 17.9056019987911,
+      "samples_ms": [
+        18.49397807382047,
+        17.967341002076864,
+        17.9056019987911
+      ],
+      "stdev_ms": 0.32335344839364555
+    },
+    "warmup_iters": 1
+  }
+}

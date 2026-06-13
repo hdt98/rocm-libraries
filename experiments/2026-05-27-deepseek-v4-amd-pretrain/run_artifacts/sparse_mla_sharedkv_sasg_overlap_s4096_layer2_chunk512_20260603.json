@@ -1,0 +1,135 @@
+{
+  "artifact": "sparse_mla_sharedkv_sasg_overlap_probe",
+  "correctness": {
+    "chunked_vs_full": {
+      "max_abs_diff": 7.62939453125e-06,
+      "mean_abs_diff": 7.611430419274257e-08
+    },
+    "passed": true,
+    "pingpong_vs_full": {
+      "max_abs_diff": 7.62939453125e-06,
+      "mean_abs_diff": 7.611430419274257e-08
+    }
+  },
+  "derived": {
+    "chunked_pingpong_stream_overlap_ms": 33.3049430847168,
+    "chunked_sequential_emit_reduce_ms": 10.29988956451416,
+    "pingpong_vs_chunked_sequential_speedup_x": 0.30926008605733496,
+    "pingpong_vs_single_full_speedup_x": 0.28802219091249476,
+    "single_full_emit_reduce_ms": 9.592562675476074
+  },
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "read": "Benchmark-only SASG overlap probe. It uses materialized actual-LI probs/grad_logits and the existing dot-K partial-store producer, then compares a host-level ping-pong producer/reduce schedule against sequential emit+reduce. A positive overlap signal here would justify moving the same contract into a persistent HIP/CK segmented/MFMA accumulator; a negative signal means wrapper-level overlap is not the lever.",
+  "scope": "actual_li_compressed_dkv_sasg_style_producer_reduce_overlap",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "layer_id": 2,
+    "num_pipeline_chunks": 8,
+    "pipeline_chunk_tokens": 512,
+    "seq_chunk": 32,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "chunked_pingpong_stream_overlap": {
+      "checksum_norm": 960.2500610351562,
+      "event": {
+        "enabled": true,
+        "max_ms": 33.3049430847168,
+        "mean_ms": 33.3049430847168,
+        "median_ms": 33.3049430847168,
+        "min_ms": 33.3049430847168,
+        "samples_ms": [
+          33.3049430847168
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "chunked_pingpong_stream_overlap",
+      "peak_memory_allocated_bytes": 2153253888,
+      "peak_memory_allocated_gib": 2.005373954772949,
+      "wall": {
+        "enabled": true,
+        "max_ms": 33.327910117805004,
+        "mean_ms": 33.327910117805004,
+        "median_ms": 33.327910117805004,
+        "min_ms": 33.327910117805004,
+        "samples_ms": [
+          33.327910117805004
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "chunked_sequential_emit_reduce": {
+      "checksum_norm": 960.2500610351562,
+      "event": {
+        "enabled": true,
+        "max_ms": 10.29988956451416,
+        "mean_ms": 10.29988956451416,
+        "median_ms": 10.29988956451416,
+        "min_ms": 10.29988956451416,
+        "samples_ms": [
+          10.29988956451416
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "chunked_sequential_emit_reduce",
+      "peak_memory_allocated_bytes": 2151156736,
+      "peak_memory_allocated_gib": 2.003420829772949,
+      "wall": {
+        "enabled": true,
+        "max_ms": 10.395515011623502,
+        "mean_ms": 10.395515011623502,
+        "median_ms": 10.395515011623502,
+        "min_ms": 10.395515011623502,
+        "samples_ms": [
+          10.395515011623502
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "single_full_emit_reduce": {
+      "checksum_norm": 960.2500610351562,
+      "event": {
+        "enabled": true,
+        "max_ms": 9.592562675476074,
+        "mean_ms": 9.592562675476074,
+        "median_ms": 9.592562675476074,
+        "min_ms": 9.592562675476074,
+        "samples_ms": [
+          9.592562675476074
+        ],
+        "stdev_ms": 0.0
+      },
+      "label": "single_full_emit_reduce",
+      "peak_memory_allocated_bytes": 2352483328,
+      "peak_memory_allocated_gib": 2.190920829772949,
+      "wall": {
+        "enabled": true,
+        "max_ms": 9.616039926186204,
+        "mean_ms": 9.616039926186204,
+        "median_ms": 9.616039926186204,
+        "min_ms": 9.616039926186204,
+        "samples_ms": [
+          9.616039926186204
+        ],
+        "stdev_ms": 0.0
+      }
+    }
+  },
+  "workspace": {
+    "grad_logits_gib": 0.5,
+    "probs_gib": 0.5,
+    "safe_groups_gib": 0.015625,
+    "valid_gib": 0.001953125
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "probe": "primus_turbo_ck_grouped_gemm_isolation",
+  "shape": {
+    "groups": 8,
+    "rows": 256,
+    "hidden": 1024,
+    "intermediate": 512,
+    "dtype": "bfloat16"
+  },
+  "overall_ok": false,
+  "results": [
+    {
+      "op": "ggemm_gate_nt",
+      "returncode": -11,
+      "ok": false,
+      "elapsed_ms": 85788.77749084495,
+      "parsed": null,
+      "stdout_tail": "",
+      "stderr_tail": "[aiter] start build [module_aiter_core] under /opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/build/module_aiter_core\n[aiter] Current hipcc not support: -mllvm -amdgpu-coerce-illegal-types=1, skip it.\n[aiter] \u001b[32mfinish build [module_aiter_core], cost 78.8s \u001b[0m\n[aiter] import [module_aiter_core] under /opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/module_aiter_core.so\n"
+    },
+    {
+      "op": "vark_dw1",
+      "returncode": -11,
+      "ok": false,
+      "elapsed_ms": 6591.8583769816905,
+      "parsed": null,
+      "stdout_tail": "",
+      "stderr_tail": "[aiter] import [module_aiter_core] under /opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/module_aiter_core.so\n"
+    }
+  ]
+}

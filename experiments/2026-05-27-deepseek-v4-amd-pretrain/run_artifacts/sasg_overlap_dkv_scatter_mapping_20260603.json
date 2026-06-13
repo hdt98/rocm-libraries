@@ -1,0 +1,193 @@
+{
+  "artifact": "sasg_overlap_dkv_scatter_mapping_20260603",
+  "created_date": "2026-06-03",
+  "status": "scatter_stage_confirmed_wrapper_level_pingpong_rejected_accumulator_rewrite_required",
+  "scope": "Map Ascend SASG Gather/Cube12/Process/Cube345/Scatter to the current AMD sparse MLA shared-KV backward dKV wall, then bound the expected win from a pipeline-overlap-only attempt.",
+  "user_question": "Does the dKV atomic accumulation belong to the SASG Scatter stage, and should we try the Ascend-style overlapping approach first?",
+  "answer": {
+    "dkv_atomic_stage": "Scatter",
+    "precise_read": "The dKV atomic write is the SASG ScatterAdd output stage. The value being written is produced by Cube345: Cube4 computes the dK term, Cube5 computes the dV term, then ScatterAdd scales dK, adds dV, and atomically scatters into original/compressed KV gradient banks.",
+    "amd_nuance": "The current AMD Triton query-major kernel does not expose a separate Scatter stage. It computes dKV partials and immediately performs tl.atomic_add inside the selected-key loop, so Ascend-style CV pipeline overlap requires a schedule split or a persistent producer/consumer kernel rather than a small wrapper around the existing kernel."
+  },
+  "ascend_source_evidence": {
+    "autofuse_doc": {
+      "path": "sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md",
+      "line": 301,
+      "read": "The doc defines SASG as five ordered stages: Gather, Cube12, Process, Cube345, Scatter, with one Gather+Cube12 preload to create CV pipeline overlap."
+    },
+    "cube345_source": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_op.h",
+      "lines": "267-276",
+      "read": "cube345Process calls cube5Process, cube4Process, and cube3Process. Cube4 writes mm4ResWorkspaceGm for dK, Cube5 writes mm5ResWorkspaceGm for dV, and Cube3 writes dQ."
+    },
+    "scatter_source": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h",
+      "lines": "853-930",
+      "read": "ScatterAdd enters SetAtomicAdd<float>(), reads mm4ResWorkspaceGm and mm5ResWorkspaceGm, computes scale*dK + dV in UB, selects original versus compressed output by route index, then DataCopy writes under atomic-add mode into dOriKv/dCmpKv."
+    },
+    "pipeline_source": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h",
+      "lines": "286-310",
+      "read": "CubeCompute preloads Cube12 for the next ping-pong slot while waiting on the vector side, then runs Cube345 for the previous slot. VecCompute waits for Cube12, runs Process, and releases Cube345."
+    }
+  },
+  "amd_current_source_evidence": {
+    "path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "kernel": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+    "lines": "1264-1632",
+    "stage_read": "For each selected-key block and D chunk, the kernel forms dkv_acc = tl.dot(dS^T, Q) * scale + tl.dot(P^T, dO), then immediately tl.atomic_adds dkv_acc into grad_kv. That atomic_add is the AMD equivalent of SASG ScatterAdd, but it is fused into the current query-major loop rather than separated into a pipeline stage."
+  },
+  "stage_mapping": [
+    {
+      "sasg_stage": "Gather",
+      "ascend_contract": "Gather selected local/original and compressed KV rows into selected-K/V workspace.",
+      "amd_current_contract": "tl.load selected KV rows via local window and compressed top-k indices inside the query-major loop.",
+      "overlap_note": "Can be overlapped with previous tile processing only after the loop is split into ping-pong tiles or a persistent kernel."
+    },
+    {
+      "sasg_stage": "Cube12",
+      "ascend_contract": "Compute QK-like score terms and dO*V-like terms for the selected tile.",
+      "amd_current_contract": "Recompute scores, probabilities, grad_probs, softmax dot, and grad logits for each selected tile.",
+      "overlap_note": "This is part of the producer side and is already much smaller than Scatter in the compressed route profile."
+    },
+    {
+      "sasg_stage": "Process",
+      "ascend_contract": "Softmax, row statistics, grad-softmax processing, sink gradients, and preparation of ds/prob buffers.",
+      "amd_current_contract": "Online softmax reconstruction and grad-logit formation inside the Triton loop.",
+      "overlap_note": "This can be hidden behind Scatter only if the Scatter consumer is decoupled from the per-query program."
+    },
+    {
+      "sasg_stage": "Cube345",
+      "ascend_contract": "Cube3 computes dQ, Cube4 computes dK partials into mm4ResWorkspaceGm, Cube5 computes dV partials into mm5ResWorkspaceGm.",
+      "amd_current_contract": "dQ accumulates locally while dKV partials are computed as dS^T*Q plus P^T*dO for each selected/D tile.",
+      "overlap_note": "The dKV dot math is not the wall by itself; existing profile split estimates about 0.79 ms for compressed top-k512 dKV dot math."
+    },
+    {
+      "sasg_stage": "Scatter",
+      "ascend_contract": "Scale dK, add dV, route original/compressed rows, and atomic-add them into dKV outputs.",
+      "amd_current_contract": "tl.atomic_add into grad_kv for every selected compressed group and D chunk.",
+      "overlap_note": "This is the current measured wall: about 8.21 ms by event split or about 9.18 ms by rocprof split for compressed top-k512."
+    }
+  ],
+  "profile_inputs": {
+    "shape": {
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "compressed_topk": 512,
+      "compress_ratio": 4,
+      "compressed_groups": 1024,
+      "local_count_for_full_route": 128,
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128
+    },
+    "artifact_references": {
+      "mechanism": "run_artifacts/sparse_mla_sharedkv_compressed_route_mechanism_inspection_20260602.json",
+      "ascend_contract": "run_artifacts/ascend_sasg_slig_amd_fusion_contract_20260601.json",
+      "actual_li_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+      "partial_store_negative": "run_artifacts/actual_li_active_list_dotk_partial_store_triton_dkv_summary_20260602.json",
+      "hip_dense_group_negative": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s4096_layer2_sb256_timing_20260602.json",
+      "rocwmma_grouped_tile_smoke": "run_artifacts/compressed_dkv_rocwmma_grouped_accum_tile_g4_smoke_20260602.json"
+    }
+  },
+  "overlap_bound_from_existing_profile": {
+    "event_split_ms": {
+      "compressed512_full_atomic": 10.894770622253418,
+      "no_dkv": 1.8989759683609009,
+      "dkv_reduce_sink": 2.684101104736328,
+      "estimated_dkv_dot_math": 0.7851251363754272,
+      "estimated_scatter_atomic_tail": 8.21066951751709,
+      "ideal_two_stage_overlap_lower_bound": 8.21066951751709,
+      "max_overlap_only_savings_ms": 2.684101104736328,
+      "max_overlap_only_speedup_x": 1.326905302074627
+    },
+    "rocprof_split_ms": {
+      "compressed512_full_atomic": 11.06122375,
+      "no_dkv": 1.1442145,
+      "dkv_reduce_sink": 1.882611,
+      "estimated_dkv_dot_math": 0.7383965000000001,
+      "estimated_scatter_atomic_tail": 9.17861275,
+      "ideal_two_stage_overlap_lower_bound": 9.17861275,
+      "max_overlap_only_savings_ms": 1.882611,
+      "max_overlap_only_speedup_x": 1.205107257352076
+    },
+    "read": "If we only pipeline the existing producer with the existing global-atomic Scatter, the compressed route cannot get below the Scatter tail. The best-case lower bound is therefore around 8.2-9.2 ms for compressed top-k512, before fill/drain, launch, stream, or scratch-buffer overhead. That is useful but not enough to return to the old ~5 ms sparse-MLA backward anchor."
+  },
+  "measured_overlap_probe": {
+    "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py",
+    "status": "wrapper_level_pingpong_negative",
+    "s512_layer2_chunk128": {
+      "artifact": "run_artifacts/sparse_mla_sharedkv_sasg_overlap_s512_layer2_chunk128_20260603.json",
+      "single_full_emit_reduce_ms": 0.30232399702072144,
+      "chunked_sequential_emit_reduce_ms": 0.6933689713478088,
+      "chunked_pingpong_stream_overlap_ms": 1.6741809844970703,
+      "pingpong_vs_single_full_speedup_x": 0.1805802358408345,
+      "correctness": "passed"
+    },
+    "s4096_layer2_chunk512": {
+      "artifact": "run_artifacts/sparse_mla_sharedkv_sasg_overlap_s4096_layer2_chunk512_20260603.json",
+      "single_full_emit_reduce_ms": 9.592562675476074,
+      "chunked_sequential_emit_reduce_ms": 10.29988956451416,
+      "chunked_pingpong_stream_overlap_ms": 33.3049430847168,
+      "pingpong_vs_single_full_speedup_x": 0.28802219091249476,
+      "correctness": "passed"
+    },
+    "read": "The wrapper-level split validates the dependency pattern but is slower than a single full emit+reduce at both S512 and S4096. Chunking adds fill/drain and reduction overhead, and two-stream ping-pong is much worse on MI350 for this materialized partial-store diagnostic. Do not pursue more host-level overlap around the existing producer/reduce split."
+  },
+  "related_negative_and_positive_evidence": {
+    "direct_sparse_atomic": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+      "best_s4096_layer2_ms": 8.80629825592041,
+      "read": "Keeping selected-key dot batching with direct sparse global atomics lands on the same 8-9 ms write wall."
+    },
+    "partial_store": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_partial_store_triton_dkv_summary_20260602.json",
+      "emit_only_ms": 8.794984817504883,
+      "full_reduce_ms": 9.507111549377441,
+      "read": "Removing final cross-tile global atomics by writing dense partial rows is still not enough; it writes the full raw KxD contribution volume and remains near the atomic wall."
+    },
+    "scalar_local_coalescing": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_sparse_triton_dkv_summary_20260602.json",
+      "status": "rejected_at_s512_for_scalar_local_sparse_accumulation",
+      "read": "Local active-list coalescing reduces global write count but scalar accumulation becomes much slower before target shape."
+    },
+    "hip_dense_group": {
+      "artifact": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s4096_layer2_sb256_timing_20260602.json",
+      "median_ms": 121.80220031738281,
+      "read": "A first dense-group local table HIP accumulator modeled 11.91x write reduction but was far too slow, showing that write reduction alone is not enough without MFMA-friendly compute."
+    },
+    "rocwmma_tile_smoke": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_grouped_accum_tile_g4_smoke_20260602.json",
+      "status": "passed_tiny_tile",
+      "read": "A tiny rocWMMA grouped-accumulation tile proves the right micro-contract: compute selected-row contributions with MFMA, reduce duplicate groups in LDS, then write grouped rows. It is not yet a full S4096 route schedule."
+    },
+    "mfma_floor": {
+      "artifacts": [
+        "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_20260602.json",
+        "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_bf16_20260602.json"
+      ],
+      "mixed_ms": 7.052491188049316,
+      "bf16_ms": 4.727312088012695,
+      "read": "Materialized MFMA floors show the target is reachable if the accumulator becomes MFMA-shaped, but the floor materializes large score/prob slabs and is not a production no-selected-state path."
+    }
+  },
+  "recommended_next_probe": {
+    "name": "parallel_producer_compact_grouped_partials",
+    "priority": "high",
+    "design": [
+      "Preserve the fast query-major selected-key schedule for QK/prob/grad-logit/dQ.",
+      "Split K16xD16 producer work across many CTAs/waves so the S4096 selected-key producer remains parallel instead of serialized by one persistent local table.",
+      "Emit bounded compact grouped partial rows keyed by compressed group and D16, not dense [seq_tile, group, D] slabs or full selected-partial tensors.",
+      "Reduce compact rows with a HIP/CK/rocWMMA segmented accumulator that groups duplicate compressed rows in LDS and emits fewer global atomics.",
+      "Only reintroduce ping-pong overlap inside a fused or persistent producer/reducer kernel after the compact reducer beats the current direct sparse atomic gate; wrapper-level two-stream overlap is rejected by the measured probe.",
+      "Benchmark against current query-major full atomic (~10.9-11.1 ms), direct sparse atomic (~8.81 ms), partial-store full reduce (~9.51 ms), and the materialized MFMA floors (mixed ~7.05 ms, BF16 ~4.73 ms)."
+    ],
+    "success_criteria": {
+      "s512_gate": "Producer+compact reducer should beat the S512 persistent-tile positive rung at 1.51 ms and avoid the wrapper-pingpong regression at 1.67 ms.",
+      "s4096_gate": "Producer+compact reducer should beat direct sparse atomic at ~8.81 ms; merely matching the single partial-store emit+reduce at 9.59 ms is not enough.",
+      "production_candidate": "A real candidate should beat direct sparse atomic (~8.81 ms) and trend toward the 4.7-7.1 ms MFMA floor while preserving the no-selected-state contract."
+    },
+    "risk": "If the compact row format expands into dense slabs or the reducer serializes selected-key producer math, it will recreate the failed partial-store or persistent-tile paths. The real optimization is segmented/MFMA accumulation with enough producer parallelism; overlap is secondary."
+  }
+}

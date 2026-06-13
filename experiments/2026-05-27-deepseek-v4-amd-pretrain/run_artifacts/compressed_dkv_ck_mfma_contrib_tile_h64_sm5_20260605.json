@@ -1,0 +1,53 @@
+{
+  "artifact": "compressed_dkv_ck_mfma_contrib_tile",
+  "status": "failed",
+  "scope": "single K16xD16 CK-Tile BF16 MFMA contribution tile",
+  "arch": "gfx950",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip": "7.2.26015-fc0010cf6a",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "k_tile": 16,
+    "d_tile": 16,
+    "h_dim": 64,
+    "mfma_k": 32,
+    "store_mode": 5
+  },
+  "contract": {
+    "formula": "dKV_tile = dL_scaled[K,H] @ Q[D,H]^T + P[K,H] @ dO[D,H]^T",
+    "backend": "ck_tile WarpGemmAttributeMfmaImplBf16Bf16F32M16N16K32",
+    "gfx950_builtin": "v_mfma_f32_16x16x32_bf16",
+    "source_boundary": false,
+    "next_use": "replace rocWMMA contribution fragments in the source-boundary score-page owner"
+  },
+  "build_seconds": 26.843677890952677,
+  "extension_dir": "/work/torch_extensions/ck_mfma_contrib_tile_20260605_sweep_sm5",
+  "correctness": {
+    "passed": false,
+    "atol": 0.25,
+    "rtol": 0.05,
+    "max_abs_diff": 56.62590026855469,
+    "mean_abs_diff": 12.581551551818848,
+    "reference_norm": 195.96978759765625,
+    "candidate_norm": 195.96978759765625
+  },
+  "timing_ms": {
+    "samples_ms": [
+      0.017920000478625298,
+      0.010479999706149101,
+      0.00800000037997961,
+      0.007639999967068434,
+      0.007439999841153622,
+      0.00800000037997961,
+      0.007720000110566616,
+      0.011719999834895134,
+      0.0060800001956522465,
+      0.007639999967068434
+    ],
+    "mean_ms": 0.00926400008611381,
+    "median_ms": 0.007860000245273113,
+    "min_ms": 0.0060800001956522465,
+    "max_ms": 0.017920000478625298
+  },
+  "read": "This is a compile/parity/timing gate for the CK/custom-MFMA lane layout only. It is not an e2e sparse-attention candidate until it is wired into the q,dO,kv,indices,lse -> dQ+dKV source boundary."
+}

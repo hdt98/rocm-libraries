@@ -1,0 +1,124 @@
+{
+  "artifact": "single_layer_moe_sweep",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_moe_sweep_20260531T2140Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "topk": 6,
+    "experts": 384
+  },
+  "commands": {
+    "full_sweep_attempt": "RUN_TAG=retained_moe_sweep_20260531T2140Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh sweep-2048",
+    "rerun_full_layer_after_ssh_stdin_fix": "RUN_TAG=retained_moe_sweep_20260531T2140Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-moe-sweep-2048"
+  },
+  "raw_artifacts": {
+    "probe_dense": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z/dynamic_moe_bridge_ops_s2048_dense/summary.json",
+    "probe_no_mask": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z/dynamic_moe_bridge_ops_s2048_no-mask/summary.json",
+    "probe_compact_reduce": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z/dynamic_moe_bridge_ops_s2048/summary.json",
+    "probe_compact_scatter": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z/dynamic_moe_bridge_ops_s2048_compact-scatter/summary.json",
+    "full_layer_sweep_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_moe_sweep_20260531T2140Z/moe_impl_s2048_sweep"
+  },
+  "isolated_bridge_probe": {
+    "route_stats": {
+      "assignments": 12288,
+      "experts": 384,
+      "mean_per_expert": 32.0,
+      "min_per_expert": 17,
+      "max_per_expert": 52,
+      "padded_rows": 19968,
+      "padding_multiplier": 1.625
+    },
+    "variants": {
+      "compact_reduce": {
+        "check_ok": true,
+        "train_total_isolated_ms": 39.04396533127874,
+        "forward_total_isolated_ms": 11.264590135775506,
+        "backward_total_isolated_ms": 27.779375195503235,
+        "output_scale_reduce_ms": 0.508804976940155,
+        "bwd_input_reduce_only_ms": 0.45088401436805725
+      },
+      "compact_scatter": {
+        "check_ok": true,
+        "train_total_isolated_ms": 39.21982352435589,
+        "forward_total_isolated_ms": 11.234429866075516,
+        "backward_total_isolated_ms": 27.985393658280373,
+        "output_scale_reduce_ms": 0.5380449891090393,
+        "bwd_input_reduce_only_ms": 0.4056439995765686
+      },
+      "dense": {
+        "check_ok": true,
+        "train_total_isolated_ms": 39.552078342065215,
+        "forward_total_isolated_ms": 11.317022075876594,
+        "backward_total_isolated_ms": 28.23505626618862,
+        "output_scale_reduce_ms": 0.7986069917678833,
+        "bwd_input_reduce_only_ms": 0.658765971660614
+      },
+      "no_mask": {
+        "check_ok": true,
+        "train_total_isolated_ms": 39.6319261463359,
+        "forward_total_isolated_ms": 11.45330720860511,
+        "backward_total_isolated_ms": 28.17861893773079,
+        "output_scale_reduce_ms": 0.6502460241317749,
+        "bwd_input_reduce_only_ms": 0.5204049944877625
+      }
+    },
+    "best_variant_by_isolated_train_ms": "compact_reduce"
+  },
+  "full_layer_sweep": {
+    "note": "Full-layer sweep uses warmup=1 and iters=3 to compare variants quickly. Use the retained bench artifact with warmup=2 and iters=5 for canonical pass/fail timing.",
+    "target_ms": 43.3,
+    "variants": {
+      "compact_reduce": {
+        "avg_ms": 53.45067129625628,
+        "min_ms": 53.059214958921075,
+        "tokens_per_s": 38315.70212932841,
+        "estimated_tflops": 182.15213678339575,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "loss_mean": 1.0037038326263428
+      },
+      "no_mask_bmm_out": {
+        "avg_ms": 53.526585339568555,
+        "min_ms": 53.05018799845129,
+        "tokens_per_s": 38261.360910800584,
+        "estimated_tflops": 181.89379963908746,
+        "moe_impl": "grouped-expert-batches-dynamic-no-mask-bmm-out-dgrad-dense-wgrad",
+        "loss_mean": 1.0037039518356323
+      },
+      "no_mask_dense": {
+        "avg_ms": 53.63590898923576,
+        "min_ms": 53.12077689450234,
+        "tokens_per_s": 38183.37450775776,
+        "estimated_tflops": 181.52305372644952,
+        "moe_impl": "grouped-expert-batches-dynamic-no-mask-dense-wgrad",
+        "loss_mean": 1.0037039518356323
+      },
+      "dynamic_bmm_out": {
+        "avg_ms": 53.797554962026574,
+        "min_ms": 53.091296926140785,
+        "tokens_per_s": 38068.644596312915,
+        "estimated_tflops": 180.97762985682792,
+        "moe_impl": "grouped-expert-batches-dynamic-bmm-out-dgrad-dense-wgrad",
+        "loss_mean": 1.0037039120992024
+      },
+      "compact_scatter": {
+        "avg_ms": 54.015903384424746,
+        "min_ms": 53.00213710870594,
+        "tokens_per_s": 37914.75975926253,
+        "estimated_tflops": 180.24606419759294,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-scatter-bmm-out-dgrad-dense-wgrad",
+        "loss_mean": 1.0037039518356323
+      }
+    },
+    "best_variant_by_avg_ms": "compact_reduce",
+    "best_avg_ms": 53.45067129625628,
+    "best_gap_to_target_ms": 10.150671296256278
+  },
+  "conclusion": "At B=1 S=2048, retained compact-reduce remains the best of the existing dynamic MoE bridge variants. The variant spread is under 0.6 ms in the quick full-layer sweep, so the remaining development-target gap is unlikely to be solved by swapping among these MoE bridge variants alone. Next optimization should target attention/backward overhead, launch count, or a deeper MoE kernel replacement rather than a retained bridge selector change.",
+  "runner_fix": "remote_shell now uses ssh -n so ssh does not consume local here-doc input during variant loops."
+}

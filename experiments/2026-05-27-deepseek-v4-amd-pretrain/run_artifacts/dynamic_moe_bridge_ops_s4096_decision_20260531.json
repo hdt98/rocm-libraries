@@ -1,0 +1,172 @@
+{
+  "artifact": "dynamic_moe_bridge_ops_s4096_decision",
+  "date": "2026-05-31",
+  "run_tag": "dynamic_moe_bridge_ops_s4096_goal_cont_20260531T1315Z",
+  "scope": "DeepSeek V4-style dynamic MoE bridge isolated op attribution at B=1 S=4096 on one MI350X",
+  "source_dir": "run_artifacts/dynamic_moe_bridge_ops_s4096_goal_cont_20260531",
+  "shape": {
+    "tokens": 4096,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "assignments": 24576,
+    "dtype": "bfloat16",
+    "device": "cuda"
+  },
+  "runtime": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a"
+  },
+  "route_stats": {
+    "assignments": 24576,
+    "experts": 384,
+    "max_per_expert": 82,
+    "mean_per_expert": 64.0,
+    "min_per_expert": 40,
+    "padded_rows": 31488,
+    "padding_multiplier": 1.28125,
+    "touched_experts": 384
+  },
+  "correctness": {
+    "all_variants_check_ok": true,
+    "tolerances": {
+      "atol": 1.0,
+      "rtol": 0.025
+    },
+    "checked_ops": [
+      "grad_y_build",
+      "input_reduce_only",
+      "output_scale_reduce",
+      "top_score_grad"
+    ]
+  },
+  "ranking_by_isolated_train_total_ms": [
+    {
+      "variant": "no-mask",
+      "train_total": 46.34222436696291,
+      "forward_total": 14.791835509240627,
+      "backward_total": 31.550388857722282,
+      "backward_dgrad_path_using_bmm_out": 13.077775850892067,
+      "backward_wgrad_gemm": 18.142251014709473,
+      "forward_gemm": 13.432826519012451,
+      "forward_glue": 1.3590089902281761,
+      "output_scale_reduce": 0.9800869822502136,
+      "input_reduce_only": 0.7862859964370728,
+      "top_score_grad": 0.3303619921207428,
+      "wgrad_lhs_copy_all": 1.1017680168151855,
+      "contract": {
+        "compact_reduction": false,
+        "compact_scatter_grad_y": false,
+        "materialize_wgrad_lhs": false,
+        "skip_padded_mask": true
+      }
+    },
+    {
+      "variant": "dense",
+      "train_total": 46.39388558268547,
+      "forward_total": 15.0574089884758,
+      "backward_total": 31.33647659420967,
+      "backward_dgrad_path_using_bmm_out": 12.918906480073929,
+      "backward_wgrad_gemm": 18.08372712135315,
+      "forward_gemm": 13.286412954330444,
+      "forward_glue": 1.7709960341453552,
+      "output_scale_reduce": 1.2208105325698853,
+      "input_reduce_only": 1.00872802734375,
+      "top_score_grad": 0.3338429927825928,
+      "wgrad_lhs_copy_all": 1.0829289555549622,
+      "contract": {
+        "compact_reduction": false,
+        "compact_scatter_grad_y": false,
+        "materialize_wgrad_lhs": false,
+        "skip_padded_mask": false
+      }
+    },
+    {
+      "variant": "compact-scatter",
+      "train_total": 46.49063363485038,
+      "forward_total": 14.727768881246448,
+      "backward_total": 31.762864753603935,
+      "backward_dgrad_path_using_bmm_out": 13.135752007365227,
+      "backward_wgrad_gemm": 18.21926975250244,
+      "forward_gemm": 13.436277866363525,
+      "forward_glue": 1.2914910148829222,
+      "output_scale_reduce": 0.922648012638092,
+      "input_reduce_only": 0.7598459720611572,
+      "top_score_grad": 0.4078429937362671,
+      "wgrad_lhs_copy_all": 1.0916889905929565,
+      "contract": {
+        "compact_reduction": true,
+        "compact_scatter_grad_y": true,
+        "materialize_wgrad_lhs": false,
+        "skip_padded_mask": true
+      }
+    },
+    {
+      "variant": "compact-reduce",
+      "train_total": 46.49300303123891,
+      "forward_total": 14.777052154764533,
+      "backward_total": 31.71595087647438,
+      "backward_dgrad_path_using_bmm_out": 12.986830979585648,
+      "backward_wgrad_gemm": 18.197434902191162,
+      "forward_gemm": 13.485761165618896,
+      "forward_glue": 1.2912909891456366,
+      "output_scale_reduce": 0.9137679934501648,
+      "input_reduce_only": 0.7467259764671326,
+      "top_score_grad": 0.5316849946975708,
+      "wgrad_lhs_copy_all": 1.0855289697647095,
+      "contract": {
+        "compact_reduction": true,
+        "compact_scatter_grad_y": false,
+        "materialize_wgrad_lhs": false,
+        "skip_padded_mask": true
+      }
+    },
+    {
+      "variant": "compact-reduce-contig-wgrad-lhs",
+      "train_total": 47.03777402732521,
+      "forward_total": 14.776916907168925,
+      "backward_total": 32.26085712015629,
+      "backward_dgrad_path_using_bmm_out": 13.102983012795448,
+      "backward_wgrad_gemm": 18.61947011947632,
+      "forward_gemm": 13.500186920166016,
+      "forward_glue": 1.2767299870029092,
+      "output_scale_reduce": 0.9101269841194153,
+      "input_reduce_only": 0.7594860196113586,
+      "top_score_grad": 0.5384039878845215,
+      "wgrad_lhs_copy_all": 1.1112890243530273,
+      "contract": {
+        "compact_reduction": true,
+        "compact_scatter_grad_y": false,
+        "materialize_wgrad_lhs": true,
+        "skip_padded_mask": true
+      }
+    }
+  ],
+  "decision": {
+    "promote": "no new wrapper variant",
+    "retain_training_baseline": "compact-reduce",
+    "demote": [
+      "compact-reduce-contig-wgrad-lhs",
+      "compact-scatter as a standalone wrapper optimization",
+      "skip-padded-mask-only tuning as the next primary lever"
+    ],
+    "reason": "All variants are correct and within 0.70 ms isolated train-total at S4096; grouped GEMM math dominates the MoE bridge while scatter/reduce glue is already small.",
+    "next_action": "Move to compact-native grouped MoE training kernels that consume group_sizes/group_offsets directly, with backward-first focus on W2 dgrad, W1/W3 xgrad, and wgrad bundling."
+  },
+  "interpretation": {
+    "dominant_costs": [
+      "forward grouped GEMMs: about 13.3-13.5 ms",
+      "backward wgrad grouped GEMMs: about 18.1-18.6 ms",
+      "backward dgrad path using bmm_out: about 12.9-13.1 ms"
+    ],
+    "small_costs": [
+      "output_scale_reduce: about 0.9-1.2 ms",
+      "input_reduce_only: about 0.75-1.0 ms",
+      "top_score_grad: less than 0.54 ms"
+    ],
+    "padding_read": "The learned route at S4096 pads 24,576 compact assignments to 31,488 rows, a 1.28125x multiplier. Removing padded rows can save part of the routed GEMM work, but the next kernel also needs better GEMM efficiency and/or launch/reuse fusion to materially close the single-layer target gap.",
+    "caveat": "The totals are sums of isolated op medians for attribution, not an end-to-end fused latency prediction."
+  }
+}

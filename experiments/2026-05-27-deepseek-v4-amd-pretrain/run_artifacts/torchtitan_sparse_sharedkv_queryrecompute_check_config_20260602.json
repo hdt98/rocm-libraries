@@ -1,0 +1,58 @@
+{
+  "artifact": "torchtitan_sparse_sharedkv_queryrecompute_check_config_20260602",
+  "date": "2026-06-02",
+  "status": "passed",
+  "purpose": "Verify the direct TorchTitan canary launcher exposes the shared-KV query-recompute backward mode through check-config before the next sparse attention target-shape run.",
+  "command_shape": "env TARGET_HOST=do-sonle5-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_SHAREDKV_SCATTER_MODE=auto CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_PERSIST_JIT_CACHE=auto launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+  "launcher_change": {
+    "file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "summary": "check-config now forwards CANARY_SHAREDKV_BACKWARD_MODE and CANARY_SHAREDKV_SCATTER_MODE to the remote script, exports them into the container, and prints both requested and effective container env values."
+  },
+  "remote_check_config": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096_steps1",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold",
+    "parallelism": {
+      "data_parallel_shard_degree": -1,
+      "expert_parallel_degree": 4
+    },
+    "moe": {
+      "comm_backend": "mori",
+      "experimental_mori_aiter_moe": true,
+      "mori_aiter_backward_mode": "routed",
+      "mori_aiter_local_vjp_mode": "padded",
+      "mori_aiter_local_vjp_swiglu_backend": "triton",
+      "mori_aiter_op_cache_mode": "backward",
+      "mori_shmem_heap_size": "32G",
+      "token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+      "score_before_experts": false,
+      "router_score_func": "sqrtsoftplus"
+    },
+    "sparse_mla": {
+      "max_seq_len": 4096,
+      "backward_mode_by_layer": ["shared_kv", "shared_kv", "shared_kv", "shared_kv"],
+      "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+      "sharedkv_backward_mode": "query_recompute",
+      "sharedkv_backward_env": "query_recompute",
+      "sharedkv_scatter_mode": "auto",
+      "sharedkv_scatter_env": "auto",
+      "li_kl_backend": "triton_tl_dot",
+      "compress_ratio_by_layer": [0, 0, 4, 128],
+      "attention_status_by_layer": [
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+      ]
+    }
+  },
+  "local_validations": [
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_li_triton_backend.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py"
+  ],
+  "read": "The next sparse attention systems run can now be launched with query_recompute explicitly pinned and audited. This config proof does not measure performance; it only proves the intended shared-KV backward and scatter modes reach the container alongside LI triton_tl_dot and MORI routed padded VJP with Triton SwiGLU."
+}

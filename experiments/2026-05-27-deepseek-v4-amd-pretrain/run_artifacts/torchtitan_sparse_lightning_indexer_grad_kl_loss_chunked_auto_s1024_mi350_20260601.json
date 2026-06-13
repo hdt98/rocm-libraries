@@ -1,0 +1,80 @@
+{
+  "deferred_forward_loss": null,
+  "deferred_grad_norms": {},
+  "device": "cuda",
+  "direct_grad_norms": {},
+  "direct_loss": null,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {},
+  "li_kl_chunk_size": 32,
+  "li_kl_chunk_size_arg": null,
+  "max_grad_diff": null,
+  "parity_skipped": true,
+  "read": "Parity was skipped for long-sequence timing. The timing block below measures the current public Ascend-style wrapper; no correctness claim is made by this run.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 256,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 1024,
+    "topk": 256
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 78.97925567626953,
+      "mean_ms": 78.47216288248698,
+      "median_ms": 78.25332641601562,
+      "min_ms": 78.18390655517578,
+      "samples_ms": [
+        78.97925567626953,
+        78.25332641601562,
+        78.18390655517578
+      ],
+      "stdev_ms": 0.4405248067923091
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 0.00011018173972843215,
+      "index_q": 0.0001156048383563757,
+      "weights": 9.34344861889258e-05
+    },
+    "li_kl_chunk_size": 32,
+    "li_kl_chunk_size_arg": null,
+    "li_kl_chunk_size_env": null,
+    "li_kl_max_selected_main_k_elements_env": null,
+    "peak_memory_allocated_bytes": 2912305152,
+    "peak_memory_allocated_gib": 2.7122955322265625,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle in PyTorch.",
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 79.0442560100928,
+      "mean_ms": 78.514151663209,
+      "median_ms": 78.28043901827186,
+      "min_ms": 78.21775996126235,
+      "samples_ms": [
+        79.0442560100928,
+        78.28043901827186,
+        78.21775996126235
+      ],
+      "stdev_ms": 0.4601522899929117
+    },
+    "warmup_iters": 1
+  },
+  "top_indices_equal": null,
+  "top_indices_shape": [
+    1,
+    1024,
+    256
+  ]
+}

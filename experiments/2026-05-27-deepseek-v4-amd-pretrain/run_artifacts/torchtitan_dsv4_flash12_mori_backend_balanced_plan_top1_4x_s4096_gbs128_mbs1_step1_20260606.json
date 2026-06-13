@@ -1,0 +1,471 @@
+{
+  "balanced_load_stats": {
+    "modeled_max_load_reduction_pct_calculated": {
+      "count": 1536,
+      "max": 8.288062404234573,
+      "mean": 3.1717751901555022,
+      "median": 3.109023018964016,
+      "min": -3.137966804979253,
+      "p95": 7.545551247297808
+    },
+    "owner_max_load_after_rows": {
+      "count": 1536,
+      "max": 31839.0,
+      "mean": 27252.5390625,
+      "median": 26943.5,
+      "min": 24957.0,
+      "p95": 30343.0
+    },
+    "owner_max_load_before_rows": {
+      "count": 1536,
+      "max": 32519.0,
+      "mean": 28167.783854166668,
+      "median": 27875.5,
+      "min": 26000.0,
+      "p95": 31182.0
+    },
+    "owner_max_over_mean_after": {
+      "count": 1536,
+      "max": 1.2955322265625,
+      "mean": 1.1089086532592773,
+      "median": 1.0963338216145835,
+      "min": 1.0155029296875,
+      "p95": 1.2346598307291667
+    },
+    "owner_max_over_mean_before": {
+      "count": 1536,
+      "max": 1.3232014973958333,
+      "mean": 1.1461500591701932,
+      "median": 1.1342569986979165,
+      "min": 1.0579427083333333,
+      "p95": 1.268798828125
+    }
+  },
+  "balanced_numeric_meta_stats": {
+    "balanced_moe_modeled_max_load_reduction_pct": {
+      "count": 1536,
+      "max": 8.288062404234573,
+      "mean": 3.1717751901555022,
+      "median": 3.109023018964016,
+      "min": -3.137966804979253,
+      "p95": 7.545551247297808
+    },
+    "balanced_moe_remote_hot_rows_total": {
+      "count": 1536,
+      "max": 2849.0,
+      "mean": 1934.6666666666667,
+      "median": 1958.5,
+      "min": 1139.0,
+      "p95": 2644.0
+    },
+    "balanced_moe_selected_rows_total": {
+      "count": 1536,
+      "max": 3694.0,
+      "mean": 2572.9583333333335,
+      "median": 2580.5,
+      "min": 1549.0,
+      "p95": 3485.0
+    },
+    "balanced_moe_weight_broadcast_grad_reduce_payload_mib": {
+      "count": 1536,
+      "max": 96.0,
+      "mean": 96.0,
+      "median": 96.0,
+      "min": 96.0,
+      "p95": 96.0
+    },
+    "local_vjp_balanced_moe_top1_remote_rows": {
+      "count": 1536,
+      "max": 2849.0,
+      "mean": 1674.181640625,
+      "median": 1575.5,
+      "min": 661.0,
+      "p95": 2494.0
+    },
+    "local_vjp_balanced_moe_topk_remote_rows": {
+      "count": 1536,
+      "max": 11871.0,
+      "mean": 8395.712239583334,
+      "median": 8333.0,
+      "min": 5085.0,
+      "p95": 10733.0
+    },
+    "local_vjp_balanced_moe_topk_remote_share": {
+      "count": 1536,
+      "max": 0.4865555369408611,
+      "mean": 0.34226535634074784,
+      "median": 0.3392251285304648,
+      "min": 0.2423226195410528,
+      "p95": 0.4268815431539032
+    },
+    "local_vjp_hot_expert_topk_rows": {
+      "count": 1536,
+      "max": 16192.0,
+      "mean": 11195.265625,
+      "median": 11109.5,
+      "min": 6815.0,
+      "p95": 14247.0
+    },
+    "local_vjp_hot_expert_topk_share": {
+      "count": 1536,
+      "max": 0.6336907354665773,
+      "mean": 0.4563830397017258,
+      "median": 0.45232462689692826,
+      "min": 0.3356164383561644,
+      "p95": 0.5682819383259912
+    },
+    "local_vjp_max_over_mean_count": {
+      "count": 1536,
+      "max": 9.989889922993338,
+      "mean": 5.802965096061045,
+      "median": 5.651791387464559,
+      "min": 3.503137762725371,
+      "p95": 8.055172413793104
+    },
+    "local_vjp_padding_multiplier": {
+      "count": 1536,
+      "max": 9.989889922993338,
+      "mean": 5.802965096061045,
+      "median": 5.651791387464559,
+      "min": 3.503137762725371,
+      "p95": 8.055172413793104
+    }
+  },
+  "balanced_record_count": 1536,
+  "decision": "mechanism proof only; not promoted because MORI bridge step-1 throughput is far below current standard EP retained path and top-1 planning only models a small owner-load reduction on this 4x smoke.",
+  "diagnostic_backend": "mori_ep",
+  "record_count": 3072,
+  "run_id": "torchtitan_dsv4_flash12_mori_backend_balanced_plan_top1_4x_s4096_gbs128_mbs1_step1_20260606",
+  "selected_owner_rank_frequency": {
+    "0": 376,
+    "1": 248,
+    "2": 568,
+    "3": 344
+  },
+  "shape": {
+    "ep": 4,
+    "fsdp": 4,
+    "global_batch_size": 128,
+    "gpus": 4,
+    "microbatch_size": 1,
+    "seq_len": 4096,
+    "steps": 1
+  },
+  "source_timing_jsonl": "/tmp/dsv4_mori_backend_balanced_plan_top1_timing_20260606.jsonl",
+  "stage_stats_gpu_ms": {
+    "backward.align_grad_output": {
+      "count": 1536,
+      "max": 0.18380199372768402,
+      "mean": 0.06168960289748308,
+      "median": 0.05752100050449371,
+      "min": 0.03184099867939949,
+      "p95": 0.09304100275039673
+    },
+    "backward.balanced_moe.plan": {
+      "count": 1536,
+      "max": 205.14215087890625,
+      "mean": 3.925063566692794,
+      "median": 1.7327365279197693,
+      "min": 0.5726050138473511,
+      "p95": 12.734800338745117
+    },
+    "backward.combine_dx.call": {
+      "count": 1536,
+      "max": 33.13951110839844,
+      "mean": 4.142243827770774,
+      "median": 2.8897069692611694,
+      "min": 0.8732879757881165,
+      "p95": 10.204615592956543
+    },
+    "backward.combine_dx.prepare_full": {
+      "count": 1536,
+      "max": 0.0801210030913353,
+      "mean": 0.06367801746819168,
+      "median": 0.06380099803209305,
+      "min": 0.04960000142455101,
+      "p95": 0.0689999982714653
+    },
+    "backward.combine_dx.slice_contiguous": {
+      "count": 1536,
+      "max": 0.028759999200701714,
+      "mean": 0.004665165982866408,
+      "median": 0.004559999797493219,
+      "min": 0.004240000154823065,
+      "p95": 0.004800000227987766
+    },
+    "backward.dispatch_grad_output.call": {
+      "count": 1536,
+      "max": 2.3059821128845215,
+      "mean": 1.486536561860703,
+      "median": 1.4582735300064087,
+      "min": 0.8159679770469666,
+      "p95": 1.8095769882202148
+    },
+    "backward.dtopk_dense_allreduce.all_reduce": {
+      "count": 1536,
+      "max": 0.7144870162010193,
+      "mean": 0.1714852364627101,
+      "median": 0.16736149787902832,
+      "min": 0.10088100284337997,
+      "p95": 0.2486030012369156
+    },
+    "backward.dtopk_dense_allreduce.prepare": {
+      "count": 1536,
+      "max": 0.5528849959373474,
+      "mean": 0.12356045312481001,
+      "median": 0.12046150118112564,
+      "min": 0.10132099688053131,
+      "p95": 0.14508099853992462
+    },
+    "backward.dtopk_dense_allreduce.slice": {
+      "count": 1536,
+      "max": 0.03320100158452988,
+      "mean": 0.004763592403530008,
+      "median": 0.004559999797493219,
+      "min": 0.00419999985024333,
+      "p95": 0.005439999978989363
+    },
+    "backward.local_vjp.aiter_stage1_recompute": {
+      "count": 1536,
+      "max": 602.6317138671875,
+      "mean": 29.47470745195945,
+      "median": 26.701871871948242,
+      "min": 21.642963409423828,
+      "p95": 33.168312072753906
+    },
+    "backward.return_casts": {
+      "count": 1536,
+      "max": 0.03020000085234642,
+      "mean": 0.007826887341858916,
+      "median": 0.004639999940991402,
+      "min": 0.00419999985024333,
+      "p95": 0.014720000326633453
+    },
+    "backward.reuse_forward_dispatch": {
+      "count": 1536,
+      "max": 0.055640000849962234,
+      "mean": 0.007186138676843257,
+      "median": 0.006800000090152025,
+      "min": 0.004600000102072954,
+      "p95": 0.009080000221729279
+    },
+    "forward.aiter.save_dispatch_for_backward": {
+      "count": 1536,
+      "max": 881.4595336914062,
+      "mean": 2.8013050639613843,
+      "median": 0.546924501657486,
+      "min": 0.4904850125312805,
+      "p95": 0.7242069840431213
+    },
+    "forward.aiter.save_route_metadata.route_pack": {
+      "count": 1536,
+      "max": 231.97647094726562,
+      "mean": 0.7305839749412067,
+      "median": 0.135561004281044,
+      "min": 0.1183210015296936,
+      "p95": 0.23308199644088745
+    },
+    "forward.aiter.save_route_metadata.sort_counts": {
+      "count": 1536,
+      "max": 648.8497314453125,
+      "mean": 1.8880437991174404,
+      "median": 0.23440200090408325,
+      "min": 0.1926420032978058,
+      "p95": 0.294842004776001
+    },
+    "local_aiter_stage1_recompute_vjp.prepare_routes": {
+      "count": 1536,
+      "max": 0.3551639914512634,
+      "mean": 0.15068588748787684,
+      "median": 0.15104150027036667,
+      "min": 0.10944099724292755,
+      "p95": 0.1740420013666153
+    },
+    "local_aiter_stage1_recompute_vjp.prepare_shuffled_weights": {
+      "count": 1536,
+      "max": 26.627851486206055,
+      "mean": 3.3377964725435354,
+      "median": 0.031420500949025154,
+      "min": 0.00547999981790781,
+      "p95": 7.464749813079834
+    },
+    "local_aiter_stage1_recompute_vjp.reuse_route_metadata": {
+      "count": 1536,
+      "max": 0.0313199982047081,
+      "mean": 0.006362489597753059,
+      "median": 0.006039999891072512,
+      "min": 0.005239999853074551,
+      "p95": 0.007319999858736992
+    },
+    "local_aiter_stage1_recompute_vjp.stage1_forward": {
+      "count": 1536,
+      "max": 4.657002925872803,
+      "mean": 3.4365434317539134,
+      "median": 3.3680319786071777,
+      "min": 2.5144639015197754,
+      "p95": 4.214200019836426
+    },
+    "local_aiter_stage1_saved_vjp.dgrad_swiglu": {
+      "count": 1536,
+      "max": 37.968238830566406,
+      "mean": 1.256595984605762,
+      "median": 1.1884509921073914,
+      "min": 0.9647690057754517,
+      "p95": 1.2948119640350342
+    },
+    "local_aiter_stage1_saved_vjp.dtopk_weight": {
+      "count": 1536,
+      "max": 2.0645790100097656,
+      "mean": 1.5264816664469738,
+      "median": 1.5293139815330505,
+      "min": 1.1251709461212158,
+      "p95": 1.7874970436096191
+    },
+    "local_aiter_stage1_saved_vjp.gate_up_recompute": {
+      "count": 1536,
+      "max": 215.96731567382812,
+      "mean": 2.6147791784411916,
+      "median": 2.1291600465774536,
+      "min": 1.7110559940338135,
+      "p95": 2.2481820583343506
+    },
+    "local_aiter_stage1_saved_vjp.gather_scale": {
+      "count": 1536,
+      "max": 1.1137709617614746,
+      "mean": 0.7734295889968053,
+      "median": 0.7789070010185242,
+      "min": 0.526764988899231,
+      "p95": 0.9352089762687683
+    },
+    "local_aiter_stage1_saved_vjp.prepare_ops": {
+      "count": 1536,
+      "max": 17.72100830078125,
+      "mean": 7.299627185488741,
+      "median": 7.25934910774231,
+      "min": 6.834024906158447,
+      "p95": 7.598911762237549
+    },
+    "local_aiter_stage1_saved_vjp.reuse_route_metadata": {
+      "count": 1536,
+      "max": 0.04571999981999397,
+      "mean": 0.006515291026516934,
+      "median": 0.006200000178068876,
+      "min": 0.005160000175237656,
+      "p95": 0.007360000163316727
+    },
+    "local_aiter_stage1_saved_vjp.wgrad": {
+      "count": 1536,
+      "max": 308.33673095703125,
+      "mean": 4.76188407978043,
+      "median": 3.8405364751815796,
+      "min": 2.8085460662841797,
+      "p95": 4.4652419090271
+    },
+    "local_aiter_stage1_saved_vjp.xgrad": {
+      "count": 1536,
+      "max": 3.0493879318237305,
+      "mean": 2.4388262225159756,
+      "median": 2.4558435678482056,
+      "min": 1.875296950340271,
+      "p95": 2.779987096786499
+    }
+  },
+  "step_1_observed": {
+    "grad_norm": 17.0,
+    "loss": 12.23826,
+    "peak_memory_gib_range": [
+      210.62,
+      213.93
+    ],
+    "tflops_per_gpu_range": [
+      106.66,
+      106.74
+    ],
+    "tok_per_gpu_s_range": [
+      2107.0,
+      2108.0
+    ]
+  },
+  "top_selected_expert_frequency": [
+    {
+      "expert_id": 196,
+      "records": 128
+    },
+    {
+      "expert_id": 129,
+      "records": 128
+    },
+    {
+      "expert_id": 194,
+      "records": 120
+    },
+    {
+      "expert_id": 168,
+      "records": 100
+    },
+    {
+      "expert_id": 11,
+      "records": 96
+    },
+    {
+      "expert_id": 254,
+      "records": 88
+    },
+    {
+      "expert_id": 176,
+      "records": 84
+    },
+    {
+      "expert_id": 14,
+      "records": 80
+    },
+    {
+      "expert_id": 123,
+      "records": 76
+    },
+    {
+      "expert_id": 124,
+      "records": 72
+    },
+    {
+      "expert_id": 163,
+      "records": 56
+    },
+    {
+      "expert_id": 117,
+      "records": 44
+    },
+    {
+      "expert_id": 181,
+      "records": 40
+    },
+    {
+      "expert_id": 177,
+      "records": 40
+    },
+    {
+      "expert_id": 35,
+      "records": 36
+    },
+    {
+      "expert_id": 165,
+      "records": 36
+    },
+    {
+      "expert_id": 60,
+      "records": 32
+    },
+    {
+      "expert_id": 178,
+      "records": 32
+    },
+    {
+      "expert_id": 26,
+      "records": 28
+    },
+    {
+      "expert_id": 97,
+      "records": 24
+    }
+  ]
+}

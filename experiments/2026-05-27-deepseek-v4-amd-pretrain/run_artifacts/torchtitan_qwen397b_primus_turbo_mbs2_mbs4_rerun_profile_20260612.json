@@ -1,0 +1,129 @@
+{
+  "artifact": "torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612",
+  "created_local": "2026-06-12",
+  "question": "Does the Qwen3.5-397B-A17B Primus-Turbo TurboEPBackend no-helper raw top-k EP drop from MBS2 to MBS4 reproduce?",
+  "surface": {
+    "model": "Qwen3.5-397B-A17B reduced 8-layer",
+    "hardware": "8xMI350",
+    "node": "do-vunguyen-mi350-gpu",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "hot_helper": false,
+    "backend": "Primus-Turbo in-tree TurboEPBackend raw token-major top-k EP"
+  },
+  "read": "The old MBS2 -> MBS4 drop does not reproduce. Fresh low-intrusion MBS2/MBS4 profiles show MBS4 is faster, and a clean 20-step MBS4 rerun reaches 15745.63 tok/GPU/s over steps 2-20 with zero allocator retry warnings. The older MBS4 row should be demoted as stale/non-comparable evidence, likely affected by the earlier stale-worker/IPC retry context. The remaining suspicious high-MBS row is MBS8, which still needs a clean rerun/profile because the old run logged allocator retry warnings.",
+  "old_demoted_row": {
+    "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs4_retry_steps20_20260612",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs4_retry_steps20_20260612/logs/train.log",
+    "steps_2_to_20_mean_tok_per_gpu_s": 11799.55,
+    "steps_13_to_20_mean_tok_per_gpu_s": 11746.88,
+    "max_logged_memory_gib": 218.39,
+    "cuda_memory_allocation_retry_warnings": 0,
+    "decision": "Demote. It is superseded by the clean rerun and profile pair below."
+  },
+  "profile_runs": {
+    "mbs2": {
+      "run_id": "qwen397b_primus_turbo_nohelper_mbs2_profile_steps6_20260612T1555",
+      "remote_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_primus_turbo_nohelper_mbs2_profile_steps6_20260612T1555",
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "steps_2_to_6_mean_tok_per_gpu_s": 12129.0,
+      "steps_3_to_6_mean_tok_per_gpu_s": 12698.5,
+      "steps_2_to_6_mean_tflops_per_gpu": 207.68,
+      "steps_3_to_6_mean_tflops_per_gpu": 217.43,
+      "max_logged_memory_gib": 166.56,
+      "cuda_memory_allocation_retry_warnings": 0,
+      "rankmax_avg_stage_ms_steps_2_to_6": {
+        "standard_ep.dispatch.local_count": 7.1386,
+        "standard_ep.dispatch.count_all_to_all": 31.5673,
+        "standard_ep.dispatch.split_d2h": 4.6511,
+        "standard_ep.dispatch.backend_normal_topk": 8.0444,
+        "standard_ep.dispatch.backend_normal_topk_dispatch_permute": 177.7581,
+        "standard_ep.combine.backend_normal_topk_unpermute_combine": 415.3565
+      },
+      "rankmax_avg_additive_ms_steps_2_to_6": {
+        "step.train_step": 5151.8906,
+        "train_step.forward_backward_call": 5046.9542,
+        "forward_backward.model_forward": 1375.1916,
+        "forward_backward.loss": 514.1445,
+        "forward_backward.backward": 3144.6214,
+        "train_step.optimizer_step": 47.9269,
+        "train_step.grad_clip": 21.5078
+      },
+      "rankmax_call_count_per_step": {
+        "standard_ep_dispatch": 64,
+        "standard_ep_combine": 64,
+        "chunked_ce_loss": 8
+      },
+      "normal_routed_rows_per_dispatch_record": 81920
+    },
+    "mbs4_profile": {
+      "run_id": "qwen397b_primus_turbo_nohelper_mbs4_profile_steps6_20260612T1558",
+      "remote_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_primus_turbo_nohelper_mbs4_profile_steps6_20260612T1558",
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "steps_2_to_6_mean_tok_per_gpu_s": 14705.8,
+      "steps_3_to_6_mean_tok_per_gpu_s": 15527.5,
+      "steps_2_to_6_mean_tflops_per_gpu": 251.8,
+      "steps_3_to_6_mean_tflops_per_gpu": 265.87,
+      "max_logged_memory_gib": 213.07,
+      "cuda_memory_allocation_retry_warnings": 0,
+      "rankmax_avg_stage_ms_steps_2_to_6": {
+        "standard_ep.dispatch.local_count": 3.919,
+        "standard_ep.dispatch.count_all_to_all": 20.4683,
+        "standard_ep.dispatch.split_d2h": 2.3907,
+        "standard_ep.dispatch.backend_normal_topk": 3.805,
+        "standard_ep.dispatch.backend_normal_topk_dispatch_permute": 164.6786,
+        "standard_ep.combine.backend_normal_topk_unpermute_combine": 369.9356
+      },
+      "rankmax_avg_additive_ms_steps_2_to_6": {
+        "step.train_step": 4210.4203,
+        "train_step.forward_backward_call": 4106.5436,
+        "forward_backward.model_forward": 1134.1111,
+        "forward_backward.loss": 400.8585,
+        "forward_backward.backward": 2565.1239,
+        "train_step.optimizer_step": 47.7698,
+        "train_step.grad_clip": 21.4605
+      },
+      "rankmax_call_count_per_step": {
+        "standard_ep_dispatch": 32,
+        "standard_ep_combine": 32,
+        "chunked_ce_loss": 4
+      },
+      "normal_routed_rows_per_dispatch_record": 163840
+    }
+  },
+  "clean_20_step_rerun": {
+    "run_id": "qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602",
+    "remote_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602",
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "steps_2_to_20_mean_tok_per_gpu_s": 15745.63,
+    "steps_13_to_20_mean_tok_per_gpu_s": 15746.38,
+    "steps_2_to_20_mean_tflops_per_gpu": 269.61,
+    "steps_13_to_20_mean_tflops_per_gpu": 269.62,
+    "max_logged_memory_gib": 262.8,
+    "cuda_memory_allocation_retry_warnings": 0,
+    "loss_step_1_to_step_20": "12.20839 -> 3.15730"
+  },
+  "explanation": {
+    "why_mbs4_is_faster_than_mbs2": "At fixed GBS128, MBS4 doubles the rows per EP call but halves GA from 8 to 4. The number of standard_ep dispatch/combine records per rank-step drops from 64/64 to 32/32, while the rank-max per-step Turbo dispatch+permute and unpermute/combine totals also drop. The profile therefore supports higher MBS4 throughput instead of the old drop.",
+    "measured_edge_delta": {
+      "dispatch_backend_normal_topk_dispatch_permute_ms": "177.7581 -> 164.6786",
+      "combine_backend_normal_topk_unpermute_combine_ms": "415.3565 -> 369.9356",
+      "step_train_step_ms": "5151.8906 -> 4210.4203"
+    },
+    "remaining_risk": "MBS8 remains diagnostic because the old MBS8 run logged 45 allocator retry warnings and reached 277.96 GiB. It needs a clean rerun/profile before being used as a high-MBS scaling baseline."
+  },
+  "decision": {
+    "promote_corrected_qwen_turboep_mbs4_row": true,
+    "demote_old_qwen_turboep_mbs4_row": true,
+    "use_qwen_turboep_mbs8_as_clean_scaling_baseline": false,
+    "next_gate": "Rerun or profile Qwen MBS8 TurboEP with clean headroom, then resume native hot-helper ABI work for Primus-Turbo/MORI."
+  }
+}

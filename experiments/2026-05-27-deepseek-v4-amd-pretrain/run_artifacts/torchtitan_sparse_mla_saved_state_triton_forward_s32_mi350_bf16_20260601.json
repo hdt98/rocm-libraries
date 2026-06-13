@@ -1,0 +1,191 @@
+{
+  "batch": 1,
+  "category_bytes": {
+    "attention_activation": 14680064,
+    "row_stat": 16384
+  },
+  "category_counts": {
+    "attention_activation": 7,
+    "row_stat": 2
+  },
+  "compressed_groups": 8,
+  "csa_count": 8,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "estimated_selected_state_elements": 83886080,
+  "flavor": "flash_4layer",
+  "full_selected_state_saved": false,
+  "full_selected_state_saved_records": [],
+  "input_grad_norm": 0.002654171548783779,
+  "layer_id": 2,
+  "local_count": 32,
+  "loss": 0.06161362677812576,
+  "mode": "fused",
+  "module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "no_selected_state_or_probs_saved": true,
+  "saved_tensor_count": 79,
+  "saved_tensor_total_bytes": 453817524,
+  "saved_tensor_total_gib": 0.4226505048573017,
+  "seed": 1234,
+  "selected_keys": 40,
+  "selected_state_saved": false,
+  "selected_state_saved_records": [],
+  "seq_len": 32,
+  "sparse_used": true,
+  "status": "passed_no_selected_state_or_probs",
+  "top_saved_tensors_by_bytes": [
+    {
+      "bytes": 268435456,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 64,
+      "numel": 134217728,
+      "requires_grad": true,
+      "shape": [
+        32768,
+        4096
+      ]
+    },
+    {
+      "bytes": 67108864,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 5,
+      "numel": 33554432,
+      "requires_grad": true,
+      "shape": [
+        1024,
+        32768
+      ]
+    },
+    {
+      "bytes": 62914560,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 14,
+      "numel": 31457280,
+      "requires_grad": true,
+      "shape": [
+        512,
+        61440
+      ]
+    },
+    {
+      "bytes": 16777216,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 20,
+      "numel": 8388608,
+      "requires_grad": true,
+      "shape": [
+        1024,
+        8192
+      ]
+    },
+    {
+      "bytes": 8388608,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 0,
+      "numel": 4194304,
+      "requires_grad": true,
+      "shape": [
+        4096,
+        1024
+      ]
+    },
+    {
+      "bytes": 4718592,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 8,
+      "numel": 2359296,
+      "requires_grad": true,
+      "shape": [
+        4096,
+        576
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 35,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        1,
+        32,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 36,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        1,
+        32,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 37,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        1,
+        32,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 44,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        64,
+        32,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 65,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        32,
+        32768
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "index": 68,
+      "numel": 1048576,
+      "requires_grad": true,
+      "shape": [
+        1,
+        32,
+        64,
+        512
+      ]
+    }
+  ]
+}

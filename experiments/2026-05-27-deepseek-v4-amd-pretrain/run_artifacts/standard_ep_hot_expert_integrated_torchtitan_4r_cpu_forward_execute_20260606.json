@@ -1,0 +1,116 @@
+{
+  "args": {
+    "atol": 0.0025,
+    "backend": "gloo",
+    "balanced_mode": "execute",
+    "device": "cpu",
+    "experts_per_rank": 4,
+    "forward_only": true,
+    "hidden": 32,
+    "hot_experts": 2,
+    "intermediate": 16,
+    "output": "/workspace/dsv4/outputs/standard_ep_hot_expert_integrated_torchtitan_4r_cpu_forward_execute_20260606.json",
+    "rtol": 0.0025,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 8,
+    "topk": 2
+  },
+  "artifact": "standard_ep_hot_expert_integrated_torchtitan",
+  "passed": true,
+  "rank_results": [
+    {
+      "device": "cpu",
+      "diffs": {
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 0,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 1,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 2,
+      "world": 4
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        12,
+        13
+      ],
+      "passed": true,
+      "rank": 3,
+      "world": 4
+    }
+  ],
+  "scope": "Integrated TorchTitan AllToAllTokenDispatcher + GroupedExperts execute-mode hot-row split."
+}

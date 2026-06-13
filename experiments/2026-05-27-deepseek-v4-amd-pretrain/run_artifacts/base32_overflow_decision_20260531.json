@@ -1,0 +1,28 @@
+{
+  "artifact": "base32_overflow_decision_20260531",
+  "decision": "do_not_promote_base32_overflow_compact_reduce",
+  "candidate": "grouped-expert-batches-dynamic-base32-overflow-compact-reduce-dense-wgrad",
+  "source_artifacts": {
+    "cpu_correctness": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/base32_overflow_cpu_correctness_20260531.json",
+    "cuda_correctness": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/base32_overflow_cuda_correctness_20260531.json",
+    "full_layer_s2048": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/base32_overflow_full_layer_s2048_20260531.json",
+    "retained_baseline_s2048": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_moe_budget_baseline_s2048_20260531.json"
+  },
+  "correctness": {
+    "cpu_float64_ok": true,
+    "cuda_bfloat16_ok": true,
+    "learned_router_and_moe_gate_gradients_checked": true
+  },
+  "s2048_full_layer": {
+    "candidate_avg_ms": 179.02634497731924,
+    "candidate_min_ms": 178.9473060052842,
+    "candidate_tokens_per_s": 11439.65710889903,
+    "candidate_estimated_tflops": 54.38391757567005,
+    "retained_compact_reduce_live_avg_ms": 52.427530428394675,
+    "retained_compact_reduce_live_min_ms": 52.3273911094293,
+    "regression_vs_retained_avg_ms": 126.59881454892457,
+    "target_ms": 43.3
+  },
+  "read": "Base32+overflow preserves gradients but is far too slow in the full layer. The extra zero buffers, index/copy work, and multiple base/overflow GEMM phases dominate any padding reduction benefit.",
+  "next_action": "Do not spend more time on Python-level base/overflow hybrids. Keep the retained compact-reduce path as the baseline and move only to a real compact/tile grouped MoE kernel or a lower-overhead library path with measured small-row wins."
+}

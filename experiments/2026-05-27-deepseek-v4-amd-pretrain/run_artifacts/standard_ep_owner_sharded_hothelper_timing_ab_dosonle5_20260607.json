@@ -1,0 +1,538 @@
+{
+  "runs": {
+    "owner_default": {
+      "derived": {
+        "hot_weight_combined_rankmax_ms": 385.3315536859445,
+        "moe_hot_path_rankmax_ms": 779.7357473331504
+      },
+      "hot_split_meta": {
+        "fallback": 0,
+        "hot_weight_groups": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "layout_counts": {
+          "owner_sharded": 144,
+          "selected": 288
+        },
+        "owner_active_count": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "pad_factor": {
+          "max": 5.0,
+          "median": 3.0,
+          "min": 2.0,
+          "n": 432
+        },
+        "padded_hot_rows": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "remote_hot_groups": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "remote_rows": {
+          "max": 54669.0,
+          "median": 26198.0,
+          "min": 4986.0,
+          "n": 432
+        }
+      },
+      "kinds": {
+        "chunked_ce_loss": {
+          "active_ranks": 8,
+          "mean_rank_ms": 410.7862828075886,
+          "rankmax_ms": 416.13581371307373
+        },
+        "standard_ep_combine": {
+          "active_ranks": 8,
+          "mean_rank_ms": 332.3977707813028,
+          "rankmax_ms": 374.4289747988805
+        },
+        "standard_ep_dispatch": {
+          "active_ranks": 8,
+          "mean_rank_ms": 293.73407741397386,
+          "rankmax_ms": 343.9679740238935
+        },
+        "standard_ep_hot_split": {
+          "active_ranks": 8,
+          "mean_rank_ms": 377.2764368816279,
+          "rankmax_ms": 394.40419364720583
+        },
+        "standard_ep_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 229.17100674228277,
+          "rankmax_ms": 259.04790616966784
+        },
+        "standard_ep_owner_sharded_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 110.86867389205145,
+          "rankmax_ms": 126.28364751627669
+        }
+      },
+      "late_records": 3136,
+      "max_call_id": 680,
+      "records_total": 5440,
+      "root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profile_timing/torchtitan_dsv4_flash12_standard_ep_top8_owner_sharded_hothelper_timing_dosonle5_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "stages": {
+        "standard_ep.combine.weighted_scatter_add": {
+          "active_ranks": 8,
+          "mean_rank_ms": 275.4187191426754,
+          "rankmax_ms": 329.01054763793945
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "active_ranks": 8,
+          "mean_rank_ms": 73.3715680683963,
+          "rankmax_ms": 121.70695745944977
+        },
+        "standard_ep.dispatch.permute": {
+          "active_ranks": 8,
+          "mean_rank_ms": 95.3465061634779,
+          "rankmax_ms": 99.03882575035095
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "active_ranks": 8,
+          "mean_rank_ms": 197.3349339067936,
+          "rankmax_ms": 200.59588742256165
+        },
+        "standard_ep.hot_split.grouped_w13": {
+          "active_ranks": 8,
+          "mean_rank_ms": 66.00736629590392,
+          "rankmax_ms": 70.63619214296341
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "active_ranks": 8,
+          "mean_rank_ms": 35.196052273735404,
+          "rankmax_ms": 38.1458660364151
+        },
+        "standard_ep.hot_split.sort_offsets": {
+          "active_ranks": 8,
+          "mean_rank_ms": 8.438320996239781,
+          "rankmax_ms": 8.98566497117281
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "active_ranks": 8,
+          "mean_rank_ms": 51.34531903266907,
+          "rankmax_ms": 56.56914782524109
+        },
+        "standard_ep_hot_weight.w13.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 107.20133711397648,
+          "rankmax_ms": 141.765993475914
+        },
+        "standard_ep_hot_weight.w13.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 8,
+          "mean_rank_ms": 49.97716489434242,
+          "rankmax_ms": 67.33327567577362
+        },
+        "standard_ep_hot_weight.w13.forward.all_reduce_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 49.72340777516365,
+          "rankmax_ms": 50.99376881122589
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.all_gather": {
+          "active_ranks": 8,
+          "mean_rank_ms": 21.75889392197132,
+          "rankmax_ms": 22.183047890663147
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.compact_active": {
+          "active_ranks": 8,
+          "mean_rank_ms": 4.547075759619474,
+          "rankmax_ms": 4.592050984501839
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 30.43634584546089,
+          "rankmax_ms": 31.597511947155
+        },
+        "standard_ep_hot_weight.w2.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 8,
+          "mean_rank_ms": 16.14521002024412,
+          "rankmax_ms": 16.85447108745575
+        },
+        "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 39.11796326190233,
+          "rankmax_ms": 42.87095618247986
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.all_gather": {
+          "active_ranks": 8,
+          "mean_rank_ms": 13.609604164958,
+          "rankmax_ms": 15.9808629155159
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.compact_active": {
+          "active_ranks": 8,
+          "mean_rank_ms": 2.3702100086957216,
+          "rankmax_ms": 2.38134203851223
+        }
+      }
+    },
+    "owner_pad8": {
+      "derived": {
+        "hot_weight_combined_rankmax_ms": 442.06591908307746,
+        "moe_hot_path_rankmax_ms": 917.4024280798621
+      },
+      "hot_split_meta": {
+        "fallback": 0,
+        "hot_weight_groups": {
+          "max": 8.0,
+          "median": 8.0,
+          "min": 8.0,
+          "n": 432
+        },
+        "layout_counts": {
+          "owner_sharded": 432
+        },
+        "owner_active_count": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "pad_factor": {
+          "max": 4.0,
+          "median": 3.0,
+          "min": 2.0,
+          "n": 432
+        },
+        "padded_hot_rows": {
+          "max": 32.0,
+          "median": 24.0,
+          "min": 16.0,
+          "n": 432
+        },
+        "remote_hot_groups": {
+          "max": 8.0,
+          "median": 7.0,
+          "min": 4.0,
+          "n": 432
+        },
+        "remote_rows": {
+          "max": 51221.0,
+          "median": 28844.0,
+          "min": 6996.0,
+          "n": 432
+        }
+      },
+      "kinds": {
+        "chunked_ce_loss": {
+          "active_ranks": 8,
+          "mean_rank_ms": 413.32485938072205,
+          "rankmax_ms": 417.4541506767273
+        },
+        "standard_ep_combine": {
+          "active_ranks": 8,
+          "mean_rank_ms": 325.96174125000834,
+          "rankmax_ms": 341.5273576071486
+        },
+        "standard_ep_dispatch": {
+          "active_ranks": 8,
+          "mean_rank_ms": 309.4237391683273,
+          "rankmax_ms": 349.6317570852116
+        },
+        "standard_ep_hot_split": {
+          "active_ranks": 8,
+          "mean_rank_ms": 451.8575294383336,
+          "rankmax_ms": 475.3365089967847
+        },
+        "standard_ep_owner_sharded_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 397.72955867182463,
+          "rankmax_ms": 442.06591908307746
+        }
+      },
+      "late_records": 3136,
+      "max_call_id": 680,
+      "records_total": 5440,
+      "root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profile_timing/torchtitan_dsv4_flash12_standard_ep_top8_owner_sharded_pad8_hothelper_timing3_dosonle5_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "stages": {
+        "standard_ep.combine.weighted_scatter_add": {
+          "active_ranks": 8,
+          "mean_rank_ms": 269.0387955605984,
+          "rankmax_ms": 288.8702025413513
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "active_ranks": 8,
+          "mean_rank_ms": 86.92727647535503,
+          "rankmax_ms": 125.06501483917236
+        },
+        "standard_ep.dispatch.permute": {
+          "active_ranks": 8,
+          "mean_rank_ms": 91.59456253051758,
+          "rankmax_ms": 94.47911298274994
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "active_ranks": 8,
+          "mean_rank_ms": 245.97061949968338,
+          "rankmax_ms": 252.2959942817688
+        },
+        "standard_ep.hot_split.grouped_w13": {
+          "active_ranks": 8,
+          "mean_rank_ms": 71.66330518573523,
+          "rankmax_ms": 82.95215183496475
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "active_ranks": 8,
+          "mean_rank_ms": 37.353935189545155,
+          "rankmax_ms": 40.712760865688324
+        },
+        "standard_ep.hot_split.sort_offsets": {
+          "active_ranks": 8,
+          "mean_rank_ms": 23.00583352893591,
+          "rankmax_ms": 23.669573932886124
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "active_ranks": 8,
+          "mean_rank_ms": 54.1172647587955,
+          "rankmax_ms": 57.383427023887634
+        },
+        "standard_ep_hot_weight.w13.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w13.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 8,
+          "mean_rank_ms": 169.3206669986248,
+          "rankmax_ms": 218.85406589508057
+        },
+        "standard_ep_hot_weight.w13.forward.all_reduce_hot_weight": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.all_gather": {
+          "active_ranks": 8,
+          "mean_rank_ms": 88.66628588736057,
+          "rankmax_ms": 90.22946774959564
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.compact_active": {
+          "active_ranks": 8,
+          "mean_rank_ms": 13.906290732324123,
+          "rankmax_ms": 14.004028961062431
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w2.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 8,
+          "mean_rank_ms": 45.78167761862278,
+          "rankmax_ms": 47.32123613357544
+        },
+        "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.all_gather": {
+          "active_ranks": 8,
+          "mean_rank_ms": 64.93208471685648,
+          "rankmax_ms": 71.34082424640656
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.compact_active": {
+          "active_ranks": 8,
+          "mean_rank_ms": 7.411692602559924,
+          "rankmax_ms": 7.488198950886726
+        }
+      }
+    },
+    "selected_w13": {
+      "derived": {
+        "hot_weight_combined_rankmax_ms": 369.1741699636914,
+        "moe_hot_path_rankmax_ms": 765.0009637423791
+      },
+      "hot_split_meta": {
+        "fallback": 0,
+        "hot_weight_groups": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "layout_counts": {
+          "selected": 432
+        },
+        "owner_active_count": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "pad_factor": {
+          "max": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "n": 432
+        },
+        "padded_hot_rows": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "remote_hot_groups": {
+          "max": null,
+          "median": null,
+          "min": null,
+          "n": 0
+        },
+        "remote_rows": {
+          "max": 50625.0,
+          "median": 28112.5,
+          "min": 5880.0,
+          "n": 432
+        }
+      },
+      "kinds": {
+        "chunked_ce_loss": {
+          "active_ranks": 8,
+          "mean_rank_ms": 412.1280488073826,
+          "rankmax_ms": 417.5456988811493
+        },
+        "standard_ep_combine": {
+          "active_ranks": 8,
+          "mean_rank_ms": 330.4575965682743,
+          "rankmax_ms": 356.6096117850393
+        },
+        "standard_ep_dispatch": {
+          "active_ranks": 8,
+          "mean_rank_ms": 292.300827517407,
+          "rankmax_ms": 322.2041080137715
+        },
+        "standard_ep_hot_split": {
+          "active_ranks": 8,
+          "mean_rank_ms": 382.7738930701744,
+          "rankmax_ms": 395.8267937786877
+        },
+        "standard_ep_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 348.0426031613606,
+          "rankmax_ms": 369.1741699636914
+        }
+      },
+      "late_records": 3136,
+      "max_call_id": 680,
+      "records_total": 5440,
+      "root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profile_timing/torchtitan_dsv4_flash12_standard_ep_top8_selected_w13_hothelper_timing_dosonle5_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "stages": {
+        "standard_ep.combine.weighted_scatter_add": {
+          "active_ranks": 8,
+          "mean_rank_ms": 273.0133886933327,
+          "rankmax_ms": 308.7544016838074
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "active_ranks": 8,
+          "mean_rank_ms": 76.11380712687969,
+          "rankmax_ms": 106.35559052228928
+        },
+        "standard_ep.dispatch.permute": {
+          "active_ranks": 8,
+          "mean_rank_ms": 92.56612114608288,
+          "rankmax_ms": 94.50986206531525
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "active_ranks": 8,
+          "mean_rank_ms": 197.6081431210041,
+          "rankmax_ms": 201.43723130226135
+        },
+        "standard_ep.hot_split.grouped_w13": {
+          "active_ranks": 8,
+          "mean_rank_ms": 68.35013620555401,
+          "rankmax_ms": 73.89402994513512
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "active_ranks": 8,
+          "mean_rank_ms": 36.0143764950335,
+          "rankmax_ms": 37.93175908923149
+        },
+        "standard_ep.hot_split.sort_offsets": {
+          "active_ranks": 8,
+          "mean_rank_ms": 8.701116750016809,
+          "rankmax_ms": 9.002183005213737
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "active_ranks": 8,
+          "mean_rank_ms": 52.66843090206385,
+          "rankmax_ms": 56.68643492460251
+        },
+        "standard_ep_hot_weight.w13.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 164.3068137317896,
+          "rankmax_ms": 185.1165782213211
+        },
+        "standard_ep_hot_weight.w13.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w13.forward.all_reduce_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 76.39446577429771,
+          "rankmax_ms": 80.02402198314667
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.all_gather": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w13.forward.owner_shard.compact_active": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 46.36804012954235,
+          "rankmax_ms": 47.45432907342911
+        },
+        "standard_ep_hot_weight.w2.backward.owner_shard.all_reduce_grad": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": {
+          "active_ranks": 8,
+          "mean_rank_ms": 56.880978152155876,
+          "rankmax_ms": 61.230368196964264
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.all_gather": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        },
+        "standard_ep_hot_weight.w2.forward.owner_shard.compact_active": {
+          "active_ranks": 0,
+          "mean_rank_ms": 0.0,
+          "rankmax_ms": 0
+        }
+      }
+    }
+  },
+  "step2_headline": {
+    "owner_default": {
+      "tflops_per_gpu": 323.02,
+      "tokens_per_gpu_s": 6380
+    },
+    "owner_pad8": {
+      "tflops_per_gpu": 319.94,
+      "tokens_per_gpu_s": 6319
+    },
+    "selected_w13": {
+      "tflops_per_gpu": 322.56,
+      "tokens_per_gpu_s": 6371
+    }
+  },
+  "threshold_call_id_gt": 288
+}

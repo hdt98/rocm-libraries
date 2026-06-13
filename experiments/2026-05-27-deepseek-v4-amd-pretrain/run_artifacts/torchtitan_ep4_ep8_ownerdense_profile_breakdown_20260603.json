@@ -1,0 +1,2741 @@
+{
+  "config": "deepseek_v4_flash_4layer_bf16_canary",
+  "generated_at_utc": "2026-06-02T18:12:00Z",
+  "how_to_read": [
+    "All timing summaries are rank statistics over the profiler dense cycle iteration_1 only; iteration_2 files in these runs are profiler flush traces with ~74 events.",
+    "Durations are trace event duration sums, not exclusive wall time. Parent and child annotations can overlap; use the mori_routed_vjp_gpu_leaf table for the routed-VJP leaf ladder.",
+    "Counts reflect one profiled step with 4 model layers and 16 gradient-accumulation microbatches, so MoE backward leaf counts are normally 64 per rank.",
+    "Profiler overhead depresses throughput; use this artifact for attribution, not final performance headline."
+  ],
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "node": "do-sonle5-mi350-gpu",
+  "runs": {
+    "EP4_FSDP4_GBS64_MBS1_S4096": {
+      "cpu_op_rank_mean_ms": {
+        "MmBackward0": {
+          "count": 4,
+          "max_ms": 3468.224856,
+          "mean_ms": 3375.916742,
+          "mean_ms_per_call": 26.37435,
+          "median_ms": 3428.280473,
+          "min_ms": 3178.881168,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "ScaledDotProductFlashAttentionBackward0": {
+          "count": 4,
+          "max_ms": 27.534751,
+          "mean_ms": 26.480748,
+          "mean_ms_per_call": 0.413762,
+          "median_ms": 26.569892,
+          "min_ms": 25.248457,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "_ProfiledLinearBackward": {
+          "count": 4,
+          "max_ms": 7125.2183,
+          "mean_ms": 6796.566234,
+          "mean_ms_per_call": 11.799594,
+          "median_ms": 6811.036501,
+          "min_ms": 6438.973633,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        },
+        "aten::baddbmm": {
+          "count": 4,
+          "max_ms": 2.480029,
+          "mean_ms": 2.39757,
+          "mean_ms_per_call": 0.037462,
+          "median_ms": 2.423997,
+          "min_ms": 2.262256,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "aten::bmm": {
+          "count": 4,
+          "max_ms": 140.038305,
+          "mean_ms": 119.561433,
+          "mean_ms_per_call": 0.233518,
+          "median_ms": 115.537231,
+          "min_ms": 107.132964,
+          "rank_max_count": 512.0,
+          "rank_mean_count": 512.0,
+          "rank_min_count": 512.0
+        },
+        "aten::linear": {
+          "count": 4,
+          "max_ms": 4556.926732,
+          "mean_ms": 4545.049846,
+          "mean_ms_per_call": 3.228018,
+          "median_ms": 4548.03489,
+          "min_ms": 4527.202874,
+          "rank_max_count": 1408.0,
+          "rank_mean_count": 1408.0,
+          "rank_min_count": 1408.0
+        },
+        "aten::matmul": {
+          "count": 4,
+          "max_ms": 3812.000263,
+          "mean_ms": 3800.973821,
+          "mean_ms_per_call": 1.5629,
+          "median_ms": 3802.838596,
+          "min_ms": 3786.217828,
+          "rank_max_count": 2432.0,
+          "rank_mean_count": 2432.0,
+          "rank_min_count": 2432.0
+        },
+        "aten::mm": {
+          "count": 4,
+          "max_ms": 7269.136414,
+          "mean_ms": 7166.520979,
+          "mean_ms_per_call": 2.666116,
+          "median_ms": 7211.172426,
+          "min_ms": 6974.602649,
+          "rank_max_count": 2688.0,
+          "rank_mean_count": 2688.0,
+          "rank_min_count": 2688.0
+        },
+        "autograd::engine::evaluate_function: MmBackward0": {
+          "count": 4,
+          "max_ms": 3468.86908,
+          "mean_ms": 3376.441664,
+          "mean_ms_per_call": 26.37845,
+          "median_ms": 3428.802291,
+          "min_ms": 3179.292991,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "autograd::engine::evaluate_function: ScaledDotProductFlashAttentionBackward0": {
+          "count": 4,
+          "max_ms": 28.021455,
+          "mean_ms": 26.991876,
+          "mean_ms_per_call": 0.421748,
+          "median_ms": 27.113635,
+          "min_ms": 25.718781,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "autograd::engine::evaluate_function: _ProfiledLinearBackward": {
+          "count": 4,
+          "max_ms": 7138.123231,
+          "mean_ms": 6810.096784,
+          "mean_ms_per_call": 11.823085,
+          "median_ms": 6824.63812,
+          "min_ms": 6452.987665,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        }
+      },
+      "dense_linear_and_loss_gpu_owner_tags_rank_mean_ms": {
+        "dsv4.linear.attention.wkv_a.bwd.dinput": {
+          "count": 4,
+          "max_ms": 2.454292,
+          "mean_ms": 2.327703,
+          "mean_ms_per_call": 0.03637,
+          "median_ms": 2.330516,
+          "min_ms": 2.195485,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_a.bwd.dweight": {
+          "count": 4,
+          "max_ms": 3.225224,
+          "mean_ms": 3.05846,
+          "mean_ms_per_call": 0.047788,
+          "median_ms": 3.040974,
+          "min_ms": 2.926667,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_b.bwd.dinput": {
+          "count": 4,
+          "max_ms": 24.919833,
+          "mean_ms": 23.015295,
+          "mean_ms_per_call": 0.359614,
+          "median_ms": 22.73582,
+          "min_ms": 21.669706,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_b.bwd.dweight": {
+          "count": 4,
+          "max_ms": 23.693144,
+          "mean_ms": 22.345408,
+          "mean_ms_per_call": 0.349147,
+          "median_ms": 22.288007,
+          "min_ms": 21.112475,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wo.bwd.dinput": {
+          "count": 4,
+          "max_ms": 72.413711,
+          "mean_ms": 63.210905,
+          "mean_ms_per_call": 0.98767,
+          "median_ms": 61.822012,
+          "min_ms": 56.785884,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wo.bwd.dweight": {
+          "count": 4,
+          "max_ms": 67.425329,
+          "mean_ms": 65.662486,
+          "mean_ms_per_call": 1.025976,
+          "median_ms": 66.065217,
+          "min_ms": 63.094181,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_a.bwd.dinput": {
+          "count": 4,
+          "max_ms": 2.958982,
+          "mean_ms": 2.762987,
+          "mean_ms_per_call": 0.043172,
+          "median_ms": 2.730858,
+          "min_ms": 2.63125,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_a.bwd.dweight": {
+          "count": 4,
+          "max_ms": 4.282554,
+          "mean_ms": 4.192353,
+          "mean_ms_per_call": 0.065506,
+          "median_ms": 4.174773,
+          "min_ms": 4.137313,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_b.bwd.dinput": {
+          "count": 4,
+          "max_ms": 21.186477,
+          "mean_ms": 19.040061,
+          "mean_ms_per_call": 0.297501,
+          "median_ms": 18.636275,
+          "min_ms": 17.701215,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_b.bwd.dweight": {
+          "count": 4,
+          "max_ms": 20.238744,
+          "mean_ms": 18.338498,
+          "mean_ms_per_call": 0.286539,
+          "median_ms": 18.336076,
+          "min_ms": 16.443097,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.router_gate.bwd.dinput": {
+          "count": 4,
+          "max_ms": 2.016489,
+          "mean_ms": 1.938521,
+          "mean_ms_per_call": 0.030289,
+          "median_ms": 1.948912,
+          "min_ms": 1.839772,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.router_gate.bwd.dweight": {
+          "count": 4,
+          "max_ms": 2.240714,
+          "mean_ms": 2.186911,
+          "mean_ms_per_call": 0.03417,
+          "median_ms": 2.206683,
+          "min_ms": 2.093562,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w1.bwd.dinput": {
+          "count": 4,
+          "max_ms": 5.239489,
+          "mean_ms": 4.532019,
+          "mean_ms_per_call": 0.070813,
+          "median_ms": 4.432955,
+          "min_ms": 4.022676,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w1.bwd.dweight": {
+          "count": 4,
+          "max_ms": 9.194179,
+          "mean_ms": 8.502394,
+          "mean_ms_per_call": 0.13285,
+          "median_ms": 8.461164,
+          "min_ms": 7.893069,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd": {
+          "count": 4,
+          "max_ms": 1943.252938,
+          "mean_ms": 1925.710057,
+          "mean_ms_per_call": 30.08922,
+          "median_ms": 1931.708987,
+          "min_ms": 1896.169316,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd.dinput": {
+          "count": 4,
+          "max_ms": 8.08891,
+          "mean_ms": 7.003561,
+          "mean_ms_per_call": 0.109431,
+          "median_ms": 6.906561,
+          "min_ms": 6.112212,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd.dweight": {
+          "count": 4,
+          "max_ms": 9.535519,
+          "mean_ms": 8.717749,
+          "mean_ms_per_call": 0.136215,
+          "median_ms": 8.595168,
+          "min_ms": 8.145141,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w3.bwd.dinput": {
+          "count": 4,
+          "max_ms": 5.278964,
+          "mean_ms": 4.535647,
+          "mean_ms_per_call": 0.070869,
+          "median_ms": 4.378317,
+          "min_ms": 4.10699,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w3.bwd.dweight": {
+          "count": 4,
+          "max_ms": 10.1075,
+          "mean_ms": 9.320521,
+          "mean_ms_per_call": 0.145633,
+          "median_ms": 9.19449,
+          "min_ms": 8.785603,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.loss.chunk_backward": {
+          "count": 4,
+          "max_ms": 0.879736,
+          "mean_ms": 0.846967,
+          "mean_ms_per_call": 0.006617,
+          "median_ms": 0.847838,
+          "min_ms": 0.812456,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "dsv4.loss.cross_entropy_chunk.forward": {
+          "count": 4,
+          "max_ms": 82.582885,
+          "mean_ms": 81.902941,
+          "mean_ms_per_call": 0.639867,
+          "median_ms": 81.9307,
+          "min_ms": 81.16748,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "dsv4.loss.lm_head_chunk.forward": {
+          "count": 4,
+          "max_ms": 14701.983636,
+          "mean_ms": 14690.730902,
+          "mean_ms_per_call": 103.455851,
+          "median_ms": 14693.320401,
+          "min_ms": 14674.299171,
+          "rank_max_count": 142.0,
+          "rank_mean_count": 142.0,
+          "rank_min_count": 142.0
+        }
+      },
+      "event_counts_by_rank": {
+        "0": 680705,
+        "1": 680677,
+        "2": 681013,
+        "3": 680609
+      },
+      "gpu_user_annotation_bucket_rank_mean_ms": {
+        "attention_forward": {
+          "count": 4,
+          "max_ms": 4032.438755,
+          "mean_ms": 4008.180838,
+          "mean_ms_per_call": 5.218985,
+          "median_ms": 4008.375351,
+          "min_ms": 3983.533895,
+          "rank_max_count": 768.0,
+          "rank_mean_count": 768.0,
+          "rank_min_count": 768.0
+        },
+        "attention_projection_backward": {
+          "count": 4,
+          "max_ms": 242.79829,
+          "mean_ms": 223.954155,
+          "mean_ms_per_call": 0.349928,
+          "median_ms": 221.238707,
+          "min_ms": 210.540915,
+          "rank_max_count": 640.0,
+          "rank_mean_count": 640.0,
+          "rank_min_count": 640.0
+        },
+        "fsdp_all_gather": {
+          "count": 4,
+          "max_ms": 850.496196,
+          "mean_ms": 834.26377,
+          "mean_ms_per_call": 1.007565,
+          "median_ms": 830.612877,
+          "min_ms": 825.33313,
+          "rank_max_count": 828.0,
+          "rank_mean_count": 828.0,
+          "rank_min_count": 828.0
+        },
+        "fsdp_other": {
+          "count": 4,
+          "max_ms": 801.699795,
+          "mean_ms": 789.543216,
+          "mean_ms_per_call": 2.760641,
+          "median_ms": 786.6176,
+          "min_ms": 783.237867,
+          "rank_max_count": 286.0,
+          "rank_mean_count": 286.0,
+          "rank_min_count": 286.0
+        },
+        "fsdp_prefetch": {
+          "count": 4,
+          "max_ms": 18776.992538,
+          "mean_ms": 18748.378415,
+          "mean_ms_per_call": 116.449555,
+          "median_ms": 18752.147171,
+          "min_ms": 18712.226781,
+          "rank_max_count": 161.0,
+          "rank_mean_count": 161.0,
+          "rank_min_count": 161.0
+        },
+        "fsdp_reduce_scatter_or_post_backward_reduce": {
+          "count": 4,
+          "max_ms": 2226.277359,
+          "mean_ms": 2005.060689,
+          "mean_ms_per_call": 3.213238,
+          "median_ms": 1935.588096,
+          "min_ms": 1922.789205,
+          "rank_max_count": 624.0,
+          "rank_mean_count": 624.0,
+          "rank_min_count": 624.0
+        },
+        "loss_chunk_backward_scope": {
+          "count": 4,
+          "max_ms": 0.879736,
+          "mean_ms": 0.846967,
+          "mean_ms_per_call": 0.006617,
+          "median_ms": 0.847838,
+          "min_ms": 0.812456,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "loss_cross_entropy_forward": {
+          "count": 4,
+          "max_ms": 82.582885,
+          "mean_ms": 81.902941,
+          "mean_ms_per_call": 0.639867,
+          "median_ms": 81.9307,
+          "min_ms": 81.16748,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "loss_lm_head_forward": {
+          "count": 4,
+          "max_ms": 14701.983636,
+          "mean_ms": 14690.730902,
+          "mean_ms_per_call": 103.455851,
+          "median_ms": 14693.320401,
+          "min_ms": 14674.299171,
+          "rank_max_count": 142.0,
+          "rank_mean_count": 142.0,
+          "rank_min_count": 142.0
+        },
+        "moe_forward_router_bridge": {
+          "count": 4,
+          "max_ms": 4662.079827,
+          "mean_ms": 4592.593858,
+          "mean_ms_per_call": 5.125663,
+          "median_ms": 4590.870033,
+          "min_ms": 4526.555538,
+          "rank_max_count": 896.0,
+          "rank_mean_count": 896.0,
+          "rank_min_count": 896.0
+        },
+        "moe_routed_backward_leaf_or_call": {
+          "count": 4,
+          "max_ms": 3905.101057,
+          "mean_ms": 3504.679534,
+          "mean_ms_per_call": 2.190425,
+          "median_ms": 3475.120117,
+          "min_ms": 3163.376846,
+          "rank_max_count": 1600.0,
+          "rank_mean_count": 1600.0,
+          "rank_min_count": 1600.0
+        },
+        "moe_router_gate_backward": {
+          "count": 4,
+          "max_ms": 4.257203,
+          "mean_ms": 4.125432,
+          "mean_ms_per_call": 0.03223,
+          "median_ms": 4.155596,
+          "min_ms": 3.933334,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "moe_shared_experts_backward": {
+          "count": 4,
+          "max_ms": 1982.318629,
+          "mean_ms": 1968.321947,
+          "mean_ms_per_call": 4.393576,
+          "median_ms": 1973.677641,
+          "min_ms": 1943.613877,
+          "rank_max_count": 448.0,
+          "rank_mean_count": 448.0,
+          "rank_min_count": 448.0
+        },
+        "nccl_other": {
+          "count": 4,
+          "max_ms": 147.7711,
+          "mean_ms": 92.671148,
+          "mean_ms_per_call": 0.233429,
+          "median_ms": 80.070157,
+          "min_ms": 62.773177,
+          "rank_max_count": 397.0,
+          "rank_mean_count": 397.0,
+          "rank_min_count": 397.0
+        },
+        "optimizer": {
+          "count": 4,
+          "max_ms": 153.01577,
+          "mean_ms": 150.466928,
+          "mean_ms_per_call": 75.233464,
+          "median_ms": 151.056732,
+          "min_ms": 146.738478,
+          "rank_max_count": 2.0,
+          "rank_mean_count": 2.0,
+          "rank_min_count": 2.0
+        },
+        "other_gpu_user_annotation": {
+          "count": 4,
+          "max_ms": 47.723023,
+          "mean_ms": 30.214406,
+          "mean_ms_per_call": 0.058783,
+          "median_ms": 26.920617,
+          "min_ms": 19.293365,
+          "rank_max_count": 514.0,
+          "rank_mean_count": 514.0,
+          "rank_min_count": 514.0
+        }
+      },
+      "log_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_ownerdense_20260603/docker-run.log",
+      "mm_backward_cpu_by_enclosing_scope_rank_mean_ms": {
+        "FSDP::reduce_scatter (tok_embeddings)": {
+          "count": 4,
+          "max_ms": 34.819208,
+          "mean_ms": 33.125989,
+          "mean_ms_per_call": 0.27605,
+          "median_ms": 32.896817,
+          "min_ms": 31.891115,
+          "rank_max_count": 120.0,
+          "rank_mean_count": 120.0,
+          "rank_min_count": 120.0
+        },
+        "UNATTRIBUTED": {
+          "count": 4,
+          "max_ms": 3433.405648,
+          "mean_ms": 3342.790753,
+          "mean_ms_per_call": 417.848844,
+          "median_ms": 3395.383656,
+          "min_ms": 3146.990053,
+          "rank_max_count": 8.0,
+          "rank_mean_count": 8.0,
+          "rank_min_count": 8.0
+        }
+      },
+      "mori_routed_vjp_cpu_user_scope_rank_mean_ms": {
+        "mori_aiter.backward.align_grad_output": {
+          "count": 4,
+          "max_ms": 1.429881,
+          "mean_ms": 1.372748,
+          "mean_ms_per_call": 0.021449,
+          "median_ms": 1.384543,
+          "min_ms": 1.292025,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.clone_dispatched_x": {
+          "count": 4,
+          "max_ms": 4.915532,
+          "mean_ms": 4.803919,
+          "mean_ms_per_call": 0.075061,
+          "median_ms": 4.861612,
+          "min_ms": 4.576921,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk": {
+          "count": 4,
+          "max_ms": 14.973888,
+          "mean_ms": 14.780787,
+          "mean_ms_per_call": 0.23095,
+          "median_ms": 14.816237,
+          "min_ms": 14.516783,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.call": {
+          "count": 4,
+          "max_ms": 6.988728,
+          "mean_ms": 6.886545,
+          "mean_ms_per_call": 0.107602,
+          "median_ms": 6.90378,
+          "min_ms": 6.749893,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.prepare_full": {
+          "count": 4,
+          "max_ms": 6.837077,
+          "mean_ms": 6.495056,
+          "mean_ms_per_call": 0.101485,
+          "median_ms": 6.440012,
+          "min_ms": 6.263121,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.slice_contiguous": {
+          "count": 4,
+          "max_ms": 0.507124,
+          "mean_ms": 0.491366,
+          "mean_ms_per_call": 0.007678,
+          "median_ms": 0.493168,
+          "min_ms": 0.472006,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx": {
+          "count": 4,
+          "max_ms": 23.736294,
+          "mean_ms": 22.150104,
+          "mean_ms_per_call": 0.346095,
+          "median_ms": 21.890737,
+          "min_ms": 21.082651,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.call": {
+          "count": 4,
+          "max_ms": 16.462799,
+          "mean_ms": 15.169634,
+          "mean_ms_per_call": 0.237026,
+          "median_ms": 15.005479,
+          "min_ms": 14.204777,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.prepare_full": {
+          "count": 4,
+          "max_ms": 4.847733,
+          "mean_ms": 4.703606,
+          "mean_ms_per_call": 0.073494,
+          "median_ms": 4.740189,
+          "min_ms": 4.486313,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.slice_contiguous": {
+          "count": 4,
+          "max_ms": 0.961677,
+          "mean_ms": 0.888747,
+          "mean_ms_per_call": 0.013887,
+          "median_ms": 0.877286,
+          "min_ms": 0.838738,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output": {
+          "count": 4,
+          "max_ms": 5.263895,
+          "mean_ms": 5.006905,
+          "mean_ms_per_call": 0.078233,
+          "median_ms": 5.041647,
+          "min_ms": 4.680433,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output.call": {
+          "count": 4,
+          "max_ms": 4.87541,
+          "mean_ms": 4.630815,
+          "mean_ms_per_call": 0.072356,
+          "median_ms": 4.661479,
+          "min_ms": 4.324891,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy": {
+          "count": 4,
+          "max_ms": 8.621009,
+          "mean_ms": 8.097748,
+          "mean_ms_per_call": 0.126527,
+          "median_ms": 7.985311,
+          "min_ms": 7.799363,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.call": {
+          "count": 4,
+          "max_ms": 5.612115,
+          "mean_ms": 5.197042,
+          "mean_ms_per_call": 0.081204,
+          "median_ms": 5.114458,
+          "min_ms": 4.947137,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+          "count": 4,
+          "max_ms": 2.527621,
+          "mean_ms": 2.425904,
+          "mean_ms_per_call": 0.037905,
+          "median_ms": 2.432663,
+          "min_ms": 2.310669,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x": {
+          "count": 4,
+          "max_ms": 109.683219,
+          "mean_ms": 93.393264,
+          "mean_ms_per_call": 1.45927,
+          "median_ms": 93.622663,
+          "min_ms": 76.64451,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.call": {
+          "count": 4,
+          "max_ms": 6.97502,
+          "mean_ms": 6.547356,
+          "mean_ms_per_call": 0.102302,
+          "median_ms": 6.585743,
+          "min_ms": 6.042916,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.total_recv_item": {
+          "count": 4,
+          "max_ms": 102.670669,
+          "mean_ms": 86.223875,
+          "mean_ms_per_call": 1.347248,
+          "median_ms": 86.510193,
+          "min_ms": 69.204446,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.local_vjp.padded": {
+          "count": 4,
+          "max_ms": 5803.84172,
+          "mean_ms": 5577.650192,
+          "mean_ms_per_call": 87.150784,
+          "median_ms": 5634.687726,
+          "min_ms": 5237.383595,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.return_casts": {
+          "count": 4,
+          "max_ms": 1.125165,
+          "mean_ms": 1.088279,
+          "mean_ms_per_call": 0.017004,
+          "median_ms": 1.087251,
+          "min_ms": 1.053448,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.routed_vjp": {
+          "count": 4,
+          "max_ms": 5946.812628,
+          "mean_ms": 5732.36209,
+          "mean_ms_per_call": 89.568158,
+          "median_ms": 5788.579855,
+          "min_ms": 5405.476024,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.dtopk_weight": {
+          "count": 4,
+          "max_ms": 28.574463,
+          "mean_ms": 19.995673,
+          "mean_ms_per_call": 0.312432,
+          "median_ms": 17.87917,
+          "min_ms": 15.649889,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+          "count": 4,
+          "max_ms": 40.327503,
+          "mean_ms": 21.011292,
+          "mean_ms_per_call": 0.328301,
+          "median_ms": 15.25706,
+          "min_ms": 13.203546,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.route_pack": {
+          "count": 4,
+          "max_ms": 258.451231,
+          "mean_ms": 251.867017,
+          "mean_ms_per_call": 3.935422,
+          "median_ms": 251.850126,
+          "min_ms": 245.316585,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.scatter_outputs": {
+          "count": 4,
+          "max_ms": 20.452599,
+          "mean_ms": 19.452224,
+          "mean_ms_per_call": 0.303941,
+          "median_ms": 19.483241,
+          "min_ms": 18.389814,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts": {
+          "count": 4,
+          "max_ms": 1013.652691,
+          "mean_ms": 998.579508,
+          "mean_ms_per_call": 15.602805,
+          "median_ms": 1003.883699,
+          "min_ms": 972.897944,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+          "count": 4,
+          "max_ms": 3.624662,
+          "mean_ms": 3.473591,
+          "mean_ms_per_call": 0.054275,
+          "median_ms": 3.513852,
+          "min_ms": 3.241997,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_backward": {
+          "count": 4,
+          "max_ms": 1996.339898,
+          "mean_ms": 1896.576531,
+          "mean_ms_per_call": 29.634008,
+          "median_ms": 1924.901129,
+          "min_ms": 1740.163968,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_forward": {
+          "count": 4,
+          "max_ms": 2335.81323,
+          "mean_ms": 2224.244191,
+          "mean_ms_per_call": 34.753815,
+          "median_ms": 2245.431826,
+          "min_ms": 2070.299881,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+          "count": 4,
+          "max_ms": 21.829485,
+          "mean_ms": 21.448989,
+          "mean_ms_per_call": 0.33514,
+          "median_ms": 21.638686,
+          "min_ms": 20.689098,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+          "count": 4,
+          "max_ms": 17.166291,
+          "mean_ms": 15.959657,
+          "mean_ms_per_call": 0.24937,
+          "median_ms": 15.727896,
+          "min_ms": 15.216545,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+          "count": 4,
+          "max_ms": 31.558076,
+          "mean_ms": 23.299882,
+          "mean_ms_per_call": 0.364061,
+          "median_ms": 21.202013,
+          "min_ms": 19.237425,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+          "count": 4,
+          "max_ms": 14.697929,
+          "mean_ms": 13.859205,
+          "mean_ms_per_call": 0.21655,
+          "median_ms": 13.673208,
+          "min_ms": 13.392473,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+          "count": 4,
+          "max_ms": 45.67742,
+          "mean_ms": 35.989548,
+          "mean_ms_per_call": 0.562337,
+          "median_ms": 33.773681,
+          "min_ms": 30.733408,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+          "count": 4,
+          "max_ms": 27.982635,
+          "mean_ms": 24.783565,
+          "mean_ms_per_call": 0.387243,
+          "median_ms": 24.481542,
+          "min_ms": 22.188542,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        }
+      },
+      "mori_routed_vjp_gpu_leaf_rank_mean_ms": {
+        "mori_aiter.backward.align_grad_output": {
+          "count": 4,
+          "max_ms": 2.161806,
+          "mean_ms": 2.089621,
+          "mean_ms_per_call": 0.03265,
+          "median_ms": 2.097233,
+          "min_ms": 2.002211,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.clone_dispatched_x": {
+          "count": 4,
+          "max_ms": 3.793624,
+          "mean_ms": 3.612383,
+          "mean_ms_per_call": 0.056443,
+          "median_ms": 3.636347,
+          "min_ms": 3.383216,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.call": {
+          "count": 4,
+          "max_ms": 4.354594,
+          "mean_ms": 4.316406,
+          "mean_ms_per_call": 0.067444,
+          "median_ms": 4.327158,
+          "min_ms": 4.256713,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.prepare_full": {
+          "count": 4,
+          "max_ms": 0.879631,
+          "mean_ms": 0.802723,
+          "mean_ms_per_call": 0.012543,
+          "median_ms": 0.790597,
+          "min_ms": 0.750065,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.call": {
+          "count": 4,
+          "max_ms": 616.557811,
+          "mean_ms": 451.66313,
+          "mean_ms_per_call": 7.057236,
+          "median_ms": 403.212812,
+          "min_ms": 383.669086,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.prepare_full": {
+          "count": 4,
+          "max_ms": 4.196672,
+          "mean_ms": 4.0852,
+          "mean_ms_per_call": 0.063831,
+          "median_ms": 4.127736,
+          "min_ms": 3.888657,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output.call": {
+          "count": 4,
+          "max_ms": 41.876398,
+          "mean_ms": 41.527101,
+          "mean_ms_per_call": 0.648861,
+          "median_ms": 41.459829,
+          "min_ms": 41.312347,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.call": {
+          "count": 4,
+          "max_ms": 20.925902,
+          "mean_ms": 20.384491,
+          "mean_ms_per_call": 0.318508,
+          "median_ms": 20.708987,
+          "min_ms": 19.194089,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+          "count": 4,
+          "max_ms": 0.422908,
+          "mean_ms": 0.394598,
+          "mean_ms_per_call": 0.006166,
+          "median_ms": 0.395568,
+          "min_ms": 0.364348,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.call": {
+          "count": 4,
+          "max_ms": 93.884844,
+          "mean_ms": 77.776427,
+          "mean_ms_per_call": 1.215257,
+          "median_ms": 76.093832,
+          "min_ms": 65.033201,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.total_recv_item": {
+          "count": 4,
+          "max_ms": 0.265227,
+          "mean_ms": 0.262395,
+          "mean_ms_per_call": 0.0041,
+          "median_ms": 0.263525,
+          "min_ms": 0.257304,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.dtopk_weight": {
+          "count": 4,
+          "max_ms": 46.3642,
+          "mean_ms": 39.191888,
+          "mean_ms_per_call": 0.612373,
+          "median_ms": 37.448817,
+          "min_ms": 35.505716,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+          "count": 4,
+          "max_ms": 123.470426,
+          "mean_ms": 99.192859,
+          "mean_ms_per_call": 1.549888,
+          "median_ms": 93.540136,
+          "min_ms": 86.220738,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.route_pack": {
+          "count": 4,
+          "max_ms": 216.107234,
+          "mean_ms": 209.953026,
+          "mean_ms_per_call": 3.280516,
+          "median_ms": 209.90139,
+          "min_ms": 203.902089,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.scatter_outputs": {
+          "count": 4,
+          "max_ms": 37.755311,
+          "mean_ms": 36.095217,
+          "mean_ms_per_call": 0.563988,
+          "median_ms": 35.855486,
+          "min_ms": 34.914585,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts": {
+          "count": 4,
+          "max_ms": 993.373622,
+          "mean_ms": 978.398958,
+          "mean_ms_per_call": 15.287484,
+          "median_ms": 983.656221,
+          "min_ms": 952.909769,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+          "count": 4,
+          "max_ms": 0.313866,
+          "mean_ms": 0.293377,
+          "mean_ms_per_call": 0.004584,
+          "median_ms": 0.287589,
+          "min_ms": 0.284467,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_backward": {
+          "count": 4,
+          "max_ms": 41.950555,
+          "mean_ms": 35.136494,
+          "mean_ms_per_call": 0.549008,
+          "median_ms": 35.137663,
+          "min_ms": 28.320096,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_forward": {
+          "count": 4,
+          "max_ms": 27.378706,
+          "mean_ms": 23.029051,
+          "mean_ms_per_call": 0.359829,
+          "median_ms": 23.202673,
+          "min_ms": 18.332153,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+          "count": 4,
+          "max_ms": 350.822325,
+          "mean_ms": 298.858808,
+          "mean_ms_per_call": 4.669669,
+          "median_ms": 300.200498,
+          "min_ms": 244.21191,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+          "count": 4,
+          "max_ms": 379.538348,
+          "mean_ms": 340.202224,
+          "mean_ms_per_call": 5.31566,
+          "median_ms": 343.047419,
+          "min_ms": 295.175712,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+          "count": 4,
+          "max_ms": 407.357585,
+          "mean_ms": 349.161421,
+          "mean_ms_per_call": 5.455647,
+          "median_ms": 349.461451,
+          "min_ms": 290.365196,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+          "count": 4,
+          "max_ms": 213.393145,
+          "mean_ms": 182.78863,
+          "mean_ms_per_call": 2.856072,
+          "median_ms": 184.039257,
+          "min_ms": 149.682859,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+          "count": 4,
+          "max_ms": 175.577141,
+          "mean_ms": 147.945921,
+          "mean_ms_per_call": 2.311655,
+          "median_ms": 148.772444,
+          "min_ms": 118.661654,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+          "count": 4,
+          "max_ms": 182.822016,
+          "mean_ms": 157.517184,
+          "mean_ms_per_call": 2.461206,
+          "median_ms": 158.552319,
+          "min_ms": 130.142085,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        }
+      },
+      "profiled_linear_backward_cpu_by_owner_family_rank_mean_ms": {
+        "fsdp": {
+          "count": 4,
+          "max_ms": 7125.2183,
+          "mean_ms": 6796.566234,
+          "mean_ms_per_call": 11.799594,
+          "median_ms": 6811.036501,
+          "min_ms": 6438.973633,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        }
+      },
+      "profiler_step_cpu_wall_ms": {
+        "count": 4,
+        "max_ms": 28468.443874,
+        "mean_ms": 28450.927351,
+        "median_ms": 28447.045341,
+        "min_ms": 28441.174851
+      },
+      "rank0_mm_backward_input_shapes": {
+        "[[512,129280]]": 128
+      },
+      "rank0_profiled_linear_backward_enclosing_scopes_top20": {
+        "FSDP::all_gather (layers.0) [pg=4]": 1593.1332289999996,
+        "FSDP::all_gather (layers.1) [pg=4]": 1585.3394889999995,
+        "FSDP::all_gather (layers.2) [pg=4]": 1667.9729520000003,
+        "FSDP::all_gather (tok_embeddings)": 1727.0781450000002
+      },
+      "rank_count": 4,
+      "run_id": "torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_ownerdense_20260603",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096_steps2_gradaccum16",
+      "step_metrics_from_log": {
+        "1": {
+          "grad_norm": {
+            "max": 9.0,
+            "mean": 9.0,
+            "min": 9.0,
+            "samples": 4
+          },
+          "loss": {
+            "max": 12.23742,
+            "mean": 12.23742,
+            "min": 12.23742,
+            "samples": 4
+          },
+          "memory_gib": {
+            "max": 134.62,
+            "mean": 99.105,
+            "min": 83.11,
+            "samples": 4
+          },
+          "mfu_percent": {
+            "max": 1.86,
+            "mean": 1.86,
+            "min": 1.86,
+            "samples": 4
+          },
+          "tflops_per_gpu": {
+            "max": 43.02,
+            "mean": 42.9975,
+            "min": 42.99,
+            "samples": 4
+          },
+          "tps_per_gpu": {
+            "max": 2274.0,
+            "mean": 2272.5,
+            "min": 2272.0,
+            "samples": 4
+          }
+        },
+        "2": {
+          "grad_norm": {
+            "max": 52.25,
+            "mean": 52.25,
+            "min": 52.25,
+            "samples": 4
+          },
+          "loss": {
+            "max": 10.73168,
+            "mean": 10.73168,
+            "min": 10.73168,
+            "samples": 4
+          },
+          "memory_gib": {
+            "max": 180.85,
+            "mean": 139.935,
+            "min": 119.06,
+            "samples": 4
+          },
+          "mfu_percent": {
+            "max": 2.53,
+            "mean": 2.53,
+            "min": 2.53,
+            "samples": 4
+          },
+          "tflops_per_gpu": {
+            "max": 58.37,
+            "mean": 58.37,
+            "min": 58.37,
+            "samples": 4
+          },
+          "tps_per_gpu": {
+            "max": 3085.0,
+            "mean": 3085.0,
+            "min": 3085.0,
+            "samples": 4
+          }
+        }
+      },
+      "trace_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_ownerdense_20260603/profiling/traces_ep4_ownerdense_s4096_20260603",
+      "trace_iteration_used": "iteration_1"
+    },
+    "EP8_FSDP8_GBS128_MBS1_S4096": {
+      "cpu_op_rank_mean_ms": {
+        "MmBackward0": {
+          "count": 8,
+          "max_ms": 3485.464998,
+          "mean_ms": 3413.374845,
+          "mean_ms_per_call": 26.666991,
+          "median_ms": 3416.771654,
+          "min_ms": 3303.477699,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "ScaledDotProductFlashAttentionBackward0": {
+          "count": 8,
+          "max_ms": 28.070061,
+          "mean_ms": 26.722632,
+          "mean_ms_per_call": 0.417541,
+          "median_ms": 26.787188,
+          "min_ms": 25.732201,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "_ProfiledLinearBackward": {
+          "count": 8,
+          "max_ms": 9955.021195,
+          "mean_ms": 9637.897928,
+          "mean_ms_per_call": 16.732462,
+          "median_ms": 9589.687441,
+          "min_ms": 9445.145345,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        },
+        "aten::baddbmm": {
+          "count": 8,
+          "max_ms": 2.708067,
+          "mean_ms": 2.407653,
+          "mean_ms_per_call": 0.03762,
+          "median_ms": 2.38734,
+          "min_ms": 2.110493,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "aten::bmm": {
+          "count": 8,
+          "max_ms": 134.905792,
+          "mean_ms": 124.622159,
+          "mean_ms_per_call": 0.243403,
+          "median_ms": 126.640885,
+          "min_ms": 105.478974,
+          "rank_max_count": 512.0,
+          "rank_mean_count": 512.0,
+          "rank_min_count": 512.0
+        },
+        "aten::linear": {
+          "count": 8,
+          "max_ms": 4762.943997,
+          "mean_ms": 4726.598749,
+          "mean_ms_per_call": 3.356959,
+          "median_ms": 4724.852144,
+          "min_ms": 4673.318231,
+          "rank_max_count": 1408.0,
+          "rank_mean_count": 1408.0,
+          "rank_min_count": 1408.0
+        },
+        "aten::matmul": {
+          "count": 8,
+          "max_ms": 3993.425996,
+          "mean_ms": 3963.018258,
+          "mean_ms_per_call": 1.629531,
+          "median_ms": 3961.828677,
+          "min_ms": 3922.325174,
+          "rank_max_count": 2432.0,
+          "rank_mean_count": 2432.0,
+          "rank_min_count": 2432.0
+        },
+        "aten::mm": {
+          "count": 8,
+          "max_ms": 7438.669015,
+          "mean_ms": 7365.924232,
+          "mean_ms_per_call": 2.740299,
+          "median_ms": 7363.457098,
+          "min_ms": 7286.072223,
+          "rank_max_count": 2688.0,
+          "rank_mean_count": 2688.0,
+          "rank_min_count": 2688.0
+        },
+        "autograd::engine::evaluate_function: MmBackward0": {
+          "count": 8,
+          "max_ms": 3486.017571,
+          "mean_ms": 3413.960255,
+          "mean_ms_per_call": 26.671564,
+          "median_ms": 3417.383559,
+          "min_ms": 3304.132841,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "autograd::engine::evaluate_function: ScaledDotProductFlashAttentionBackward0": {
+          "count": 8,
+          "max_ms": 28.547844,
+          "mean_ms": 27.208991,
+          "mean_ms_per_call": 0.42514,
+          "median_ms": 27.238205,
+          "min_ms": 26.211327,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "autograd::engine::evaluate_function: _ProfiledLinearBackward": {
+          "count": 8,
+          "max_ms": 9968.541637,
+          "mean_ms": 9651.826268,
+          "mean_ms_per_call": 16.756643,
+          "median_ms": 9603.728821,
+          "min_ms": 9459.01039,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        }
+      },
+      "dense_linear_and_loss_gpu_owner_tags_rank_mean_ms": {
+        "dsv4.linear.attention.wkv_a.bwd.dinput": {
+          "count": 8,
+          "max_ms": 2.450127,
+          "mean_ms": 2.283406,
+          "mean_ms_per_call": 0.035678,
+          "median_ms": 2.287214,
+          "min_ms": 2.170013,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_a.bwd.dweight": {
+          "count": 8,
+          "max_ms": 3.245469,
+          "mean_ms": 3.020479,
+          "mean_ms_per_call": 0.047195,
+          "median_ms": 2.996377,
+          "min_ms": 2.914134,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_b.bwd.dinput": {
+          "count": 8,
+          "max_ms": 25.060712,
+          "mean_ms": 22.604048,
+          "mean_ms_per_call": 0.353188,
+          "median_ms": 22.267631,
+          "min_ms": 21.492799,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wkv_b.bwd.dweight": {
+          "count": 8,
+          "max_ms": 23.666669,
+          "mean_ms": 21.738611,
+          "mean_ms_per_call": 0.339666,
+          "median_ms": 21.74504,
+          "min_ms": 20.334661,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wo.bwd.dinput": {
+          "count": 8,
+          "max_ms": 71.077345,
+          "mean_ms": 58.870276,
+          "mean_ms_per_call": 0.919848,
+          "median_ms": 56.135545,
+          "min_ms": 54.998993,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wo.bwd.dweight": {
+          "count": 8,
+          "max_ms": 68.670041,
+          "mean_ms": 64.961572,
+          "mean_ms_per_call": 1.015025,
+          "median_ms": 65.00109,
+          "min_ms": 62.21108,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_a.bwd.dinput": {
+          "count": 8,
+          "max_ms": 2.977539,
+          "mean_ms": 2.746063,
+          "mean_ms_per_call": 0.042907,
+          "median_ms": 2.723281,
+          "min_ms": 2.648738,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_a.bwd.dweight": {
+          "count": 8,
+          "max_ms": 4.272958,
+          "mean_ms": 4.198707,
+          "mean_ms_per_call": 0.065605,
+          "median_ms": 4.191089,
+          "min_ms": 4.157516,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_b.bwd.dinput": {
+          "count": 8,
+          "max_ms": 20.702921,
+          "mean_ms": 18.333967,
+          "mean_ms_per_call": 0.286468,
+          "median_ms": 18.211101,
+          "min_ms": 17.195316,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.attention.wq_b.bwd.dweight": {
+          "count": 8,
+          "max_ms": 19.951665,
+          "mean_ms": 17.525887,
+          "mean_ms_per_call": 0.273842,
+          "median_ms": 17.341929,
+          "min_ms": 16.190857,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.router_gate.bwd.dinput": {
+          "count": 8,
+          "max_ms": 2.000678,
+          "mean_ms": 1.935606,
+          "mean_ms_per_call": 0.030244,
+          "median_ms": 1.936186,
+          "min_ms": 1.821011,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.router_gate.bwd.dweight": {
+          "count": 8,
+          "max_ms": 2.312554,
+          "mean_ms": 2.258718,
+          "mean_ms_per_call": 0.035292,
+          "median_ms": 2.250244,
+          "min_ms": 2.234981,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w1.bwd.dinput": {
+          "count": 8,
+          "max_ms": 5.331527,
+          "mean_ms": 4.404573,
+          "mean_ms_per_call": 0.068821,
+          "median_ms": 4.269261,
+          "min_ms": 3.967389,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w1.bwd.dweight": {
+          "count": 8,
+          "max_ms": 9.221376,
+          "mean_ms": 8.120809,
+          "mean_ms_per_call": 0.126888,
+          "median_ms": 8.24072,
+          "min_ms": 7.068521,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd": {
+          "count": 8,
+          "max_ms": 1888.206815,
+          "mean_ms": 1862.485284,
+          "mean_ms_per_call": 29.101333,
+          "median_ms": 1862.989309,
+          "min_ms": 1825.067675,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd.dinput": {
+          "count": 8,
+          "max_ms": 8.12998,
+          "mean_ms": 6.429859,
+          "mean_ms_per_call": 0.100467,
+          "median_ms": 6.077111,
+          "min_ms": 5.766454,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w2.bwd.dweight": {
+          "count": 8,
+          "max_ms": 9.717289,
+          "mean_ms": 8.337772,
+          "mean_ms_per_call": 0.130278,
+          "median_ms": 8.155124,
+          "min_ms": 7.331919,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w3.bwd.dinput": {
+          "count": 8,
+          "max_ms": 5.304808,
+          "mean_ms": 4.573323,
+          "mean_ms_per_call": 0.071458,
+          "median_ms": 4.460517,
+          "min_ms": 4.247595,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.linear.moe.shared_experts.w3.bwd.dweight": {
+          "count": 8,
+          "max_ms": 10.284544,
+          "mean_ms": 9.16574,
+          "mean_ms_per_call": 0.143215,
+          "median_ms": 9.069714,
+          "min_ms": 8.664088,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "dsv4.loss.chunk_backward": {
+          "count": 8,
+          "max_ms": 0.872497,
+          "mean_ms": 0.835727,
+          "mean_ms_per_call": 0.006529,
+          "median_ms": 0.832219,
+          "min_ms": 0.801131,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "dsv4.loss.cross_entropy_chunk.forward": {
+          "count": 8,
+          "max_ms": 89.799229,
+          "mean_ms": 87.954437,
+          "mean_ms_per_call": 0.687144,
+          "median_ms": 88.890123,
+          "min_ms": 84.707999,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "dsv4.loss.lm_head_chunk.forward": {
+          "count": 8,
+          "max_ms": 19853.873848,
+          "mean_ms": 19815.034525,
+          "mean_ms_per_call": 139.542497,
+          "median_ms": 19805.531898,
+          "min_ms": 19796.940385,
+          "rank_max_count": 142.0,
+          "rank_mean_count": 142.0,
+          "rank_min_count": 142.0
+        }
+      },
+      "event_counts_by_rank": {
+        "0": 677273,
+        "1": 677285,
+        "2": 677413,
+        "3": 677345,
+        "4": 677241,
+        "5": 677173,
+        "6": 677337,
+        "7": 677069
+      },
+      "gpu_user_annotation_bucket_rank_mean_ms": {
+        "attention_forward": {
+          "count": 8,
+          "max_ms": 4163.871304,
+          "mean_ms": 4115.322757,
+          "mean_ms_per_call": 5.358493,
+          "median_ms": 4108.967875,
+          "min_ms": 4084.883664,
+          "rank_max_count": 768.0,
+          "rank_mean_count": 768.0,
+          "rank_min_count": 768.0
+        },
+        "attention_projection_backward": {
+          "count": 8,
+          "max_ms": 242.075446,
+          "mean_ms": 216.283016,
+          "mean_ms_per_call": 0.337942,
+          "median_ms": 213.173944,
+          "min_ms": 204.45597,
+          "rank_max_count": 640.0,
+          "rank_mean_count": 640.0,
+          "rank_min_count": 640.0
+        },
+        "fsdp_all_gather": {
+          "count": 8,
+          "max_ms": 635.128632,
+          "mean_ms": 598.771164,
+          "mean_ms_per_call": 0.723154,
+          "median_ms": 600.91297,
+          "min_ms": 548.462934,
+          "rank_max_count": 828.0,
+          "rank_mean_count": 828.0,
+          "rank_min_count": 828.0
+        },
+        "fsdp_other": {
+          "count": 8,
+          "max_ms": 653.021339,
+          "mean_ms": 641.456513,
+          "mean_ms_per_call": 2.242855,
+          "median_ms": 639.097021,
+          "min_ms": 636.951344,
+          "rank_max_count": 286.0,
+          "rank_mean_count": 286.0,
+          "rank_min_count": 286.0
+        },
+        "fsdp_prefetch": {
+          "count": 8,
+          "max_ms": 21122.575511,
+          "mean_ms": 21091.572334,
+          "mean_ms_per_call": 131.003555,
+          "median_ms": 21106.700411,
+          "min_ms": 21042.656277,
+          "rank_max_count": 161.0,
+          "rank_mean_count": 161.0,
+          "rank_min_count": 161.0
+        },
+        "fsdp_reduce_scatter_or_post_backward_reduce": {
+          "count": 8,
+          "max_ms": 1273.682106,
+          "mean_ms": 1177.578734,
+          "mean_ms_per_call": 1.887145,
+          "median_ms": 1172.713419,
+          "min_ms": 1115.990412,
+          "rank_max_count": 624.0,
+          "rank_mean_count": 624.0,
+          "rank_min_count": 624.0
+        },
+        "loss_chunk_backward_scope": {
+          "count": 8,
+          "max_ms": 0.872497,
+          "mean_ms": 0.835727,
+          "mean_ms_per_call": 0.006529,
+          "median_ms": 0.832219,
+          "min_ms": 0.801131,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "loss_cross_entropy_forward": {
+          "count": 8,
+          "max_ms": 89.799229,
+          "mean_ms": 87.954437,
+          "mean_ms_per_call": 0.687144,
+          "median_ms": 88.890123,
+          "min_ms": 84.707999,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "loss_lm_head_forward": {
+          "count": 8,
+          "max_ms": 19853.873848,
+          "mean_ms": 19815.034525,
+          "mean_ms_per_call": 139.542497,
+          "median_ms": 19805.531898,
+          "min_ms": 19796.940385,
+          "rank_max_count": 142.0,
+          "rank_mean_count": 142.0,
+          "rank_min_count": 142.0
+        },
+        "moe_forward_router_bridge": {
+          "count": 8,
+          "max_ms": 5737.860327,
+          "mean_ms": 5208.85477,
+          "mean_ms_per_call": 5.813454,
+          "median_ms": 5265.733978,
+          "min_ms": 4918.437297,
+          "rank_max_count": 896.0,
+          "rank_mean_count": 896.0,
+          "rank_min_count": 896.0
+        },
+        "moe_routed_backward_leaf_or_call": {
+          "count": 8,
+          "max_ms": 4153.904699,
+          "mean_ms": 3952.577937,
+          "mean_ms_per_call": 2.470361,
+          "median_ms": 3939.015089,
+          "min_ms": 3787.465111,
+          "rank_max_count": 1600.0,
+          "rank_mean_count": 1600.0,
+          "rank_min_count": 1600.0
+        },
+        "moe_router_gate_backward": {
+          "count": 8,
+          "max_ms": 4.249355,
+          "mean_ms": 4.194324,
+          "mean_ms_per_call": 0.032768,
+          "median_ms": 4.195322,
+          "min_ms": 4.133565,
+          "rank_max_count": 128.0,
+          "rank_mean_count": 128.0,
+          "rank_min_count": 128.0
+        },
+        "moe_shared_experts_backward": {
+          "count": 8,
+          "max_ms": 1927.786398,
+          "mean_ms": 1903.51736,
+          "mean_ms_per_call": 4.248923,
+          "median_ms": 1905.15248,
+          "min_ms": 1873.057199,
+          "rank_max_count": 448.0,
+          "rank_mean_count": 448.0,
+          "rank_min_count": 448.0
+        },
+        "nccl_other": {
+          "count": 8,
+          "max_ms": 339.326403,
+          "mean_ms": 246.034835,
+          "mean_ms_per_call": 0.619735,
+          "median_ms": 232.312963,
+          "min_ms": 153.494244,
+          "rank_max_count": 397.0,
+          "rank_mean_count": 397.0,
+          "rank_min_count": 397.0
+        },
+        "optimizer": {
+          "count": 8,
+          "max_ms": 148.015111,
+          "mean_ms": 142.985852,
+          "mean_ms_per_call": 71.492926,
+          "median_ms": 142.558237,
+          "min_ms": 139.043717,
+          "rank_max_count": 2.0,
+          "rank_mean_count": 2.0,
+          "rank_min_count": 2.0
+        },
+        "other_gpu_user_annotation": {
+          "count": 8,
+          "max_ms": 101.649675,
+          "mean_ms": 44.097641,
+          "mean_ms_per_call": 0.085793,
+          "median_ms": 40.322084,
+          "min_ms": 19.856187,
+          "rank_max_count": 514.0,
+          "rank_mean_count": 514.0,
+          "rank_min_count": 514.0
+        }
+      },
+      "log_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_ownerdense_20260603/docker-run.log",
+      "mm_backward_cpu_by_enclosing_scope_rank_mean_ms": {
+        "FSDP::reduce_scatter (tok_embeddings)": {
+          "count": 8,
+          "max_ms": 34.242682,
+          "mean_ms": 33.379632,
+          "mean_ms_per_call": 0.278164,
+          "median_ms": 33.422255,
+          "min_ms": 32.110948,
+          "rank_max_count": 120.0,
+          "rank_mean_count": 120.0,
+          "rank_min_count": 120.0
+        },
+        "UNATTRIBUTED": {
+          "count": 8,
+          "max_ms": 3452.054292,
+          "mean_ms": 3379.995213,
+          "mean_ms_per_call": 422.499402,
+          "median_ms": 3382.933412,
+          "min_ms": 3269.444662,
+          "rank_max_count": 8.0,
+          "rank_mean_count": 8.0,
+          "rank_min_count": 8.0
+        }
+      },
+      "mori_routed_vjp_cpu_user_scope_rank_mean_ms": {
+        "mori_aiter.backward.align_grad_output": {
+          "count": 8,
+          "max_ms": 1.459797,
+          "mean_ms": 1.394195,
+          "mean_ms_per_call": 0.021784,
+          "median_ms": 1.39868,
+          "min_ms": 1.344099,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.clone_dispatched_x": {
+          "count": 8,
+          "max_ms": 4.810881,
+          "mean_ms": 4.586803,
+          "mean_ms_per_call": 0.071669,
+          "median_ms": 4.589252,
+          "min_ms": 4.398157,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk": {
+          "count": 8,
+          "max_ms": 14.385753,
+          "mean_ms": 13.674748,
+          "mean_ms_per_call": 0.213668,
+          "median_ms": 13.946193,
+          "min_ms": 12.419067,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.call": {
+          "count": 8,
+          "max_ms": 7.148554,
+          "mean_ms": 6.903765,
+          "mean_ms_per_call": 0.107871,
+          "median_ms": 6.852526,
+          "min_ms": 6.798712,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.prepare_full": {
+          "count": 8,
+          "max_ms": 6.127194,
+          "mean_ms": 5.384547,
+          "mean_ms_per_call": 0.084134,
+          "median_ms": 5.443603,
+          "min_ms": 4.226769,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.slice_contiguous": {
+          "count": 8,
+          "max_ms": 0.518572,
+          "mean_ms": 0.504276,
+          "mean_ms_per_call": 0.007879,
+          "median_ms": 0.50339,
+          "min_ms": 0.485639,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx": {
+          "count": 8,
+          "max_ms": 23.939272,
+          "mean_ms": 22.398432,
+          "mean_ms_per_call": 0.349975,
+          "median_ms": 22.591299,
+          "min_ms": 21.008181,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.call": {
+          "count": 8,
+          "max_ms": 16.831123,
+          "mean_ms": 15.487605,
+          "mean_ms_per_call": 0.241994,
+          "median_ms": 15.647799,
+          "min_ms": 14.056595,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.prepare_full": {
+          "count": 8,
+          "max_ms": 4.758971,
+          "mean_ms": 4.583222,
+          "mean_ms_per_call": 0.071613,
+          "median_ms": 4.643197,
+          "min_ms": 4.200217,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.slice_contiguous": {
+          "count": 8,
+          "max_ms": 0.935992,
+          "mean_ms": 0.896372,
+          "mean_ms_per_call": 0.014006,
+          "median_ms": 0.881231,
+          "min_ms": 0.868594,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output": {
+          "count": 8,
+          "max_ms": 5.226092,
+          "mean_ms": 5.057306,
+          "mean_ms_per_call": 0.07902,
+          "median_ms": 5.06291,
+          "min_ms": 4.891449,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output.call": {
+          "count": 8,
+          "max_ms": 4.865301,
+          "mean_ms": 4.693339,
+          "mean_ms_per_call": 0.073333,
+          "median_ms": 4.701173,
+          "min_ms": 4.530631,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy": {
+          "count": 8,
+          "max_ms": 8.605745,
+          "mean_ms": 8.168338,
+          "mean_ms_per_call": 0.12763,
+          "median_ms": 8.167535,
+          "min_ms": 7.694073,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.call": {
+          "count": 8,
+          "max_ms": 5.666499,
+          "mean_ms": 5.333454,
+          "mean_ms_per_call": 0.083335,
+          "median_ms": 5.298383,
+          "min_ms": 5.032756,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+          "count": 8,
+          "max_ms": 2.463878,
+          "mean_ms": 2.346386,
+          "mean_ms_per_call": 0.036662,
+          "median_ms": 2.3396,
+          "min_ms": 2.183765,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x": {
+          "count": 8,
+          "max_ms": 242.470297,
+          "mean_ms": 198.485785,
+          "mean_ms_per_call": 3.10134,
+          "median_ms": 208.062713,
+          "min_ms": 127.363129,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.call": {
+          "count": 8,
+          "max_ms": 8.123057,
+          "mean_ms": 7.331809,
+          "mean_ms_per_call": 0.11456,
+          "median_ms": 7.303295,
+          "min_ms": 6.960117,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.total_recv_item": {
+          "count": 8,
+          "max_ms": 233.734857,
+          "mean_ms": 190.523068,
+          "mean_ms_per_call": 2.976923,
+          "median_ms": 200.12204,
+          "min_ms": 119.694027,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.local_vjp.padded": {
+          "count": 8,
+          "max_ms": 6088.719425,
+          "mean_ms": 5889.155994,
+          "mean_ms_per_call": 92.018062,
+          "median_ms": 5912.590399,
+          "min_ms": 5553.111095,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.return_casts": {
+          "count": 8,
+          "max_ms": 1.106588,
+          "mean_ms": 1.081411,
+          "mean_ms_per_call": 0.016897,
+          "median_ms": 1.090969,
+          "min_ms": 1.03993,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.routed_vjp": {
+          "count": 8,
+          "max_ms": 6328.257341,
+          "mean_ms": 6147.984717,
+          "mean_ms_per_call": 96.062261,
+          "median_ms": 6193.005374,
+          "min_ms": 5742.027139,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.dtopk_weight": {
+          "count": 8,
+          "max_ms": 28.745143,
+          "mean_ms": 18.307354,
+          "mean_ms_per_call": 0.286052,
+          "median_ms": 16.761956,
+          "min_ms": 15.339311,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+          "count": 8,
+          "max_ms": 38.58008,
+          "mean_ms": 17.214615,
+          "mean_ms_per_call": 0.268978,
+          "median_ms": 14.421701,
+          "min_ms": 12.990016,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.route_pack": {
+          "count": 8,
+          "max_ms": 307.65139,
+          "mean_ms": 302.747945,
+          "mean_ms_per_call": 4.730437,
+          "median_ms": 303.167848,
+          "min_ms": 298.158979,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.scatter_outputs": {
+          "count": 8,
+          "max_ms": 22.823055,
+          "mean_ms": 20.119947,
+          "mean_ms_per_call": 0.314374,
+          "median_ms": 19.810482,
+          "min_ms": 17.656808,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts": {
+          "count": 8,
+          "max_ms": 1378.0209,
+          "mean_ms": 1353.0367,
+          "mean_ms_per_call": 21.141198,
+          "median_ms": 1355.464835,
+          "min_ms": 1302.083371,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+          "count": 8,
+          "max_ms": 3.649621,
+          "mean_ms": 3.396973,
+          "mean_ms_per_call": 0.053078,
+          "median_ms": 3.387877,
+          "min_ms": 3.098539,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_backward": {
+          "count": 8,
+          "max_ms": 1944.707474,
+          "mean_ms": 1854.627269,
+          "mean_ms_per_call": 28.978551,
+          "median_ms": 1866.563323,
+          "min_ms": 1687.110934,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_forward": {
+          "count": 8,
+          "max_ms": 2265.133621,
+          "mean_ms": 2171.194999,
+          "mean_ms_per_call": 33.924922,
+          "median_ms": 2195.605265,
+          "min_ms": 1996.107608,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+          "count": 8,
+          "max_ms": 22.202208,
+          "mean_ms": 21.125997,
+          "mean_ms_per_call": 0.330094,
+          "median_ms": 21.329255,
+          "min_ms": 19.14782,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+          "count": 8,
+          "max_ms": 18.013047,
+          "mean_ms": 16.196899,
+          "mean_ms_per_call": 0.253077,
+          "median_ms": 16.443275,
+          "min_ms": 13.981429,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+          "count": 8,
+          "max_ms": 31.216197,
+          "mean_ms": 24.780627,
+          "mean_ms_per_call": 0.387197,
+          "median_ms": 24.972278,
+          "min_ms": 17.539033,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+          "count": 8,
+          "max_ms": 15.401532,
+          "mean_ms": 13.736556,
+          "mean_ms_per_call": 0.214634,
+          "median_ms": 13.77221,
+          "min_ms": 12.643405,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+          "count": 8,
+          "max_ms": 44.419652,
+          "mean_ms": 37.900696,
+          "mean_ms_per_call": 0.592198,
+          "median_ms": 37.807976,
+          "min_ms": 27.393927,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+          "count": 8,
+          "max_ms": 29.800016,
+          "mean_ms": 27.392532,
+          "mean_ms_per_call": 0.428008,
+          "median_ms": 27.152479,
+          "min_ms": 23.407093,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        }
+      },
+      "mori_routed_vjp_gpu_leaf_rank_mean_ms": {
+        "mori_aiter.backward.align_grad_output": {
+          "count": 8,
+          "max_ms": 3.730511,
+          "mean_ms": 3.268963,
+          "mean_ms_per_call": 0.051078,
+          "median_ms": 3.11274,
+          "min_ms": 2.925937,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.clone_dispatched_x": {
+          "count": 8,
+          "max_ms": 4.87456,
+          "mean_ms": 4.431745,
+          "mean_ms_per_call": 0.069246,
+          "median_ms": 4.386474,
+          "min_ms": 4.099663,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.call": {
+          "count": 8,
+          "max_ms": 6.347302,
+          "mean_ms": 6.298755,
+          "mean_ms_per_call": 0.098418,
+          "median_ms": 6.301821,
+          "min_ms": 6.235498,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dtopk.prepare_full": {
+          "count": 8,
+          "max_ms": 1.046417,
+          "mean_ms": 0.956469,
+          "mean_ms_per_call": 0.014945,
+          "median_ms": 0.938325,
+          "min_ms": 0.901868,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.call": {
+          "count": 8,
+          "max_ms": 1167.255501,
+          "mean_ms": 761.179376,
+          "mean_ms_per_call": 11.893428,
+          "median_ms": 741.64445,
+          "min_ms": 539.538908,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.combine_dx.prepare_full": {
+          "count": 8,
+          "max_ms": 6.895888,
+          "mean_ms": 6.483174,
+          "mean_ms_per_call": 0.1013,
+          "median_ms": 6.37452,
+          "min_ms": 6.226577,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_grad_output.call": {
+          "count": 8,
+          "max_ms": 39.383073,
+          "mean_ms": 39.039058,
+          "mean_ms_per_call": 0.609985,
+          "median_ms": 39.021933,
+          "min_ms": 38.688531,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.call": {
+          "count": 8,
+          "max_ms": 24.375986,
+          "mean_ms": 23.494259,
+          "mean_ms_per_call": 0.367098,
+          "median_ms": 23.334294,
+          "min_ms": 22.974654,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_topk_dummy.prepare_dummy": {
+          "count": 8,
+          "max_ms": 0.569071,
+          "mean_ms": 0.488989,
+          "mean_ms_per_call": 0.00764,
+          "median_ms": 0.483468,
+          "min_ms": 0.42935,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.call": {
+          "count": 8,
+          "max_ms": 231.15975,
+          "mean_ms": 185.95351,
+          "mean_ms_per_call": 2.905524,
+          "median_ms": 194.053299,
+          "min_ms": 115.002828,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.backward.dispatch_x.total_recv_item": {
+          "count": 8,
+          "max_ms": 0.280709,
+          "mean_ms": 0.269183,
+          "mean_ms_per_call": 0.004206,
+          "median_ms": 0.269147,
+          "min_ms": 0.256547,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.dtopk_weight": {
+          "count": 8,
+          "max_ms": 49.520114,
+          "mean_ms": 37.589823,
+          "mean_ms_per_call": 0.587341,
+          "median_ms": 36.44386,
+          "min_ms": 32.57464,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.gather_scale_scatter": {
+          "count": 8,
+          "max_ms": 114.30618,
+          "mean_ms": 91.895642,
+          "mean_ms_per_call": 1.435869,
+          "median_ms": 90.764226,
+          "min_ms": 81.657924,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.route_pack": {
+          "count": 8,
+          "max_ms": 266.909077,
+          "mean_ms": 262.439428,
+          "mean_ms_per_call": 4.100616,
+          "median_ms": 262.558166,
+          "min_ms": 257.7748,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.scatter_outputs": {
+          "count": 8,
+          "max_ms": 41.26278,
+          "mean_ms": 37.152175,
+          "mean_ms_per_call": 0.580503,
+          "median_ms": 37.018198,
+          "min_ms": 33.648788,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts": {
+          "count": 8,
+          "max_ms": 1354.276149,
+          "mean_ms": 1330.318275,
+          "mean_ms_per_call": 20.786223,
+          "median_ms": 1333.227756,
+          "min_ms": 1279.753359,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.sort_counts.max_count_item": {
+          "count": 8,
+          "max_ms": 0.304027,
+          "mean_ms": 0.280727,
+          "mean_ms_per_call": 0.004386,
+          "median_ms": 0.278427,
+          "min_ms": 0.258907,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_backward": {
+          "count": 8,
+          "max_ms": 31.905507,
+          "mean_ms": 28.429251,
+          "mean_ms_per_call": 0.444207,
+          "median_ms": 28.724947,
+          "min_ms": 23.677964,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.swiglu_forward": {
+          "count": 8,
+          "max_ms": 21.388498,
+          "mean_ms": 18.701955,
+          "mean_ms_per_call": 0.292218,
+          "median_ms": 18.990176,
+          "min_ms": 15.757901,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_forward_gemm": {
+          "count": 8,
+          "max_ms": 253.272917,
+          "mean_ms": 220.284517,
+          "mean_ms_per_call": 3.441946,
+          "median_ms": 222.971515,
+          "min_ms": 185.093156,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_wgrad_gemm": {
+          "count": 8,
+          "max_ms": 280.192808,
+          "mean_ms": 255.726553,
+          "mean_ms_per_call": 3.995727,
+          "median_ms": 260.939131,
+          "min_ms": 221.169768,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w13_xgrad_gemm_reduce": {
+          "count": 8,
+          "max_ms": 306.295911,
+          "mean_ms": 280.253832,
+          "mean_ms_per_call": 4.378966,
+          "median_ms": 284.142841,
+          "min_ms": 241.294339,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_dgrad_gemm": {
+          "count": 8,
+          "max_ms": 154.280746,
+          "mean_ms": 139.064416,
+          "mean_ms_per_call": 2.172881,
+          "median_ms": 141.878808,
+          "min_ms": 117.815213,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_forward_gemm": {
+          "count": 8,
+          "max_ms": 128.077961,
+          "mean_ms": 108.892932,
+          "mean_ms_per_call": 1.701452,
+          "median_ms": 109.877656,
+          "min_ms": 90.914092,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        },
+        "mori_aiter.local_padded_vjp.w2_wgrad_gemm": {
+          "count": 8,
+          "max_ms": 127.232781,
+          "mean_ms": 109.684931,
+          "mean_ms_per_call": 1.713827,
+          "median_ms": 109.021963,
+          "min_ms": 91.589341,
+          "rank_max_count": 64.0,
+          "rank_mean_count": 64.0,
+          "rank_min_count": 64.0
+        }
+      },
+      "profiled_linear_backward_cpu_by_owner_family_rank_mean_ms": {
+        "fsdp": {
+          "count": 8,
+          "max_ms": 9955.021195,
+          "mean_ms": 9637.897928,
+          "mean_ms_per_call": 16.732462,
+          "median_ms": 9589.687442,
+          "min_ms": 9445.145345,
+          "rank_max_count": 576.0,
+          "rank_mean_count": 576.0,
+          "rank_min_count": 576.0
+        }
+      },
+      "profiler_step_cpu_wall_ms": {
+        "count": 8,
+        "max_ms": 35572.170486,
+        "mean_ms": 35514.43735,
+        "median_ms": 35511.307312,
+        "min_ms": 35489.165968
+      },
+      "rank0_mm_backward_input_shapes": {
+        "[[512,129280]]": 128
+      },
+      "rank0_profiled_linear_backward_enclosing_scopes_top20": {
+        "FSDP::all_gather (layers.0) [pg=8]": 2475.8481209999995,
+        "FSDP::all_gather (layers.1) [pg=8]": 2337.6902510000004,
+        "FSDP::all_gather (layers.2) [pg=8]": 2224.129188999999,
+        "FSDP::all_gather (tok_embeddings)": 2453.2114699999997
+      },
+      "rank_count": 8,
+      "run_id": "torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_ownerdense_20260603",
+      "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096_steps2_gradaccum16",
+      "step_metrics_from_log": {
+        "1": {
+          "grad_norm": {
+            "max": 9.0625,
+            "mean": 9.0625,
+            "min": 9.0625,
+            "samples": 8
+          },
+          "loss": {
+            "max": 12.21028,
+            "mean": 12.21028,
+            "min": 12.21028,
+            "samples": 8
+          },
+          "memory_gib": {
+            "max": 74.34,
+            "mean": 57.0175,
+            "min": 43.55,
+            "samples": 8
+          },
+          "mfu_percent": {
+            "max": 1.49,
+            "mean": 1.49,
+            "min": 1.49,
+            "samples": 8
+          },
+          "tflops_per_gpu": {
+            "max": 34.48,
+            "mean": 34.455,
+            "min": 34.44,
+            "samples": 8
+          },
+          "tps_per_gpu": {
+            "max": 1822.0,
+            "mean": 1820.75,
+            "min": 1820.0,
+            "samples": 8
+          }
+        },
+        "2": {
+          "grad_norm": {
+            "max": 51.5,
+            "mean": 51.5,
+            "min": 51.5,
+            "samples": 8
+          },
+          "loss": {
+            "max": 9.98689,
+            "mean": 9.98689,
+            "min": 9.98689,
+            "samples": 8
+          },
+          "memory_gib": {
+            "max": 136.43,
+            "mean": 106.27125,
+            "min": 76.8,
+            "samples": 8
+          },
+          "mfu_percent": {
+            "max": 1.95,
+            "mean": 1.95,
+            "min": 1.95,
+            "samples": 8
+          },
+          "tflops_per_gpu": {
+            "max": 45.09,
+            "mean": 45.09,
+            "min": 45.09,
+            "samples": 8
+          },
+          "tps_per_gpu": {
+            "max": 2383.0,
+            "mean": 2383.0,
+            "min": 2383.0,
+            "samples": 8
+          }
+        }
+      },
+      "trace_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_ownerdense_20260603/profiling/traces_ep8_ownerdense_s4096_20260603",
+      "trace_iteration_used": "iteration_1"
+    }
+  },
+  "runtime_knobs": {
+    "MORI_SHMEM_HEAP_SIZE": "32G",
+    "TORCHTITAN_DSV4_LI_KL_BACKEND": "triton_tl_dot",
+    "TORCHTITAN_DSV4_MOE_COMM_BACKEND": "mori",
+    "TORCHTITAN_DSV4_PROFILE_DENSE_LINEAR_BACKWARD": "1",
+    "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_SCATTER_MODE": "auto",
+    "TORCHTITAN_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "TORCHTITAN_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": "1",
+    "TORCHTITAN_MORI_AITER_BACKWARD_MODE": "routed",
+    "TORCHTITAN_MORI_AITER_LOCAL_VJP_MODE": "padded",
+    "TORCHTITAN_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "TORCHTITAN_MORI_AITER_OP_CACHE_MODE": "backward",
+    "activation_checkpoint.mode": "full"
+  }
+}

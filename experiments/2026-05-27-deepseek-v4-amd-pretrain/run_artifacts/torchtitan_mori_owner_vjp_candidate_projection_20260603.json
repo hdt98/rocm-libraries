@@ -1,0 +1,101 @@
+{
+  "artifact": "torchtitan_mori_owner_vjp_candidate_projection",
+  "date_utc": "2026-06-03",
+  "scope": "Project how standalone owner-rank VJP candidate latencies map onto the retained 8xMI350 TorchTitan DeepSeek-V4-style canary.",
+  "projection_type": "model_from_existing_sidecars_not_a_new_training_run",
+  "inputs": {
+    "retained_canary_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "retained_step2": {
+      "tok_per_gpu_s": 3103,
+      "implied_step_time_s": 21.12,
+      "tflops_per_gpu": 58.71
+    },
+    "owner_vjp_tail_model_artifact": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_mori_vjp_tail_components_20260603.json",
+    "owner_vjp_tail_sum_ms": 3733.7580795288086,
+    "standalone_owner_rank_probe_artifact": "run_artifacts/owned_expert_vjp_ep8_stage1_saved_activation_20260602.json",
+    "standalone_retained_local_vjp_ms": 6.577022075653076,
+    "model_assumption": "Candidate local-VJP latency speedup applies uniformly to the per-call max owner-rank VJP tail. Step throughput is then scaled from the retained no-profiler 21.12 s/step anchor. This captures the current owner-VJP skew model but excludes secondary overlap changes, memory effects, and final sparse-MLA/LI changes."
+  },
+  "candidate_projection": [
+    {
+      "candidate": "public_stage1_hidden_only",
+      "standalone_local_vjp_ms": 6.591463088989258,
+      "local_vjp_speedup_pct": -0.2195676579776068,
+      "modeled_step_saved_s": 0.0,
+      "projected_step_time_s": 21.12,
+      "projected_tok_per_gpu_s": 3103.0,
+      "projected_tflops_per_gpu": 58.71,
+      "promotion_read": "reject: neutral/regressed versus retained recompute path"
+    },
+    {
+      "candidate": "public_stage1_hidden_plus_unweighted_output",
+      "standalone_local_vjp_ms": 5.85913610458374,
+      "local_vjp_speedup_pct": 10.915060992828616,
+      "modeled_step_saved_s": 0.4075419717052359,
+      "projected_step_time_s": 20.712458028294765,
+      "projected_tok_per_gpu_s": 3164.055174449783,
+      "projected_tflops_per_gpu": 59.865188299048256,
+      "promotion_read": "too small for a new production contract unless it arrives nearly for free"
+    },
+    {
+      "candidate": "ideal_gate_up_hidden",
+      "standalone_local_vjp_ms": 5.387613773345947,
+      "local_vjp_speedup_pct": 18.08429846556391,
+      "modeled_step_saved_s": 0.6752239550840969,
+      "projected_step_time_s": 20.444776044915905,
+      "projected_tok_per_gpu_s": 3205.48192144648,
+      "projected_tflops_per_gpu": 60.64899890690392,
+      "promotion_read": "minimum interesting saved-intermediate contract; still only about a 3.3% step-throughput lever"
+    },
+    {
+      "candidate": "ideal_gate_up_hidden_plus_unweighted_output",
+      "standalone_local_vjp_ms": 4.77380895614624,
+      "local_vjp_speedup_pct": 27.416862810632775,
+      "modeled_step_saved_s": 1.0236793303453304,
+      "projected_step_time_s": 20.09632066965467,
+      "projected_tok_per_gpu_s": 3261.0626132652246,
+      "projected_tflops_per_gpu": 61.70060780689698,
+      "promotion_read": "good saved-state target; roughly 5.0% step-throughput lever before overlap and attention work"
+    },
+    {
+      "candidate": "fused_owner_vjp_4p5ms",
+      "standalone_local_vjp_ms": 4.5,
+      "local_vjp_speedup_pct": 31.57997725660416,
+      "modeled_step_saved_s": 1.179119952331818,
+      "projected_step_time_s": 19.940880047668184,
+      "projected_tok_per_gpu_s": 3286.482835428493,
+      "projected_tflops_per_gpu": 62.181568568484316,
+      "promotion_read": "reasonable first fused-kernel target if parity is clean and memory footprint is stable"
+    },
+    {
+      "candidate": "fused_owner_vjp_4p0ms",
+      "standalone_local_vjp_ms": 4.0,
+      "local_vjp_speedup_pct": 39.182202005870366,
+      "modeled_step_saved_s": 1.4629686331314835,
+      "projected_step_time_s": 19.657031366868516,
+      "projected_tok_per_gpu_s": 3333.9398394845302,
+      "projected_tflops_per_gpu": 63.07947404967347,
+      "promotion_read": "strong first production target; about 7.5% step-throughput lever"
+    },
+    {
+      "candidate": "fused_owner_vjp_3p5ms",
+      "standalone_local_vjp_ms": 3.5,
+      "local_vjp_speedup_pct": 46.784426755136565,
+      "modeled_step_saved_s": 1.7468173139311491,
+      "projected_step_time_s": 19.37318268606885,
+      "projected_tok_per_gpu_s": 3382.787488352449,
+      "projected_tflops_per_gpu": 64.00369108642356,
+      "promotion_read": "aggressive target; useful if achievable without extra memory/dispatch cost"
+    }
+  ],
+  "promotion_gate": {
+    "standalone_gate": "A fused or saved-intermediate owner-VJP candidate should beat 5.86 ms to justify integration and should preferably be 4.5 ms or faster.",
+    "distributed_gate": "After standalone parity, rerun 4xMI350 S4096 GBS64 and 8xMI350 S4096 GBS128 CE2 retained canaries, then regenerate MORI sidecars. A real win should improve retained 8x step 2 beyond 3,200 tok/GPU/s without increasing peak memory or destabilizing loss.",
+    "non_goals": [
+      "Do not integrate public stage1-hidden-only AITER output as the lead path.",
+      "Do not claim the modeled projection as measured throughput.",
+      "Do not run no-profile canaries for a fused branch before standalone VJP parity and receive-count-distribution timing pass."
+    ]
+  },
+  "bottom_line": "Owner-rank VJP fusion is still a real MoE lever, but not a magic 2x end-to-end jump. The first useful kernel gate is below 5.86 ms local VJP; a serious production target is about 4.0-4.5 ms, which models to roughly 3,286-3,334 tok/GPU/s on the retained EP8 canary before attention/LI improvements."
+}

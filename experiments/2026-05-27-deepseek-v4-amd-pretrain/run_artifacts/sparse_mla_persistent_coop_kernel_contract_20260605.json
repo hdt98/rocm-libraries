@@ -1,0 +1,113 @@
+{
+  "artifact": "sparse_mla_persistent_coop_kernel_contract",
+  "created_at": "2026-06-05",
+  "scope": "S4096 DeepSeek-V4 sparse-MLA backward source-boundary kernel direction on MI350",
+  "status": "current_rocwmma_score_page_scaffold_rejected_next_gate_is_lower_level_persistent_or_cooperative_mfma_producer",
+  "source_boundary_inputs": [
+    "q[B,S,H,D]",
+    "grad_output[B,S,H,D]",
+    "output[B,S,H,D]",
+    "lse[B,S,H]",
+    "kv_bank[B,S+G,D]",
+    "safe_groups[B,S,topk]",
+    "valid_u8[B,S,topk]"
+  ],
+  "required_outputs": [
+    "grad_q[B,S,H,D]",
+    "grad_kv[B,S+G,D]"
+  ],
+  "reference_gates_ms": {
+    "retained_triton_full_sparse_attention_backward_boundary": 11.13,
+    "retained_triton_sparse_atomic_dkv_wall": 8.80629825592041,
+    "old_flash_sparse_mla_backward_reference_median": 5.07
+  },
+  "measured_s4096_rocwmma_score_page_scaffold": {
+    "multiwave_score_only_seq_chunk_16_ms": 15.390443801879883,
+    "multiwave_score_only_seq_chunk_1_ms": 16.395856857299805,
+    "multiwave_contribution_sink_seq_chunk_16_ms": 43.82099533081055,
+    "ck_direct_source_score_only_seq_chunk_16_ms": 32.7027,
+    "ck_direct_source_score_plus_ck_contribution_seq_chunk_16_ms": 54.2865,
+    "read": "Changing the existing rocWMMA score-page scaffold from serial token chunks to token-parallel CTAs does not make the score producer viable. Score-only remains above the retained full Triton sparse-attention backward boundary, so adding a local dKV epilogue around this producer would not materialize a useful latency candidate."
+  },
+  "rejected_branches": [
+    {
+      "name": "local_epilogue_around_current_rocwmma_score_page",
+      "reason": "The producer alone is 15.39-16.40 ms at S4096, already slower than the 11.13 ms full sparse-attention backward gate."
+    },
+    {
+      "name": "direct_source_ck_score_producer_swap",
+      "reason": "CK score-only direct-source loop measured about 32.70 ms, worse than rocWMMA score-only."
+    },
+    {
+      "name": "late_dkv_only_tilelang_or_reducer_replacement",
+      "reason": "It arrives after PyTorch/Triton has already materialized or bridged expensive score/prob/selected-state work, so isolated dKV wins do not materialize e2e."
+    }
+  ],
+  "next_kernel_contract": {
+    "name": "persistent_or_cooperative_mfma_sparse_mla_backward_v0",
+    "goal": "Consume score/prob/scaled-dP inside the same producer-consumer ownership schedule before HBM, then perform group-aware dKV reduction before global writes.",
+    "must_not_materialize_to_hbm": [
+      "selected_kv",
+      "scores",
+      "probs",
+      "scaled_dP",
+      "per_selected_dkv_partials"
+    ],
+    "producer_requirements": [
+      "Keep query-major reuse of q and grad_output while sweeping selected compressed groups.",
+      "Stage selected KV and q/grad_output operands for MFMA instead of direct-source scalar or direct-source CK loops.",
+      "Compute QK and dO.V score pages into registers or LDS ring-buffer pages.",
+      "Immediately form prob and scaled-dP from lse/output row terms.",
+      "Feed dQ and dKV consumers from the live score page without an HBM score/prob slab."
+    ],
+    "consumer_requirements": [
+      "Compute dQ from scaled-dP and selected KV within the same ownership schedule.",
+      "Compute dKV contributions from scaled-dP*q plus prob*grad_output.",
+      "Use route-aware local segmented reduction by compressed group before any global write.",
+      "Emit either reduced global atomics or compact reduced rows only after local grouping."
+    ],
+    "resource_warning": "A single ordinary CTA cannot hold a T32/SB512/full-D group accumulator in LDS. The implementation needs a rolling D tile, a tiny score ring buffer consumed immediately, and either persistent group ownership or a compact reduced partial stream. The current rocWMMA scaffold does not provide enough control or producer speed."
+  },
+  "ascend_sasg_source_mapping": {
+    "source_root": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22",
+    "process_pipeline": {
+      "sasg_basic_h": "CubeCompute preloads Cube12, signals Vec, waits on the opposite ping-pong buffer, then runs Cube345. VecCompute waits for Cube12, runs vector softmax/grad processing, and signals the next cube stage.",
+      "amd_lesson": "A useful AMD analogue needs explicit producer-consumer ownership and ping-pong/ring-buffer staging. A normal single CTA score loop is not equivalent to Ascend's AIC/AIV overlap."
+    },
+    "cube4": {
+      "file": "basic_modules/cube_modules/cube4.h",
+      "formula": "dk_partial = dS^T @ Q",
+      "source_detail": "cube4Process writes mm4ResWorkspaceGm by D loops after loading dS and query into local cube buffers.",
+      "amd_mapping": "MFMA dKV-key contribution producer: scaled_dP^T @ q, preferably consumed before an unreduced selected-row HBM slab."
+    },
+    "cube5": {
+      "file": "basic_modules/cube_modules/cube5.h",
+      "formula": "dv_partial = P^T @ dY",
+      "source_detail": "cube5Process writes mm5ResWorkspaceGm by D loops after loading P and dY into local cube buffers.",
+      "amd_mapping": "MFMA dKV-value contribution producer: prob^T @ grad_output, fused with the dk_partial stream before final write."
+    },
+    "scatter": {
+      "file": "basic_modules/vec_op.h",
+      "formula": "scatter_add(dKV[group]) += scale * dk_partial + dv_partial",
+      "source_detail": "ScatterAdd reads mm4ResWorkspaceGm and mm5ResWorkspaceGm into UB, scales dk, adds dv, and uses SetAtomicAdd<float>() before copying into original/compressed KV gradient.",
+      "amd_lesson": "Ascend does not eliminate scatter-add; it moves it behind fused Cube/Vector workspaces and controls the pipeline. AMD should similarly avoid framework-visible P/dP/selected-KV slabs, then reduce or compact before global atomics."
+    }
+  },
+  "next_measurement_gates": {
+    "score_producer_only_s4096_ms": {
+      "target": "<= 4 ms",
+      "reason": "The old sparse-MLA forward/backward envelope leaves only a few ms for score recompute if full backward is to approach 5-11 ms."
+    },
+    "full_source_boundary_dq_dkv_s4096_ms": {
+      "target": "< 11.13 ms",
+      "reason": "Must beat the retained Triton sparse-attention backward boundary before e2e TFLOPs can plausibly improve."
+    },
+    "materialized_e2e": {
+      "when": "Only after the S4096 source-boundary latency gate improves.",
+      "shape": "8xMI350 TP1 PP1 CP1 FSDP8 EP8 MBS1 S4096 GBS128",
+      "metric": "sustained late-step TFLOPs/GPU and peak memory under /scratch"
+    }
+  },
+  "new_evidence_artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode0_scoreonly_s4096_layer2_sc1_sb64_bd512_thr256_timing3_20260605.json",
+  "decision": "Do not spend the next kernel iteration on a dKV reducer bolted onto source_boundary_score_page_rocwmma_d512.hip. Start a lower-level HIP/rocWMMA or CK/MFMA producer-consumer kernel where the score tile and dKV grouped epilogue are designed together."
+}

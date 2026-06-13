@@ -1,0 +1,91 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_mbs8_fit_failure_8x_s4096_gbs128_20260607",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_mbs8_8x_s4096_gbs128_steps4_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "rejected_fit_failure_after_step1",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_EP": 8,
+    "CANARY_DP_SHARD": 8,
+    "CANARY_MBS": 8,
+    "CANARY_GBS": 128,
+    "CANARY_SEQ_LEN": 4096,
+    "CANARY_STEPS": 4,
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "false",
+    "CANARY_PERSIST_JIT_CACHE": "auto",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": 4096,
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false",
+    "MASTER_PORT": 29549
+  },
+  "observed_step_metrics": {
+    "step_1": {
+      "tokens_per_gpu_s_range": [1902, 1905],
+      "tflops_per_gpu_range": [96.31, 96.43],
+      "loss": 12.16727,
+      "grad_norm": 18.875,
+      "memory_gib_range": [251.85, 259.68],
+      "peak_logged_memory_gib": 259.68
+    }
+  },
+  "failure": {
+    "phase": "after_step1_next_forward_loss_path",
+    "first_observed_rank": 5,
+    "first_observed_local_rank": 5,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "available_free_memory_mb_at_abort": 38,
+    "stack_site": "torchtitan/components/loss.py:cross_entropy_loss",
+    "read": "MBS8/no-AC reaches the first logged step but leaves too little HBM/runtime headroom for the next loss/forward-backward path, then aborts with HSA out-of-resources."
+  },
+  "comparison": {
+    "retained_mbs4_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "retained_mbs4_steps_2_to_6_tokens_per_gpu_s_mean": 7975.8,
+    "retained_mbs4_steps_2_to_6_tflops_per_gpu_mean": 403.834,
+    "retained_mbs4_peak_logged_memory_gib": 194.62,
+    "mbs8_step1_peak_memory_minus_mbs4_peak_gib": 65.06
+  },
+  "source_artifacts": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_mbs8_8x_s4096_gbs128_steps4_20260607",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_mbs8_8x_s4096_gbs128_steps4_20260607/docker-run.log",
+    "structured_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_mbs8_8x_s4096_gbs128_steps4_20260607/structured_logs"
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "MBS8/no-AC does not fit robustly at GBS128 on the current standard-EP top-8 branch. Retain MBS4 as the stable e2e best. Future MBS8 work would need a separate memory-saving variant such as activation checkpointing, loss/vocab memory reduction, or optimizer/activation liveness fixes, then a new e2e tok/s run."
+  }
+}

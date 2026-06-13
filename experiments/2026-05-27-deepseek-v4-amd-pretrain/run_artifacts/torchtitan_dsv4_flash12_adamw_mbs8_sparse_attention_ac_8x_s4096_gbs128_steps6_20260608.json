@@ -1,0 +1,113 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_adamw_mbs8_sparse_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "created_at": "2026-06-08T12:37:30Z",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_adamw_mbs8_sparse_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_adamw_mbs8_sparse_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_adamw_mbs8_sparse_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "selective_sparse_attention_only",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "sparse_attention_only",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected"
+  },
+  "result": "completed_six_steps_not_promoted",
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.31632,
+      "grad_norm": 12.875,
+      "tokens_per_gpu_s": 1748,
+      "tflops_per_gpu": 88.49,
+      "rank_max_memory_gib": 227.53
+    },
+    {
+      "step": 2,
+      "loss": 9.93764,
+      "grad_norm": 25.125,
+      "tokens_per_gpu_s": 6427,
+      "tflops_per_gpu": 325.41,
+      "rank_max_memory_gib": 267.79
+    },
+    {
+      "step": 3,
+      "loss": 17.65086,
+      "grad_norm": 38.75,
+      "tokens_per_gpu_s": 6715,
+      "tflops_per_gpu": 339.99,
+      "rank_max_memory_gib": 267.81
+    },
+    {
+      "step": 4,
+      "loss": 15.35938,
+      "grad_norm": 47.25,
+      "tokens_per_gpu_s": 6755,
+      "tflops_per_gpu": 342.03,
+      "rank_max_memory_gib": 267.81
+    },
+    {
+      "step": 5,
+      "loss": 12.73433,
+      "grad_norm": 39.0,
+      "tokens_per_gpu_s": 6744,
+      "tflops_per_gpu": 341.47,
+      "rank_max_memory_gib": 267.81
+    },
+    {
+      "step": 6,
+      "loss": 10.93244,
+      "grad_norm": 38.5,
+      "tokens_per_gpu_s": 6833,
+      "tflops_per_gpu": 345.94,
+      "rank_max_memory_gib": 267.81
+    }
+  ],
+  "summary_windows": {
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 6694.8,
+      "node_tokens_s_mean": 53558.4,
+      "tflops_per_gpu_mean": 338.968,
+      "peak_memory_gib": 267.81
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s_mean": 6777.3333,
+      "node_tokens_s_mean": 54218.6667,
+      "tflops_per_gpu_mean": 343.1467,
+      "peak_memory_gib": 267.81
+    }
+  },
+  "comparison_to_retained_attention_only": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_8x_s4096_gbs128_20260608.json",
+    "retained_steps_2_to_20_tokens_per_gpu_s_mean": 8431.8684,
+    "retained_steps_13_to_20_tokens_per_gpu_s_mean": 8514.625,
+    "retained_peak_memory_gib": 259.82,
+    "tokens_per_gpu_s_delta_vs_retained_steps_2_to_20_pct": -21.78,
+    "peak_memory_delta_gib": 7.99
+  },
+  "decision": "Reject sparse_attention_only as an MBS8 promotion. It validates the new scope, but it is slower and higher-memory than retained attention_only selective AC, so MBS16 with this less aggressive scope is not a useful next fit attempt."
+}

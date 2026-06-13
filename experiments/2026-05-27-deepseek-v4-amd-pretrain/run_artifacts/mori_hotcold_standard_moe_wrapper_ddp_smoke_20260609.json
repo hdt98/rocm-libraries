@@ -1,0 +1,60 @@
+{
+  "hidden_dim": 16,
+  "mode": "wrapper_hotcold_standard_moe_ddp",
+  "mori_kernel_dir": "/workspace/sources/references/mori/python/mori",
+  "passed": true,
+  "rank0_shmem_finalize_status": 0,
+  "ranks": [
+    {
+      "expected_hot_counts": [
+        4,
+        0
+      ],
+      "expected_normal_counts": [
+        12,
+        0
+      ],
+      "hot_counts": [
+        4,
+        0
+      ],
+      "hot_passed": true,
+      "max_score_diff": 0.0,
+      "max_x_diff": 0.0,
+      "normal_counts": [
+        12,
+        0
+      ],
+      "normal_passed": true,
+      "rank": 0,
+      "shmem_init_status": 0
+    },
+    {
+      "expected_hot_counts": [
+        0,
+        4
+      ],
+      "expected_normal_counts": [
+        12,
+        0
+      ],
+      "hot_counts": [
+        0,
+        4
+      ],
+      "hot_passed": true,
+      "max_score_diff": 0.0,
+      "max_x_diff": 0.0,
+      "normal_counts": [
+        12,
+        0
+      ],
+      "normal_passed": true,
+      "rank": 1,
+      "shmem_init_status": 0
+    }
+  ],
+  "tokens": 8,
+  "topk": 2,
+  "world_size": 2
+}

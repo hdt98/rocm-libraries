@@ -1,0 +1,43 @@
+{
+  "artifact": "actual_li_active_list_dotk_atomic_rocprof_s4096_kernel_trace_20260602",
+  "created_date": "2026-06-02",
+  "scope": "rocprofv3 kernel trace for the Actual-LI S4096 layer-2 dot_k_atomic compressed-dKV diagnostic on one MI350.",
+  "remote_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/dotk_atomic_s4096_kernel_trace_20260602",
+  "raw_files_retained_remotely": [
+    "trace_kernel_stats.csv",
+    "trace_kernel_trace.csv",
+    "trace_results.json",
+    "probe_result.json",
+    "probe_stdout.json"
+  ],
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_atomic --seq-len 4096 --layer-id 2 --seq-chunk 32 --block-d 16 --block-h 64 --block-k 64",
+  "profile_result": {
+    "status": "ok",
+    "domain_kernel_dispatch_calls": 175,
+    "domain_kernel_dispatch_total_ns": 25418814,
+    "domain_kernel_dispatch_pct": 74.69,
+    "domain_memory_copy_calls": 17,
+    "domain_memory_copy_total_ns": 8614403,
+    "domain_memory_copy_pct": 25.31
+  },
+  "top_kernel": {
+    "name": "_active_list_dkv_dotk_atomic_from_materialized_probs_kernel",
+    "calls": 1,
+    "total_duration_ns": 8614211,
+    "average_ns": 8614211,
+    "duration_ms": 8.614211,
+    "kernel_trace_percentage": 33.89
+  },
+  "probe_event_timing": {
+    "median_ms": 135.9499969482422,
+    "read": "Do not use the in-probe CUDA event timing from the rocprof run for performance; profiling overhead contaminated the single timing sample. Use trace_kernel_stats.csv for the kernel duration."
+  },
+  "write_accounting": {
+    "actual_kernel_atomic_elements": 805044224,
+    "actual_kernel_atomic_reduction_x": 1.0,
+    "coalesced_active_list_atomic_elements": 33806848,
+    "coalesced_active_list_reduction_x": 23.813051840857806,
+    "query_major_raw_atomic_elements": 805044224
+  },
+  "read": "The rocprof trace agrees with the clean unprofiled dot_k_atomic timing: the target kernel itself is 8.614 ms, close to the retained 8.806 ms CUDA-event median. It also reinforces the mechanism read: selected-key dot batching is not the wall once the dense route matrix is removed; the remaining work is global many-to-one compressed-dKV accumulation with actual write reduction still 1.0x."
+}

@@ -1,0 +1,85 @@
+{
+  "artifact": "sparse_mla_4wave_scorepage_direct_epilogue_gate",
+  "status": "implemented_and_measured_not_promoted",
+  "created_at": "2026-06-05",
+  "scope": "Less-invasive implementation requested after rejecting the 16-wave H64xN64 owner: keep the existing 4-wave query-major score/prob/scaled-dP producer in source_boundary_query_major_scorepage_dparallel.hip and change only the dKV epilogue hook.",
+  "source": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "python_probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "new_modes": {
+      "7": "direct head-wave contribution sink; bypasses the older shared-memory H16-partial reduce epilogue",
+      "8": "direct head-wave contribution atomicAdd to compressed dKV; bypasses the older shared-memory H16-partial reduce epilogue"
+    },
+    "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "selected_block": 512,
+    "seq_chunk": 1,
+    "threads": 256,
+    "dtype": "bf16_source_fp32_accum"
+  },
+  "baseline_triton_query_major_actual_li": {
+    "artifact": "actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+    "no_dkv_dq_recompute_ms": 1.974266,
+    "dkv_reduce_sink_ms": 2.79503,
+    "full_dq_dkv_atomic_ms": 11.08092,
+    "global_dkv_accumulation_estimate_ms": 8.28589
+  },
+  "existing_4wave_scorepage_baselines_ms": {
+    "mode2_score_grad_prob_sink": {
+      "artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_dotpart4_20260605.json",
+      "event_median_ms": 7.075130939483643,
+      "read": "existing 4-wave score/prob/scaled-dP producer with no dKV contribution"
+    },
+    "mode4_shared_reduce_contribution_sink": {
+      "artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode4_20260605.json",
+      "event_median_ms": 21.769060134887695,
+      "read": "same producer plus older shared-memory H16 partial reduce epilogue, checksum sink"
+    },
+    "mode3_shared_reduce_valid_dkv": {
+      "artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode3_20260605.json",
+      "event_median_ms": 25.937744140625,
+      "read": "same producer plus older shared-memory H16 partial reduce epilogue and valid dKV atomics"
+    }
+  },
+  "new_direct_epilogue_results_ms": {
+    "mode7_direct_contribution_sink": {
+      "artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode7_direct_sink_thr256_20260605.json",
+      "event_median_ms": 22.064376831054688,
+      "delta_vs_mode4_ms": 0.2953166961669922,
+      "read": "bypassing the shared-memory H16 partial reduce epilogue does not improve the contribution-sink path"
+    },
+    "mode8_direct_valid_dkv_atomic": {
+      "artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode8_direct_atomic_thr256_20260605.json",
+      "event_median_ms": 29.481874465942383,
+      "delta_vs_mode7_ms": 7.417497634887695,
+      "delta_vs_mode3_ms": 3.544130325317383,
+      "read": "direct head-wave partial atomics are worse than the older reduced-atomic epilogue"
+    }
+  },
+  "decision": {
+    "passes_triton_11p13_ms_gate": false,
+    "root_cause": "The less-invasive hook confirms the shared-memory H16 partial-reduce epilogue is not the local wall. Mode 7 is essentially equal to the old mode 4 sink, while mode 8 gets worse because it emits four head-wave partial atomics. The current 4-wave HIP/CK score-page producer is already slower than Triton, and the dKV contribution consumer attached to it adds about 14-15 ms before valid writes.",
+    "rejected": [
+      "direct head-wave dKV epilogue as a speed path",
+      "optimizing the existing H16 partial-reduce epilogue in isolation"
+    ],
+    "next_code_step": "Keep the 4-wave score/prob producer unchanged, but the next epilogue must be group-aware across multiple tokens or a persistent producer-consumer tile; a token_block=1 epilogue has route_atomic_reduction_x=1.0 and cannot realize the 23.8x route coalescing model."
+  },
+  "commands": [
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 512 --block-d 16 --threads 256 --warmup-iters 1 --timed-iters 3 --skip-correctness --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --hip-define SCOREPAGE_PRODUCER_MODE=7 --extension-dir /workspace/torch_extensions_scorepage_mode7_direct_sink_sb512_thr256_20260605b --summary-path run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode7_direct_sink_thr256_20260605.json --json",
+    "python tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 512 --block-d 16 --threads 256 --warmup-iters 1 --timed-iters 3 --skip-correctness --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --hip-define SCOREPAGE_PRODUCER_MODE=8 --extension-dir /workspace/torch_extensions_scorepage_mode8_direct_atomic_sb512_thr256_20260605 --summary-path run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode8_direct_atomic_thr256_20260605.json --json"
+  ],
+  "dependency_pin_changes": []
+}

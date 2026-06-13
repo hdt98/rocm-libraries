@@ -1,0 +1,145 @@
+{
+  "artifact": "torchtitan_qwen397b_a17b_primus_deepep_nohelper_mbs4_mbs8_20step_20260612",
+  "created_utc": "2026-06-12T13:35:00Z",
+  "question": "Can the Qwen3.5-397B-A17B reduced no-helper baseline run with the Primus-Turbo DeepEP/TurboEP-style normal top-k backend?",
+  "answer": {
+    "retained_no_helper_rows_were_deepep": false,
+    "primus_turbo_no_helper_runs_completed": true,
+    "read": "The retained Qwen no-helper ladder was plain standard EP. The first Primus-Turbo normal top-k EP backend MBS4 row was later superseded by a clean rerun at 15745.63 tok/GPU/s over steps 2-20, so the old MBS4 regression read is demoted. MBS8 remains diagnostic because the old run hit allocator-pressure symptoms. Use the correction artifact torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612 for the retained MBS4 row."
+  },
+  "model": "Qwen3.5-397B-A17B reduced 8-layer hot-helper gate",
+  "node": "do-vunguyen-mi350-gpu",
+  "hardware": "8xMI350",
+  "surface": {
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "data": "tests/assets/c4_test",
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "steps": 20,
+    "warmup_steps_excluded_from_retained_windows": 1,
+    "hot_helper": false
+  },
+  "backend": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "off",
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_backend_normal_topk_dispatch_tensors": true,
+    "standard_ep_backend_normal_topk_dispatch_validate": false,
+    "standard_ep_backend_normal_topk_dispatch_permute": true,
+    "balanced_moe_plan_backend": "primus_turbo",
+    "implementation_read": "For no-helper Qwen all top-k routes are normal/cold. TorchTitan uses the Primus-Turbo balanced_moe normal top-k hooks, which route through Primus-Turbo moe_dispatch, moe_permute, moe_unpermute, and moe_combine. This is not the hot-helper owner-compact transport."
+  },
+  "primus_turbo_staging": {
+    "source": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/primus-turbo",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "extension_smoke": "Docker import of primus_turbo.pytorch._C plus balanced_moe normal_topk hooks passed in the retained Qwen runtime image.",
+    "checksums": {
+      "libprimus_turbo_kernels.so": "894d21fa4ce38b0862f6c5af09cfd4eeda94d3cb4b615cf2f2a9465b073061af",
+      "_C.cpython-310-x86_64-linux-gnu.so": "277defd3ecf8aef79ee4d789dd46607ea10060f397ccfc38a8be0ec64d951a91"
+    },
+    "caveat": "The copied extension came from the same single-node gfx950 build used for the DeepSeek Primus-Turbo gate. rocSHMEM/MPI were not present during build, so internode DeepEP is disabled; these are single-node/intranode 8xMI350 runs."
+  },
+  "runs": [
+    {
+      "run_id": "qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602/logs/train.log",
+      "supersedes_run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs4_retry_steps20_20260612",
+      "correction_artifact": "run_artifacts/torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612.json",
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "completed_steps": 20,
+      "steps_2_20": {
+        "tokens_per_gpu_s": 15745.63,
+        "node_tokens_per_s": 125965.04,
+        "tflops_per_gpu": 269.61,
+        "mfu_pct": 11.67,
+        "peak_logged_memory_gib": 262.8,
+        "loss_first": 8.99124,
+        "loss_last": 3.1573,
+        "grad_norm_last": 8.0607
+      },
+      "steps_13_20": {
+        "tokens_per_gpu_s": 15746.38,
+        "node_tokens_per_s": 125971.04,
+        "tflops_per_gpu": 269.62,
+        "mfu_pct": 11.67,
+        "peak_logged_memory_gib": 262.8,
+        "loss_first": 4.15362,
+        "loss_last": 3.1573,
+        "grad_norm_last": 8.0607
+      },
+      "comparison_steps_2_20": {
+        "plain_standard_ep_no_helper_tokens_per_gpu_s": 12106.349,
+        "plain_standard_ep_no_helper_delta_pct": 30.0609,
+        "standard_ep_top8_helper_tokens_per_gpu_s": 13914.217,
+        "standard_ep_top8_helper_delta_pct": 13.1621,
+        "plain_standard_ep_no_helper_peak_logged_memory_gib": 226.01,
+        "standard_ep_top8_helper_peak_logged_memory_gib": 178.09
+      },
+      "comparison_steps_13_20": {
+        "plain_standard_ep_no_helper_tokens_per_gpu_s": 12220.656,
+        "plain_standard_ep_no_helper_delta_pct": 28.8521,
+        "standard_ep_top8_helper_tokens_per_gpu_s": 13850.0,
+        "standard_ep_top8_helper_delta_pct": 13.6923
+      }
+    },
+    {
+      "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs8_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs8_steps20_20260612/logs/train.log",
+      "micro_batch_size": 8,
+      "gradient_accumulation_steps": 2,
+      "completed_steps": 20,
+      "steps_2_20": {
+        "tokens_per_gpu_s": 11650.895,
+        "node_tokens_per_s": 93207.158,
+        "tflops_per_gpu": 199.494,
+        "mfu_pct": 8.638,
+        "peak_logged_memory_gib": 277.96,
+        "loss_first": 9.31578,
+        "loss_last": 3.42854,
+        "grad_norm_last": 8.4927
+      },
+      "steps_13_20": {
+        "tokens_per_gpu_s": 12149.562,
+        "node_tokens_per_s": 97196.5,
+        "tflops_per_gpu": 208.032,
+        "mfu_pct": 9.008,
+        "peak_logged_memory_gib": 277.11,
+        "loss_first": 5.75225,
+        "loss_last": 3.42854,
+        "grad_norm_last": 8.4927
+      },
+      "comparison_steps_2_20": {
+        "plain_standard_ep_no_helper_tokens_per_gpu_s": 12683.539,
+        "plain_standard_ep_no_helper_delta_pct": -8.1416,
+        "standard_ep_top8_helper_tokens_per_gpu_s": 15833.914,
+        "standard_ep_top8_helper_delta_pct": -26.4181,
+        "plain_standard_ep_no_helper_peak_logged_memory_gib": 281.42,
+        "standard_ep_top8_helper_peak_logged_memory_gib": 242.22
+      },
+      "comparison_steps_13_20": {
+        "plain_standard_ep_no_helper_tokens_per_gpu_s": 13174.906,
+        "plain_standard_ep_no_helper_delta_pct": -7.7826,
+        "standard_ep_top8_helper_tokens_per_gpu_s": 15676.328,
+        "standard_ep_top8_helper_delta_pct": -22.4974
+      }
+    }
+  ],
+  "invalid_attempts": [
+    {
+      "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs4_steps20_20260612",
+      "result": "invalid_contaminated_failure",
+      "reason": "The first MBS4 attempt failed in NCCL seed broadcast with hipIpcGetMemHandle invalid argument and left run-owned workers holding VRAM. Process inspection showed the stale workers still carried the previous MBS8 command line, so this is treated as stale-process/IPC contamination, not as a backend performance row. The workers were killed and ROCm SMI returned to idle before the clean retry."
+    }
+  ],
+  "decision": {
+    "promote_as_qwen_no_helper_deepep_baseline": true,
+    "promote_over_plain_standard_ep_no_helper": false,
+    "promote_over_hot_helper_current_best": false,
+    "read": "Primus-Turbo normal top-k backend is useful for the DeepSeek no-helper fit/perf branch and for Qwen MBS4 after the corrected rerun. Qwen MBS8 remains diagnostic. The robust feature target remains hot-helper partitioning; backend-native Primus-Turbo/MORI work should preserve that partition rather than only swapping normal top-k dispatch/combine."
+  }
+}

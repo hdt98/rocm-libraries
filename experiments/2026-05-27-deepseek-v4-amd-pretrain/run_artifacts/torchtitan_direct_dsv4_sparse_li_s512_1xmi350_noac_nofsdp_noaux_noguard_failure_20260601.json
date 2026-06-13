@@ -1,0 +1,44 @@
+{
+  "run_id": "torchtitan_direct_dsv4_s512_sparse_li_1xmi350_noac_nofsdp_noaux_noguard_20260601T000000",
+  "date_utc": "2026-06-01",
+  "result": "failed_before_step_metric",
+  "selected_execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "host": "do-sonle5-mi350-gpu",
+  "visible_devices": "0",
+  "model": "DeepSeek-V4-Flash_4layer_unguarded_pytorch_sparse_mla_lightning_indexer",
+  "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512",
+  "checkpoint_enable": false,
+  "activation_checkpoint_mode": "none",
+  "skip_single_rank_fsdp": true,
+  "dsa_indexer_loss_coeff": 0.0,
+  "sparse_mla_max_selected_state_elements": 0,
+  "gradient_accumulation_steps": 1,
+  "command": "env GPUS_PER_NODE=1 CANARY_VISIBLE_DEVICES=0 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SKIP_SINGLE_RANK_FSDP=true CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS=0 MASTER_PORT=29553 RUN_ID=torchtitan_direct_dsv4_s512_sparse_li_1xmi350_noac_nofsdp_noaux_noguard_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "observed": {
+    "trainer_initialized": true,
+    "training_started_step": 1,
+    "step_metrics_logged": false,
+    "peak_flops_used_for_mfu": 2310000000000000.0,
+    "remote_output_size": "156K",
+    "remote_log_size": "16K",
+    "checkpoint_directory_created": false
+  },
+  "failure": {
+    "phase": "loss.backward",
+    "error_class": "gpu_memory_access_fault",
+    "torch_elastic_root_cause_rank": 0,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "messages": [
+      "Memory access fault by GPU node-2: Reason: Unknown",
+      "Fatal Python error: Aborted",
+      "torch.autograd.graph._engine_run_backward",
+      "torchtitan.trainer.forward_backward_step"
+    ]
+  },
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_sparse_li_1xmi350_noac_nofsdp_noaux_noguard_20260601T000000/docker-run.log",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_sparse_li_1xmi350_noac_nofsdp_noaux_noguard_20260601T000000",
+  "read": "Unguarded S512 sparse-LI still faults when single-rank FSDP is skipped and the LightningIndexer auxiliary loss is disabled. This narrows the current crash to the materialized sparse attention backward path itself rather than FSDP post-backward handling, multi-rank EP, activation checkpointing, or LI aux-loss gradients. The temporary selected-state guard is still required until the sparse MLA path stops materializing selected K/V state or uses a fused backward-safe kernel."
+}

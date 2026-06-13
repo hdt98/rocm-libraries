@@ -1,0 +1,261 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "fused": false,
+    "index_logits": {
+      "block_d": 64,
+      "block_h": 16,
+      "block_k": 128
+    },
+    "li_grads": {
+      "block_d": 128,
+      "block_h": 64,
+      "block_k": 512,
+      "dot_block_d": 64,
+      "mode": "full"
+    },
+    "target": {
+      "block_d": 64,
+      "block_h": 16,
+      "block_k": 512,
+      "num_warps": 8
+    },
+    "uses_tl_dot": true
+  },
+  "max_abs_diff": null,
+  "promotion_read": "This is the unfused diagnostic floor for the LI auxiliary-loss pipeline. It avoids selected main-K, selected index-K, and per-head logit materialization, but still writes target_probs, index_logits, d_index_logits, and final gradients as separate intermediate tensors. Production should fuse these slices with the sparse MLA/compressor backward path.",
+  "reference": null,
+  "scope": "triton_sparse_li_full_pipeline_tl_dot_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 1024,
+    "index_head_dim": 128,
+    "index_heads": 64,
+    "index_pattern": "shifted",
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_edges": 1572352
+  },
+  "status": "passed",
+  "timing": {
+    "logical_flops": 266246029312,
+    "logical_tflops_at_pipeline_event_median": 59.337398509835865,
+    "peak_memory_allocated_bytes": 841220096,
+    "peak_memory_allocated_gib": 0.783447265625,
+    "pipeline": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 4.740449905395508,
+        "mean_ms": 4.528457832336426,
+        "median_ms": 4.486985206604004,
+        "min_ms": 4.4811248779296875,
+        "samples_ms": [
+          4.642807960510254,
+          4.740449905395508,
+          4.502045154571533,
+          4.488725185394287,
+          4.4811248779296875,
+          4.482325077056885,
+          4.49192476272583,
+          4.485044956207275,
+          4.484885215759277,
+          4.485245227813721
+        ],
+        "stdev_ms": 0.08922305905833465
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.765335004776716,
+        "mean_ms": 4.555317887570709,
+        "median_ms": 4.511975450441241,
+        "min_ms": 4.503214964643121,
+        "samples_ms": [
+          4.695554031059146,
+          4.765335004776716,
+          4.526844946667552,
+          4.516765009611845,
+          4.508354933932424,
+          4.503214964643121,
+          4.515595966950059,
+          4.507145029492676,
+          4.506964003667235,
+          4.507404984906316
+        ],
+        "stdev_ms": 0.09399930932259536
+      }
+    },
+    "stages": {
+      "index_logits": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.3432460129261017,
+          "mean_ms": 0.3051900029182434,
+          "median_ms": 0.297325998544693,
+          "min_ms": 0.29216599464416504,
+          "samples_ms": [
+            0.3432460129261017,
+            0.29956600069999695,
+            0.297325998544693,
+            0.2936460077762604,
+            0.29216599464416504
+          ],
+          "stdev_ms": 0.021474522572211358
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.36511896178126335,
+          "mean_ms": 0.3258789889514446,
+          "median_ms": 0.31782803125679493,
+          "min_ms": 0.3121589543297887,
+          "samples_ms": [
+            0.36511896178126335,
+            0.3205490065738559,
+            0.31782803125679493,
+            0.3137399908155203,
+            0.3121589543297887
+          ],
+          "stdev_ms": 0.022184435565249173
+        }
+      },
+      "kl_derivative": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.06952100247144699,
+          "mean_ms": 0.05568900033831596,
+          "median_ms": 0.05256099998950958,
+          "min_ms": 0.048760998994112015,
+          "samples_ms": [
+            0.06952100247144699,
+            0.05604099854826927,
+            0.05256099998950958,
+            0.05156100168824196,
+            0.048760998994112015
+          ],
+          "stdev_ms": 0.008158893114467014
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.08845003321766853,
+          "mean_ms": 0.07184778805822134,
+          "median_ms": 0.06768899038434029,
+          "min_ms": 0.06618001498281956,
+          "samples_ms": [
+            0.08845003321766853,
+            0.070389942266047,
+            0.06768899038434029,
+            0.06618001498281956,
+            0.06652995944023132
+          ],
+          "stdev_ms": 0.009426802342589316
+        }
+      },
+      "li_grads": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 3.184659004211426,
+          "mean_ms": 3.1786590099334715,
+          "median_ms": 3.1772189140319824,
+          "min_ms": 3.1754190921783447,
+          "samples_ms": [
+            3.1772189140319824,
+            3.1754190921783447,
+            3.184659004211426,
+            3.1770589351654053,
+            3.1789391040802
+          ],
+          "stdev_ms": 0.003578042991475554
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 3.2478499924764037,
+          "mean_ms": 3.2102334080263972,
+          "median_ms": 3.2006289111450315,
+          "min_ms": 3.1977490289136767,
+          "samples_ms": [
+            3.2478499924764037,
+            3.1977490289136767,
+            3.20673908572644,
+            3.1982000218704343,
+            3.2006289111450315
+          ],
+          "stdev_ms": 0.021331468412730436
+        }
+      },
+      "target_probs": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.9626579880714417,
+          "mean_ms": 0.9518262028694153,
+          "median_ms": 0.9543780088424683,
+          "min_ms": 0.9363380074501038,
+          "samples_ms": [
+            0.9626579880714417,
+            0.9597790241241455,
+            0.9543780088424683,
+            0.9459779858589172,
+            0.9363380074501038
+          ],
+          "stdev_ms": 0.0107374635022115
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.989368068985641,
+          "mean_ms": 0.9701987961307168,
+          "median_ms": 0.9709970327094197,
+          "min_ms": 0.9522660402581096,
+          "samples_ms": [
+            0.989368068985641,
+            0.9766769362613559,
+            0.9709970327094197,
+            0.9616859024390578,
+            0.9522660402581096
+          ],
+          "stdev_ms": 0.014178483656286434
+        }
+      }
+    },
+    "timed_iters": 10,
+    "warmup_iters": 2
+  },
+  "triton_norms": {
+    "d_index_logits": 4.3260325810479117e-07,
+    "index_k": 2.7968970243819058e-05,
+    "index_logits": 80201.203125,
+    "index_q": 2.7280078938929364e-05,
+    "target_probs": 5.6412153244018555,
+    "weights": 2.2086680473876186e-05
+  },
+  "workspace": {
+    "derivative": {
+      "d_index_logits_bytes": 8388608,
+      "index_logits_bytes": 8388608,
+      "row_count": 4093,
+      "target_probs_bytes": 8388608
+    },
+    "grads": {
+      "d_index_k_bytes": 524288,
+      "d_index_q_bytes": 134217728,
+      "d_weights_bytes": 1048576,
+      "head_logits_materialized_bytes": 0,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 1572352
+    },
+    "logits": {
+      "head_logits_bytes": 0,
+      "index_logits_bytes": 8388608,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 1572352
+    },
+    "target": {
+      "per_head_probs_bytes": 0,
+      "selected_main_k_bytes": 0,
+      "target_logits_bytes": 0,
+      "target_probs_bytes": 8388608
+    }
+  }
+}

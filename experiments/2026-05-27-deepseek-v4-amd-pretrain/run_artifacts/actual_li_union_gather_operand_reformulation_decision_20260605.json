@@ -1,0 +1,133 @@
+{
+  "artifact": "actual_li_union_gather_operand_reformulation_decision_20260605",
+  "status": "promote_slice_not_full_boundary",
+  "scope": "materialized-prob sparse MLA compressed-dKV slice for actual S4096 layer-2 LI routes",
+  "code_changes": {
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+    "new_kernel": "dot_k_union_gather",
+    "new_sidecar": "build_micro_union_route_slots",
+    "planner": "tools/dsv4_runtime_probe/plan_sparse_dkv_union_operand_tile.py"
+  },
+  "operand_reformulation": {
+    "old_rejected_shape": "per-token selected-slot contribution rows, then fold/route duplicates afterward",
+    "new_shape": "per-(token tile, selected window) compressed-group union rows, with union_route_slots[token, union_group] -> selected_slot",
+    "math_contract": "acc[union_group, d] += sum_token sum_head grad_logits[token, head, slot(union_group)] * q[token, head, d] * scale + probs[token, head, slot(union_group)] * dO[token, head, d]",
+    "why_it_is_different": "probs and grad_logits are gathered by compressed-group union row before tl.dot, so the dot output is union_group x D directly instead of selected_slot x D followed by a dense route matrix or per-selected global writes"
+  },
+  "route_planner": {
+    "artifact": "actual_li_union_operand_tile_plan_s4096_layer2_20260605.json",
+    "T4_K64": {
+      "operand_kv_load_reuse_x": 1.2078495718932107,
+      "dense_token_union_score_expansion_x": 3.3116554054054053,
+      "decision": "reject as too sparse for dense token x union work"
+    },
+    "T4_K512": {
+      "operand_kv_load_reuse_x": 3.04843444037302,
+      "dense_token_union_score_expansion_x": 1.3121470256024097
+    },
+    "T8_K512": {
+      "operand_kv_load_reuse_x": 5.992058108427399,
+      "dense_token_union_score_expansion_x": 1.3350967213448388,
+      "decision": "first promoted shape family"
+    }
+  },
+  "correctness": {
+    "S512_T8_K512_U256_D64": {
+      "artifact": "actual_li_active_list_dotk_union_gather_s512_layer2_t8k512_d64h64u256_20260605.json",
+      "status": "ok",
+      "max_abs_diff": 0.07167911529541016,
+      "dkv_atol": 0.1,
+      "duplicate_token_group_hits": 0
+    }
+  },
+  "s4096_timing_ms": [
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t4k512_d16h64u64_timing5_20260605.json",
+      "seq_chunk": 4,
+      "selected_block": 512,
+      "block_u": 64,
+      "block_d": 16,
+      "median_ms": 19.383480072021484
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d16h64u64_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 64,
+      "block_d": 16,
+      "median_ms": 19.147079467773438
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d16h64u128_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 128,
+      "block_d": 16,
+      "median_ms": 16.105173110961914
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d16h64u256_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 256,
+      "block_d": 16,
+      "median_ms": 13.25662899017334
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d16h64u512_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 512,
+      "block_d": 16,
+      "median_ms": 16.106454849243164
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d32h64u128_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 128,
+      "block_d": 32,
+      "median_ms": 12.532705307006836
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d32h64u256_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 256,
+      "block_d": 32,
+      "median_ms": 8.3047513961792
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d64h64u128_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 128,
+      "block_d": 64,
+      "median_ms": 6.755496978759766
+    },
+    {
+      "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d64h64u256_timing5_20260605.json",
+      "seq_chunk": 8,
+      "selected_block": 512,
+      "block_u": 256,
+      "block_d": 64,
+      "median_ms": 6.258613109588623,
+      "best": true
+    }
+  ],
+  "best_candidate": {
+    "shape": "S4096 layer2 T8 K512 U256 D64 H64",
+    "artifact": "actual_li_active_list_dotk_union_gather_s4096_layer2_t8k512_d64h64u256_timing5_20260605.json",
+    "median_ms": 6.258613109588623,
+    "modeled_write_reduction_x": 5.992058108427399,
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "union_route_sidecar_mib_int64": 31.875
+  },
+  "comparison": {
+    "old_sparse_atomic_dkv_wall_ms": "about 8.0-8.8",
+    "best_union_gather_speedup_vs_8p0_ms": 1.2782388443370147,
+    "best_union_gather_speedup_vs_8p8_ms": 1.4060637327707162
+  },
+  "remaining_caveat": "This is still the materialized-prob dKV slice. To materialize end-to-end sparse-attention backward speedup, the same union-group sidecar and union-gather epilogue must move inside the source-boundary producer that recomputes QK, softmax row terms, grad_logits, dQ, and dKV without writing P/grad_logits slabs to HBM."
+}

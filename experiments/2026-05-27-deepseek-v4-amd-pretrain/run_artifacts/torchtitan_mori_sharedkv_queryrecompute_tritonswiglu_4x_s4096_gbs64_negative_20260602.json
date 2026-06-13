@@ -1,0 +1,95 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_negative_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_two_steps_but_performance_negative",
+  "purpose": "Record the integrated TorchTitan result after explicitly pinning shared-KV query-recompute backward, so it is not mistaken for a promotion candidate.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_direct_dsv4_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_steps2_20260602Tcont2",
+  "shape": {
+    "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+    "distributed": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+    "visible_devices": "4,5,6,7",
+    "gpus": 4,
+    "fsdp": 4,
+    "ep": 4,
+    "seq_len": 4096,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 262144,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false
+  },
+  "sparse_mla": {
+    "backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "auto",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "li_kl_backend": "triton_tl_dot",
+    "check_config_artifact": "run_artifacts/torchtitan_sparse_sharedkv_queryrecompute_check_config_20260602.json",
+    "check_config_read": "The launcher check-config path verifies sharedkv_backward_env=query_recompute and sharedkv_scatter_env=auto in the container before the run."
+  },
+  "moe": {
+    "comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G"
+  },
+  "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_steps2_20260602Tcont2 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_SHAREDKV_SCATTER_MODE=auto CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29583 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_steps2_20260602Tcont2/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_steps2_20260602Tcont2",
+  "rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_queryrecompute_tritonswiglu_4x_s4096_gbs64_steps2_20260602Tcont2/structured_logs/training.global_rank_0.20260602-040512-3M5IA6.jsonl",
+  "results": {
+    "step1": {
+      "loss": 12.1805,
+      "grad_norm": 12.8125,
+      "memory_gib_range": [
+        81.45,
+        92.97
+      ],
+      "tokens_per_gpu_s_range": [
+        1598,
+        1602
+      ],
+      "tflops_per_gpu_range": [
+        30.23,
+        30.3
+      ],
+      "mfu_pct": 1.31
+    },
+    "step2": {
+      "loss": 8.83994,
+      "grad_norm": 24.125,
+      "memory_gib_range": [
+        128.54,
+        162.08
+      ],
+      "tokens_per_gpu_s": 690,
+      "tflops_per_gpu": 13.06,
+      "mfu_pct": 0.57,
+      "cuda_memory_allocation_retries": 1
+    },
+    "teardown": "process_groups_destroyed_cleanly"
+  },
+  "comparison": {
+    "normalized_4x_target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "safe_auto_reference_artifact": "run_artifacts/torchtitan_sparse_sharedkv_scatter_safeauto_4x_s4096_gbs64_20260602.json",
+    "safe_auto_step1_tokens_per_gpu_s_range": [
+      2244,
+      2248
+    ],
+    "safe_auto_step2_tokens_per_gpu_s": 3901,
+    "query_recompute_step1_vs_target": "below_target",
+    "query_recompute_step2_vs_target": "far_below_target",
+    "query_recompute_step2_vs_safe_auto": "regresses_from_3901_to_690_tok_per_gpu_s"
+  },
+  "read": "The run proves the launcher can explicitly pin query-recompute and that the path is stable for two optimizer steps, but it is a clear integrated performance regression. The isolated query-major recompute kernel should remain a diagnostic probe until the compressed dKV accumulation/scatter mechanism is narrowed and improved."
+}

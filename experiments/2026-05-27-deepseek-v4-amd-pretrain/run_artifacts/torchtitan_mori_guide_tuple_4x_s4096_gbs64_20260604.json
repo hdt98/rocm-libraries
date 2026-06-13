@@ -1,0 +1,244 @@
+{
+  "artifact": "torchtitan_mori_guide_tuple_4x_s4096_gbs64_20260604",
+  "created_at": "2026-06-04",
+  "status": "positive_4x_durability_signal_negative_8x_promotion_gate",
+  "question": "Does applying the MORI guide's single-node IntraNode launch tuple improve the current MoE/MORI e2e path without replacing AITER fused forward?",
+  "candidate": {
+    "mori_ep_launch_config_mode": "MANUAL",
+    "mori_aiter_block_num": 80,
+    "mori_aiter_rdma_block_num": 0,
+    "mori_aiter_warp_num_per_block": 8,
+    "read": "This follows the vendored MORI guide's IntraNode/default shape more closely than the prior TorchTitan bridge default of block=64, rdma=32, warp=8. The rdma=0 part matters because this is single-node EP."
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350",
+    "visible_devices": "0,1,2,3",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 64,
+    "fsdp": 4,
+    "ep": 4,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "gradient_accumulation_steps": 16,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8
+  },
+  "active_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "sharedkv_timing": false,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_shmem_heap_size": "32G"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps3_20260604",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps3_20260604/docker-run.log",
+      "status": "passed_3_steps",
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 12.12716,
+          "grad_norm": 13.0,
+          "tflops_per_gpu": 38.53,
+          "tokens_per_gpu_s": 2037,
+          "peak_logged_memory_gib_range": [79.39, 80.39]
+        },
+        {
+          "step": 2,
+          "loss": 8.67250,
+          "grad_norm": 21.875,
+          "tflops_per_gpu": 100.84,
+          "tokens_per_gpu_s": 5329,
+          "peak_logged_memory_gib_range": [110.59, 119.24]
+        },
+        {
+          "step": 3,
+          "loss": 14.83411,
+          "grad_norm": 40.25,
+          "tflops_per_gpu": 79.76,
+          "tokens_per_gpu_s": 4215,
+          "peak_logged_memory_gib_range": [129.26, 144.18]
+        }
+      ],
+      "read": "Initial positive signal, but too short for promotion because the branch has shown step-2 bursts before."
+    },
+    {
+      "run_id": "torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps6_20260604",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps6_20260604/docker-run.log",
+      "status": "passed_6_steps",
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 12.39687,
+          "grad_norm": 12.875,
+          "tflops_per_gpu": 38.44,
+          "tokens_per_gpu_s": 2031,
+          "peak_logged_memory_gib_range": [79.64, 80.0]
+        },
+        {
+          "step": 2,
+          "loss": 8.48282,
+          "grad_norm": 25.625,
+          "tflops_per_gpu": 97.19,
+          "tokens_per_gpu_s": 5136,
+          "peak_logged_memory_gib_range": [112.73, 128.40]
+        },
+        {
+          "step": 3,
+          "loss": 22.01402,
+          "grad_norm": 22.75,
+          "tflops_per_gpu": 80.12,
+          "tokens_per_gpu_s": 4234,
+          "peak_logged_memory_gib_range": [130.64, 144.24]
+        },
+        {
+          "step": 4,
+          "loss": 13.48252,
+          "grad_norm": 40.75,
+          "tflops_per_gpu": 74.85,
+          "tokens_per_gpu_s": 3956,
+          "peak_logged_memory_gib_range": [144.24, 147.37]
+        },
+        {
+          "step": 5,
+          "loss": 12.15933,
+          "grad_norm": 45.0,
+          "tflops_per_gpu": 74.42,
+          "tokens_per_gpu_s": 3933,
+          "peak_logged_memory_gib_range": [144.67, 147.37]
+        },
+        {
+          "step": 6,
+          "loss": 10.18292,
+          "grad_norm": 39.5,
+          "tflops_per_gpu": 75.62,
+          "tokens_per_gpu_s": 3996,
+          "peak_logged_memory_gib_range": [145.33, 147.37]
+        }
+      ],
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 80.04,
+        "mean_steps3_to6_tflops_per_gpu": 77.26,
+        "mean_steps4_to6_tflops_per_gpu": 74.96,
+        "step2_to_step6_drop_percent": 22.19,
+        "target_tflops_per_gpu": 277.0,
+        "late_step_ratio_to_target": 0.2706,
+        "speedup_needed_to_target_from_late_step": 3.69
+      },
+      "read": "The tuple still has a step-2 burst, but late steps hold around 75 TFLOPs/GPU on 4x, making it worth an 8x six-step promotion gate."
+    }
+  ],
+  "eight_gpu_gate": {
+    "run_id": "torchtitan_mori_guide_tuple_8x_s4096_gbs128_steps6_20260604",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_guide_tuple_8x_s4096_gbs128_steps6_20260604/docker-run.log",
+    "status": "passed_6_steps_not_promoted",
+    "shape": {
+      "gpus": 8,
+      "visible_devices": "all",
+      "sequence_length": 4096,
+      "micro_batch_size": 1,
+      "global_batch_size": 128,
+      "fsdp": 8,
+      "ep": 8,
+      "gradient_accumulation_steps": 16,
+      "activation_checkpoint_mode": "none",
+      "checkpoint_enable": false,
+      "allocator": "expandable_segments:True",
+      "chunked_ce_num_chunks": 2
+    },
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.32639,
+        "grad_norm": 13.25,
+        "tflops_per_gpu": 34.49,
+        "tokens_per_gpu_s": 1824,
+        "peak_logged_memory_gib_range": [51.64, 51.91]
+      },
+      {
+        "step": 2,
+        "loss": 8.38830,
+        "grad_norm": 21.0,
+        "tflops_per_gpu": 79.53,
+        "tokens_per_gpu_s": 4203,
+        "peak_logged_memory_gib_range": [65.11, 91.21]
+      },
+      {
+        "step": 3,
+        "loss": 15.05065,
+        "grad_norm": 45.25,
+        "tflops_per_gpu": 69.0,
+        "tokens_per_gpu_s": 3647,
+        "peak_logged_memory_gib_range": [77.54, 108.22]
+      },
+      {
+        "step": 4,
+        "loss": 11.64534,
+        "grad_norm": 40.25,
+        "tflops_per_gpu": 56.99,
+        "tokens_per_gpu_s": 3012,
+        "peak_logged_memory_gib_range": [77.54, 108.24]
+      },
+      {
+        "step": 5,
+        "loss": 10.11888,
+        "grad_norm": 42.75,
+        "tflops_per_gpu": 51.92,
+        "tokens_per_gpu_s": 2744,
+        "peak_logged_memory_gib_range": [82.93, 109.31]
+      },
+      {
+        "step": 6,
+        "loss": 7.70677,
+        "grad_norm": 32.0,
+        "tflops_per_gpu": 53.72,
+        "tokens_per_gpu_s": 2839,
+        "peak_logged_memory_gib_range": [95.43, 109.35]
+      }
+    ],
+    "summary": {
+      "mean_steps2_to6_tflops_per_gpu": 62.23,
+      "mean_steps3_to6_tflops_per_gpu": 57.91,
+      "mean_steps4_to6_tflops_per_gpu": 54.21,
+      "step2_to_step6_drop_percent": 32.45,
+      "retained_8x_late_step_anchor_tflops_per_gpu": 64.91,
+      "regression_vs_retained_anchor_percent": 16.95,
+      "target_tflops_per_gpu": 277.0,
+      "late_step_ratio_to_target": 0.1957,
+      "speedup_needed_to_target_from_late_step": 5.11
+    },
+    "read": "The MORI guide tuple improves/stabilizes the 4x slice but does not transfer to EP8. Its 8x late-step average regresses below the current no-AC expandable-allocator retained anchor."
+  },
+  "decision": {
+    "promote_8x": false,
+    "promote_4x_diagnostic": true,
+    "summary": "The MORI guide tuple is a useful 4x diagnostic but not the retained 8x path. The 8x six-step gate completed and late steps averaged 54.21 TFLOPs/GPU, below the current 64.91 TFLOPs/GPU anchor.",
+    "next_actions": [
+      "Do not promote block=80 rdma=0 warp=8 as the EP8 tuple.",
+      "Use a low-intrusion 8x MORI timing pass only if we need to understand why the tuple regresses at EP8; otherwise return to local VJP fusion and AITER-forward intermediate exposure.",
+      "Continue sparse-MLA whole-boundary work separately; current TileLang slab-free fused recompute+dKV remains about 42.85 ms and is not yet an e2e promotion."
+    ]
+  },
+  "commands": [
+    "ssh do-sonle5-mi350-gpu rocm-smi --showuse --showmemuse --showpidgpus",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps3_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_EP_LAUNCH_CONFIG_MODE=MANUAL CANARY_MORI_AITER_BLOCK_NUM=80 CANARY_MORI_AITER_RDMA_BLOCK_NUM=0 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_mori_guide_tuple_4x_s4096_gbs64_steps6_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_EP_LAUNCH_CONFIG_MODE=MANUAL CANARY_MORI_AITER_BLOCK_NUM=80 CANARY_MORI_AITER_RDMA_BLOCK_NUM=0 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_mori_guide_tuple_8x_s4096_gbs128_steps6_20260604 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_GBS=128 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_EP_LAUNCH_CONFIG_MODE=MANUAL CANARY_MORI_AITER_BLOCK_NUM=80 CANARY_MORI_AITER_RDMA_BLOCK_NUM=0 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  ],
+  "dependency_pin_changes": []
+}

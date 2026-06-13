@@ -1,0 +1,62 @@
+{
+  "artifact": "sparse_mla_qgo_lds_staging_decision",
+  "date": "2026-06-05",
+  "status": "implemented_measured_not_promoted",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "gate_ms": {
+    "retained_full_sparse_attention_backward": 11.1347,
+    "retained_sparse_atomic_dkv_wall_context": 8.8063
+  },
+  "candidate": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "mode": 25,
+    "selected_block": 512,
+    "threads": 512,
+    "read": "K16 query-major score/prob/scaled-dP producer with q/grad_output D-stripe staged into LDS before contribution MFMA; checksum sink, no valid dKV atomics."
+  },
+  "measurements_ms": {
+    "mode15_forward_sidecar_sink_thr512": {
+      "event_median_ms": 23.571,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_thr512_20260605.json"
+    },
+    "mode25_qgo_lds_staged_sink_thr512": {
+      "event_median_ms": 21.4261,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode25_thr512_20260605.json"
+    },
+    "mode15_forward_sidecar_sink_thr256_context": {
+      "event_median_ms": 21.472,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json"
+    },
+    "mode16_valid_dkv_thr256_context": {
+      "event_median_ms": 22.955,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json"
+    }
+  },
+  "interpretation": {
+    "what_worked": "Staging q/grad_output into LDS reduces the 512-thread contribution sink by about 2.15 ms versus the same-thread direct q/dO global-load path.",
+    "what_failed": "The result remains 21.43 ms, effectively equal to the older 256-thread direct sink and still 1.92x slower than the retained 11.13 ms sparse-attention backward gate before valid dKV atomics.",
+    "root_cause": "The q/dO replay count and contribution schedule remain the wall. Coalescing the replayed loads helps slightly but does not remove the second-pass replay across K16 selected tiles.",
+    "promotion": "Do not run e2e TFLOPs and do not run mode26 valid atomics unless a future sink path first beats the 11.13 ms gate."
+  },
+  "next_kernel_contract": {
+    "next_code_target": "Move to a persistent producer-consumer or CK/FMHA-style block pipeline where q/grad_output fragments stay resident across multiple K16 score/prob/scaled-dP pages and are consumed before HBM, instead of staging the same q/dO stripe once per K16 tile.",
+    "must_preserve": [
+      "source-boundary q, grad_output, output, lse, compressed KV, safe_groups, valid_u8 input contract",
+      "query-major score/prob/scaled-dP producer",
+      "no full selected-window P/dP page",
+      "S4096 latency gate before e2e promotion"
+    ]
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,84 @@
+{
+  "artifact": "torchtitan_mori_overlay_image_build_20260601",
+  "created_date": "2026-06-01",
+  "status": "built_and_probe_validated",
+  "purpose": "Record the TorchTitan runtime image used to exercise the opt-in MORI+AITER MoE bridge.",
+  "host": "do-sonle5-mi350-gpu",
+  "base_image": {
+    "tag": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "id": "sha256:48c8b82bb0c23c9c1833480a3a6c7717763220f97ce56e8d427d3f81806075a2",
+    "created": "2026-06-01T08:46:23.359328071Z",
+    "repo_digest": "onenexus/nexus-titan@sha256:48c8b82bb0c23c9c1833480a3a6c7717763220f97ce56e8d427d3f81806075a2",
+    "read": "Internal NexusTitan ROCm 7.2.2/PyTorch/TorchTitan runtime available on the MI350 host, not a public upstream SGLang image.",
+    "key_env": {
+      "ROCM_VERSION": "7.2.2",
+      "NEXUS_HOME": "/opt/NexusTitan",
+      "TORCHTITAN_PATH": "/opt/NexusTitan/thirdparty/torchtitan",
+      "PRIMUS_TURBO_PATH": "/opt/NexusTitan/thirdparty/primus-turbo",
+      "PRIMUS_TURBO_AITER_COMMIT": "b5e03ed191fca11ee423226537ef8d9435e432a6",
+      "GPU_ARCHS": "gfx942;gfx950"
+    }
+  },
+  "overlay_image": {
+    "tag": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "id": "sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012",
+    "created": "2026-06-01T16:50:20.71304016Z",
+    "repo_digest": "onenexus/nexus-titan@sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012",
+    "dockerfile": "launchers/Dockerfile.torchtitan_mori_overlay",
+    "builder": "launchers/build_torchtitan_mori_overlay_image.sh"
+  },
+  "mori_source": {
+    "remote": "https://github.com/ROCm/mori.git",
+    "commit": "5dd02d6815e9113381a72f6de6b22034fc09b5a3",
+    "remote_build_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/deps/torchtitan_mori_overlay_image_git/mori",
+    "submodules": {
+      "3rdparty/msgpack-c": "9b801f087ab7434f2ab1ab3c0f48a966c19d3b70",
+      "3rdparty/spdlog": "4a9ccf7e38e257feecce0c579a782741254eaeef"
+    }
+  },
+  "build_notes": [
+    "Installed libibverbs-dev, libpci-dev, pciutils, rdma-core, and setuptools-scm>=8.",
+    "Patched the Docker build copy of MORI pyproject.toml from license = \"MIT\" to license = { text = \"MIT\" } for setuptools metadata validation.",
+    "Built MORI for gfx950 with examples, tests, benchmark, and MPI disabled; ENABLE_STANDARD_MOE_ADAPT=ON.",
+    "The SGLang DSv4 image was not used for direct TorchTitan because it failed config import with ModuleNotFoundError: tyro."
+  ],
+  "validation": [
+    {
+      "command": "docker run --rm --network=host --ipc=host --entrypoint /bin/bash onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'python3 - <<PY ... import mori, aiter ... PY'",
+      "result": "pass",
+      "mori_version": "1.1.2.dev32+g5dd02d681.d20260601",
+      "mori_file": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/mori/__init__.py",
+      "aiter_file": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/__init__.py"
+    },
+    {
+      "command": "CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_STEPS=1 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "pass",
+      "summary": {
+        "model_spec": "deepseek_v4 flash_4layer",
+        "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+        "moe_score_before_experts": false,
+        "router_score_func": "sqrtsoftplus",
+        "attention_compress_ratio_by_layer": [
+          0,
+          0,
+          4,
+          128
+        ]
+      }
+    },
+    {
+      "artifact": "run_artifacts/mori_aiter_autograd_bridge_overlay_4x_smoke_20260601_v2.json",
+      "result": "pass",
+      "summary": {
+        "all_ranks_pass": true,
+        "max_forward_abs_diff_across_ranks": 0.000003814697265625,
+        "max_grad_abs_diff_across_ranks": 0.0,
+        "bridge_fwd_bwd_ms_rank_median": 8.484003067016602
+      }
+    }
+  ],
+  "limitations": [
+    "The overlay image is host-local and should be rebuilt or pushed before relying on it from another MI350 host.",
+    "The first run in a fresh container recompiles MORI and AITER JIT modules; mount or bake a JIT cache before collecting timing."
+  ]
+}

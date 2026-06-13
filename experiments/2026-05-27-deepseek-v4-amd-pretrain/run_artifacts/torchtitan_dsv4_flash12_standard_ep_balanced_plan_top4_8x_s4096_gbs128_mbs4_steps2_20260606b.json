@@ -1,0 +1,431 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_balanced_plan_top4_8x_s4096_gbs128_mbs4_steps2_20260606b",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "backend": "standard_ep_plan_only",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation": 4,
+    "layers": 12,
+    "fsdp": 8,
+    "ep": 8,
+    "activation_checkpointing": "none"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.28943,
+      "grad_norm": 19.75,
+      "tok_per_gpu_s_range": [
+        1904,
+        1910
+      ],
+      "tflops_per_gpu_range": [
+        96.42,
+        96.71
+      ],
+      "peak_memory_gib_range": [
+        148.13,
+        151.49
+      ]
+    },
+    {
+      "step": 2,
+      "loss": 8.59256,
+      "grad_norm": 55.75,
+      "tok_per_gpu_s": 7465,
+      "tflops_per_gpu": 377.95,
+      "peak_memory_gib_range": [
+        181.13,
+        191.03
+      ]
+    }
+  ],
+  "sidecar": {
+    "remote_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_balanced_plan_top4_8x_s4096_gbs128_mbs4_steps2_20260606b/standard_ep_hot_plan.jsonl",
+    "local_copy": "/tmp/dsv4_standard_ep_balanced_plan_top4_8x_20260606b.jsonl",
+    "records": 768,
+    "plan_records": 768,
+    "expected_records": 768
+  },
+  "balanced_moe_plan": {
+    "mode": "plan_only_no_execution_change",
+    "hot_experts": 4,
+    "owner_max_over_mean_before": {
+      "count": 768,
+      "min": 1.1651204427083333,
+      "median": 1.4528554280598958,
+      "mean": 1.5488534503512912,
+      "p95": 2.043701171875,
+      "max": 2.4510396321614585
+    },
+    "owner_max_over_mean_after": {
+      "count": 768,
+      "min": 1.073150634765625,
+      "median": 1.195526123046875,
+      "mean": 1.2338516447279189,
+      "p95": 1.4962565104166667,
+      "max": 1.5506693522135417
+    },
+    "modeled_max_load_reduction_pct": {
+      "count": 768,
+      "min": 2.9299761776417603,
+      "median": 19.220465213641283,
+      "mean": 18.98757506491882,
+      "p95": 35.22666722388808,
+      "max": 36.761611474722656
+    },
+    "remote_hot_rows_total": {
+      "count": 768,
+      "min": 53068,
+      "median": 89916.5,
+      "mean": 113831.76041666667,
+      "p95": 207454,
+      "max": 247548
+    },
+    "selected_rows_total": {
+      "count": 768,
+      "min": 61332,
+      "median": 102198.0,
+      "mean": 130059.97916666667,
+      "p95": 237111,
+      "max": 283003
+    },
+    "selected_owner_rank_frequency": [
+      [
+        5,
+        576
+      ],
+      [
+        0,
+        536
+      ],
+      [
+        3,
+        536
+      ],
+      [
+        7,
+        344
+      ],
+      [
+        4,
+        328
+      ],
+      [
+        1,
+        296
+      ],
+      [
+        6,
+        256
+      ],
+      [
+        2,
+        200
+      ]
+    ],
+    "selected_global_expert_frequency_top16": [
+      [
+        5,
+        112
+      ],
+      [
+        169,
+        96
+      ],
+      [
+        30,
+        96
+      ],
+      [
+        31,
+        88
+      ],
+      [
+        145,
+        64
+      ],
+      [
+        171,
+        64
+      ],
+      [
+        98,
+        64
+      ],
+      [
+        27,
+        64
+      ],
+      [
+        186,
+        64
+      ],
+      [
+        105,
+        64
+      ],
+      [
+        54,
+        56
+      ],
+      [
+        123,
+        56
+      ],
+      [
+        113,
+        56
+      ],
+      [
+        68,
+        40
+      ],
+      [
+        44,
+        40
+      ],
+      [
+        69,
+        40
+      ]
+    ],
+    "layer_slot_stats": {
+      "0": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 2.9299761776417603,
+          "median": 7.348165680204334,
+          "mean": 7.504086015807234,
+          "p95": 12.491427388361952,
+          "max": 12.491427388361952
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 65773,
+          "median": 118997.5,
+          "mean": 119473.625,
+          "p95": 175648,
+          "max": 175648
+        }
+      },
+      "1": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 6.764929365608572,
+          "median": 14.262872512522055,
+          "mean": 14.179286737962356,
+          "p95": 21.68540204631585,
+          "max": 21.68540204631585
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 63670,
+          "median": 80537.5,
+          "mean": 80229.625,
+          "p95": 96780,
+          "max": 96780
+        }
+      },
+      "2": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 15.521286788837166,
+          "median": 26.668178522797753,
+          "mean": 26.08973455363429,
+          "p95": 35.22666722388808,
+          "max": 35.22666722388808
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 58823,
+          "median": 105560.5,
+          "mean": 105777,
+          "p95": 153326,
+          "max": 153326
+        }
+      },
+      "3": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 4.052153353640121,
+          "median": 16.757408803812428,
+          "mean": 16.215188459306127,
+          "p95": 27.925715248594525,
+          "max": 27.925715248594525
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 64978,
+          "median": 81581.5,
+          "mean": 81513.5,
+          "p95": 98551,
+          "max": 98551
+        }
+      },
+      "4": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 17.770781800464732,
+          "median": 23.032222265833575,
+          "mean": 22.28130384095898,
+          "p95": 26.20925476160041,
+          "max": 26.20925476160041
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 82308,
+          "median": 99778.0,
+          "mean": 99967.5,
+          "p95": 118323,
+          "max": 118323
+        }
+      },
+      "5": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 19.350852300590432,
+          "median": 25.50206807898563,
+          "mean": 24.76893254846918,
+          "p95": 27.874700918509088,
+          "max": 27.874700918509088
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 54664,
+          "median": 98050.0,
+          "mean": 98301.875,
+          "p95": 143250,
+          "max": 143250
+        }
+      },
+      "6": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 13.98888491861358,
+          "median": 23.504553689967807,
+          "mean": 23.41355637420012,
+          "p95": 33.35461025243545,
+          "max": 33.35461025243545
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 60213,
+          "median": 120423.0,
+          "mean": 120365,
+          "p95": 179196,
+          "max": 179196
+        }
+      },
+      "7": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 12.917217101796775,
+          "median": 26.17899484148237,
+          "mean": 25.287699659676925,
+          "p95": 36.761611474722656,
+          "max": 36.761611474722656
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 62407,
+          "median": 123780.0,
+          "mean": 128559,
+          "p95": 199310,
+          "max": 199310
+        }
+      },
+      "8": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 18.43336753928226,
+          "median": 19.77280169119411,
+          "mean": 19.70342447129311,
+          "p95": 21.44578313253012,
+          "max": 21.44578313253012
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 66144,
+          "median": 124047.5,
+          "mean": 123890.875,
+          "p95": 182010,
+          "max": 182010
+        }
+      },
+      "9": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 6.465083627047252,
+          "median": 16.14400436882024,
+          "mean": 16.405275028034385,
+          "p95": 26.632382939114475,
+          "max": 26.632382939114475
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 56639,
+          "median": 123885.5,
+          "mean": 124174.625,
+          "p95": 191660,
+          "max": 191660
+        }
+      },
+      "10": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 11.663515644265763,
+          "median": 17.83116562723145,
+          "mean": 16.60475113538041,
+          "p95": 21.021886610479708,
+          "max": 21.021886610479708
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 60275,
+          "median": 128509.5,
+          "mean": 132820.125,
+          "p95": 207454,
+          "max": 207454
+        }
+      },
+      "11": {
+        "records": 64,
+        "modeled_max_load_reduction_pct": {
+          "count": 64,
+          "min": 11.930379091643145,
+          "median": 15.374244797611045,
+          "mean": 15.397661954302698,
+          "p95": 18.818123293449066,
+          "max": 18.818123293449066
+        },
+        "remote_hot_rows_total": {
+          "count": 64,
+          "min": 53068,
+          "median": 151412.0,
+          "mean": 150908.375,
+          "p95": 247548,
+          "max": 247548
+        }
+      }
+    }
+  },
+  "read": "Plan-only standard EP hot-expert movement models a median 19.22% reduction in max owner load on the 8x MBS4 shape, but does not change execution yet. The target execution branch is to compute remote-hot rows on helper/source ranks and reduce hot expert weight gradients back to the true owner.",
+  "promotion": "not_promoted_plan_only_two_steps"
+}

@@ -1,0 +1,827 @@
+{
+  "cases": {
+    "full_wo_residual_rms_router_autocast_topk": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 4.40625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.6303776502609253,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 4.53125,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.6301384568214417,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "rms_weight": {
+          "abs_max": 23.875,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 16.20013427734375,
+          "nonfinite": 0,
+          "shape": [
+            4096
+          ]
+        },
+        "router_weight": {
+          "abs_max": 38.75,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 5.829536437988281,
+          "nonfinite": 0,
+          "shape": [
+            256,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 6.3125,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.901884913444519,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 3.3109540939331055,
+        "mean": 3.2234060764312744,
+        "median": 3.229072093963623,
+        "min": 3.1301920413970947
+      },
+      "output": [
+        {
+          "abs_max": 2.214937210083008,
+          "dtype": "torch.float32",
+          "finite": true,
+          "mean_abs": 1.5512771606445312,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        },
+        {
+          "abs_max": 255.0,
+          "dtype": "torch.int64",
+          "finite": true,
+          "mean_abs": 127.45919036865234,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        }
+      ],
+      "peak_memory_gib": 3.2335433959960938,
+      "status": "ok"
+    },
+    "full_wo_residual_rms_router_bf16_topk": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 4.40625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.6304523944854736,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 4.5625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.6301935911178589,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "rms_weight": {
+          "abs_max": 23.875,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 16.201385498046875,
+          "nonfinite": 0,
+          "shape": [
+            4096
+          ]
+        },
+        "router_weight": {
+          "abs_max": 38.75,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 5.829576015472412,
+          "nonfinite": 0,
+          "shape": [
+            256,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 6.5625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.9020060300827026,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 2.5264248847961426,
+        "mean": 2.4478246370951333,
+        "median": 2.4379050731658936,
+        "min": 2.3791439533233643
+      },
+      "output": [
+        {
+          "abs_max": 2.2166693210601807,
+          "dtype": "torch.float32",
+          "finite": true,
+          "mean_abs": 1.5512762069702148,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        },
+        {
+          "abs_max": 255.0,
+          "dtype": "torch.int64",
+          "finite": true,
+          "mean_abs": 126.8919677734375,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        }
+      ],
+      "peak_memory_gib": 3.2335433959960938,
+      "status": "ok"
+    },
+    "full_wo_residual_rms_shared_ffn": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 366.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 48.18651580810547,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 344.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 48.16193389892578,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "rms_weight": {
+          "abs_max": 1176.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 233.26783752441406,
+          "nonfinite": 0,
+          "shape": [
+            4096
+          ]
+        },
+        "shared_w1": {
+          "abs_max": 3056.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 146.67648315429688,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        },
+        "shared_w2": {
+          "abs_max": 576.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 128.39483642578125,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            2048
+          ]
+        },
+        "shared_w3": {
+          "abs_max": 3248.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 145.55633544921875,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 668.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 94.74066162109375,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 5.086812973022461,
+        "mean": 4.987438996632894,
+        "median": 4.949811935424805,
+        "min": 4.925692081451416
+      },
+      "output": {
+        "abs_max": 3.484375,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.472665399312973,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          4096
+        ]
+      },
+      "peak_memory_gib": 3.4472885131835938,
+      "status": "ok"
+    },
+    "full_wo_residual_rms_shared_gateup": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 239.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 33.99180221557617,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 248.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 33.96904373168945,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "rms_weight": {
+          "abs_max": 736.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 166.54745483398438,
+          "nonfinite": 0,
+          "shape": [
+            4096
+          ]
+        },
+        "shared_w1": {
+          "abs_max": 892.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 129.7115478515625,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        },
+        "shared_w3": {
+          "abs_max": 832.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 128.62567138671875,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 474.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 66.82075500488281,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 4.216681957244873,
+        "mean": 4.159561951955159,
+        "median": 4.177122116088867,
+        "min": 4.084881782531738
+      },
+      "output": {
+        "abs_max": 13.9375,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.31658732891082764,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          2048
+        ]
+      },
+      "peak_memory_gib": 3.3535385131835938,
+      "status": "ok"
+    },
+    "router_only_autocast_topk": {
+      "grads": {
+        "normed_input": {
+          "abs_max": 0.0634765625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.008968875743448734,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "router_weight": {
+          "abs_max": 38.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 5.590999603271484,
+          "nonfinite": 0,
+          "shape": [
+            256,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 2.008141040802002,
+        "mean": 1.4607617060343425,
+        "median": 1.1973320245742798,
+        "min": 1.1768120527267456
+      },
+      "output": [
+        {
+          "abs_max": 2.2184903621673584,
+          "dtype": "torch.float32",
+          "finite": true,
+          "mean_abs": 1.5509214401245117,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        },
+        {
+          "abs_max": 255.0,
+          "dtype": "torch.int64",
+          "finite": true,
+          "mean_abs": 127.32588958740234,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        }
+      ],
+      "peak_memory_gib": 2.9210281372070312,
+      "status": "ok"
+    },
+    "router_only_bf16_topk": {
+      "grads": {
+        "normed_input": {
+          "abs_max": 0.0634765625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.008969416841864586,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "router_weight": {
+          "abs_max": 37.75,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 5.592313766479492,
+          "nonfinite": 0,
+          "shape": [
+            256,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 0.38220399618148804,
+        "mean": 0.3807239929835002,
+        "median": 0.3815639913082123,
+        "min": 0.37840399146080017
+      },
+      "output": [
+        {
+          "abs_max": 2.2166693210601807,
+          "dtype": "torch.float32",
+          "finite": true,
+          "mean_abs": 1.5509164333343506,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        },
+        {
+          "abs_max": 255.0,
+          "dtype": "torch.int64",
+          "finite": true,
+          "mean_abs": 126.8170166015625,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        }
+      ],
+      "peak_memory_gib": 2.9210281372070312,
+      "status": "ok"
+    },
+    "router_only_fp32_topk": {
+      "grads": {
+        "normed_input": {
+          "abs_max": 0.0634765625,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.008968875743448734,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "router_weight": {
+          "abs_max": 38.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 5.590999603271484,
+          "nonfinite": 0,
+          "shape": [
+            256,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 1.1526520252227783,
+        "mean": 1.138184666633606,
+        "median": 1.1352909803390503,
+        "min": 1.1266109943389893
+      },
+      "output": [
+        {
+          "abs_max": 2.2184903621673584,
+          "dtype": "torch.float32",
+          "finite": true,
+          "mean_abs": 1.5509214401245117,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        },
+        {
+          "abs_max": 255.0,
+          "dtype": "torch.int64",
+          "finite": true,
+          "mean_abs": 127.32588958740234,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            6
+          ]
+        }
+      ],
+      "peak_memory_gib": 2.9210281372070312,
+      "status": "ok"
+    },
+    "shared_gateup_only": {
+      "grads": {
+        "normed_input": {
+          "abs_max": 3.4375,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.4815327525138855,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "shared_w1": {
+          "abs_max": 788.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 119.29073333740234,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        },
+        "shared_w3": {
+          "abs_max": 752.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 118.09160614013672,
+          "nonfinite": 0,
+          "shape": [
+            2048,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 2.5512259006500244,
+        "mean": 2.425504684448242,
+        "median": 2.4097840785980225,
+        "min": 2.3155040740966797
+      },
+      "output": {
+        "abs_max": 14.5625,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.31638360023498535,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          2048
+        ]
+      },
+      "peak_memory_gib": 3.0410232543945312,
+      "status": "ok"
+    },
+    "wo_only": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 3.5,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.7890359163284302,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 4.84375,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 1.0227819681167603,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 1.824537992477417,
+        "mean": 1.7345110177993774,
+        "median": 1.8139790296554565,
+        "min": 1.5650160312652588
+      },
+      "output": {
+        "abs_max": 0.056640625,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.007980442605912685,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          4096
+        ]
+      },
+      "peak_memory_gib": 3.1035232543945312,
+      "status": "ok"
+    },
+    "wo_residual": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 3.5,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 0.7890359163284302,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 1.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 1.0,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 4.84375,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 1.0227819681167603,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 1.8262189626693726,
+        "mean": 1.7466450134913127,
+        "median": 1.7606990337371826,
+        "min": 1.6530170440673828
+      },
+      "output": {
+        "abs_max": 0.08642578125,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.011287430301308632,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          4096
+        ]
+      },
+      "peak_memory_gib": 3.3535232543945312,
+      "status": "ok"
+    },
+    "wo_residual_rms": {
+      "grads": {
+        "attention_output": {
+          "abs_max": 260.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 55.64345932006836,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "residual": {
+          "abs_max": 87.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 70.51612854003906,
+          "nonfinite": 0,
+          "shape": [
+            4,
+            4096,
+            4096
+          ]
+        },
+        "rms_weight": {
+          "abs_max": 448.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 101.27806091308594,
+          "nonfinite": 0,
+          "shape": [
+            4096
+          ]
+        },
+        "wo_weight": {
+          "abs_max": 344.0,
+          "dtype": "torch.bfloat16",
+          "finite": true,
+          "mean_abs": 72.13681030273438,
+          "nonfinite": 0,
+          "shape": [
+            4096,
+            4096
+          ]
+        }
+      },
+      "latency_ms": {
+        "max": 2.1314220428466797,
+        "mean": 2.1045819918314614,
+        "median": 2.1129820346832275,
+        "min": 2.0693418979644775
+      },
+      "output": {
+        "abs_max": 6.1875,
+        "dtype": "torch.bfloat16",
+        "finite": true,
+        "mean_abs": 0.7960126399993896,
+        "nonfinite": 0,
+        "shape": [
+          4,
+          4096,
+          4096
+        ]
+      },
+      "peak_memory_gib": 3.3535385131835938,
+      "status": "ok"
+    }
+  },
+  "derived": {
+    "full_router_autocast_minus_neighbor_gemms_ms": 0.21776103973388672,
+    "full_shared_gateup_minus_neighbor_gemms_ms": -0.046640992164611816,
+    "residual_rms_over_wo_ms": 0.299003005027771
+  },
+  "read": "Measure current unfused wo/residual/RMS/router/shared-expert boundary. Derived raw-GEMM deltas are opportunity estimates, not fused-kernel timings.",
+  "runtime": {
+    "device": "AMD Instinct MI350X VF",
+    "torch_hip": "7.2.53211",
+    "torch_version": "2.13.0a0+gitccf72d7"
+  },
+  "scope": "dsv4_attention_wo_epilogue_boundary_probe",
+  "shape": {
+    "batch": 4,
+    "dim": 4096,
+    "dtype": "torch.bfloat16",
+    "iters": 3,
+    "moe_hidden_dim": 2048,
+    "num_experts": 256,
+    "scale_input": 0.01,
+    "seq": 4096,
+    "tokens": 16384,
+    "top_k": 6,
+    "warmup": 1
+  },
+  "timestamp_unix": 1780821920
+}

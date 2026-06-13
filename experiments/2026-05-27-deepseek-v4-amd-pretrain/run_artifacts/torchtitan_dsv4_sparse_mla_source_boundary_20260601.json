@@ -1,0 +1,41 @@
+{
+  "artifact": "torchtitan_dsv4_sparse_mla_source_boundary_20260601",
+  "date": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "command": "CANARY_SEQ_LEN=128 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+  "result": "passed",
+  "direct_runtime": true,
+  "primus_runtime": false,
+  "model_spec": {
+    "name": "deepseek_v4",
+    "flavor": "flash_4layer",
+    "model_config_type": "Config",
+    "model_family": "deepseek_v4",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold"
+  },
+  "shape": {
+    "local_batch_size": 1,
+    "global_batch_size": 64,
+    "seq_len": 128,
+    "steps": 1
+  },
+  "parallelism": {
+    "data_parallel_shard_degree": -1,
+    "expert_parallel_degree": 4
+  },
+  "router_score_func": "sqrtsoftplus",
+  "attention_status_by_layer": [
+    "dense_mla_for_uncompressed_dsv4_layer",
+    "dense_mla_for_uncompressed_dsv4_layer",
+    "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+    "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+  ],
+  "attention_compress_ratio_by_layer": [
+    0,
+    0,
+    4,
+    128
+  ],
+  "read": "Compressed DSv4 layers now materialize a bounded PyTorch sparse MLA/LightningIndexer correctness path for short sequence. Long S=4096 canaries still intentionally use the dense attention fallback above the materialization threshold until the fused sparse MLA/indexer kernel exists."
+}

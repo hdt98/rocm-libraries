@@ -1,0 +1,24 @@
+{
+  "counts": [
+    3,
+    2,
+    2
+  ],
+  "expected_counts": [
+    3,
+    2,
+    2
+  ],
+  "hidden_dim": 16,
+  "max_score_diff": 0.0,
+  "max_x_diff": 0.0,
+  "mismatches": [],
+  "mori_kernel_dir": "/workspace/sources/references/mori/python/mori",
+  "num_hot_routes": 7,
+  "num_hot_slots": 3,
+  "passed": true,
+  "shmem_finalize_status": 0,
+  "shmem_init_status": 0,
+  "tokens": 8,
+  "topk": 2
+}

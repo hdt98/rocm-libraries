@@ -1,0 +1,49 @@
+{
+  "artifact": "actual_li_active_list_dotk_partial_store_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Mechanism probe for actual-LI compressed dKV: selected-key dot-K contraction with per-seq-tile partial rows instead of direct global grad_kv atomics.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_partial_store",
+  "read": "This branch keeps the fast selected-key tl.dot body from dot_k_atomic, but writes into a dense [seq_tile, compressed_group, D] partial slab using load/store, then reduces partials across seq tiles. It removes final cross-tile global dKV atomics but still writes the full raw KxD contribution volume. The result closes the cross-tile-contention hypothesis: S4096 emit-only is about the same as dot_k_atomic, and full partial+reduce is slower.",
+  "status": "rejected_as_standalone_writepath_but_useful_mechanism_evidence",
+  "s128_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_partial_store_s128_layer2_sc16_d16h64k32_20260602.json",
+    "status": "passed",
+    "seq_len": 128,
+    "topk": 32,
+    "max_abs_diff": 0.06965041160583496,
+    "partial_store_full_ms": 0.1098020002245903,
+    "pytorch_reference_ms": 0.4634850025177002,
+    "raw_write_elements": 1032192,
+    "coalesced_target_write_elements": 73728,
+    "coalesced_target_reduction_x": 14.0
+  },
+  "s512_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_partial_store_s512_layer2_sc32_d16h64k64_20260602.json",
+    "status": "passed",
+    "seq_len": 512,
+    "topk": 128,
+    "max_abs_diff": 0.07167887687683105,
+    "partial_store_full_ms": 0.2998040020465851,
+    "pytorch_reference_ms": 1.5704180002212524,
+    "dot_k_atomic_ms_same_shape": 0.27184200286865234,
+    "raw_write_elements": 16711680,
+    "coalesced_target_write_elements": 557056,
+    "coalesced_target_reduction_x": 30.0
+  },
+  "s4096_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_partial_store_s4096_layer2_sc32_d16h64k64_timing_20260602.json",
+    "status": "timing_only",
+    "seq_len": 4096,
+    "topk": 512,
+    "partial_store_emit_only_ms": 8.794984817504883,
+    "partial_store_full_reduce_ms": 9.507111549377441,
+    "dot_k_atomic_best_ms": 8.80629825592041,
+    "query_major_full_atomic_ms": 11.080920219421387,
+    "raw_write_elements": 805044224,
+    "coalesced_target_write_elements": 33806848,
+    "coalesced_target_reduction_x": 23.813051840857806,
+    "dense_partial_slab_elements": 67108864,
+    "peak_memory_gib": 2.8168983459472656
+  },
+  "decision": "Do not pursue dense per-seq-tile partial slabs as the production write path. They remove cross-tile global atomics, but S4096 emit-only remains at the dot_k_atomic wall because raw KxD contribution writes are still 1.0x. The next kernel must keep selected-key MFMA/dot-K contraction and reduce repeated compressed-group contributions inside the tile before global memory, or fuse LI/compressor gradients so fewer dKV rows are emitted."
+}

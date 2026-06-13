@@ -1,0 +1,63 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_accumulator_layout_probe",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "heads": 64,
+    "dim": 512,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "plan_on_device": true
+  },
+  "best_retained_hsk_bf16_source_ms": 5.105003833770752,
+  "baseline_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_current_baseline_s4096_layer2_gp512_20260604.json",
+  "profile_evidence": {
+    "artifact": "run_artifacts/tilelang_hsk_bf16_rocprof_sq_counter_summary_do_sonle_kernel_20260604.json",
+    "kernel_ms": 5.164727210998535,
+    "sq_insts_lds": 217475704.0,
+    "sq_lds_bank_conflict": 330771584.0,
+    "sq_insts_vmem_rd": 39248824.0,
+    "sq_insts_vmem_wr": 1052344.0,
+    "lds_bank_conflict_per_lds_inst": 1.5209587917922087,
+    "read": "The selected-limit HSK bf16 producer is dominated by the active-group accumulator fold in LDS. Global VMEM writes are already heavily reduced in this branch, so the next useful kernel work should reduce LDS update/conflict pressure, not just lower final global atomic count."
+  },
+  "layout_probe_results": {
+    "accum_stride_pad_1": {
+      "s128_correct": true,
+      "s128_baseline_ms": 0.06974050030112267,
+      "s128_padded_ms": 0.06774099916219711,
+      "s4096_status": "not_runnable",
+      "s4096_reason": "S4096 max_active_groups=512 already uses the MI350 dynamic shared-memory limit. Padding the accumulator row by one float requests 165888 bytes versus the 163840-byte device limit.",
+      "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_accpad1_s128_layer2_gp32_20260604.json"
+    },
+    "accum_slot_swizzle_1": {
+      "s128_correct": true,
+      "s128_baseline_ms": 0.06988000124692917,
+      "s128_swizzle_ms": 0.07250100001692772,
+      "s4096_same_benchmark_baseline_ms": 6.799656867980957,
+      "s4096_same_benchmark_swizzle_ms": 6.584974765777588,
+      "s4096_baseline_only_ms": 5.105003833770752,
+      "retained": false,
+      "read": "The simple slot/D swizzle is correct but not retained. It is slower on the small correctness point, and the S4096 same-benchmark comparison perturbs the HSK bf16 baseline relative to the clean baseline-only 5.105 ms run.",
+      "artifacts": [
+        "run_artifacts/tilelang_selected_limit_hsk_bf16_swizzle1_s128_layer2_gp32_20260604.json",
+        "run_artifacts/tilelang_selected_limit_hsk_bf16_swizzle1_s4096_layer2_gp512_20260604.json"
+      ]
+    }
+  },
+  "decision": {
+    "retain_current_best_kernel": true,
+    "promote_stride_padding": false,
+    "promote_simple_slot_swizzle": false,
+    "next_kernel_direction": "Keep the fast HSK bf16 source-fed producer, but replace the single [max_active_groups, block_d] shared accumulator fold with a different ownership/reduction strategy: fewer active groups per CTA, wave-private or lane-group accumulators before LDS, or a two-stage local reduction that lowers repeated LDS read-modify-write pressure. Re-profile SQ_LDS_BANK_CONFLICT and SQ_INSTS_LDS after that change."
+  }
+}

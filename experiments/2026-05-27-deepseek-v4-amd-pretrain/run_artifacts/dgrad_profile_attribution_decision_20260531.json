@@ -1,0 +1,99 @@
+{
+  "artifact": "dgrad_profile_attribution_decision_20260531",
+  "date": "2026-05-31",
+  "target_basis": {
+    "s2048_target_ms": 16.0,
+    "normalized_layer_tokens_per_s": 128100
+  },
+  "method": {
+    "profile_tool": "tools/dsv4_layer_microbench/profile_microbench.py",
+    "profile_mode": "freeze_params_forward_plus_input_dgrad",
+    "profile_wgrad": false,
+    "note": "These are lower-bound attribution profiles. Model parameter gradients are intentionally disabled, so results are not full pretraining iterations."
+  },
+  "learned_router_s2048": {
+    "artifact": "run_artifacts/dgrad_only_profile_s2048_20260531.json",
+    "phase_ms": {
+      "forward": 17.271558366095025,
+      "backward": 17.5628896880274,
+      "loss": 0.09381903025011222,
+      "total": 34.928267084372536
+    },
+    "tokens_per_s": 58634.45773169514,
+    "estimated_tflops_fwd_plus_dgrad": 185.83141586729548,
+    "forward_subsystems_ms": {
+      "attention": 4.9027350420753155,
+      "moe": 11.596865020692348,
+      "boundary": 0.3997149566809336
+    },
+    "backward_dgrad_subsystems_ms": {
+      "attention_dgrad": 5.630845029372722,
+      "moe_dgrad": 11.51838357327506,
+      "boundary_dgrad": 0.8788715349510312
+    },
+    "routed_moe_dgrad_subblocks_ms": {
+      "w1_w3_dgrad": 6.65447092615068,
+      "w2_dgrad": 3.0995935085229576,
+      "input_gather_reduce_dgrad": 0.8394424803555012,
+      "output_scale_reduce_dgrad": 0.7316980045288801,
+      "swiglu_dgrad": 0.42824901174753904,
+      "score_grad": 0.37928851088508964
+    },
+    "attention_dgrad_subblocks_ms": {
+      "sparse_mla_dgrad_qkv": 3.110358491539955,
+      "q_path_dgrad": 1.178500009700656,
+      "out_proj_dgrad": 0.9267759742215276,
+      "output_rope_inv_dgrad": 0.7005924708209932,
+      "csa_dgrad": 0.49630296416580677,
+      "hca_dgrad": 0.48191793030127883,
+      "kv_path_dgrad": 0.2860400127246976
+    }
+  },
+  "fixed_balanced_router_s2048": {
+    "artifact": "run_artifacts/dgrad_only_fixed_router_profile_s2048_20260531.json",
+    "phase_ms": {
+      "forward": 15.392764316250881,
+      "backward": 16.572510978827875,
+      "loss": 0.08783935724447171,
+      "total": 32.053114652323224
+    },
+    "tokens_per_s": 63893.9467260652,
+    "estimated_tflops_fwd_plus_dgrad": 202.5004245760418,
+    "forward_subsystems_ms": {
+      "attention": 4.848889114024739,
+      "moe": 9.77551432636877,
+      "boundary": 0.3999050240963697
+    },
+    "backward_dgrad_subsystems_ms": {
+      "attention_dgrad": 5.632949993014336,
+      "moe_dgrad": 10.504707461223006,
+      "boundary_dgrad": 0.8533570216968656
+    },
+    "routed_moe_dgrad_subblocks_ms": {
+      "w1_w3_dgrad": 6.068093061912805,
+      "w2_dgrad": 3.0851290212012827,
+      "input_gather_reduce_dgrad": 0.5875375354662538,
+      "output_scale_reduce_dgrad": 0.7104824762791395,
+      "swiglu_dgrad": 0.30880403937771916,
+      "score_grad": 0.4772779648192227
+    }
+  },
+  "delta_fixed_minus_learned": {
+    "phase_total_ms": -2.875152432049312,
+    "forward_moe_ms": -1.8213506943235776,
+    "backward_moe_dgrad_ms": -1.013676112052054,
+    "backward_attention_dgrad_ms": 0.002104963641613722
+  },
+  "decision": {
+    "read": "Fixed balanced routing helps, but it does not change the main bottleneck. The non-training frozen-param fixed-router path is still 32.05 ms at S2048, roughly 2x the 16 ms full-train target. Dgrad work is dominated by routed MoE, not boundary code; within routed MoE, W1/W3 xgrad and W2 dgrad are the largest blocks.",
+    "promote_next_focus": [
+      "compact-native routed-MoE dgrad kernel family that fuses or tightly schedules W2 dgrad, SwiGLU backward, W1/W3 xgrad, and input reduce",
+      "reduce forward routed-MoE cost in the same compact-native path, because S2048 forward is already near or above the full target",
+      "after routed MoE dgrad falls materially, revisit attention sparse MLA dgrad_qkv and q_path dgrad"
+    ],
+    "demote_next_focus": [
+      "router-balance-only work as a target-closing strategy",
+      "standalone parameter wgrad fusion as the primary next step"
+    ]
+  }
+}

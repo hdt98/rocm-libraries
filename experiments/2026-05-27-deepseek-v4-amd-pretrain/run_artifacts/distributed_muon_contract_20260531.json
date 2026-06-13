@@ -1,0 +1,33 @@
+{
+  "artifact": "distributed_muon_contract_20260531",
+  "status": "passed",
+  "purpose": "CPU-only preflight for faithful FSDP Muon semantics before replacing the local-shard bring-up optimizer.",
+  "command": "env RUN_ID=torchtitan_distributed_muon_contract_20260531T0640Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh distributed-muon-contract",
+  "target_host": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_distributed_muon_contract_20260531T0640Z",
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_distributed_muon_contract_20260531T0640Z/distributed-muon-contract.log",
+  "torch_version": "2.10.0a0+git449b176",
+  "seed": 20260531,
+  "muon": {
+    "lr": 0.001,
+    "momentum": 0.95,
+    "nesterov": true,
+    "weight_decay": 0.1,
+    "ns_steps": 5,
+    "eps": 1e-7,
+    "initial_momentum_buffer": "random_nonzero"
+  },
+  "result_summary": {
+    "gather_orthogonalize_scatter_vs_full_max_rel_l2": 0.0,
+    "local_shard_update_rel_l2": {
+      "matrix_row_shard": 0.46949973702430725,
+      "matrix_column_shard": 0.7323395013809204,
+      "expert_axis_shard": 0.0,
+      "expert_row_shard": 0.46700865030288696,
+      "expert_column_shard": 0.7343050241470337
+    }
+  },
+  "conclusion": "A faithful FSDP Muon update can keep sharded momentum buffers, but any shard that cuts a Muon matrix axis must gather the pre-orthogonalized update, orthogonalize at full matrix scope, then scatter the orthogonalized update before applying the local parameter step. Sharding only the independent expert/batch axis of a rank-3 expert tensor is equivalent because Muon orthogonalizes each matrix in the batch independently.",
+  "gpu_use": "none"
+}

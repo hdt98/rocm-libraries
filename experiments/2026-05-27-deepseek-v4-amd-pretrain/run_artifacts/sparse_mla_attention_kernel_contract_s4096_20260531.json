@@ -1,0 +1,224 @@
+{
+  "artifact": "sparse_mla_attention_kernel_contract_s4096_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Backward-first sparse MLA attention kernel contract and gates for the one-MI350 DeepSeek V4-Pro S4096 single-layer target.",
+  "source_artifacts": {
+    "target_gap": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_s4096_updated_target_gap_20260531.json",
+    "block_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_retained_compact_reduce_s4096_blocks_after_m12288_20260531.json",
+    "rocprof_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/rocprof_s4096_after_m12288_decision_20260531.json",
+    "selector_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_attention_s4096_selector_decision_20260531.json",
+    "triton_window_sum_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_triton_window_sum_decision_20260531.json"
+  },
+  "active_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+  "shape": {
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden": 7168,
+    "heads": 128,
+    "kv_dim": 512,
+    "rope_dim": 64,
+    "q_lora_rank": 1536,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "window_size": 128,
+    "csa_tokens": 1024,
+    "hca_tokens": 32,
+    "sparse_keys_per_query_excluding_sink": 1184,
+    "sparse_keys_per_query_including_sink": 1185,
+    "dtype": "bfloat16",
+    "accum_dtype": "float32"
+  },
+  "forward_sparse_mla_contract": {
+    "inputs": {
+      "q": [
+        1,
+        4096,
+        128,
+        512
+      ],
+      "kv": [
+        1,
+        4096,
+        512
+      ],
+      "csa": [
+        1,
+        1024,
+        512
+      ],
+      "hca": [
+        1,
+        32,
+        512
+      ],
+      "kv_selected_window_view": [
+        1,
+        4096,
+        128,
+        512
+      ],
+      "attn_sink": [
+        128
+      ],
+      "sparse_key_indices": [
+        4096,
+        128
+      ],
+      "attn_invalid_mask": [
+        1,
+        128,
+        4096,
+        1185
+      ]
+    },
+    "saved_or_materialized_intermediates": {
+      "scores_with_sink": [
+        1,
+        128,
+        4096,
+        1185
+      ],
+      "probs_excluding_sink": [
+        1,
+        128,
+        4096,
+        1184
+      ]
+    },
+    "outputs": {
+      "sparse_out": [
+        1,
+        4096,
+        128,
+        512
+      ]
+    },
+    "current_ms": 7.1169809671118855,
+    "current_estimated_tflops": 178.63056336539643,
+    "first_promotion_gate_ms": 5.5,
+    "target_gate_ms": 2.0,
+    "read": "Forward sparse MLA alone is already almost 2x the 3.6 ms full-attention anchor. A first useful kernel must beat the retained core by at least about 1.6 ms; hitting the final target also requires projection/RoPE work to shrink."
+  },
+  "backward_sparse_mla_contract": {
+    "inputs": {
+      "d_sparse_out": [
+        1,
+        4096,
+        128,
+        512
+      ],
+      "q": [
+        1,
+        4096,
+        128,
+        512
+      ],
+      "kv": [
+        1,
+        4096,
+        512
+      ],
+      "csa": [
+        1,
+        1024,
+        512
+      ],
+      "hca": [
+        1,
+        32,
+        512
+      ],
+      "probs_excluding_sink": [
+        1,
+        128,
+        4096,
+        1184
+      ],
+      "sink_prob": [
+        1,
+        128,
+        4096
+      ]
+    },
+    "outputs": {
+      "d_q": [
+        1,
+        4096,
+        128,
+        512
+      ],
+      "d_kv": [
+        1,
+        4096,
+        512
+      ],
+      "d_csa": [
+        1,
+        1024,
+        512
+      ],
+      "d_hca": [
+        1,
+        32,
+        512
+      ],
+      "d_attn_sink": [
+        128
+      ]
+    },
+    "current_blocks_ms": {
+      "attention.sparse_mla.dgrad_qkv": 8.75095499213785,
+      "attention.sparse_mla.sink_wgrad": 8.778095012530684,
+      "combined": 17.529050004668534
+    },
+    "current_dispatch_counts": {
+      "attention.sparse_mla.dgrad_qkv": 31,
+      "attention.sparse_mla.sink_wgrad": 31
+    },
+    "first_promotion_gate_ms": 12.0,
+    "target_gate_ms": 6.0,
+    "read": "The current sparse MLA backward path launches about 31 kernels for dQ/dKV and another 31 for sink wgrad. Fusing softmax backward, dQ/dKV accumulation, and sink-gradient reduction is the next attention-sized win; a window-reduction-only Triton swap was correct but 1.43x slower in the full layer."
+  },
+  "surrounding_attention_costs_ms": {
+    "forward_attention_total": 11.321553844027221,
+    "forward_q_proj": 1.8726419657468796,
+    "forward_kv_proj": 0.2602889435365796,
+    "forward_compress_csa": 0.4954589530825615,
+    "forward_compress_hca": 0.3877379931509495,
+    "forward_out_proj": 1.1884450213983655,
+    "attention_dgrad_total": 15.60960803180933,
+    "attention_wgrad_total": 16.205736086703837,
+    "out_proj_dgrad": 2.1888510091230273,
+    "out_proj_wgrad": 1.456724014133215,
+    "q_path_dgrad": 3.2406160607934,
+    "q_path_wgrad": 3.3246470848098397,
+    "kv_path_dgrad": 0.5740280030295253,
+    "kv_path_wgrad": 0.4878180334344506,
+    "csa_dgrad": 0.9217970073223114,
+    "csa_wgrad": 0.8585960604250431,
+    "hca_dgrad": 0.9175060549750924,
+    "hca_wgrad": 0.8317680330947042
+  },
+  "demoted_attention_routes": [
+    {
+      "route": "current selector swaps",
+      "reason": "S4096 selector sweep retained bf16_contract as best; qnorm, triton_rope, fast_rope, fwd_bwd, and sinkgrad variants were all slower."
+    },
+    {
+      "route": "triton-softmax-triton-window-sum",
+      "reason": "Correct for sparse gather attention, but full-layer S4096 avg was 109.44 ms versus 76.57 ms retained."
+    }
+  ],
+  "decision": {
+    "status": "attention_kernel_contract_ready_backward_first",
+    "primary_next_kernel": "fused_sparse_mla_backward_dq_dkv_sinkgrad",
+    "secondary_next_kernel": "fused_sparse_mla_forward_scores_softmax_value_mix",
+    "not_next": [
+      "More attention selector permutations unless they remove sparse MLA backward launch count",
+      "Window-gradient reduction alone",
+      "Dense full-attention fallback"
+    ],
+    "read": "Attention is not the largest single offender, but it is now a target-sized gap: forward attention is 11.32 ms versus the 3.6 ms anchor, and sparse MLA backward subblocks alone cost 17.53 ms. The next attention implementation should fuse the sparse MLA backward core, not tune the surrounding PyTorch reductions one at a time."
+  },
+  "dependency_pin_changes": []
+}

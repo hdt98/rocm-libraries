@@ -1,0 +1,67 @@
+{
+  "artifact": "primus_turbo_compact_rows_api_wrapper_status_20260612",
+  "created_utc": "2026-06-12T16:05:00Z",
+  "scope": "Primus-Turbo balanced-MoE compact-row public ABI wrapper validation",
+  "source": {
+    "repo": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/primus-turbo",
+    "head": "abacf7403da30692d8ccb18c3397be53e90d652f",
+    "files": [
+      "primus_turbo/pytorch/ops/moe/balanced_moe.py",
+      "tests/pytorch/ops/test_balanced_moe.py"
+    ]
+  },
+  "capability_read": {
+    "balanced_moe_compact_rows_api": true,
+    "balanced_moe_compact_rows_reference_dispatch": true,
+    "balanced_moe_compact_rows_reference_dispatch_backend": "torch_distributed_all_to_all_single_reference",
+    "balanced_moe_compact_rows_reference_combine": true,
+    "balanced_moe_compact_rows_reference_combine_backend": "torch_distributed_all_to_all_single_reference",
+    "balanced_moe_compact_rows_dispatch": false,
+    "balanced_moe_compact_rows_dispatch_backend": "not_implemented",
+    "balanced_moe_compact_rows_combine": false,
+    "balanced_moe_compact_rows_combine_backend": "not_implemented",
+    "read": "Primus-Turbo exposes the same compact-row wrapper names TorchTitan would need for a native compact-row backend and provides a torch-distributed reference implementation. The native capability flags intentionally remain false until a real Primus-Turbo backend op implements the compact-row movement primitive and passes throughput gates."
+  },
+  "validation": [
+    {
+      "kind": "local_py_compile",
+      "host": "local_mac",
+      "command": "python3 -m py_compile balanced_moe.py test_balanced_moe.py",
+      "result": "passed"
+    },
+    {
+      "kind": "local_diff_check",
+      "host": "local_mac",
+      "command": "git diff --check -- primus_turbo/pytorch/ops/moe/balanced_moe.py tests/pytorch/ops/test_balanced_moe.py primus_turbo/pytorch/ops/moe/__init__.py tools/build_ext.py",
+      "result": "passed"
+    },
+    {
+      "kind": "local_text_hygiene",
+      "host": "local_mac",
+      "command": "rg -n \"[ \\\\t]+$\" touched files; verify touched files end with newline",
+      "result": "passed"
+    },
+    {
+      "kind": "local_pytest",
+      "host": "local_mac",
+      "command": "PYTHONPATH=. python3 -m pytest -q tests/pytorch/ops/test_balanced_moe.py",
+      "result": "not_run",
+      "reason": "local python does not have pytest installed"
+    },
+    {
+      "kind": "remote_pytest",
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "copy": "/scratch/sonle5/dsv4_pretrain_canary_20260527/validation/primus_turbo_compact_rows_api_20260612",
+      "command": "PYTHONPATH=. python3 -m pytest -q tests/pytorch/ops/test_balanced_moe.py",
+      "result": "passed",
+      "tests": 36,
+      "duration_s": 3.86
+    }
+  ],
+  "decision": {
+    "throughput_promotion": false,
+    "native_primus_compact_rows_backend_available": false,
+    "next_target": "Implement a Primus-Turbo backend op that consumes already compact owner-row streams directly, then flip balanced_moe_compact_rows_dispatch/combine only after a matched 20-step no-helper/helper performance gate."
+  }
+}

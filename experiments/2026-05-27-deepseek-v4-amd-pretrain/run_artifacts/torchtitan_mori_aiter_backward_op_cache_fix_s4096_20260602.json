@@ -1,0 +1,258 @@
+{
+  "artifact": "torchtitan_mori_aiter_backward_op_cache_fix_s4096_20260602",
+  "created_date": "2026-06-02",
+  "status": "target_shape_4x_s4096_gbs64_two_step_passed",
+  "purpose": "Record the MORI+AITER routed padded VJP S4096 repeated-use fix and the first normalized 4xMI350 target-shape pass.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "source_changes": {
+    "torchtitan_bridge": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "summary": [
+      "Use a distinct MORI op role for backward saved-activation routing (`backward_x`) instead of reusing the grad-output route handle.",
+      "Add `TORCHTITAN_MORI_AITER_OP_CACHE_MODE` with modes `default`, `backward`, and `none`.",
+      "Set the code default to `backward`, which keeps forward MORI op caching but builds fresh backward ops for each forward/backward call.",
+      "Thread `CANARY_MORI_AITER_OP_CACHE_MODE` through the direct launcher for explicit A/B tests."
+    ]
+  },
+  "config_gate": {
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_GBS=4 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "result": "pass",
+    "observed": {
+      "model_spec": "deepseek_v4 flash_4layer",
+      "shape": "1 4 4096 2",
+      "moe_comm_backend": "mori",
+      "mori_aiter_backward_mode": "routed",
+      "mori_aiter_local_vjp_mode": "padded",
+      "mori_aiter_op_cache_mode": "backward",
+      "mori_shmem_heap_size": "32G",
+      "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+      "attention_status_by_layer": [
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+      ],
+      "attention_sparse_backward_mode_by_layer": [
+        "manual",
+        "manual",
+        "manual",
+        "manual"
+      ]
+    }
+  },
+  "negative_cache_ab": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_bwdx_defaultcache_20260602",
+    "status": "fail",
+    "cache_mode": "default",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "failure": "MORI routed backward recv mismatch",
+    "rank_mismatches": {
+      "rank0": {
+        "x_recv": 26120,
+        "grad_recv": 13345
+      },
+      "rank1": {
+        "x_recv": 27600,
+        "grad_recv": 12088
+      },
+      "rank2": {
+        "x_recv": 21108,
+        "grad_recv": 10595
+      },
+      "rank3": {
+        "x_recv": 29161,
+        "grad_recv": 15610
+      }
+    },
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_bwdx_defaultcache_20260602/docker-run.log",
+    "read": "A separate `backward_x` role alone is insufficient when backward MORI ops are cached. The cached-backward A/B converts the prior GPU memory access fault into an explicit receive-count skew."
+  },
+  "safe_default_runs": {
+    "gbs4_steps2_acfull": {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_bwdcachedefault_20260602",
+      "status": "pass",
+      "cache_mode": "backward",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+      "gpus": 4,
+      "visible_devices": "0,1,2,3",
+      "fsdp": 4,
+      "ep": 4,
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "seq_len": 4096,
+      "steps": 2,
+      "activation_checkpoint_mode": "full",
+      "checkpoint_enable": false,
+      "mori_shmem_heap_size": "32G",
+      "step1": {
+        "loss": 12.24577,
+        "grad_norm": 11.0625,
+        "memory_gib_range": [
+          71.35,
+          95.66
+        ],
+        "tps_per_gpu_range": [
+          304,
+          307
+        ],
+        "tflops_per_gpu_range": [
+          5.76,
+          5.80
+        ],
+        "mfu_percent": 0.25
+      },
+      "step2": {
+        "loss": 9.66617,
+        "grad_norm": 21.25,
+        "memory_gib_range": [
+          148.14,
+          166.87
+        ],
+        "tps_per_gpu": 3874,
+        "node_tps": 15496,
+        "tflops_per_gpu_range": [
+          73.30,
+          73.31
+        ],
+        "mfu_percent": 3.17
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_bwdcachedefault_20260602/docker-run.log"
+    },
+    "gbs64_steps1_acfull": {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_acfull_bwdcachedefault_20260602",
+      "status": "pass",
+      "cache_mode": "backward",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+      "gpus": 4,
+      "visible_devices": "0,1,2,3",
+      "fsdp": 4,
+      "ep": 4,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 16,
+      "seq_len": 4096,
+      "steps": 1,
+      "activation_checkpoint_mode": "full",
+      "checkpoint_enable": false,
+      "mori_shmem_heap_size": "32G",
+      "step1": {
+        "loss": 12.22881,
+        "grad_norm": 10.9375,
+        "memory_gib_range": [
+          117.59,
+          191.55
+        ],
+        "tps_per_gpu": 2440,
+        "node_tps": 9760,
+        "tokens_per_step": 262144,
+        "implied_step_time_seconds": 26.86,
+        "tflops_per_gpu_range": [
+          46.16,
+          46.17
+        ],
+        "mfu_percent": 2.00
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_acfull_bwdcachedefault_20260602/docker-run.log"
+    },
+    "gbs64_steps2_acfull": {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_steps2_acfull_bwdcachedefault_20260602",
+      "status": "pass",
+      "cache_mode": "backward",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+      "gpus": 4,
+      "visible_devices": "0,1,2,3",
+      "fsdp": 4,
+      "ep": 4,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 16,
+      "seq_len": 4096,
+      "steps": 2,
+      "activation_checkpoint_mode": "full",
+      "checkpoint_enable": false,
+      "mori_shmem_heap_size": "32G",
+      "step1": {
+        "loss": 12.21879,
+        "grad_norm": 11.6875,
+        "memory_gib_range": [
+          115.69,
+          248.30
+        ],
+        "tps_per_gpu_range": [
+          2440,
+          2445
+        ],
+        "node_tps_range": [
+          9760,
+          9780
+        ],
+        "tokens_per_step": 262144,
+        "implied_step_time_seconds_range": [
+          26.80,
+          26.86
+        ],
+        "tflops_per_gpu_range": [
+          46.16,
+          46.26
+        ],
+        "mfu_percent": 2.00
+      },
+      "step2": {
+        "loss": 9.32217,
+        "grad_norm": 20.625,
+        "memory_gib_range": [
+          205.31,
+          250.55
+        ],
+        "tps_per_gpu": 3226,
+        "node_tps": 12904,
+        "tokens_per_step": 262144,
+        "implied_step_time_seconds": 20.32,
+        "tflops_per_gpu": 61.04,
+        "mfu_percent": 2.64,
+        "cuda_memory_allocation_retries_by_rank": [
+          0,
+          0,
+          1,
+          2
+        ]
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_steps2_acfull_bwdcachedefault_20260602/docker-run.log"
+    }
+  },
+  "target_comparison": {
+    "normalized_4x_target_tok_per_gpu_per_s": [
+      2200,
+      2400
+    ],
+    "normalized_4x_target_node_tok_per_s": [
+      8800,
+      9600
+    ],
+    "normalized_4x_target_step_time_seconds_at_gbs64_s4096": [
+      27,
+      30
+    ],
+    "observed_gbs64_step1_tok_per_gpu_per_s_range": [
+      2440,
+      2445
+    ],
+    "observed_gbs64_step2_tok_per_gpu_per_s": 3226,
+    "read": "The 4x S4096 GBS64 pass meets the normalized throughput target in this guarded systems configuration, but it is not final sparse-MLA/LightningIndexer performance evidence because compressed attention layers still fall back over the sparse sequence threshold."
+  },
+  "limitations": [
+    "The compressed DeepSeek-V4 Flash attention layers still report dense fallback over the current sparse MLA/LightningIndexer long-sequence threshold.",
+    "The local owned-expert VJP remains padded PyTorch BMM math, not final fused MoE backward.",
+    "GBS64 two-step memory peaks around 250.55 GiB on a 287.69 GiB MI350X VF and reports CUDA allocation retries on two ranks.",
+    "The observed TorchTitan MFU remains much lower than the normalized target because the current FLOP accounting and guarded fallback path are not the final fused sparse-MLA/LI training path."
+  ],
+  "read": "Disabling backward MORI op caching fixes the S4096 repeated-use hazard for the 4x target slice. The old cached-backward path fails with explicit route receive-count skew, while the safe default `backward` mode passes GBS4 two-step, GBS64 one-step, and GBS64 two-step full-AC runs."
+}

@@ -1,0 +1,117 @@
+{
+  "all_stats": {
+    "active_send_pairs": {
+      "max": 36402,
+      "mean": 30013.462890625,
+      "median": 30728.5,
+      "min": 20237
+    },
+    "masked_route_row_pct": {
+      "max": 0.554931640625,
+      "mean": 0.23917877674102783,
+      "median": 0.21149698893229169,
+      "min": 0.06528727213541667
+    },
+    "masked_route_rows": {
+      "max": 27276,
+      "mean": 11756.115234375,
+      "median": 10395.5,
+      "min": 3209
+    },
+    "masked_rows_per_removed_send_pair": {
+      "max": 2.7838709677419353,
+      "mean": 1.785257258903331,
+      "median": 1.763751007742066,
+      "min": 1.1630102749236324
+    },
+    "removed_send_pair_pct": {
+      "max": 0.493415821904194,
+      "mean": 0.18349685700476576,
+      "median": 0.15461517074913445,
+      "min": 0.047421142369991474
+    },
+    "removed_send_pairs": {
+      "max": 19859,
+      "mean": 6806.615885416667,
+      "median": 5577.0,
+      "min": 1780
+    },
+    "total_send_pairs": {
+      "max": 41333,
+      "mean": 36820.078776041664,
+      "median": 36812.0,
+      "min": 32844
+    }
+  },
+  "artifacts": {
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_sendmodel_timing_8x_s4096_gbs128_mbs2_steps2_20260607/docker-run.log",
+    "remote_timing_jsonl": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_sendmodel_timing_8x_s4096_gbs128_mbs2_steps2_20260607/mori_timing.jsonl"
+  },
+  "date": "2026-06-07",
+  "env_delta_vs_prior_top8_sdma_timing": {
+    "CANARY_MORI_AITER_ROUTE_MASK_SEND_MODEL": "1",
+    "local_mori_aiter_moe_py": "patched route-mask send-pair model hook"
+  },
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "purpose": "MORI/AITER route-mask top-8 send-pair diagnostic; timing evidence only, not throughput promotion",
+  "read": "MORI route_mask removes fewer token-destination send pairs than route slots because intranode dispatch deduplicates top-k slots by destination rank per token. The steady median masked route-row reduction is 33.36%, but the modeled send-pair reduction is 24.79%, with about 1.73 masked route rows per removed send pair. This supports moving hot/cold/helper rows into a first-class MORI/AITER dispatcher layout instead of continuing route-mask-only tuning.",
+  "records": {
+    "all": 4608,
+    "steady_call_id_gt_288": 2368
+  },
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_sendmodel_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "shape": "8xMI350 TP1 PP1 CP1 FSDP8 EP8 S4096 GBS128 MBS2 GA8 flash_12layer_ceiling_probe",
+  "steady_stats": {
+    "active_send_pairs": {
+      "max": 35127,
+      "mean": 27439.322212837837,
+      "median": 27394.0,
+      "min": 20237
+    },
+    "masked_route_row_pct": {
+      "max": 0.554931640625,
+      "mean": 0.3312735428681245,
+      "median": 0.3335978190104167,
+      "min": 0.0748291015625
+    },
+    "masked_route_rows": {
+      "max": 27276,
+      "mean": 16282.757179054053,
+      "median": 16397.0,
+      "min": 3678
+    },
+    "masked_rows_per_removed_send_pair": {
+      "max": 2.7838709677419353,
+      "mean": 1.7697023995660672,
+      "median": 1.72508515547742,
+      "min": 1.2361882490499854
+    },
+    "removed_send_pair_pct": {
+      "max": 0.493415821904194,
+      "mean": 0.25587743447465244,
+      "median": 0.247880984392354,
+      "min": 0.056611391492429705
+    },
+    "removed_send_pairs": {
+      "max": 19859,
+      "mean": 9536.703547297297,
+      "median": 8865.0,
+      "min": 1963
+    },
+    "total_send_pairs": {
+      "max": 41333,
+      "mean": 36976.02576013513,
+      "median": 36971.0,
+      "min": 32844
+    }
+  },
+  "step2_observed": {
+    "grad_norm": 54.5,
+    "loss": 6.63401,
+    "max_logged_memory_gib": 157.18,
+    "read": "diagnostic timing run; do not promote for throughput",
+    "tflops_per_gpu": 216.83,
+    "tokens_per_gpu_s": 4283
+  }
+}

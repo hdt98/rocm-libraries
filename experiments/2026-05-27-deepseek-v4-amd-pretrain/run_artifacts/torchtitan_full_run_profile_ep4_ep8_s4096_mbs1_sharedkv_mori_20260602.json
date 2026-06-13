@@ -1,0 +1,1256 @@
+{
+  "artifact": "torchtitan_full_run_profile_ep4_ep8_s4096_mbs1_sharedkv_mori_20260602",
+  "created": "2026-06-02",
+  "method": {
+    "env": "shared-KV sparse MLA, LI triton_tl_dot, MORI+AITER routed padded MoE backward, Triton SwiGLU owner-rank VJP, full activation checkpointing, checkpoint disabled",
+    "profiled_step": "iteration_2 after one warmup step",
+    "runtime": "direct TorchTitan DeepSeek-V4-Flash 4-layer BF16 full training run",
+    "trace_read": "User-scope durations are CPU/launch-region wall durations summed across all profiled microsteps and checkpoint recomputes. CPU op durations are exact op-name inclusive durations and can overlap/nest. Kernel-name-class durations are summed GPU kernel dispatch durations by kernel name, not wall-clock critical-path time. Rank max is the gating rank view."
+  },
+  "runs": {
+    "ep4": {
+      "aggregated_cpu_op_ms": {
+        "MmBackward0": {
+          "max": 6014.689073999996,
+          "mean": 5969.033249499998,
+          "min": 5923.173228999996
+        },
+        "_MoriAiterForwardBackward": {
+          "max": 116.05291999999999,
+          "mean": 110.85388874999998,
+          "min": 103.70550300000001
+        },
+        "_MoriAiterForwardBackwardBackward": {
+          "max": 6535.042986000001,
+          "mean": 6524.276658750001,
+          "min": 6511.150714
+        },
+        "_SparseLIGradKLLossTriton": {
+          "max": 7.229799999999999,
+          "mean": 7.100103249999999,
+          "min": 6.8956209999999984
+        },
+        "_SparseLIGradKLLossTritonBackward": {
+          "max": 107.74382100000001,
+          "mean": 101.182635,
+          "min": 96.157185
+        },
+        "_SparseMLASharedKVTritonForwardExplicitBackward": {
+          "max": 18.021686999999996,
+          "mean": 16.9046905,
+          "min": 15.264488
+        },
+        "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": {
+          "max": 143.179935,
+          "mean": 139.91076200000003,
+          "min": 137.06497600000003
+        }
+      },
+      "aggregated_kernel_name_class_ms": {
+        "collective_kernel": {
+          "max": 1494.525331000002,
+          "mean": 1435.3196857500002,
+          "min": 1368.6894959999977
+        },
+        "copy_kernel": {
+          "max": 1829.8999789999716,
+          "mean": 1810.9447092500047,
+          "min": 1791.6766530000173
+        },
+        "gemm_bmm_kernel": {
+          "max": 361.4622730000002,
+          "mean": 295.8609765000001,
+          "min": 261.0340219999999
+        },
+        "other_kernel": {
+          "max": 6504.664160000017,
+          "mean": 6163.152069249992,
+          "min": 5661.030064
+        },
+        "pointwise_reduction_index_kernel": {
+          "max": 1701.89268000004,
+          "mean": 1652.7951217500304,
+          "min": 1626.0206820000203
+        },
+        "sparse_attention_or_triton_kernel": {
+          "max": 250.29934300000016,
+          "mean": 210.23094725000004,
+          "min": 168.83389800000003
+        }
+      },
+      "aggregated_user_scope_ms": {
+        "Optimizer.step#OptimizersContainer.step": {
+          "max": 23.155159,
+          "mean": 23.017336,
+          "min": 22.909788
+        },
+        "dsv4.attention.dense_inner_attention": {
+          "max": 24.338713,
+          "mean": 23.607356499999998,
+          "min": 22.899048999999994
+        },
+        "dsv4.attention.kv_a_rope_norm": {
+          "max": 96.74920200000001,
+          "mean": 94.81205925,
+          "min": 92.98186599999997
+        },
+        "dsv4.attention.kv_b_dense": {
+          "max": 16.35562,
+          "mean": 16.085899,
+          "min": 15.698929000000005
+        },
+        "dsv4.attention.q_projection": {
+          "max": 59.32947499999998,
+          "mean": 57.681079249999996,
+          "min": 54.714953000000015
+        },
+        "dsv4.attention.q_rope": {
+          "max": 72.35862800000002,
+          "mean": 70.90319450000001,
+          "min": 69.67065199999999
+        },
+        "dsv4.attention.sparse_mla_shared_kv": {
+          "max": 381.431223,
+          "mean": 376.02461974999994,
+          "min": 368.297537
+        },
+        "dsv4.attention.wo": {
+          "max": 21.414954999999996,
+          "mean": 20.749232,
+          "min": 20.308276999999997
+        },
+        "dsv4.block.attention": {
+          "max": 692.6315489999996,
+          "mean": 680.0592997499997,
+          "min": 663.6088179999998
+        },
+        "dsv4.block.attention_norm": {
+          "max": 24.75256499999999,
+          "mean": 23.435674499999994,
+          "min": 21.986415
+        },
+        "dsv4.block.ffn_norm": {
+          "max": 15.720139999999999,
+          "mean": 15.2587825,
+          "min": 14.843152000000002
+        },
+        "dsv4.block.moe": {
+          "max": 4762.511360000001,
+          "mean": 4677.7965167500015,
+          "min": 4625.086206000004
+        },
+        "moe.mori_aiter_bridge": {
+          "max": 4565.204269000003,
+          "mean": 4474.56598525,
+          "min": 4418.3279250000005
+        },
+        "moe.output_sum": {
+          "max": 11.563067000000002,
+          "mean": 11.389594999999998,
+          "min": 11.258767999999998
+        },
+        "moe.routed_experts": {
+          "max": 4572.682662,
+          "mean": 4482.6528535,
+          "min": 4426.777374000002
+        },
+        "moe.router": {
+          "max": 130.055839,
+          "mean": 126.72693075000001,
+          "min": 123.05574300000002
+        },
+        "moe.shared_experts": {
+          "max": 40.751988,
+          "mean": 39.67640999999999,
+          "min": 38.69697799999998
+        },
+        "moe.tokens_per_expert_update": {
+          "max": 11.045924999999997,
+          "mean": 10.866326249999998,
+          "min": 10.555092999999998
+        },
+        "mori_aiter.backward.routed_vjp": {
+          "max": 6531.981965,
+          "mean": 6521.326184500001,
+          "min": 6508.197363000001
+        },
+        "mori_aiter.forward.combine": {
+          "max": 11.720883000000002,
+          "mean": 11.038270250000002,
+          "min": 10.027914999999998
+        },
+        "mori_aiter.forward.dispatch": {
+          "max": 18.234648,
+          "mean": 17.026098500000003,
+          "min": 15.517494
+        },
+        "mori_aiter.forward.fused_moe": {
+          "max": 51.67073599999998,
+          "mean": 50.33328400000001,
+          "min": 47.514079
+        },
+        "mori_aiter.forward.pack_weights": {
+          "max": 14.865647,
+          "mean": 14.516569250000002,
+          "min": 14.200132000000004
+        }
+      },
+      "all_step_metrics_from_log": {
+        "1": {
+          "loss": {
+            "max": 12.27562,
+            "mean": 12.27562,
+            "min": 12.27562
+          },
+          "memory_gib": {
+            "max": 104.37,
+            "mean": 103.59,
+            "min": 103.04
+          },
+          "mfu_pct": {
+            "max": 1.64,
+            "mean": 1.64,
+            "min": 1.64
+          },
+          "tflops": {
+            "max": 37.89,
+            "mean": 37.86,
+            "min": 37.83
+          },
+          "tok_per_gpu_s": {
+            "max": 2003.0,
+            "mean": 2001.0,
+            "min": 1999.0
+          }
+        },
+        "2": {
+          "loss": {
+            "max": 8.44258,
+            "mean": 8.44258,
+            "min": 8.44258
+          },
+          "memory_gib": {
+            "max": 143.39,
+            "mean": 130.0575,
+            "min": 123.29
+          },
+          "mfu_pct": {
+            "max": 2.83,
+            "mean": 2.83,
+            "min": 2.83
+          },
+          "tflops": {
+            "max": 65.47,
+            "mean": 65.47,
+            "min": 65.47
+          },
+          "tok_per_gpu_s": {
+            "max": 3460.0,
+            "mean": 3460.0,
+            "min": 3460.0
+          }
+        },
+        "3": {
+          "loss": {
+            "max": 18.52813,
+            "mean": 18.52813,
+            "min": 18.52813
+          },
+          "memory_gib": {
+            "max": 250.41,
+            "mean": 206.0525,
+            "min": 136.82
+          },
+          "mfu_pct": {
+            "max": 2.21,
+            "mean": 2.21,
+            "min": 2.21
+          },
+          "tflops": {
+            "max": 51.04,
+            "mean": 51.04,
+            "min": 51.04
+          },
+          "tok_per_gpu_s": {
+            "max": 2698.0,
+            "mean": 2698.0,
+            "min": 2698.0
+          }
+        }
+      },
+      "headline_ms_rank_max": {
+        "attention_forward_recompute_scope": 692.6315489999996,
+        "dense_mm_backward_bucket": 6014.689073999996,
+        "li_kl_backward_op": 107.74382100000001,
+        "moe_backward_routed_vjp_scope": 6531.981965,
+        "moe_forward_recompute_scope": 4762.511360000001,
+        "optimizer_step_scope": 23.155159,
+        "sparse_mla_backward_op": 143.179935
+      },
+      "profile_step_metrics_from_log": {
+        "loss": {
+          "max": 8.44258,
+          "mean": 8.44258,
+          "min": 8.44258
+        },
+        "memory_gib": {
+          "max": 143.39,
+          "mean": 130.0575,
+          "min": 123.29
+        },
+        "mfu_pct": {
+          "max": 2.83,
+          "mean": 2.83,
+          "min": 2.83
+        },
+        "tflops": {
+          "max": 65.47,
+          "mean": 65.47,
+          "min": 65.47
+        },
+        "tok_per_gpu_s": {
+          "max": 3460.0,
+          "mean": 3460.0,
+          "min": 3460.0
+        }
+      },
+      "rank_count": 4,
+      "ranks": [
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 5923.173228999996,
+            "_MoriAiterForwardBackward": 113.35320699999997,
+            "_MoriAiterForwardBackwardBackward": 6535.042986000001,
+            "_SparseLIGradKLLossTriton": 7.229799999999999,
+            "_SparseLIGradKLLossTritonBackward": 103.075883,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 17.415514000000005,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 139.98205900000002
+          },
+          "event_count": 727197,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1426.8637300000012,
+            "copy_kernel": 1791.6766530000173,
+            "gemm_bmm_kernel": 281.4406770000002,
+            "other_kernel": 5661.030064,
+            "pointwise_reduction_index_kernel": 1627.8714900000311,
+            "sparse_attention_or_triton_kernel": 168.83389800000003
+          },
+          "rank": 0,
+          "total_kernel_name_class_ms": 10957.716512000317,
+          "trace_bytes": 218729264,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2/rank0_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 22.972908,
+            "dsv4.attention.dense_inner_attention": 24.039800000000003,
+            "dsv4.attention.kv_a_rope_norm": 96.74920200000001,
+            "dsv4.attention.kv_b_dense": 16.35562,
+            "dsv4.attention.q_projection": 59.32947499999998,
+            "dsv4.attention.q_rope": 72.35862800000002,
+            "dsv4.attention.sparse_mla_shared_kv": 381.431223,
+            "dsv4.attention.wo": 21.414954999999996,
+            "dsv4.block.attention": 692.6315489999996,
+            "dsv4.block.attention_norm": 24.75256499999999,
+            "dsv4.block.ffn_norm": 15.720139999999999,
+            "dsv4.block.moe": 4637.940699000003,
+            "moe.mori_aiter_bridge": 4429.388666,
+            "moe.output_sum": 11.563067000000002,
+            "moe.routed_experts": 4437.79505,
+            "moe.router": 130.055839,
+            "moe.shared_experts": 40.751988,
+            "moe.tokens_per_expert_update": 11.039425,
+            "mori_aiter.backward.routed_vjp": 6531.981965,
+            "mori_aiter.forward.combine": 11.720883000000002,
+            "mori_aiter.forward.dispatch": 17.97625900000001,
+            "mori_aiter.forward.fused_moe": 50.791090000000054,
+            "mori_aiter.forward.pack_weights": 14.865647
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 5988.339907000002,
+            "_MoriAiterForwardBackward": 110.30392499999998,
+            "_MoriAiterForwardBackwardBackward": 6511.150714,
+            "_SparseLIGradKLLossTriton": 6.8956209999999984,
+            "_SparseLIGradKLLossTritonBackward": 107.74382100000001,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 16.917073000000006,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 137.06497600000003
+          },
+          "event_count": 727393,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1368.6894959999977,
+            "copy_kernel": 1829.8999789999716,
+            "gemm_bmm_kernel": 279.50693400000023,
+            "other_kernel": 6299.812041999964,
+            "pointwise_reduction_index_kernel": 1655.3956350000303,
+            "sparse_attention_or_triton_kernel": 211.050073
+          },
+          "rank": 1,
+          "total_kernel_name_class_ms": 11644.354158999213,
+          "trace_bytes": 218794451,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2/rank1_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 23.031489,
+            "dsv4.attention.dense_inner_attention": 23.151864,
+            "dsv4.attention.kv_a_rope_norm": 94.16885199999999,
+            "dsv4.attention.kv_b_dense": 16.001518,
+            "dsv4.attention.q_projection": 57.54109300000003,
+            "dsv4.attention.q_rope": 69.89357800000002,
+            "dsv4.attention.sparse_mla_shared_kv": 372.9893409999998,
+            "dsv4.attention.wo": 20.497665000000005,
+            "dsv4.block.attention": 674.115968,
+            "dsv4.block.attention_norm": 22.627634000000004,
+            "dsv4.block.ffn_norm": 15.213987,
+            "dsv4.block.moe": 4685.647801999999,
+            "moe.mori_aiter_bridge": 4485.343080999999,
+            "moe.output_sum": 11.325999000000003,
+            "moe.routed_experts": 4493.356327999999,
+            "moe.router": 124.704464,
+            "moe.shared_experts": 39.07926,
+            "moe.tokens_per_expert_update": 10.824862000000001,
+            "mori_aiter.backward.routed_vjp": 6508.197363000001,
+            "mori_aiter.forward.combine": 10.960842000000003,
+            "mori_aiter.forward.dispatch": 16.375993,
+            "mori_aiter.forward.fused_moe": 51.35723100000003,
+            "mori_aiter.forward.pack_weights": 14.358502999999999
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 5949.930788000001,
+            "_MoriAiterForwardBackward": 116.05291999999999,
+            "_MoriAiterForwardBackwardBackward": 6520.004323000002,
+            "_SparseLIGradKLLossTriton": 7.219593999999998,
+            "_SparseLIGradKLLossTritonBackward": 97.75365100000002,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 18.021686999999996,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 139.41607800000003
+          },
+          "event_count": 727133,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1451.200186,
+            "copy_kernel": 1798.4812699999477,
+            "gemm_bmm_kernel": 261.0340219999999,
+            "other_kernel": 6187.102010999987,
+            "pointwise_reduction_index_kernel": 1626.0206820000203,
+            "sparse_attention_or_triton_kernel": 210.74047499999992
+          },
+          "rank": 2,
+          "total_kernel_name_class_ms": 11534.578645998776,
+          "trace_bytes": 218638400,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2/rank2_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 23.155159,
+            "dsv4.attention.dense_inner_attention": 24.338713,
+            "dsv4.attention.kv_a_rope_norm": 95.34831700000002,
+            "dsv4.attention.kv_b_dense": 16.287529,
+            "dsv4.attention.q_projection": 59.13879599999997,
+            "dsv4.attention.q_rope": 71.68992000000003,
+            "dsv4.attention.sparse_mla_shared_kv": 381.3803780000001,
+            "dsv4.attention.wo": 20.776031000000007,
+            "dsv4.block.attention": 689.8808639999995,
+            "dsv4.block.attention_norm": 24.376083999999985,
+            "dsv4.block.ffn_norm": 15.257851000000002,
+            "dsv4.block.moe": 4625.086206000004,
+            "moe.mori_aiter_bridge": 4418.3279250000005,
+            "moe.output_sum": 11.41054599999999,
+            "moe.routed_experts": 4426.777374000002,
+            "moe.router": 129.09167700000003,
+            "moe.shared_experts": 40.17741399999999,
+            "moe.tokens_per_expert_update": 11.045924999999997,
+            "mori_aiter.backward.routed_vjp": 6516.965907,
+            "mori_aiter.forward.combine": 11.443441000000002,
+            "mori_aiter.forward.dispatch": 18.234648,
+            "mori_aiter.forward.fused_moe": 51.67073599999998,
+            "mori_aiter.forward.pack_weights": 14.641995000000003
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 6014.689073999996,
+            "_MoriAiterForwardBackward": 103.70550300000001,
+            "_MoriAiterForwardBackwardBackward": 6530.908612,
+            "_SparseLIGradKLLossTriton": 7.055398000000001,
+            "_SparseLIGradKLLossTritonBackward": 96.157185,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 15.264488,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 143.179935
+          },
+          "event_count": 727473,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1494.525331000002,
+            "copy_kernel": 1823.7209350000821,
+            "gemm_bmm_kernel": 361.4622730000002,
+            "other_kernel": 6504.664160000017,
+            "pointwise_reduction_index_kernel": 1701.89268000004,
+            "sparse_attention_or_triton_kernel": 250.29934300000016
+          },
+          "rank": 3,
+          "total_kernel_name_class_ms": 12136.564722000328,
+          "trace_bytes": 218844058,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2/rank3_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 22.909788,
+            "dsv4.attention.dense_inner_attention": 22.899048999999994,
+            "dsv4.attention.kv_a_rope_norm": 92.98186599999997,
+            "dsv4.attention.kv_b_dense": 15.698929000000005,
+            "dsv4.attention.q_projection": 54.714953000000015,
+            "dsv4.attention.q_rope": 69.67065199999999,
+            "dsv4.attention.sparse_mla_shared_kv": 368.297537,
+            "dsv4.attention.wo": 20.308276999999997,
+            "dsv4.block.attention": 663.6088179999998,
+            "dsv4.block.attention_norm": 21.986415,
+            "dsv4.block.ffn_norm": 14.843152000000002,
+            "dsv4.block.moe": 4762.511360000001,
+            "moe.mori_aiter_bridge": 4565.204269000003,
+            "moe.output_sum": 11.258767999999998,
+            "moe.routed_experts": 4572.682662,
+            "moe.router": 123.05574300000002,
+            "moe.shared_experts": 38.69697799999998,
+            "moe.tokens_per_expert_update": 10.555092999999998,
+            "mori_aiter.backward.routed_vjp": 6528.159503000001,
+            "mori_aiter.forward.combine": 10.027914999999998,
+            "mori_aiter.forward.dispatch": 15.517494,
+            "mori_aiter.forward.fused_moe": 47.514079,
+            "mori_aiter.forward.pack_weights": 14.200132000000004
+          }
+        }
+      ],
+      "run_id": "torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602",
+      "shape": {
+        "cp": 1,
+        "ep": 4,
+        "fsdp": 4,
+        "gbs": 64,
+        "mbs": 1,
+        "pp": 1,
+        "seq_len": 4096,
+        "tp": 1,
+        "world_size": 4
+      },
+      "total_kernel_name_class_ms": {
+        "max": 12136.564722000328,
+        "mean": 11568.303509749658,
+        "min": 10957.716512000317
+      },
+      "trace_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_sharedkv_mori_20260602/profiling/traces_ep4_full_s4096_20260602/iteration_2"
+    },
+    "ep8": {
+      "aggregated_cpu_op_ms": {
+        "MmBackward0": {
+          "max": 8817.047718999987,
+          "mean": 8738.743641875002,
+          "min": 8688.045865000006
+        },
+        "_MoriAiterForwardBackward": {
+          "max": 118.98438599999999,
+          "mean": 112.190297,
+          "min": 108.152028
+        },
+        "_MoriAiterForwardBackwardBackward": {
+          "max": 6726.544505000001,
+          "mean": 6680.851718999999,
+          "min": 6620.770635000001
+        },
+        "_SparseLIGradKLLossTriton": {
+          "max": 6.600796999999998,
+          "mean": 6.078082625000001,
+          "min": 5.4079010000000025
+        },
+        "_SparseLIGradKLLossTritonBackward": {
+          "max": 109.03675399999999,
+          "mean": 101.34075725,
+          "min": 97.218051
+        },
+        "_SparseMLASharedKVTritonForwardExplicitBackward": {
+          "max": 17.012031999999998,
+          "mean": 16.19569225,
+          "min": 15.056833000000003
+        },
+        "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": {
+          "max": 149.59343900000002,
+          "mean": 142.36630787500002,
+          "min": 138.90838600000004
+        }
+      },
+      "aggregated_kernel_name_class_ms": {
+        "collective_kernel": {
+          "max": 1062.5056610000008,
+          "mean": 1004.8298515,
+          "min": 887.9182969999986
+        },
+        "copy_kernel": {
+          "max": 1326.53556700018,
+          "mean": 1273.0476496250108,
+          "min": 1240.3622199999422
+        },
+        "gemm_bmm_kernel": {
+          "max": 353.1985199999999,
+          "mean": 250.57786975,
+          "min": 207.58288200000013
+        },
+        "other_kernel": {
+          "max": 6533.415331000005,
+          "mean": 6081.178145250009,
+          "min": 5622.960284999977
+        },
+        "pointwise_reduction_index_kernel": {
+          "max": 1364.9879290000104,
+          "mean": 1316.227011500006,
+          "min": 1283.7555000000084
+        },
+        "sparse_attention_or_triton_kernel": {
+          "max": 209.49229899999992,
+          "mean": 181.49448387500001,
+          "min": 159.11735300000007
+        }
+      },
+      "aggregated_user_scope_ms": {
+        "Optimizer.step#OptimizersContainer.step": {
+          "max": 13.199593,
+          "mean": 12.320595749999999,
+          "min": 11.526684
+        },
+        "dsv4.attention.dense_inner_attention": {
+          "max": 24.27011600000001,
+          "mean": 23.480759250000002,
+          "min": 22.885527000000003
+        },
+        "dsv4.attention.kv_a_rope_norm": {
+          "max": 96.50313899999999,
+          "mean": 95.223322375,
+          "min": 93.56696799999996
+        },
+        "dsv4.attention.kv_b_dense": {
+          "max": 16.336553000000002,
+          "mean": 15.81575175,
+          "min": 15.586187999999998
+        },
+        "dsv4.attention.q_projection": {
+          "max": 57.35128,
+          "mean": 55.73112987499999,
+          "min": 54.158535
+        },
+        "dsv4.attention.q_rope": {
+          "max": 70.86937800000001,
+          "mean": 69.16109925,
+          "min": 68.01289200000004
+        },
+        "dsv4.attention.sparse_mla_shared_kv": {
+          "max": 377.274234,
+          "mean": 370.700698875,
+          "min": 363.48458700000003
+        },
+        "dsv4.attention.wo": {
+          "max": 20.66911899999999,
+          "mean": 19.828985499999998,
+          "min": 19.212388999999995
+        },
+        "dsv4.block.attention": {
+          "max": 681.8191740000002,
+          "mean": 669.9031490000001,
+          "min": 658.5643520000003
+        },
+        "dsv4.block.attention_norm": {
+          "max": 24.714152999999996,
+          "mean": 23.216589625,
+          "min": 22.19587600000001
+        },
+        "dsv4.block.ffn_norm": {
+          "max": 14.345872000000002,
+          "mean": 13.640030375,
+          "min": 12.984891999999997
+        },
+        "dsv4.block.moe": {
+          "max": 4864.195328000001,
+          "mean": 4825.193606375001,
+          "min": 4783.6014110000015
+        },
+        "moe.mori_aiter_bridge": {
+          "max": 4692.603408999997,
+          "mean": 4653.27044875,
+          "min": 4608.6726960000005
+        },
+        "moe.output_sum": {
+          "max": 3.650115,
+          "mean": 3.5278255000000005,
+          "min": 3.408389000000001
+        },
+        "moe.routed_experts": {
+          "max": 4700.812918999998,
+          "mean": 4661.172781625,
+          "min": 4616.879256999999
+        },
+        "moe.router": {
+          "max": 107.68585699999998,
+          "mean": 103.196178625,
+          "min": 100.73826000000001
+        },
+        "moe.shared_experts": {
+          "max": 41.18362099999999,
+          "mean": 39.92260424999999,
+          "min": 38.567660000000004
+        },
+        "moe.tokens_per_expert_update": {
+          "max": 11.270047999999996,
+          "mean": 11.020496875,
+          "min": 10.805594000000003
+        },
+        "mori_aiter.backward.routed_vjp": {
+          "max": 6723.476767999998,
+          "mean": 6677.808038125,
+          "min": 6618.047511999999
+        },
+        "mori_aiter.forward.combine": {
+          "max": 11.629086000000001,
+          "mean": 11.026243625000001,
+          "min": 10.446456000000001
+        },
+        "mori_aiter.forward.dispatch": {
+          "max": 17.897548000000008,
+          "mean": 16.954901125,
+          "min": 16.334297
+        },
+        "mori_aiter.forward.fused_moe": {
+          "max": 55.39011900000003,
+          "mean": 51.41194050000001,
+          "min": 49.13182099999998
+        },
+        "mori_aiter.forward.pack_weights": {
+          "max": 14.963693000000001,
+          "mean": 14.320525,
+          "min": 13.900413000000004
+        }
+      },
+      "all_step_metrics_from_log": {
+        "1": {
+          "loss": {
+            "max": 12.2977,
+            "mean": 12.2977,
+            "min": 12.2977
+          },
+          "memory_gib": {
+            "max": 77.95,
+            "mean": 74.37125,
+            "min": 72.35
+          },
+          "mfu_pct": {
+            "max": 1.33,
+            "mean": 1.33,
+            "min": 1.33
+          },
+          "tflops": {
+            "max": 30.69,
+            "mean": 30.64875,
+            "min": 30.63
+          },
+          "tok_per_gpu_s": {
+            "max": 1622.0,
+            "mean": 1620.0,
+            "min": 1619.0
+          }
+        },
+        "2": {
+          "loss": {
+            "max": 8.67513,
+            "mean": 8.67513,
+            "min": 8.67513
+          },
+          "memory_gib": {
+            "max": 86.37,
+            "mean": 84.13625,
+            "min": 81.98
+          },
+          "mfu_pct": {
+            "max": 2.2,
+            "mean": 2.2,
+            "min": 2.2
+          },
+          "tflops": {
+            "max": 50.85,
+            "mean": 50.85,
+            "min": 50.85
+          },
+          "tok_per_gpu_s": {
+            "max": 2687.0,
+            "mean": 2687.0,
+            "min": 2687.0
+          }
+        },
+        "3": {
+          "loss": {
+            "max": 17.78453,
+            "mean": 17.78453,
+            "min": 17.78453
+          },
+          "memory_gib": {
+            "max": 248.93,
+            "mean": 156.75625,
+            "min": 82.96
+          },
+          "mfu_pct": {
+            "max": 1.72,
+            "mean": 1.72,
+            "min": 1.72
+          },
+          "tflops": {
+            "max": 39.75,
+            "mean": 39.75,
+            "min": 39.75
+          },
+          "tok_per_gpu_s": {
+            "max": 2101.0,
+            "mean": 2101.0,
+            "min": 2101.0
+          }
+        }
+      },
+      "headline_ms_rank_max": {
+        "attention_forward_recompute_scope": 681.8191740000002,
+        "dense_mm_backward_bucket": 8817.047718999987,
+        "li_kl_backward_op": 109.03675399999999,
+        "moe_backward_routed_vjp_scope": 6723.476767999998,
+        "moe_forward_recompute_scope": 4864.195328000001,
+        "optimizer_step_scope": 13.199593,
+        "sparse_mla_backward_op": 149.59343900000002
+      },
+      "profile_step_metrics_from_log": {
+        "loss": {
+          "max": 8.67513,
+          "mean": 8.67513,
+          "min": 8.67513
+        },
+        "memory_gib": {
+          "max": 86.37,
+          "mean": 84.13625,
+          "min": 81.98
+        },
+        "mfu_pct": {
+          "max": 2.2,
+          "mean": 2.2,
+          "min": 2.2
+        },
+        "tflops": {
+          "max": 50.85,
+          "mean": 50.85,
+          "min": 50.85
+        },
+        "tok_per_gpu_s": {
+          "max": 2687.0,
+          "mean": 2687.0,
+          "min": 2687.0
+        }
+      },
+      "rank_count": 8,
+      "ranks": [
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8717.915846000004,
+            "_MoriAiterForwardBackward": 111.56192199999998,
+            "_MoriAiterForwardBackwardBackward": 6667.398426000001,
+            "_SparseLIGradKLLossTriton": 5.563705000000001,
+            "_SparseLIGradKLLossTritonBackward": 104.92280300000002,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 16.560453,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 149.59343900000002
+          },
+          "event_count": 728499,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1005.3574910000003,
+            "copy_kernel": 1326.53556700018,
+            "gemm_bmm_kernel": 353.1985199999999,
+            "other_kernel": 5622.960284999977,
+            "pointwise_reduction_index_kernel": 1364.9879290000104,
+            "sparse_attention_or_triton_kernel": 209.49229899999992
+          },
+          "rank": 0,
+          "total_kernel_name_class_ms": 9882.532090997618,
+          "trace_bytes": 220221403,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank0_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.775979999999999,
+            "dsv4.attention.dense_inner_attention": 24.27011600000001,
+            "dsv4.attention.kv_a_rope_norm": 96.12228900000002,
+            "dsv4.attention.kv_b_dense": 16.336553000000002,
+            "dsv4.attention.q_projection": 56.394232000000024,
+            "dsv4.attention.q_rope": 70.86937800000001,
+            "dsv4.attention.sparse_mla_shared_kv": 377.274234,
+            "dsv4.attention.wo": 19.653296000000008,
+            "dsv4.block.attention": 681.8191740000002,
+            "dsv4.block.attention_norm": 24.714152999999996,
+            "dsv4.block.ffn_norm": 12.984891999999997,
+            "dsv4.block.moe": 4864.195328000001,
+            "moe.mori_aiter_bridge": 4692.603408999997,
+            "moe.output_sum": 3.6270890000000002,
+            "moe.routed_experts": 4700.812918999998,
+            "moe.router": 101.44212899999998,
+            "moe.shared_experts": 40.49941499999999,
+            "moe.tokens_per_expert_update": 11.270047999999996,
+            "mori_aiter.backward.routed_vjp": 6664.227096999999,
+            "mori_aiter.forward.combine": 11.220837,
+            "mori_aiter.forward.dispatch": 16.725724000000003,
+            "mori_aiter.forward.fused_moe": 50.945234,
+            "mori_aiter.forward.pack_weights": 14.575711
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8715.647013000005,
+            "_MoriAiterForwardBackward": 118.98438599999999,
+            "_MoriAiterForwardBackwardBackward": 6698.989648999997,
+            "_SparseLIGradKLLossTriton": 5.4079010000000025,
+            "_SparseLIGradKLLossTritonBackward": 109.03675399999999,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 16.632678000000002,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 138.90838600000004
+          },
+          "event_count": 727043,
+          "kernel_name_class_ms": {
+            "collective_kernel": 887.9182969999986,
+            "copy_kernel": 1315.3280049999314,
+            "gemm_bmm_kernel": 259.24104799999986,
+            "other_kernel": 6533.415331000005,
+            "pointwise_reduction_index_kernel": 1328.390289999995,
+            "sparse_attention_or_triton_kernel": 176.77576000000008
+          },
+          "rank": 1,
+          "total_kernel_name_class_ms": 10501.068730999341,
+          "trace_bytes": 219326749,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank1_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.61276,
+            "dsv4.attention.dense_inner_attention": 24.032740000000004,
+            "dsv4.attention.kv_a_rope_norm": 96.50313899999999,
+            "dsv4.attention.kv_b_dense": 15.826653000000002,
+            "dsv4.attention.q_projection": 55.81103200000001,
+            "dsv4.attention.q_rope": 68.44355599999999,
+            "dsv4.attention.sparse_mla_shared_kv": 372.96857300000005,
+            "dsv4.attention.wo": 19.212388999999995,
+            "dsv4.block.attention": 673.1627450000001,
+            "dsv4.block.attention_norm": 22.93620100000001,
+            "dsv4.block.ffn_norm": 13.332173000000006,
+            "dsv4.block.moe": 4783.6014110000015,
+            "moe.mori_aiter_bridge": 4608.6726960000005,
+            "moe.output_sum": 3.601821999999999,
+            "moe.routed_experts": 4616.879256999999,
+            "moe.router": 104.25264100000001,
+            "moe.shared_experts": 41.18362099999999,
+            "moe.tokens_per_expert_update": 11.249983999999998,
+            "mori_aiter.backward.routed_vjp": 6696.002957000001,
+            "mori_aiter.forward.combine": 11.629086000000001,
+            "mori_aiter.forward.dispatch": 17.463385,
+            "mori_aiter.forward.fused_moe": 55.39011900000003,
+            "mori_aiter.forward.pack_weights": 14.963693000000001
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8688.045865000006,
+            "_MoriAiterForwardBackward": 112.13676000000004,
+            "_MoriAiterForwardBackwardBackward": 6721.3168080000005,
+            "_SparseLIGradKLLossTriton": 6.087971000000001,
+            "_SparseLIGradKLLossTritonBackward": 100.77373200000001,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 17.012031999999998,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 139.25382000000002
+          },
+          "event_count": 725647,
+          "kernel_name_class_ms": {
+            "collective_kernel": 986.6116260000009,
+            "copy_kernel": 1248.096118999959,
+            "gemm_bmm_kernel": 219.15705599999993,
+            "other_kernel": 6228.172599000003,
+            "pointwise_reduction_index_kernel": 1283.7555000000084,
+            "sparse_attention_or_triton_kernel": 159.11735300000007
+          },
+          "rank": 2,
+          "total_kernel_name_class_ms": 10124.910252999596,
+          "trace_bytes": 218490801,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank2_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 13.199593,
+            "dsv4.attention.dense_inner_attention": 23.468296999999993,
+            "dsv4.attention.kv_a_rope_norm": 95.19889500000001,
+            "dsv4.attention.kv_b_dense": 15.586187999999998,
+            "dsv4.attention.q_projection": 55.65928999999999,
+            "dsv4.attention.q_rope": 69.145719,
+            "dsv4.attention.sparse_mla_shared_kv": 374.02772000000016,
+            "dsv4.attention.wo": 19.544855999999996,
+            "dsv4.block.attention": 672.907657,
+            "dsv4.block.attention_norm": 23.660138999999983,
+            "dsv4.block.ffn_norm": 13.494774000000007,
+            "dsv4.block.moe": 4792.297702000002,
+            "moe.mori_aiter_bridge": 4621.642215999998,
+            "moe.output_sum": 3.5621600000000018,
+            "moe.routed_experts": 4629.713472999999,
+            "moe.router": 101.65330399999999,
+            "moe.shared_experts": 39.870085,
+            "moe.tokens_per_expert_update": 11.033573000000004,
+            "mori_aiter.backward.routed_vjp": 6718.203984999999,
+            "mori_aiter.forward.combine": 10.604362000000004,
+            "mori_aiter.forward.dispatch": 16.650178,
+            "mori_aiter.forward.fused_moe": 51.27029700000004,
+            "mori_aiter.forward.pack_weights": 14.276290999999997
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8717.583247,
+            "_MoriAiterForwardBackward": 112.86028700000001,
+            "_MoriAiterForwardBackwardBackward": 6674.231789999998,
+            "_SparseLIGradKLLossTriton": 6.446624000000002,
+            "_SparseLIGradKLLossTritonBackward": 101.723308,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 16.520527999999995,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 149.25701700000005
+          },
+          "event_count": 727311,
+          "kernel_name_class_ms": {
+            "collective_kernel": 954.0721330000001,
+            "copy_kernel": 1266.492747999956,
+            "gemm_bmm_kernel": 217.04148500000002,
+            "other_kernel": 6054.6338390000365,
+            "pointwise_reduction_index_kernel": 1298.7324369999906,
+            "sparse_attention_or_triton_kernel": 189.878168
+          },
+          "rank": 3,
+          "total_kernel_name_class_ms": 9980.85080999942,
+          "trace_bytes": 219423493,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank3_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.121807,
+            "dsv4.attention.dense_inner_attention": 23.036858,
+            "dsv4.attention.kv_a_rope_norm": 95.82216599999995,
+            "dsv4.attention.kv_b_dense": 15.758266000000003,
+            "dsv4.attention.q_projection": 55.64425199999999,
+            "dsv4.attention.q_rope": 69.14485200000001,
+            "dsv4.attention.sparse_mla_shared_kv": 373.2610349999999,
+            "dsv4.attention.wo": 20.66911899999999,
+            "dsv4.block.attention": 674.127976,
+            "dsv4.block.attention_norm": 23.640499000000002,
+            "dsv4.block.ffn_norm": 13.913929999999995,
+            "dsv4.block.moe": 4792.634603999998,
+            "moe.mori_aiter_bridge": 4620.474738000001,
+            "moe.output_sum": 3.650115,
+            "moe.routed_experts": 4628.6524979999995,
+            "moe.router": 102.29754499999996,
+            "moe.shared_experts": 40.43429099999999,
+            "moe.tokens_per_expert_update": 11.053196000000002,
+            "mori_aiter.backward.routed_vjp": 6671.019426000002,
+            "mori_aiter.forward.combine": 11.107129,
+            "mori_aiter.forward.dispatch": 17.022183,
+            "mori_aiter.forward.fused_moe": 52.52270300000002,
+            "mori_aiter.forward.pack_weights": 14.287714000000001
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8726.773207000004,
+            "_MoriAiterForwardBackward": 109.33177899999997,
+            "_MoriAiterForwardBackwardBackward": 6726.544505000001,
+            "_SparseLIGradKLLossTriton": 6.0967090000000015,
+            "_SparseLIGradKLLossTritonBackward": 97.61630199999999,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 15.549747000000005,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 139.73825599999992
+          },
+          "event_count": 726839,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1060.62424,
+            "copy_kernel": 1251.211170000051,
+            "gemm_bmm_kernel": 240.72466500000002,
+            "other_kernel": 6082.528172999999,
+            "pointwise_reduction_index_kernel": 1315.032160000015,
+            "sparse_attention_or_triton_kernel": 175.17757699999999
+          },
+          "rank": 4,
+          "total_kernel_name_class_ms": 10125.297984999585,
+          "trace_bytes": 219204811,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank4_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.166058000000001,
+            "dsv4.attention.dense_inner_attention": 22.885527000000003,
+            "dsv4.attention.kv_a_rope_norm": 94.38269100000002,
+            "dsv4.attention.kv_b_dense": 15.658352999999998,
+            "dsv4.attention.q_projection": 54.158535,
+            "dsv4.attention.q_rope": 68.01289200000004,
+            "dsv4.attention.sparse_mla_shared_kv": 368.233523,
+            "dsv4.attention.wo": 19.771462,
+            "dsv4.block.attention": 662.4847230000001,
+            "dsv4.block.attention_norm": 22.232876000000005,
+            "dsv4.block.ffn_norm": 13.782633,
+            "dsv4.block.moe": 4841.6456620000035,
+            "moe.mori_aiter_bridge": 4669.504099999999,
+            "moe.output_sum": 3.464665,
+            "moe.routed_experts": 4677.106642000002,
+            "moe.router": 104.65027700000005,
+            "moe.shared_experts": 39.23925999999999,
+            "moe.tokens_per_expert_update": 10.947840000000001,
+            "mori_aiter.backward.routed_vjp": 6723.476767999998,
+            "mori_aiter.forward.combine": 10.893410000000003,
+            "mori_aiter.forward.dispatch": 16.571223999999994,
+            "mori_aiter.forward.fused_moe": 50.24966799999999,
+            "mori_aiter.forward.pack_weights": 13.929242
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8817.047718999987,
+            "_MoriAiterForwardBackward": 108.152028,
+            "_MoriAiterForwardBackwardBackward": 6620.770635000001,
+            "_SparseLIGradKLLossTriton": 6.600796999999998,
+            "_SparseLIGradKLLossTritonBackward": 102.016907,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 15.056833000000003,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 141.102256
+          },
+          "event_count": 725083,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1028.3769890000003,
+            "copy_kernel": 1271.2795590000155,
+            "gemm_bmm_kernel": 207.58288200000013,
+            "other_kernel": 6176.589317000002,
+            "pointwise_reduction_index_kernel": 1317.791466000014,
+            "sparse_attention_or_triton_kernel": 180.20535700000005
+          },
+          "rank": 5,
+          "total_kernel_name_class_ms": 10181.825569997767,
+          "trace_bytes": 218131245,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank5_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 11.526684,
+            "dsv4.attention.dense_inner_attention": 23.604730999999997,
+            "dsv4.attention.kv_a_rope_norm": 93.56696799999996,
+            "dsv4.attention.kv_b_dense": 15.721464999999997,
+            "dsv4.attention.q_projection": 54.97932299999997,
+            "dsv4.attention.q_rope": 68.11480299999997,
+            "dsv4.attention.sparse_mla_shared_kv": 363.48458700000003,
+            "dsv4.attention.wo": 20.160654,
+            "dsv4.block.attention": 658.5643520000003,
+            "dsv4.block.attention_norm": 22.19587600000001,
+            "dsv4.block.ffn_norm": 14.345872000000002,
+            "dsv4.block.moe": 4859.195392999998,
+            "moe.mori_aiter_bridge": 4685.307897999997,
+            "moe.output_sum": 3.408389000000001,
+            "moe.routed_experts": 4692.7240440000005,
+            "moe.router": 107.68585699999998,
+            "moe.shared_experts": 38.567660000000004,
+            "moe.tokens_per_expert_update": 10.852976999999997,
+            "mori_aiter.backward.routed_vjp": 6618.047511999999,
+            "mori_aiter.forward.combine": 10.446456000000001,
+            "mori_aiter.forward.dispatch": 16.334297,
+            "mori_aiter.forward.fused_moe": 49.13182099999998,
+            "mori_aiter.forward.pack_weights": 13.900413000000004
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8730.877542000004,
+            "_MoriAiterForwardBackward": 112.12905299999997,
+            "_MoriAiterForwardBackwardBackward": 6694.167471,
+            "_SparseLIGradKLLossTriton": 6.136015000000002,
+            "_SparseLIGradKLLossTritonBackward": 97.218051,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 15.988707000000003,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 140.43320200000002
+          },
+          "event_count": 727599,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1062.5056610000008,
+            "copy_kernel": 1240.3622199999422,
+            "gemm_bmm_kernel": 222.53377799999993,
+            "other_kernel": 5892.0505110000495,
+            "pointwise_reduction_index_kernel": 1294.853440999998,
+            "sparse_attention_or_triton_kernel": 166.97036000000003
+          },
+          "rank": 6,
+          "total_kernel_name_class_ms": 9879.27597099944,
+          "trace_bytes": 219422458,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank6_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.084377,
+            "dsv4.attention.dense_inner_attention": 23.505698000000002,
+            "dsv4.attention.kv_a_rope_norm": 95.27018900000004,
+            "dsv4.attention.kv_b_dense": 15.750461,
+            "dsv4.attention.q_projection": 57.35128,
+            "dsv4.attention.q_rope": 70.20857699999998,
+            "dsv4.attention.sparse_mla_shared_kv": 369.1151209999999,
+            "dsv4.attention.wo": 19.492330000000006,
+            "dsv4.block.attention": 670.2870399999999,
+            "dsv4.block.attention_norm": 23.539044,
+            "dsv4.block.ffn_norm": 13.578909999999997,
+            "dsv4.block.moe": 4839.551128000003,
+            "moe.mori_aiter_bridge": 4668.758833,
+            "moe.output_sum": 3.4777740000000006,
+            "moe.routed_experts": 4676.537766,
+            "moe.router": 102.849416,
+            "moe.shared_experts": 39.493374,
+            "moe.tokens_per_expert_update": 10.950762999999998,
+            "mori_aiter.backward.routed_vjp": 6690.990132999999,
+            "mori_aiter.forward.combine": 11.618899000000003,
+            "mori_aiter.forward.dispatch": 17.897548000000008,
+            "mori_aiter.forward.fused_moe": 49.191992,
+            "mori_aiter.forward.pack_weights": 14.099626999999993
+          }
+        },
+        {
+          "cpu_op_ms": {
+            "MmBackward0": 8796.058696000004,
+            "_MoriAiterForwardBackward": 112.36616100000002,
+            "_MoriAiterForwardBackwardBackward": 6643.394467999999,
+            "_SparseLIGradKLLossTriton": 6.284939,
+            "_SparseLIGradKLLossTritonBackward": 97.418201,
+            "_SparseMLASharedKVTritonForwardExplicitBackward": 16.244560000000003,
+            "_SparseMLASharedKVTritonForwardExplicitBackwardBackward": 140.64408699999996
+          },
+          "event_count": 728483,
+          "kernel_name_class_ms": {
+            "collective_kernel": 1053.1723749999987,
+            "copy_kernel": 1265.0758090000506,
+            "gemm_bmm_kernel": 285.14352400000007,
+            "other_kernel": 6059.075107000001,
+            "pointwise_reduction_index_kernel": 1326.2728690000167,
+            "sparse_attention_or_triton_kernel": 194.338997
+          },
+          "rank": 7,
+          "total_kernel_name_class_ms": 10183.078680999632,
+          "trace_bytes": 220180566,
+          "trace_file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2/rank7_trace.json",
+          "user_scope_ms": {
+            "Optimizer.step#OptimizersContainer.step": 12.077506999999999,
+            "dsv4.attention.dense_inner_attention": 23.042107000000005,
+            "dsv4.attention.kv_a_rope_norm": 94.92024199999999,
+            "dsv4.attention.kv_b_dense": 15.888074999999999,
+            "dsv4.attention.q_projection": 55.85109499999998,
+            "dsv4.attention.q_rope": 69.349017,
+            "dsv4.attention.sparse_mla_shared_kv": 367.240798,
+            "dsv4.attention.wo": 20.127778,
+            "dsv4.block.attention": 665.8715250000002,
+            "dsv4.block.attention_norm": 22.81392900000001,
+            "dsv4.block.ffn_norm": 13.687058999999996,
+            "dsv4.block.moe": 4828.427623,
+            "moe.mori_aiter_bridge": 4659.1997,
+            "moe.output_sum": 3.43059,
+            "moe.routed_experts": 4666.955654000003,
+            "moe.router": 100.73826000000001,
+            "moe.shared_experts": 40.09312799999999,
+            "moe.tokens_per_expert_update": 10.805594000000003,
+            "mori_aiter.backward.routed_vjp": 6640.496427000001,
+            "mori_aiter.forward.combine": 10.689770000000001,
+            "mori_aiter.forward.dispatch": 16.97467,
+            "mori_aiter.forward.fused_moe": 52.59369,
+            "mori_aiter.forward.pack_weights": 14.531509000000009
+          }
+        }
+      ],
+      "run_id": "torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602",
+      "shape": {
+        "cp": 1,
+        "ep": 8,
+        "fsdp": 8,
+        "gbs": 128,
+        "mbs": 1,
+        "pp": 1,
+        "seq_len": 4096,
+        "tp": 1,
+        "world_size": 8
+      },
+      "total_kernel_name_class_ms": {
+        "max": 10501.068730999341,
+        "mean": 10107.35501149905,
+        "min": 9879.27597099944
+      },
+      "trace_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_sharedkv_mori_20260602/profiling/traces_ep8_full_s4096_20260602/iteration_2"
+    }
+  }
+}

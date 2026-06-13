@@ -1,0 +1,93 @@
+{
+  "artifact": "actual_li_prepacked_route_panel_d16_contrib_decision_20260603",
+  "date": "2026-06-03",
+  "scope": "Decision gate for using the prepacked route list as a panel-owned full-D16 contribution producer.",
+  "source_artifacts": {
+    "s128_smoke": "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s128_layer2_smoke_20260603.json",
+    "s512": "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s512_layer2_20260603.json",
+    "s4096_k16_sweep": "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_20260603.json",
+    "s4096_k32": "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_k32_20260603.json",
+    "s4096_k64": "run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_k64_20260603.json",
+    "route_consumption": "run_artifacts/actual_li_prepacked_route_consumption_decision_20260603.json"
+  },
+  "shape": {
+    "s4096_layer2": {
+      "batch": 1,
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "compress_ratio": 4,
+      "valid_pairs": 1572352
+    }
+  },
+  "positive_short_sequence": {
+    "s128_token32_panel256_panel_d16_ms": 0.646,
+    "s512_token32_panel256_panel_d16_ms": 0.863
+  },
+  "s4096_results": [
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "panel_block_k": 16,
+      "panel_d16_ms": 111.3907699584961,
+      "modeled_write_reduction_x": 23.813051840857806
+    },
+    {
+      "token_block": 32,
+      "group_panel": 512,
+      "panel_block_k": 16,
+      "panel_d16_ms": 121.62906646728516,
+      "modeled_write_reduction_x": 23.813051840857806
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "panel_block_k": 16,
+      "panel_d16_ms": 116.34085845947266,
+      "modeled_write_reduction_x": 47.254673318506946
+    },
+    {
+      "token_block": 64,
+      "group_panel": 512,
+      "panel_block_k": 16,
+      "panel_d16_ms": 129.8949432373047,
+      "modeled_write_reduction_x": 47.254673318506946
+    },
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "panel_block_k": 32,
+      "panel_d16_ms": 110.98064422607422,
+      "modeled_write_reduction_x": 23.813051840857806
+    },
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "panel_block_k": 64,
+      "panel_d16_ms": 110.39334106445312,
+      "modeled_write_reduction_x": 23.813051840857806
+    }
+  ],
+  "comparison": {
+    "retained_sparse_atomic_dkv_wall_ms": "8.0-8.8",
+    "prepacked_pair_metadata_ms": "~0.02",
+    "prepacked_one_d_scalar_input_ms": "0.58-0.68",
+    "read": "Route packing and route traversal are cheap, but making the contribution producer panel-owned/token-panel-owned is far too fragmented at S4096."
+  },
+  "decision": {
+    "status": "reject_panel_owned_contribution_producer",
+    "reason": "The full-D16 prepacked panel producer is 110-130 ms at S4096, over 12x slower than the current sparse-atomic dKV slice, even though it does not write dKV. Increasing the K tile from 16 to 32 or 64 does not materially improve it.",
+    "candidate_refinement": "Keep the existing fast query-major dot-K/MFMA contribution producer shape. Use prepacked or compact route metadata only after contribution math, for in-producer grouped/segmented reduction or a reduced write path.",
+    "next_kernel_target": "Modify the retained dot_k_atomic-style producer so it computes grad_logits^T q + probs^T dO once per query-major tile, then performs lane/warp/tile-local segmented accumulation before global dKV writes. Do not move the producer to token-panel/group-panel ownership."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 128 --layer-id 2 --token-blocks 32 --group-panels 256 --include-panel-d16-contrib-sink --warmup-iters 1 --timed-iters 2 --summary-path run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s128_layer2_smoke_20260603.json",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 512 --layer-id 2 --token-blocks 32,64 --group-panels 256,512 --include-panel-d16-contrib-sink --warmup-iters 2 --timed-iters 5 --summary-path run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s512_layer2_20260603.json",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --group-panels 256,512 --include-panel-d16-contrib-sink --allow-large-materialization --warmup-iters 2 --timed-iters 5 --summary-path run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_20260603.json",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 4096 --layer-id 2 --token-blocks 32 --group-panels 256 --include-panel-d16-contrib-sink --allow-large-materialization --panel-block-k 32 --warmup-iters 1 --timed-iters 3 --summary-path run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_k32_20260603.json",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 4096 --layer-id 2 --token-blocks 32 --group-panels 256 --include-panel-d16-contrib-sink --allow-large-materialization --panel-block-k 64 --warmup-iters 1 --timed-iters 3 --summary-path run_artifacts/actual_li_prepacked_route_panel_d16_contrib_s4096_layer2_k64_20260603.json"
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "artifact": "sparse_attn_li_source_dependency_audit",
+  "date": "2026-06-05",
+  "status": "source_contract_checked",
+  "question": "Does SparseLightningIndexerGradKLLoss have to wait for SparseAttnSharedkvGrad dKV/compressor outputs?",
+  "conclusion": {
+    "li_depends_on_sparse_attn_dkv_output": false,
+    "li_can_overlap_sparse_attn_backward_branches": true,
+    "read": "SparseLightningIndexerGradKLLoss consumes forward-time query, compressed key, LI query/key projections, LI weights, and top indices. Its backward returns gradients for LI query/key projections and LI weights only. It does not consume SparseAttnSharedkvGrad d_cmp_kv/dKV, and it returns no gradient for query or compressed_k in the current AMD public ABI or fallback wrapper."
+  },
+  "amd_torchtitan_source": {
+    "call_site": {
+      "path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+      "lines": "1849-1871",
+      "inputs": [
+        "q",
+        "compressed_k",
+        "index_q",
+        "index_k",
+        "index_weights",
+        "top_indices"
+      ]
+    },
+    "fallback_backward_contract": {
+      "path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+      "lines": "473-535",
+      "saved_forward_inputs": [
+        "q.detach()",
+        "compressed_k.detach()",
+        "index_q",
+        "index_k",
+        "weights",
+        "top_indices"
+      ],
+      "returned_gradients": [
+        "None for q",
+        "None for compressed_k",
+        "grad_index_q",
+        "grad_index_k",
+        "grad_weights",
+        "None for top_indices"
+      ]
+    },
+    "triton_backend_backward_contract": {
+      "path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_li_triton_backend.py",
+      "lines": "619-654",
+      "saved_forward_inputs": [
+        "query.detach()",
+        "compressed_k.detach()",
+        "query_index",
+        "key_index",
+        "weights",
+        "sparse_indices"
+      ],
+      "returned_gradients": [
+        "None for query",
+        "None for compressed_k",
+        "d_query_index",
+        "d_key_index",
+        "d_weights",
+        "None for sparse_indices"
+      ]
+    }
+  },
+  "ascend_reference_contract": {
+    "sparse_lightning_indexer_grad_kl_loss_proto": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_proto/inc/sparse_lightning_indexer_grad_kl_loss_proto.h",
+      "lines": "9-25",
+      "inputs": [
+        "query",
+        "key",
+        "query_index",
+        "key_index",
+        "weight",
+        "sparse_indices"
+      ],
+      "outputs": [
+        "d_query_index",
+        "d_key_index",
+        "d_weight",
+        "loss"
+      ]
+    },
+    "sparse_attn_sharedkv_grad_proto": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_proto/inc/sparse_attn_sharedkv_grad_proto.h",
+      "lines": "9-25",
+      "inputs": [
+        "query",
+        "ori_kv",
+        "cmp_kv",
+        "d_out",
+        "out",
+        "lse",
+        "ori_sparse_indices",
+        "cmp_sparse_indices"
+      ],
+      "outputs": [
+        "d_query",
+        "d_ori_kv",
+        "d_cmp_kv",
+        "d_sinks"
+      ]
+    }
+  },
+  "latency_budget_update_ms": {
+    "serial_baseline_sparse_attn_plus_li": 15.3062,
+    "dependent_li_after_compressed_dkv_candidate": 14.2442,
+    "source_contract_valid_candidate_lower_bound": {
+      "three_branch_sparse_attn_split_plus_independent_li": 12.5525,
+      "fused_local_sparse_attn_split_plus_independent_li": 12.2984
+    },
+    "read": "The earlier 14.2442 ms conservative candidate assumed LI had to sit behind compressed dKV. Source code contradicts that dependency. The source-valid schedule is max(SparseAttnSharedkvGrad split makespan, SparseLightningIndexerGradKLLoss), subject to a direct same-process contention benchmark."
+  },
+  "next_measurement": "Run direct same-process baseline and candidate: serialized SparseAttnSharedkvGrad + LI/KL versus split SparseAttnSharedkvGrad streams plus independent LI/KL stream, with branch events and parent-stream makespan."
+}

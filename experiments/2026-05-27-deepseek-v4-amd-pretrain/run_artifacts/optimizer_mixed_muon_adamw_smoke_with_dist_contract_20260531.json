@@ -1,0 +1,71 @@
+{
+  "artifact": "optimizer_mixed_muon_adamw_smoke_with_dist_contract_20260531",
+  "status": "passed",
+  "purpose": "CPU-only ROCm Primus container smoke for mixed AdamW/Muon routing, optimizer state round-trip, local-shard Muon caveat, distributed Muon gather-orthogonalize-scatter contract, and unit tests.",
+  "command": "env RUN_ID=torchtitan_mixed_muon_adamw_smoke_with_dist_contract_20260531T0700Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh all",
+  "target_host": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_mixed_muon_adamw_smoke_with_dist_contract_20260531T0700Z",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_with_dist_contract_20260531T0700Z",
+  "gpu_use": "none",
+  "torch_version": "2.10.0a0+git449b176",
+  "modes": {
+    "toy": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "muon_params": [
+        "expert_weight",
+        "proj.weight"
+      ],
+      "state_dict_keys": 2
+    },
+    "deepseek_debugmodel": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "param_counts": {
+        "AdamW": 21,
+        "Muon": 62
+      },
+      "stepped_params": [
+        "tok_embeddings.weight",
+        "layers.1.moe.router.gate.weight",
+        "layers.1.moe.experts.w1"
+      ],
+      "state_dict_keys": 2
+    },
+    "muon_shard_contract": {
+      "status": "passed",
+      "matrix_axis_local_shard_rel_l2": {
+        "row": 0.46550610661506653,
+        "column": 0.7442668676376343
+      },
+      "rank3_expert_tensor_rel_l2": {
+        "expert_axis": 0.0,
+        "row_axis": 0.46919289231300354,
+        "column_axis": 0.7377979159355164
+      }
+    },
+    "distributed_muon_contract": {
+      "status": "passed",
+      "gather_orthogonalize_scatter_vs_full_max_rel_l2": 0.0,
+      "local_shard_update_rel_l2": {
+        "matrix_row_shard": 0.46949973702430725,
+        "matrix_column_shard": 0.7323395013809204,
+        "expert_axis_shard": 0.0,
+        "expert_row_shard": 0.46700865030288696,
+        "expert_column_shard": 0.7343050241470337
+      }
+    },
+    "unit": {
+      "status": "passed",
+      "tests": 15
+    }
+  },
+  "conclusion": "Mixed AdamW/Muon routing and checkpointable native optimizer state remain intact, and the distributed Muon contract is now testable: keep momentum buffers sharded, gather the pre-orthogonalized update across any FSDP matrix-axis shard, orthogonalize at full matrix scope, then scatter before the local parameter update."
+}

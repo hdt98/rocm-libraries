@@ -1,0 +1,41 @@
+{
+  "device": "cuda",
+  "new_filter": {
+    "max_ms": 0.2608480863273144,
+    "mean_ms": 0.20870940992608666,
+    "median_ms": 0.20666804630309343,
+    "min_ms": 0.1931081060320139
+  },
+  "old_filter": {
+    "max_ms": 0.294616911560297,
+    "mean_ms": 0.11287786299362779,
+    "median_ms": 0.11246907524764538,
+    "min_ms": 0.09822892025113106
+  },
+  "parity": {
+    "equal": true,
+    "kept_rows": 0,
+    "mask_equal": true,
+    "offsets_equal": true,
+    "positions_equal": true,
+    "suppressed_new": 768,
+    "suppressed_old": 768
+  },
+  "scope": "mori_route_mask_threshold_filter",
+  "shape": {
+    "active_hot": 2,
+    "flat_size": 98304,
+    "iters": 100,
+    "min_helper_rows": 512,
+    "num_hot": 2,
+    "rows": 768,
+    "warmup": 10
+  },
+  "small_hot_filter": {
+    "max_ms": 0.172498170286417,
+    "mean_ms": 0.12944970279932022,
+    "median_ms": 0.1269845524802804,
+    "min_ms": 0.12350780889391899
+  },
+  "speedup": 0.8856909998175633
+}

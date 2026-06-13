@@ -1,0 +1,83 @@
+{
+  "status": "closed_no_latency_promotion",
+  "scope": "actual_li_panel TileLang dKV spill-overflow branch",
+  "date": "2026-06-04",
+  "hardware": "1xMI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "question": "Can the fast but overflowing actual-LI cap-limited panel route become correctness-preserving by adding a TileLang spill kernel for overflow pairs?",
+  "baseline_correct_actual_li": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb32_cap512_k64d64_thr512_timing10_20260604.json",
+    "panel_capacity": 512,
+    "token_block": 32,
+    "overflow_fraction": 0.0,
+    "median_ms": 12.735137939453125,
+    "read": "Full-capacity actual-LI route, no dropped selected pairs, final [groups,D] dKV output."
+  },
+  "overflowing_no_spill_context": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap448_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 448,
+      "overflow_fraction": 0.01088305926408336,
+      "median_ms": 11.797181606292725
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap384_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 384,
+      "overflow_fraction": 0.04592419509117551,
+      "median_ms": 10.251991271972656
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap320_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 320,
+      "overflow_fraction": 0.11036078435363074,
+      "median_ms": 8.707921028137207
+    }
+  ],
+  "spill_results": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_spill_s4096_tb256_cap448_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 448,
+      "spill_panel_capacity": 64,
+      "spill_pair_count": 17112,
+      "spill_pair_fraction": 0.01088305926408336,
+      "spill_panel_extra_overflow_count": 0,
+      "median_ms": 14.358564853668213,
+      "spill_only_median_ms": 2.483444929122925,
+      "checksum": 6397.07421875
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_spill_s4096_tb256_cap384_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 384,
+      "spill_panel_capacity": 128,
+      "spill_pair_count": 72209,
+      "spill_pair_fraction": 0.04592419509117551,
+      "spill_panel_extra_overflow_count": 0,
+      "median_ms": 14.351255416870117,
+      "spill_only_median_ms": 4.093824148178101,
+      "checksum": 6397.07421875
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_spill_s4096_tb256_cap320_k64d64_thr512_timing10_20260604.json",
+      "panel_capacity": 320,
+      "spill_panel_capacity": 192,
+      "spill_pair_count": 173526,
+      "spill_pair_fraction": 0.11036078435363074,
+      "spill_panel_extra_overflow_count": 0,
+      "median_ms": 14.38597059249878,
+      "spill_only_median_ms": 5.668783903121948,
+      "checksum": 6397.07421875
+    }
+  ],
+  "decision": {
+    "promote_spill_branch": false,
+    "retain_current_actual_li_tilelang": "actual_li_panel + mfma_panel_atomic_final, cap512, tb32, 12.735 ms",
+    "read": "The spill path is a real correctness-preserving TileLang branch: the main panel writes final dKV, and a second panel-MFMA spill kernel adds all overflow pairs with zero extra overflow. But the second kernel removes the cap-limited speed win. All tested spill capacities land near 14.35-14.39 ms, slower than the 12.735 ms full-capacity actual-LI kernel and far from the 8.0-8.8 ms sparse-atomic wall.",
+    "next_kernel_work": [
+      "Do not continue with two-kernel cap-limited spill for latency.",
+      "Keep the retained source-indexed selected-limit dKV body for the materialized-input bridge, where actual-LI S4096 layer-2 is about 7.3 ms and packed kernel-only is about 6.2 ms.",
+      "For a real actual-route final-dKV TileLang promotion, replace padded panels with a true sparse segmented producer or fuse route/probability production so the kernel does not pay both padding and a separate spill pass."
+    ]
+  },
+  "command_shape": "python3 tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py --seq-len 4096 --groups 1024 --heads 64 --dim 512 --valid-topk 512 --route-pattern actual_li_panel --actual-li-input-source boundary --layer-id 2 --token-block 256 --group-panel-size 512 --block-k 64 --block-d 64 --threads 512 --math-mode mfma_panel_atomic_final --spill-overflow --spill-mode panel_mfma --warmup-iters 3 --timed-iters 10"
+}

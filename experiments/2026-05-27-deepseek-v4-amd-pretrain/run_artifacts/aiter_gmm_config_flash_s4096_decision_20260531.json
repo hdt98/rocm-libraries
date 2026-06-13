@@ -1,0 +1,66 @@
+{
+  "created_at": "2026-05-31",
+  "purpose": "Decision record for AITER compact GMM W2 dgrad at the DeepSeek-V4-Flash S=4096 MoE shape.",
+  "source_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_config_flash_s4096_20260531.json",
+  "command": "RUN_TAG=aiter_gmm_config_flash_s4096_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-aiter-gmm-config-flash-4096",
+  "shape": {
+    "tokens": 4096,
+    "assignments": 24576,
+    "experts": 256,
+    "topk": 6,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "dtype": "bfloat16"
+  },
+  "route_stats": {
+    "min_per_expert": 73,
+    "max_per_expert": 130,
+    "mean_per_expert": 96.0,
+    "padded_rows_global_max": 33280,
+    "padding_multiplier_global_max": 1.3541666666666667
+  },
+  "results": {
+    "aiter_default_median_ms": 2.328227996826172,
+    "best_aiter_median_ms": 1.48185396194458,
+    "best_aiter_min_ms": 1.4781739711761475,
+    "best_aiter_compact_tflops_median": 278.24392349360284,
+    "best_aiter_config": {
+      "BLOCK_SIZE_M": 128,
+      "BLOCK_SIZE_K": 64,
+      "BLOCK_SIZE_N": 256,
+      "GRID_DIM": 256,
+      "GROUP_SIZE": 1,
+      "num_warps": 8,
+      "num_stages": 1
+    },
+    "torch_padded_bmm_out_median_ms": 1.0687299966812134,
+    "torch_padded_bmm_out_padded_tflops_median": 522.4385487577424,
+    "torch_padded_bmm_out_compact_equivalent_tflops_median": 385.80077446725596,
+    "best_aiter_speedup_vs_default": 1.571158870318724,
+    "best_aiter_speedup_vs_torch_padded_bmm_out": 0.7212114176748969
+  },
+  "correctness": {
+    "ok": true,
+    "max_abs": 0.0,
+    "rel_l2": 0.0,
+    "pct_close": 100.0,
+    "atol": 0.5,
+    "rtol": 0.025
+  },
+  "decision": {
+    "status": "demote_aiter_compact_gmm_for_flash_w2_dgrad",
+    "promote": false,
+    "read": "The tuned AITER compact GMM is correct and 1.57x faster than AITER's default gfx950 config, but it is still slower than the retained padded torch.bmm(out=) baseline at the Flash S=4096 shape. Removing padded rows is not enough unless the grouped kernel keeps library-like MFMA efficiency.",
+    "next_action": [
+      "Keep padded torch.bmm(out=) as the retained W2 dgrad baseline for Flash until a compact kernel beats it.",
+      "Shift the next MoE kernel attempt toward CK/CK-Tile/TileLang or fused backward kernels that combine compact grouped GEMM with SwiGLU derivative and token-gradient reduction.",
+      "Do not promote AITER compact GMM solely because it beats AITER's default config."
+    ]
+  },
+  "validation": {
+    "helper_bash_n": "passed before run",
+    "probe_py_compile": "passed before run",
+    "summary_jq_empty": "passed",
+    "decision_jq_empty": "pending_at_creation"
+  }
+}

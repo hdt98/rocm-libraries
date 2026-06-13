@@ -1,0 +1,182 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_mbs8_selective_attention_ac_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Can expert-Muon's optimizer-state memory saving materialize into an MBS8 8xMI350 run if activation checkpointing is scoped away from collective-bearing MoE?",
+  "root_cause_read": {
+    "why_muon_used_more_memory_before": "Muon halves persistent expert optimizer state versus AdamW, but native/per-expert Muon introduced large transient rank-2 view/update/orthogonalization state and slow Newton-Schulz work. Batched chunked Muon fixed the isolated optimizer transient-memory regression, but no-AC MBS8 remained activation/backward-memory limited.",
+    "why_whole_block_selective_ac_failed": "Whole-transformer selective activation checkpointing recomputed the standard-EP hot-helper MoE path, including route counts, scatter, and MORI/SDMA hot-weight collectives. That exposed checkpoint placeholder dtype issues and unsafe collective replay.",
+    "fix": "Keep MoE outside checkpoint recompute by adding an attention-only selective activation-checkpoint scope. Replace torch.histc route counts with integer torch.bincount so selective recompute does not hit histogram_cpu on Byte placeholders."
+  },
+  "code_changes": {
+    "activation_checkpoint": "sources/wip/torchtitan/torchtitan/distributed/activation_checkpoint.py adds TORCHTITAN_ACTIVATION_CHECKPOINT_SCOPE/CANARY_ACTIVATION_CHECKPOINT_SCOPE with selective attention_only support.",
+    "route_counts": [
+      "sources/wip/torchtitan/torchtitan/models/common/moe.py replaces hot-split/router torch.histc counts with _count_route_ids via torch.bincount.",
+      "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py replaces standard-EP dispatch torch.histc counts with _count_route_ids via torch.bincount."
+    ],
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh forwards CANARY_ACTIVATION_CHECKPOINT_SCOPE into the remote and Docker environments."
+  },
+  "failed_gates_before_fix": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_ac_8x_s4096_gbs128_steps3_20260608",
+      "activation_checkpoint_mode": "selective",
+      "activation_checkpoint_scope": "transformer_block",
+      "result": "failed_before_metric",
+      "failure": "NotImplementedError: histogram_cpu not implemented for Byte",
+      "failure_site": "torch.histc(sorted_offsets.to(torch.float32)) in _standard_ep_hot_split_forward",
+      "read": "Whole-block selective AC recomputed through MoE hot-split route-counting code under checkpoint placeholder state."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_ac_histfix_8x_s4096_gbs128_steps3_20260608",
+      "activation_checkpoint_mode": "selective",
+      "activation_checkpoint_scope": "transformer_block",
+      "result": "failed_before_metric",
+      "failure": "RuntimeError: Autograd not support dtype: Byte",
+      "failure_site": "weighted_scatter_add(out, token_indices, remote_y, scatter_scores)",
+      "read": "The route-count fix moved the failure forward, but whole-block checkpointing still replayed the MoE hot-helper scatter path in an invalid recompute context."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_ac_triton_scatter_8x_s4096_gbs128_steps3_20260608",
+      "activation_checkpoint_mode": "selective",
+      "activation_checkpoint_scope": "transformer_block",
+      "result": "failed_before_metric",
+      "failure": "HSA/GPU hang in MORI SDMA hot-weight all-reduce during checkpointed forward recompute",
+      "read": "Switching scatter backend did not solve the root issue: whole-block selective AC re-entered collective-bearing MoE."
+    }
+  ],
+  "positive_gate": {
+    "run_id": "torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_expert_muon_ns1_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608",
+    "shape": {
+      "model": "deepseek_v4_flash_12layer_ceiling_probe",
+      "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+      "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+      "gpus": 8,
+      "sequence_length": 4096,
+      "global_batch_size": 128,
+      "micro_batch_size": 8,
+      "gradient_accumulation_steps": 2,
+      "tensor_parallel": 1,
+      "pipeline_parallel": 1,
+      "context_parallel": 1,
+      "fsdp": 8,
+      "expert_parallel": 8,
+      "activation_checkpointing": "selective_attention_only",
+      "checkpointing": "disabled",
+      "data": "tests/assets/c4_test"
+    },
+    "env": {
+      "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+      "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+      "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+      "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+      "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+      "CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "bfloat16",
+      "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+      "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+      "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+      "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+      "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+      "CANARY_SHAREDKV_BLOCK_H": "64",
+      "CANARY_SHAREDKV_BLOCK_N": "64",
+      "CANARY_SHAREDKV_BLOCK_D": "128",
+      "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+    },
+    "step_metrics": {
+      "1": {
+        "tokens_per_gpu_s": 1627,
+        "node_tokens_s": 13016,
+        "tflops_per_gpu": 82.38,
+        "mfu_pct": 3.57,
+        "loss": 12.33384,
+        "grad_norm": 20.0,
+        "memory_gib_min": 215.13,
+        "memory_gib_max": 219.94
+      },
+      "2": {
+        "tokens_per_gpu_s": 7906,
+        "node_tokens_s": 63248,
+        "tflops_per_gpu": 400.27,
+        "mfu_pct": 17.33,
+        "loss": 9.55583,
+        "grad_norm": 94.5,
+        "memory_gib_min": 235.81,
+        "memory_gib_max": 240.68
+      },
+      "3": {
+        "tokens_per_gpu_s": 8014,
+        "node_tokens_s": 64112,
+        "tflops_per_gpu": 405.74,
+        "mfu_pct": 17.57,
+        "loss": 6.23901,
+        "grad_norm": 41.0,
+        "memory_gib_min": 236.38,
+        "memory_gib_max": 243.22
+      },
+      "4": {
+        "tokens_per_gpu_s": 8090,
+        "node_tokens_s": 64720,
+        "tflops_per_gpu": 409.62,
+        "mfu_pct": 17.74,
+        "loss": 31.49031,
+        "grad_norm": 71.0,
+        "memory_gib_min": 236.38,
+        "memory_gib_max": 243.22
+      },
+      "5": {
+        "tokens_per_gpu_s": 8086,
+        "node_tokens_s": 64688,
+        "tflops_per_gpu": 409.38,
+        "mfu_pct": 17.73,
+        "loss": 15.16305,
+        "grad_norm": 26.375,
+        "memory_gib_min": 237.08,
+        "memory_gib_max": 243.22
+      },
+      "6": {
+        "tokens_per_gpu_s": 8150,
+        "node_tokens_s": 65200,
+        "tflops_per_gpu": 412.64,
+        "mfu_pct": 17.87,
+        "loss": 10.60424,
+        "grad_norm": 21.25,
+        "memory_gib_min": 237.35,
+        "memory_gib_max": 243.22
+      }
+    },
+    "summary": {
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8049.2,
+      "steps_2_to_6_node_tokens_s_mean": 64393.6,
+      "steps_2_to_6_tflops_per_gpu_mean": 407.53,
+      "steps_4_to_6_tokens_per_gpu_s_mean": 8108.67,
+      "steps_4_to_6_node_tokens_s_mean": 64869.33,
+      "steps_4_to_6_tflops_per_gpu_mean": 410.5467,
+      "peak_logged_memory_gib": 243.22,
+      "delta_vs_retained_adamw_tokens_per_gpu_pct": 0.25,
+      "delta_vs_retained_adamw_tflops_pct": 0.25,
+      "delta_vs_retained_adamw_peak_memory_gib": 49.42,
+      "delta_vs_ns1_mbs4_noac_tokens_per_gpu_pct": 4.65,
+      "delta_vs_ns1_mbs4_noac_tflops_pct": 4.65,
+      "delta_vs_ns1_mbs4_noac_peak_memory_gib": 65.65
+    }
+  },
+  "decision": {
+    "promote_as_retained_baseline": false,
+    "read": "This fixes the root-cause path enough to make MBS8 + expert-Muon run six steps and slightly exceed retained AdamW throughput. It is not a clean retained baseline because it uses NS=1 Muon quality-risk semantics and peaks at 243.22 GiB, about 49.42 GiB above the retained MBS4 AdamW baseline.",
+    "retained_baseline": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "next_action": "Keep attention-only selective AC as the valid memory-scope fix. For promotion, either validate Muon quality at NS=1 and reduce the 243 GiB peak, or use the scoped AC mechanism with AdamW/other memory reducers while continuing MoE/EP and sparse-MLA kernel work."
+  },
+  "validation": {
+    "py_compile": "passed for activation_checkpoint.py, moe.py, token_dispatcher.py",
+    "launcher_bash_n": "passed",
+    "git_diff_check": "passed on touched files",
+    "remote_e2e": "completed 6 steps on 8xMI350"
+  }
+}

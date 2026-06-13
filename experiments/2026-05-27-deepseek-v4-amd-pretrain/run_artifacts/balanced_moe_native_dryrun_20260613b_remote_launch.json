@@ -1,0 +1,16 @@
+{
+  "artifact": "balanced_moe_native_dryrun_20260613b.json",
+  "host": "do-vunguyen-mi350-gpu",
+  "poll_commands": {
+    "artifact": "scp do-vunguyen-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/sweep_snapshots/balanced_moe_native_dryrun_20260613b/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/balanced_moe_native_dryrun_20260613b.json /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform/sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/balanced_moe_native_dryrun_20260613b.json",
+    "log": "ssh do-vunguyen-mi350-gpu 'tail -n 120 /scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_native_dryrun_20260613b/logs/table-driver.log; cat /scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_native_dryrun_20260613b/table-driver.exit 2>/dev/null || true'",
+    "tmux": "ssh do-vunguyen-mi350-gpu 'tmux has-session -t bm_native_dryrun_20260613b; tmux capture-pane -pt bm_native_dryrun_20260613b | tail -n 80'"
+  },
+  "remote_artifact": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sweep_snapshots/balanced_moe_native_dryrun_20260613b/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/balanced_moe_native_dryrun_20260613b.json",
+  "remote_exit": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_native_dryrun_20260613b/table-driver.exit",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_native_dryrun_20260613b/logs/table-driver.log",
+  "remote_self_host": "localhost",
+  "remote_snapshot": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sweep_snapshots/balanced_moe_native_dryrun_20260613b/playground",
+  "status": "remote_tmux_started",
+  "tmux_session": "bm_native_dryrun_20260613b"
+}

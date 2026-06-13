@@ -1,0 +1,64 @@
+{
+  "artifact": "sparse_mla_sidecar_resident_operand_replay_next_decision",
+  "date": "2026-06-05",
+  "scope": "Next sparse-MLA dKV producer decision after sidecar attribution and an on-the-fly prob/scaled-dP schedule test",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "selected_block": 512,
+    "seq_chunk": 1,
+    "threads": 256
+  },
+  "evidence_ms": {
+    "mode2_score_qk_dov_prob_dp_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_dotpart4_20260605.json",
+      "median_ms": 7.075130939483643
+    },
+    "mode15_sidecar_checksum_real_probdp_qgo_replay": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+      "median_ms": 21.471811294555664
+    },
+    "mode16_sidecar_valid_dkv_real_probdp_qgo_replay": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+      "median_ms": 22.955167770385742
+    },
+    "mode19_const_qgo_real_probdp_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode19_const_qgo_contrib_sink_20260605.json",
+      "median_ms": 11.716370582580566,
+      "read": "Attribution only: removes contribution-stage q/grad_output global reloads."
+    },
+    "mode20_const_qgo_const_probdp_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode20_const_all_contrib_sink_20260605.json",
+      "median_ms": 7.573606967926025,
+      "read": "Attribution only: removes contribution-stage q/grad_output global reloads and prob/scaled-dP shared replay."
+    },
+    "mode21_onfly_probdp_real_qgo_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode21_onfly_probdp_sink_20260605.json",
+      "median_ms": 33.87312316894531,
+      "read": "Real schedule variant: skips BF16 prob/scaled-dP shared-page reads and derives prob/scaled-dP from the float score/dO.V page inside each contribution setup. It keeps real q/grad_output reloads and checksum output."
+    }
+  },
+  "read": {
+    "sidecar_metadata": "Not the wall. Duplicate sidecar preload and sidecar use were within timing noise of the baseline.",
+    "q_grad_output_replay": "Major wall. Removing contribution-stage q and grad_output global reloads by replacing them with constants cut mode15 from 21.47 ms to 11.72 ms, attributing about 9.76 ms.",
+    "prob_scaled_dp_replay": "Second wall. Removing contribution-stage prob/scaled-dP shared reads after q/go constants cut 11.72 ms to 7.57 ms, attributing about 4.14 ms.",
+    "on_the_fly_prob_scaled_dp": "Rejected. Recomputing exp/scale from the float score page for every contribution D block produced 33.87 ms, worse than the 21.47 ms BF16 page replay baseline."
+  },
+  "decision": {
+    "status": "simple_onfly_probdp_rejected_true_resident_consumer_required",
+    "why": "The useful target is still resident consumption, but it cannot mean recomputing prob/scaled-dP per D block. The kernel has to compute prob/scaled-dP once per (token, selected slot, head) and consume it before it leaves registers/LDS, while also avoiding contribution-stage q/grad_output global replay. That requires a deeper cooperative or persistent producer-consumer shape, not the current one-CTA score-page replay loop.",
+    "next_kernel_contract": "Build a producer where the score/dO.V wave computes prob and scaled-dP once, then hands that small H/K tile to D-block consumers by warp-register shuffle or a persistent same-workgroup pipeline. q and grad_output D tiles must be loaded once per token/head/D tile and reused across selected slots before final group-aware dKV reduction and global atomics.",
+    "do_not_retry": [
+      "Do not retry mode21-style on-the-fly prob/scaled-dP recompute per D block.",
+      "Do not tune sidecar preload placement as the main lever.",
+      "Do not materialize a global prob/scaled-dP slab before the dKV producer."
+    ]
+  }
+}

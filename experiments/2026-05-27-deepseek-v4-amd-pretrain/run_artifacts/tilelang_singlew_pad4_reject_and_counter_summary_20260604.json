@@ -1,0 +1,72 @@
+{
+  "artifact": "tilelang_singlew_pad4_reject_and_counter_summary_20260604",
+  "created_at": "2026-06-04",
+  "status": "rejected",
+  "scope": "Record the TileLang compact sparse-dKV single-write pad4 branch and why it should not be pursued.",
+  "host": "do-sonle-kernel",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "valid_topk": 512,
+    "token_block": 256,
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "route_pattern": "panel_capacity_random",
+    "fold_final_dkv": true,
+    "fold_backend": "tilelang_panel_dense"
+  },
+  "correctness": {
+    "s128_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_singlew_pad4_fold_tilelang_panel_dense_s128_valid512_tb256_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "s128_max_abs_diff": 1.862645149230957e-08,
+    "read": "The branch is numerically viable on the small correctness gate."
+  },
+  "latency": {
+    "retained_current_best_artifact": "run_artifacts/tilelang_tb256_paneldense_rocprof_bottleneck_and_panel256_reject_20260604.json",
+    "retained_current_best_ms": 7.990410327911377,
+    "singlew_pad4_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_singlew_pad4_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "singlew_pad4_ms": 8.349532127380371,
+    "regression_pct": 4.5,
+    "read": "singlew_pad4 regresses the target S4096 timing despite the same MFMA count and a solved final fold."
+  },
+  "counter_comparison": {
+    "retained_current_best": {
+      "SQ_INSTS": 924522416,
+      "SQ_INSTS_MFMA": 41943040,
+      "SQ_INSTS_VALU_MFMA_BF16": 41943040,
+      "SQ_INSTS_VMEM_RD": 51185664,
+      "SQ_INSTS_VMEM_WR": 32768,
+      "SQ_WAVES": 2048,
+      "VGPR": 92,
+      "SGPR": 64
+    },
+    "singlew_pad4": {
+      "artifact": "run_artifacts/tilelang_singlew_pad4_pmc_primary_timed_20260604T0715.json",
+      "SQ_INSTS": 1058639664,
+      "SQ_INSTS_MFMA": 41943040,
+      "SQ_INSTS_VALU_MFMA_BF16": 41943040,
+      "SQ_INSTS_VMEM_RD": 53807104,
+      "SQ_INSTS_VMEM_WR": 32768,
+      "SQ_WAVES": 2048,
+      "VGPR": 80,
+      "SGPR": 64
+    },
+    "read": "The pad4 branch keeps the same BF16 MFMA work and wave count but adds about 14.5% more SQ instructions and more VMEM reads. Lower VGPR pressure does not offset the extra control/index/load work."
+  },
+  "decision": {
+    "keep": "retained_tb256_gps512_cap320_mfma_reduced_fold_tilelang_panel_dense",
+    "reject": "mfma_reduced_singlew_pad4",
+    "next_work": "Do not spend more time on single-write pad geometry. Use the e2e bridge audit to move toward a fuller TileLang sparse-MLA backward boundary."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "S128 correctness run on do-sonle-kernel in rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "S4096 timing10 run on do-sonle-kernel in rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "rocprofv3 primary SQ counter pass for singlew_pad4"
+  ],
+  "dependency_pin_changes": []
+}

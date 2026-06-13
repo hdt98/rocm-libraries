@@ -1,0 +1,57 @@
+{
+  "status": "rejected_as_full_boundary_latency_candidate",
+  "date": "2026-06-05",
+  "scope": "actual LI sparse-MLA shared latent-KV backward, S4096 layer 2, BF16, 1xMI350",
+  "question": "Can the compressed-group union operand keep the query-major producer and materialize the dKV-slice win into full sparse-attention backward latency?",
+  "answer": "No for this implementation. The schedule is correct, but full source-boundary dQ+dKV is 28.78-29.02 ms versus the retained 11.13 ms sparse-attention backward gate.",
+  "artifacts": {
+    "timing": "run_artifacts/sparse_mla_query_recompute_union_operand_full_t4k512_u64_s4096_layer2_20260605.json",
+    "correctness": "run_artifacts/sparse_mla_query_recompute_union_operand_full_t4k512_u64_s4096_layer2_correctness_20260605.json"
+  },
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "token_block": 4,
+    "block_h": 64,
+    "block_u": 64,
+    "block_d": 128,
+    "route_model_selected_block": 512
+  },
+  "correctness": {
+    "passed": true,
+    "dq_max_abs_diff": 0.0016285479068756104,
+    "dkv_max_abs_diff": 0.06619834899902344,
+    "atol": 1.0
+  },
+  "timing_ms": {
+    "retained_sparse_attention_backward_gate": 11.1347,
+    "union_full_dq_dkv_median": 29.02492332458496,
+    "union_full_dq_dkv_correctness_sample": 28.776460647583008,
+    "union_dkv_only_median": 8.479180335998535,
+    "union_dkv_only_sink_median": 7.5212931632995605,
+    "split_single_token_no_dkv_plus_union_dkv": 10.469472289085388,
+    "matched_single_token_full": 11.076744079589844
+  },
+  "route_stats": {
+    "valid_pairs": 1572352,
+    "coalesced_unique_groups": 515790,
+    "modeled_write_reduction_x": 3.04843444037302,
+    "union_route_slots_mib": 30.40625,
+    "duplicate_token_group_hits": 0,
+    "unique_groups_per_tile_mean": 503.701171875,
+    "unique_groups_per_tile_p99": 954.77001953125,
+    "unique_groups_per_tile_max": 973
+  },
+  "read": [
+    "The user's correction is right: union must remain an epilogue/output organization on top of the query-major source boundary, not a route/group-major owner for the whole kernel.",
+    "This implementation keeps token/query-major CTA placement, but it changes the selected operand axis from per-token selected slots to the compressed-group union for a token tile.",
+    "That union axis is not free for dQ. A four-token tile often has many groups that are valid for only a subset of tokens, so QK/PV/softmax/scaled-dP and dQ are replayed over masked union columns.",
+    "The dKV-only split still looks near the retained gate, but the actual full dQ+dKV boundary is the promotion metric and it loses badly.",
+    "The next viable design should keep the baseline selected-slot QK/PV/dQ path intact and attach group-aware dKV reduction after scaled-dP is available, instead of making union groups the operand axis for dQ."
+  ],
+  "next_kernel_contract": "selected-slot query-major producer for QK/PV/softmax/scaled-dP/dQ, with a separate group-aware dKV epilogue that consumes the same scaled-dP page before HBM and reduces only the dKV write path by compressed group"
+}

@@ -1,0 +1,280 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_aiter_compact_ptgmm_dhidden_dtopk_materialization",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_aiter_compact_ptgmm_dhidden_dtopk_retry_4x_s4096_gbs128_mbs2_heap40_steps6_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_ptgmm_dhidden_dtopk_retry_4x_s4096_gbs128_mbs2_heap40_steps6_20260606/docker-run.log",
+  "local_log_copy_for_parse": "/tmp/torchtitan_dsv4_flash12_dhidden_dtopk_retry_docker-run.log",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW",
+    "tokens_per_step": 524288
+  },
+  "runtime": {
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "save_forward_dispatch": true,
+    "local_vjp_mode": "aiter_compact",
+    "local_vjp_swiglu_backend": "triton",
+    "local_vjp_aiter_wgrad_op": "ptgmm",
+    "compact_recompute_mode": "expert_loop",
+    "xgrad_mode": "full",
+    "transpose_cache_size": 0,
+    "op_cache_mode": "backward",
+    "backward_combine_input_mode": "registered",
+    "dx_return_mode": "sync",
+    "mori_ep_launch_config_mode": "MANUAL",
+    "mori_aiter_block_num": 64,
+    "mori_aiter_rdma_block_num": 32,
+    "mori_aiter_warp_num_per_block": 8,
+    "dsv4_profile_sharedkv_backward": false,
+    "enable_profiling": false,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "dtopk_mode": "dhidden",
+    "dtopk_chunk_rows": "default",
+    "run_notes": "Same retained compact ptgmm expert-loop recompute shape, with TORCHTITAN_MORI_AITER_DTOPK_MODE=dhidden."
+  },
+  "steps": [
+    {
+      "step": 1,
+      "loss": 12.28694,
+      "grad_norm": 15.9375,
+      "tokens_per_gpu_s_mean": 2591.75,
+      "tokens_per_gpu_s_values": [
+        2591,
+        2592,
+        2592,
+        2592
+      ],
+      "node_tokens_s_mean": 10367.0,
+      "tflops_per_gpu_mean": 131.215,
+      "tflops_per_gpu_values": [
+        131.18,
+        131.22,
+        131.24,
+        131.22
+      ],
+      "memory_gib_max": 171.95,
+      "memory_gib_values": [
+        171.73,
+        171.95,
+        171.62,
+        171.62
+      ],
+      "mfu_percent_mean": 5.68
+    },
+    {
+      "step": 2,
+      "loss": 8.57766,
+      "grad_norm": 28.875,
+      "tokens_per_gpu_s_mean": 3838.0,
+      "tokens_per_gpu_s_values": [
+        3838,
+        3838,
+        3838,
+        3838
+      ],
+      "node_tokens_s_mean": 15352.0,
+      "tflops_per_gpu_mean": 194.34,
+      "tflops_per_gpu_values": [
+        194.34,
+        194.34,
+        194.34,
+        194.34
+      ],
+      "memory_gib_max": 218.29,
+      "memory_gib_values": [
+        217.22,
+        218.29,
+        216.92,
+        217.22
+      ],
+      "mfu_percent_mean": 8.41
+    },
+    {
+      "step": 3,
+      "loss": 22.58006,
+      "grad_norm": 22.0,
+      "tokens_per_gpu_s_mean": 3758.0,
+      "tokens_per_gpu_s_values": [
+        3758,
+        3758,
+        3758,
+        3758
+      ],
+      "node_tokens_s_mean": 15032.0,
+      "tflops_per_gpu_mean": 190.29,
+      "tflops_per_gpu_values": [
+        190.29,
+        190.29,
+        190.29,
+        190.29
+      ],
+      "memory_gib_max": 218.55,
+      "memory_gib_values": [
+        218.55,
+        216.92,
+        217.51,
+        218.29
+      ],
+      "mfu_percent_mean": 8.24
+    },
+    {
+      "step": 4,
+      "loss": 13.88181,
+      "grad_norm": 131.0,
+      "tokens_per_gpu_s_mean": 3790.0,
+      "tokens_per_gpu_s_values": [
+        3790,
+        3790,
+        3790,
+        3790
+      ],
+      "node_tokens_s_mean": 15160.0,
+      "tflops_per_gpu_mean": 191.91,
+      "tflops_per_gpu_values": [
+        191.91,
+        191.91,
+        191.91,
+        191.91
+      ],
+      "memory_gib_max": 218.55,
+      "memory_gib_values": [
+        218.55,
+        217.51,
+        218.33,
+        218.32
+      ],
+      "mfu_percent_mean": 8.31
+    },
+    {
+      "step": 5,
+      "loss": 14.47576,
+      "grad_norm": 55.25,
+      "tokens_per_gpu_s_mean": 3611.0,
+      "tokens_per_gpu_s_values": [
+        3611,
+        3611,
+        3611,
+        3611
+      ],
+      "node_tokens_s_mean": 14444.0,
+      "tflops_per_gpu_mean": 182.84,
+      "tflops_per_gpu_values": [
+        182.84,
+        182.84,
+        182.84,
+        182.84
+      ],
+      "memory_gib_max": 218.94,
+      "memory_gib_values": [
+        218.94,
+        217.51,
+        218.55,
+        218.32
+      ],
+      "mfu_percent_mean": 7.92
+    },
+    {
+      "step": 6,
+      "loss": 12.55707,
+      "grad_norm": 34.75,
+      "tokens_per_gpu_s_mean": 3662.0,
+      "tokens_per_gpu_s_values": [
+        3662,
+        3662,
+        3662,
+        3662
+      ],
+      "node_tokens_s_mean": 14648.0,
+      "tflops_per_gpu_mean": 185.435,
+      "tflops_per_gpu_values": [
+        185.44,
+        185.44,
+        185.43,
+        185.43
+      ],
+      "memory_gib_max": 219.8,
+      "memory_gib_values": [
+        218.55,
+        218.32,
+        218.94,
+        219.8
+      ],
+      "mfu_percent_mean": 8.03
+    }
+  ],
+  "late_step_summary": {
+    "window": "steps_2_to_6",
+    "tokens_per_gpu_s": 3731.8,
+    "node_tokens_s": 14927.2,
+    "tflops_per_gpu": 188.963,
+    "peak_logged_memory_gib": 219.8,
+    "mfu_percent": 8.182,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu": 0.3059,
+    "derived_step_time_s": 35.12,
+    "derived_flops_per_token_gflop": 50.64
+  },
+  "late_tail_summary": {
+    "window": "steps_4_to_6",
+    "tokens_per_gpu_s": 3687.67,
+    "node_tokens_s": 14750.67,
+    "tflops_per_gpu": 186.728,
+    "peak_logged_memory_gib": 219.8,
+    "mfu_percent": 8.087,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu": 0.3023,
+    "derived_step_time_s": 35.54,
+    "derived_flops_per_token_gflop": 50.64
+  },
+  "comparison": {
+    "retained_baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_aiter_compact_ptgmm_expertrecompute_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+    "retained_steps_2_to_6_tokens_per_gpu_s": 3925.6,
+    "retained_steps_2_to_6_tflops_per_gpu": 198.74,
+    "retained_steps_2_to_6_peak_logged_memory_gib": 220.66,
+    "tokens_delta_vs_retained_pct": -4.94,
+    "tflops_delta_vs_retained_pct": -4.92,
+    "peak_memory_delta_vs_retained_gib": -0.86,
+    "retained_steps_4_to_6_tokens_per_gpu_s": 3928.0,
+    "candidate_steps_4_to_6_tokens_per_gpu_s": 3687.67,
+    "tokens_delta_steps_4_to_6_vs_retained_pct": -6.12,
+    "owner_vjp_warm_probe_artifact": "run_artifacts/mori_aiter_owner_vjp_dhidden_dtopk_warm_s4096_ptgmm_4x_20260606.json",
+    "owner_vjp_warm_probe_local_total_mean_delta_ms": -83.47,
+    "owner_vjp_warm_probe_read": "Local owner-rank VJP probe showed parity and a small mean timing win by computing dTopK from dhidden_unscaled, but the full 12-layer training run did not materialize that win."
+  },
+  "decision": {
+    "promote_as_current_12layer_mbs_candidate": false,
+    "read": "The dhidden dTopK identity is correct and useful locally, but it does not materialize into the 12-layer e2e target. Steps 2-6 average 3731.8 tok/GPU/s and 188.96 TFLOPs/GPU, about 4.9% and 4.4% below the retained compact ptgmm expert-recompute baseline.",
+    "caveat": "This is a clean non-profile six-step run, so it is strong rejection evidence for this exact dTopK-only rearrangement at the active MBS2/GBS128/S4096 shape. It should remain available as an opt-in diagnostic mode but not become the default.",
+    "next_actions": [
+      "Keep retained 12-layer candidate on out_recompute dTopK mode.",
+      "Do not spend more time on dTopK-only e2e promotion unless it is folded into a larger fused compact owner-rank backward.",
+      "Return focus to the two material paths: fused compact MORI/AITER owner VJP and C4 sparse MLA backward rewrite."
+    ]
+  }
+}

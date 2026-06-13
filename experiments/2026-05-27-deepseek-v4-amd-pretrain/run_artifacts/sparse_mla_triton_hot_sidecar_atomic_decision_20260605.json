@@ -1,0 +1,96 @@
+{
+  "scope": "sparse_mla_shared_latent_kv_actual_li_triton_hot_sidecar_atomic_decision",
+  "status": "rejected_as_latency_promotion",
+  "date": "2026-06-05",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "gpu": "HIP_VISIBLE_DEVICES=0"
+  },
+  "kernel_added": {
+    "name": "dot_k_hot_sidecar_atomic",
+    "contract": "Preserve the Triton query-major dot_k_atomic producer, carry a bounded hot compressed-group sidecar per (seq tile, selected tile), accumulate those hot groups locally, and fall back to raw global atomics for non-hot groups.",
+    "correctness_smoke": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_hot_sidecar_atomic_s128_layer2_sc16_sb64_hot16_d16h64k32_20260605.json",
+      "seq_len": 128,
+      "selected_block": 64,
+      "hot_groups": 16,
+      "passed": true,
+      "max_abs_diff": 0.08408737182617188,
+      "atol": 0.1,
+      "median_ms": 0.15632200241088867,
+      "write_reduction_x": 3.36,
+      "hot_pair_coverage": 0.753968253968254
+    }
+  },
+  "s4096_results": [
+    {
+      "kernel": "dot_k_atomic",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+      "median_ms": 8.144311904907227,
+      "write_reduction_x": 1.0
+    },
+    {
+      "kernel": "dot_k_compact_micro_sink",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+      "median_ms": 7.047167062759399,
+      "read": "Checksum floor only; not a valid dKV result."
+    },
+    {
+      "kernel": "dot_k_compact_micro_partial_store",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+      "median_ms": 8.824965953826904,
+      "emit_only_median_ms": 8.507503986358643,
+      "write_reduction_x": 1.0
+    },
+    {
+      "kernel": "dot_k_hot_sidecar_atomic",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_hot_sidecar_atomic_s4096_layer2_sc32_sb512_hot8_d16h64k64_timing10_seq_20260605.json",
+      "hot_groups": 8,
+      "median_ms": 16.57238006591797,
+      "write_reduction_x": 1.0191712984719095,
+      "hot_pair_coverage": 0.019461927100293062
+    },
+    {
+      "kernel": "dot_k_hot_sidecar_atomic",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_hot_sidecar_atomic_s4096_layer2_sc32_sb512_hot16_d16h64k64_timing10_seq_20260605.json",
+      "hot_groups": 16,
+      "median_ms": 9.424831867218018,
+      "write_reduction_x": 1.03859854932602,
+      "hot_pair_coverage": 0.03846148953923803
+    },
+    {
+      "kernel": "dot_k_hot_sidecar_atomic",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_hot_sidecar_atomic_s4096_layer2_sc32_sb512_hot32_d16h64k64_timing10_20260605.json",
+      "hot_groups": 32,
+      "median_ms": 9.646866798400879,
+      "write_reduction_x": 1.0788073476954574,
+      "hot_pair_coverage": 0.07562492368121133
+    },
+    {
+      "kernel": "dot_k_hot_sidecar_atomic",
+      "artifact": "run_artifacts/actual_li_active_list_dotk_hot_sidecar_atomic_s4096_layer2_sc32_sb512_hot64_d16h64k64_timing10_seq_20260605.json",
+      "hot_groups": 64,
+      "median_ms": 16.064001083374023,
+      "write_reduction_x": 1.1654934040577072,
+      "hot_pair_coverage": 0.14706185383425593
+    }
+  ],
+  "read": [
+    "Yes, the sidecar idea belongs in Triton if we want to preserve the fast loop. The SB512 sink floor at about 7.05 ms confirms sidecar metadata and selected-window traversal do not inherently destroy the fast query-major producer.",
+    "The current valid compact-partial Triton sidecar path is not enough because it still performs one memory update per selected contribution before the final reduction. That is why it lands at about 8.82 ms instead of the 7.05 ms floor.",
+    "The new bounded hot-sidecar atomic kernel is correct at S128 but does not improve S4096 latency. Actual layer-2 LI routing is too flat inside each seq tile: hot32 covers only about 7.56% of selected pairs, and hot64 covers only about 14.71%. The extra route-match/dot epilogue costs more than the small write reduction saves.",
+    "The next Triton attempt should not be a bounded hot-set sidecar. It needs full selected-window segmented reduction, but without the old dot_k_micro route-owned replay. That likely means a two-level Triton producer: query-major contribution production writes compact per-CTA grouped fragments that are already reduced over a larger portion of the selected window, followed by the cheap reducer, or a lower-level cooperative kernel if Triton cannot express that reduction without large register pressure."
+  ],
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_hot_sidecar_atomic --seq-len 128 --selected-block 64 --hot-groups 16 --block-d 16 --block-h 64 --block-k 32 --dkv-atol 0.1",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_hot_sidecar_atomic --seq-len 4096 --selected-block 512 --hot-groups 8 --block-d 16 --block-h 64 --block-k 64 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_hot_sidecar_atomic --seq-len 4096 --selected-block 512 --hot-groups 16 --block-d 16 --block-h 64 --block-k 64 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_hot_sidecar_atomic --seq-len 4096 --selected-block 512 --hot-groups 32 --block-d 16 --block-h 64 --block-k 64 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_hot_sidecar_atomic --seq-len 4096 --selected-block 512 --hot-groups 64 --block-d 16 --block-h 64 --block-k 64 --skip-correctness --skip-reference-timing --allow-large-materialization"
+  ]
+}

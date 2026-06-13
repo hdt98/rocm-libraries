@@ -1,0 +1,133 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_bucketed_cachedebug_nockpt_mbs8_steps3_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_bucketed_cachedebug_nockpt_mbs8_steps3_20260609",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "configuration": {
+    "optimizer": "config_default_adamw",
+    "activation_checkpoint_scope": "attention_only",
+    "checkpoint_enable": false,
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "native_compact_max_peer_rows_floor": 65536,
+    "native_compact_blocks": 64,
+    "native_compact_warps": 8,
+    "native_compact_prereset": false,
+    "native_compact_debug_cache": true,
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "sharedkv_block_shape": {
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128
+    },
+    "li_kl_backend": "triton_tl_dot",
+    "mori_shmem_heap_size": "48G"
+  },
+  "result": {
+    "status": "completed_three_steps_not_promoted",
+    "step_metrics": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s": 1087,
+        "tflops_per_gpu": 55.05,
+        "loss": 12.18387,
+        "grad_norm": 16.75,
+        "rank_max_memory_gib": 174.04
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s": 8213,
+        "tflops_per_gpu": 415.86,
+        "loss": 9.20251,
+        "grad_norm": 91.0,
+        "rank_max_memory_gib": 220.08
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s": 8453,
+        "tflops_per_gpu": 428.0,
+        "loss": 7.61106,
+        "grad_norm": 157.0,
+        "rank_max_memory_gib": 224.93
+      }
+    ],
+    "steps_2_to_3_tokens_per_gpu_s_mean": 8333.0,
+    "steps_2_to_3_tflops_per_gpu_mean": 421.93,
+    "peak_logged_memory_gib": 224.93
+  },
+  "native_compact_cache_evidence": {
+    "pre_fix_failure_run_id": "torchtitan_dsv4_flash12_mori_native_keyfix_cachedebug_heap48_mbs8_steps3_20260609c",
+    "pre_fix_observed_capacity_peer_rows": [
+      65536,
+      71201,
+      67073,
+      69231,
+      125223
+    ],
+    "pre_fix_failure": {
+      "phase": "post_step2_next_dispatch_handle_allocation",
+      "requested_bytes": 8206614528,
+      "heap_size_bytes": 51539607552,
+      "message": "Out of static heap memory in MORI dispatch_combine.cpp:186"
+    },
+    "post_fix_capacity_policy": "capacity=max(fixed_floor, next_power_of_two(required_rows))",
+    "post_fix_observed_cache_buckets": [
+      {
+        "capacity_peer_rows": 65536,
+        "max_peer_rows": 35612,
+        "cache_size_before_insert": 0
+      },
+      {
+        "capacity_peer_rows": 131072,
+        "max_peer_rows": 69775,
+        "cache_size_before_insert": 1
+      }
+    ],
+    "read": "The 6.8k native-MORI drop was not an inherent native dispatch/combine regression. The corrected apples-to-apples native path plus bucketed compact capacity returns to the restored-src-info performance band, while the exact-sized capacity policy was creating multiple multi-GiB MORI handles and exhausting the static heap."
+  },
+  "comparison": {
+    "retained_standard_ep_adamw_20step": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 8518.84,
+      "steps_2_to_20_tflops_per_gpu_mean": 431.31,
+      "peak_logged_memory_gib": 251.97
+    },
+    "mori_compact_restored_src_info": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_compact_srcinfo_regression_fix_8x_s4096_gbs128_20260609.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8286.6,
+      "steps_4_to_6_tokens_per_gpu_s_mean": 8471.3,
+      "steps_4_to_6_tflops_per_gpu_mean": 428.9
+    },
+    "this_bucketed_native_step3": {
+      "tokens_per_gpu_s": 8453,
+      "tflops_per_gpu": 428.0
+    }
+  },
+  "mori_profiler_followup": {
+    "source": "https://github.com/ROCm/mori/blob/main/docs/PROFILER.md",
+    "read": "Use MORI-VIZ after the capacity fix for dispatch/combine phase attribution. It requires a MORI build with ENABLE_PROFILER=ON, device-side MORI_TRACE_* slots, and Python export via mori.kernel_profiler.export_to_perfetto(mori.cpp.get_debug_time_buf(op._handle), trace.json). Keep to a single iteration to avoid circular-buffer wrap."
+  }
+}

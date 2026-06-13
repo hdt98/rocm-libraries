@@ -1,0 +1,960 @@
+{
+  "artifact": "compact_moe_tile_kernel_manifest_20260531",
+  "budget_gates": {
+    "first_kernel_isolated_gates": {
+      "bwd_w2_dgrad": {
+        "correctness": "match PyTorch compact-reduce bwd_w2_dgrad for learned routes",
+        "latency_gate_ms": 3.0,
+        "reference_current_median_ms": 3.57997989654541,
+        "why": "A tile-native dgrad should realize most row savings without wgrad output scheduling or token atomics."
+      },
+      "bwd_xgrad_w1w3_pair": {
+        "correctness": "match summed W1/W3 xgrad before compact-to-token reduce",
+        "latency_gate_ms": 6.3,
+        "reference_current_median_ms": 7.086366176605225,
+        "why": "This is the next large dgrad block after W2 dgrad and benefits from pair fusion."
+      }
+    },
+    "full_layer_promotion": {
+      "must_not_promote": [
+        "cached-learned routing as a training result",
+        "fixed-balanced routing as a training result",
+        "wrapper variants that lose to paired compact-reduce full-layer timing"
+      ],
+      "must_preserve": [
+        "learned router and moe.gate gradients",
+        "compact grouped rows with group_sizes/group_offsets",
+        "dense expert gradient output layout for dw1/dw2/dw3"
+      ],
+      "s2048_promotion_gate": "full-layer avg_ms <= paired compact-reduce avg_ms - 1.0 ms (51.328626 ms)",
+      "s2048_target_gate": "full-layer avg_ms <= 43.3 ms",
+      "s4096_promotion_gate": "full-layer avg_ms <= retained compact-reduce avg_ms - 1.0 ms (75.573240 ms)",
+      "s4096_target_gate": "full-layer avg_ms <= 86.6 ms"
+    },
+    "s2048": {
+      "paired_current_default_avg_ms": 52.328626019880176,
+      "paired_current_default_min_ms": 52.19650699291378,
+      "predicted_avg_ms_if_tile_row_savings_scale_from_learned": 48.12624154879746,
+      "promotion_required_avg_ms": 51.328626019880176,
+      "remaining_gap_ms_after_tile_from_learned": 4.826241548797462,
+      "target_ms": 43.3,
+      "target_required_avg_ms": 43.3
+    },
+    "s4096": {
+      "paired_current_default_avg_ms": 76.57323967820655,
+      "paired_current_default_min_ms": 76.30661700386554,
+      "predicted_avg_ms_if_tile_row_savings_scale_from_learned": 70.17686438969879,
+      "promotion_required_avg_ms": 75.57323967820655,
+      "remaining_gap_ms_after_tile_from_learned": -16.423135610301202,
+      "target_ms": 86.6,
+      "target_required_avg_ms": 86.6
+    }
+  },
+  "date": "2026-05-31",
+  "implementation_order": [
+    "bwd_w2_dgrad",
+    "bwd_xgrad_w1w3_pair",
+    "pack_dy_and_dscore",
+    "reduce_dx_and_restore_dscore",
+    "bwd_w2_wgrad",
+    "bwd_w1_w3_wgrad_pair",
+    "forward W1/W3/W2 after backward kernels prove the compact-tile contract"
+  ],
+  "operator": "compact_dynamic_grouped_moe_train_tile_manifest",
+  "read": "This manifest is the handoff from PyTorch wrapper exploration to a compact-native TileLang/CK implementation. It keeps learned routing, per-expert group sizes, dense expert-gradient outputs, and tile-row padding, while removing the global max_count padded bridge from the routed expert GEMMs.",
+  "retained_full_layer_baselines": {
+    "s2048": {
+      "avg_ms": 52.328626019880176,
+      "estimated_tflops": 186.05789468695653,
+      "min_ms": 52.19650699291378,
+      "tokens_per_s": 39137.2783077076
+    },
+    "s4096": {
+      "avg_ms": 76.57323967820655,
+      "estimated_tflops": 276.50802181590427,
+      "min_ms": 76.30661700386554,
+      "tokens_per_s": 53491.27211037617
+    }
+  },
+  "route_source_note": "The tile schedule is a deterministic CPU route sample, while the S2048 timing artifact was collected from the GPU bridge. Use timing references as baseline magnitudes and promotion gates, not exact per-route predictions.",
+  "routes": [
+    {
+      "blocking": {
+        "element_cta": 256,
+        "hidden_n_blocks": 56,
+        "intermediate_n_blocks": 24,
+        "m_tile_rows": 8,
+        "n_tile_hidden": 128,
+        "n_tile_intermediate": 128
+      },
+      "check": {
+        "total_matches_expected": true
+      },
+      "expected_train_gemm_flops": 5390519500800.0,
+      "kernels": [
+        {
+          "estimated_ctas": 380800,
+          "implementation_note": "Gather valid token rows and leave tile padding rows zero-filled.",
+          "input_shapes": {
+            "compact_to_tile": [
+              12288
+            ],
+            "token_ids_sorted": [
+              12288
+            ],
+            "x": [
+              2048,
+              7168
+            ]
+          },
+          "kind": "gather_pack",
+          "name": "pack_x_to_tile_rows",
+          "output_shapes": {
+            "x_tile": [
+              13600,
+              7168
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 1197893222400.0,
+          "estimated_ctas": 40800,
+          "implementation_note": "Fuse W1 and W3 over the same compact M tiles when register/LDS pressure allows.",
+          "input_shapes": {
+            "tile_descriptors": [
+              1700,
+              4
+            ],
+            "w1": [
+              384,
+              3072,
+              7168
+            ],
+            "w3": [
+              384,
+              3072,
+              7168
+            ],
+            "x_tile": [
+              13600,
+              7168
+            ]
+          },
+          "kind": "grouped_gemm_pair",
+          "name": "fwd_w1_w3_grouped_gemm_pair",
+          "output_shapes": {
+            "gate_tile": [
+              13600,
+              3072
+            ],
+            "up_tile": [
+              13600,
+              3072
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 7.016682863235474,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 5.2873940015515535
+          }
+        },
+        {
+          "estimated_ctas": 163200,
+          "implementation_note": "Apply SiLU(gate) * up only on valid compact rows or zero-padded tile rows.",
+          "input_shapes": {
+            "gate_tile": [
+              13600,
+              3072
+            ],
+            "up_tile": [
+              13600,
+              3072
+            ]
+          },
+          "kind": "pointwise",
+          "name": "fwd_swiglu",
+          "output_shapes": {
+            "hidden_tile": [
+              13600,
+              3072
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 598946611200.0,
+          "estimated_ctas": 95200,
+          "implementation_note": "Grouped GEMM over compact rows; do not materialize [experts, max_count, hidden].",
+          "input_shapes": {
+            "hidden_tile": [
+              13600,
+              3072
+            ],
+            "tile_descriptors": [
+              1700,
+              4
+            ],
+            "w2": [
+              384,
+              7168,
+              3072
+            ]
+          },
+          "kind": "grouped_gemm",
+          "name": "fwd_w2_grouped_gemm",
+          "output_shapes": {
+            "y_unscaled_tile": [
+              13600,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 3.4705801010131836,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 2.615242097394686
+          }
+        },
+        {
+          "estimated_ctas": 380800,
+          "implementation_note": "Weighted compact-row reduction back to token order.",
+          "input_shapes": {
+            "score_sorted": [
+              12288
+            ],
+            "tile_to_compact": [
+              13600
+            ],
+            "token_ids_sorted": [
+              12288
+            ],
+            "y_unscaled_tile": [
+              13600,
+              7168
+            ]
+          },
+          "kind": "scatter_reduce",
+          "name": "reduce_y_to_tokens",
+          "output_shapes": {
+            "y": [
+              2048,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 0.4991630017757416,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 0.3761423328983868
+          }
+        },
+        {
+          "estimated_ctas": 380800,
+          "implementation_note": "Gather dy, apply score, and compute per-assignment dscore dot products.",
+          "input_shapes": {
+            "dy": [
+              2048,
+              7168
+            ],
+            "score_sorted": [
+              12288
+            ],
+            "tile_to_compact": [
+              13600
+            ],
+            "token_ids_sorted": [
+              12288
+            ],
+            "y_unscaled_tile": [
+              13600,
+              7168
+            ]
+          },
+          "kind": "gather_scale_reduce",
+          "name": "pack_dy_and_dscore",
+          "output_shapes": {
+            "dtop_scores_sorted": [
+              12288
+            ],
+            "dy_unscaled_tile": [
+              13600,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 0.47692301869392395,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 0.3593834803987902
+          }
+        },
+        {
+          "bf16_gemm_flops": 598946611200.0,
+          "estimated_ctas": 40800,
+          "implementation_note": "Best first kernel: no expert-gradient output and no token-order atomics.",
+          "input_shapes": {
+            "dy_unscaled_tile": [
+              13600,
+              7168
+            ],
+            "tile_descriptors": [
+              1700,
+              4
+            ],
+            "w2": [
+              384,
+              7168,
+              3072
+            ]
+          },
+          "kind": "grouped_gemm",
+          "name": "bwd_w2_dgrad",
+          "output_shapes": {
+            "dhidden_tile": [
+              13600,
+              3072
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 3.57997989654541,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 2.6976798865812044
+          }
+        },
+        {
+          "bf16_gemm_flops": 598946611200.0,
+          "estimated_ctas": 516096,
+          "implementation_note": "Dense expert-gradient layout; group K is valid rows, rounded tile rows only if zero-filled.",
+          "input_shapes": {
+            "dy_unscaled_tile": [
+              13600,
+              7168
+            ],
+            "group_offsets": [
+              385
+            ],
+            "group_sizes": [
+              384
+            ],
+            "hidden_tile": [
+              13600,
+              3072
+            ]
+          },
+          "kind": "grouped_tgmm",
+          "name": "bwd_w2_wgrad",
+          "output_shapes": {
+            "dw2": [
+              384,
+              7168,
+              3072
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 5.549757957458496,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 4.181998460850817
+          }
+        },
+        {
+          "estimated_ctas": 163200,
+          "implementation_note": "Pointwise backward for the compact saved W1/W3 activations.",
+          "input_shapes": {
+            "dhidden_tile": [
+              13600,
+              3072
+            ],
+            "gate_tile": [
+              13600,
+              3072
+            ],
+            "up_tile": [
+              13600,
+              3072
+            ]
+          },
+          "kind": "pointwise",
+          "name": "bwd_swiglu",
+          "output_shapes": {
+            "dgate_tile": [
+              13600,
+              3072
+            ],
+            "dup_tile": [
+              13600,
+              3072
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 0.16708099842071533,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 0.12590323462553904
+          }
+        },
+        {
+          "bf16_gemm_flops": 1197893222400.0,
+          "estimated_ctas": 95200,
+          "implementation_note": "Fuse W1/W3 xgrad accumulation into one compact dx_tile when possible.",
+          "input_shapes": {
+            "dgate_tile": [
+              13600,
+              3072
+            ],
+            "dup_tile": [
+              13600,
+              3072
+            ],
+            "tile_descriptors": [
+              1700,
+              4
+            ],
+            "w1": [
+              384,
+              3072,
+              7168
+            ],
+            "w3": [
+              384,
+              3072,
+              7168
+            ]
+          },
+          "kind": "grouped_gemm_pair_reduce",
+          "name": "bwd_xgrad_w1w3_pair",
+          "output_shapes": {
+            "dx_tile": [
+              13600,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 7.086366176605225,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 5.339903590526986
+          }
+        },
+        {
+          "bf16_gemm_flops": 1197893222400.0,
+          "estimated_ctas": 1032192,
+          "implementation_note": "Same output grid as W2 wgrad, emitted for W1 and W3.",
+          "input_shapes": {
+            "dgate_tile": [
+              13600,
+              3072
+            ],
+            "dup_tile": [
+              13600,
+              3072
+            ],
+            "group_offsets": [
+              385
+            ],
+            "group_sizes": [
+              384
+            ],
+            "x_tile": [
+              13600,
+              7168
+            ]
+          },
+          "kind": "grouped_tgmm_pair",
+          "name": "bwd_w1_w3_wgrad_pair",
+          "output_shapes": {
+            "dw1": [
+              384,
+              3072,
+              7168
+            ],
+            "dw3": [
+              384,
+              3072,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 10.883473873138428,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 8.20119928383658
+          }
+        },
+        {
+          "estimated_ctas": 380800,
+          "implementation_note": "Reduce compact dx rows to tokens and scatter dscore back to router topk order.",
+          "input_shapes": {
+            "dtop_scores_sorted": [
+              12288
+            ],
+            "dx_tile": [
+              13600,
+              7168
+            ],
+            "sorted_assignment_order": [
+              12288
+            ],
+            "tile_to_compact": [
+              13600
+            ],
+            "token_ids_sorted": [
+              12288
+            ]
+          },
+          "kind": "scatter_reduce",
+          "name": "reduce_dx_and_restore_dscore",
+          "output_shapes": {
+            "dtop_scores": [
+              2048,
+              6
+            ],
+            "dx": [
+              2048,
+              7168
+            ]
+          },
+          "timing_reference": {
+            "current_s2048_bridge_median_ms": 0.38964301347732544,
+            "row_ratio_source": "tile_train_gemm_flop_ratio_vs_current_max",
+            "row_scaled_s2048_ms": 0.29361397292174346
+          }
+        }
+      ],
+      "schedule": {
+        "assignments": 12288,
+        "compact_flop_ratio_vs_current_max": 0.6808510638297872,
+        "current_max_padded_rows": 18048,
+        "experts": 384,
+        "max_per_expert": 47,
+        "nonzero_percentiles": {
+          "p50": 32,
+          "p90": 39,
+          "p95": 41,
+          "p99": 45
+        },
+        "tile_count": 1700,
+        "tile_flop_ratio_vs_current_max": 0.7535460992907801,
+        "tile_m": 8,
+        "tile_row_utilization": 0.9035294117647059,
+        "tile_rows": 13600,
+        "topk": 6
+      },
+      "tokens": 2048,
+      "total_tile_train_gemm_flops": 5390519500800.0
+    },
+    {
+      "blocking": {
+        "element_cta": 256,
+        "hidden_n_blocks": 56,
+        "intermediate_n_blocks": 24,
+        "m_tile_rows": 8,
+        "n_tile_hidden": 128,
+        "n_tile_intermediate": 128
+      },
+      "check": {
+        "total_matches_expected": true
+      },
+      "expected_train_gemm_flops": 10286379565056.0,
+      "kernels": [
+        {
+          "estimated_ctas": 726656,
+          "implementation_note": "Gather valid token rows and leave tile padding rows zero-filled.",
+          "input_shapes": {
+            "compact_to_tile": [
+              24576
+            ],
+            "token_ids_sorted": [
+              24576
+            ],
+            "x": [
+              4096,
+              7168
+            ]
+          },
+          "kind": "gather_pack",
+          "name": "pack_x_to_tile_rows",
+          "output_shapes": {
+            "x_tile": [
+              25952,
+              7168
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 2285862125568.0,
+          "estimated_ctas": 77856,
+          "implementation_note": "Fuse W1 and W3 over the same compact M tiles when register/LDS pressure allows.",
+          "input_shapes": {
+            "tile_descriptors": [
+              3244,
+              4
+            ],
+            "w1": [
+              384,
+              3072,
+              7168
+            ],
+            "w3": [
+              384,
+              3072,
+              7168
+            ],
+            "x_tile": [
+              25952,
+              7168
+            ]
+          },
+          "kind": "grouped_gemm_pair",
+          "name": "fwd_w1_w3_grouped_gemm_pair",
+          "output_shapes": {
+            "gate_tile": [
+              25952,
+              3072
+            ],
+            "up_tile": [
+              25952,
+              3072
+            ]
+          }
+        },
+        {
+          "estimated_ctas": 311424,
+          "implementation_note": "Apply SiLU(gate) * up only on valid compact rows or zero-padded tile rows.",
+          "input_shapes": {
+            "gate_tile": [
+              25952,
+              3072
+            ],
+            "up_tile": [
+              25952,
+              3072
+            ]
+          },
+          "kind": "pointwise",
+          "name": "fwd_swiglu",
+          "output_shapes": {
+            "hidden_tile": [
+              25952,
+              3072
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 1142931062784.0,
+          "estimated_ctas": 181664,
+          "implementation_note": "Grouped GEMM over compact rows; do not materialize [experts, max_count, hidden].",
+          "input_shapes": {
+            "hidden_tile": [
+              25952,
+              3072
+            ],
+            "tile_descriptors": [
+              3244,
+              4
+            ],
+            "w2": [
+              384,
+              7168,
+              3072
+            ]
+          },
+          "kind": "grouped_gemm",
+          "name": "fwd_w2_grouped_gemm",
+          "output_shapes": {
+            "y_unscaled_tile": [
+              25952,
+              7168
+            ]
+          }
+        },
+        {
+          "estimated_ctas": 726656,
+          "implementation_note": "Weighted compact-row reduction back to token order.",
+          "input_shapes": {
+            "score_sorted": [
+              24576
+            ],
+            "tile_to_compact": [
+              25952
+            ],
+            "token_ids_sorted": [
+              24576
+            ],
+            "y_unscaled_tile": [
+              25952,
+              7168
+            ]
+          },
+          "kind": "scatter_reduce",
+          "name": "reduce_y_to_tokens",
+          "output_shapes": {
+            "y": [
+              4096,
+              7168
+            ]
+          }
+        },
+        {
+          "estimated_ctas": 726656,
+          "implementation_note": "Gather dy, apply score, and compute per-assignment dscore dot products.",
+          "input_shapes": {
+            "dy": [
+              4096,
+              7168
+            ],
+            "score_sorted": [
+              24576
+            ],
+            "tile_to_compact": [
+              25952
+            ],
+            "token_ids_sorted": [
+              24576
+            ],
+            "y_unscaled_tile": [
+              25952,
+              7168
+            ]
+          },
+          "kind": "gather_scale_reduce",
+          "name": "pack_dy_and_dscore",
+          "output_shapes": {
+            "dtop_scores_sorted": [
+              24576
+            ],
+            "dy_unscaled_tile": [
+              25952,
+              7168
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 1142931062784.0,
+          "estimated_ctas": 77856,
+          "implementation_note": "Best first kernel: no expert-gradient output and no token-order atomics.",
+          "input_shapes": {
+            "dy_unscaled_tile": [
+              25952,
+              7168
+            ],
+            "tile_descriptors": [
+              3244,
+              4
+            ],
+            "w2": [
+              384,
+              7168,
+              3072
+            ]
+          },
+          "kind": "grouped_gemm",
+          "name": "bwd_w2_dgrad",
+          "output_shapes": {
+            "dhidden_tile": [
+              25952,
+              3072
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 1142931062784.0,
+          "estimated_ctas": 516096,
+          "implementation_note": "Dense expert-gradient layout; group K is valid rows, rounded tile rows only if zero-filled.",
+          "input_shapes": {
+            "dy_unscaled_tile": [
+              25952,
+              7168
+            ],
+            "group_offsets": [
+              385
+            ],
+            "group_sizes": [
+              384
+            ],
+            "hidden_tile": [
+              25952,
+              3072
+            ]
+          },
+          "kind": "grouped_tgmm",
+          "name": "bwd_w2_wgrad",
+          "output_shapes": {
+            "dw2": [
+              384,
+              7168,
+              3072
+            ]
+          }
+        },
+        {
+          "estimated_ctas": 311424,
+          "implementation_note": "Pointwise backward for the compact saved W1/W3 activations.",
+          "input_shapes": {
+            "dhidden_tile": [
+              25952,
+              3072
+            ],
+            "gate_tile": [
+              25952,
+              3072
+            ],
+            "up_tile": [
+              25952,
+              3072
+            ]
+          },
+          "kind": "pointwise",
+          "name": "bwd_swiglu",
+          "output_shapes": {
+            "dgate_tile": [
+              25952,
+              3072
+            ],
+            "dup_tile": [
+              25952,
+              3072
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 2285862125568.0,
+          "estimated_ctas": 181664,
+          "implementation_note": "Fuse W1/W3 xgrad accumulation into one compact dx_tile when possible.",
+          "input_shapes": {
+            "dgate_tile": [
+              25952,
+              3072
+            ],
+            "dup_tile": [
+              25952,
+              3072
+            ],
+            "tile_descriptors": [
+              3244,
+              4
+            ],
+            "w1": [
+              384,
+              3072,
+              7168
+            ],
+            "w3": [
+              384,
+              3072,
+              7168
+            ]
+          },
+          "kind": "grouped_gemm_pair_reduce",
+          "name": "bwd_xgrad_w1w3_pair",
+          "output_shapes": {
+            "dx_tile": [
+              25952,
+              7168
+            ]
+          }
+        },
+        {
+          "bf16_gemm_flops": 2285862125568.0,
+          "estimated_ctas": 1032192,
+          "implementation_note": "Same output grid as W2 wgrad, emitted for W1 and W3.",
+          "input_shapes": {
+            "dgate_tile": [
+              25952,
+              3072
+            ],
+            "dup_tile": [
+              25952,
+              3072
+            ],
+            "group_offsets": [
+              385
+            ],
+            "group_sizes": [
+              384
+            ],
+            "x_tile": [
+              25952,
+              7168
+            ]
+          },
+          "kind": "grouped_tgmm_pair",
+          "name": "bwd_w1_w3_wgrad_pair",
+          "output_shapes": {
+            "dw1": [
+              384,
+              3072,
+              7168
+            ],
+            "dw3": [
+              384,
+              3072,
+              7168
+            ]
+          }
+        },
+        {
+          "estimated_ctas": 726656,
+          "implementation_note": "Reduce compact dx rows to tokens and scatter dscore back to router topk order.",
+          "input_shapes": {
+            "dtop_scores_sorted": [
+              24576
+            ],
+            "dx_tile": [
+              25952,
+              7168
+            ],
+            "sorted_assignment_order": [
+              24576
+            ],
+            "tile_to_compact": [
+              25952
+            ],
+            "token_ids_sorted": [
+              24576
+            ]
+          },
+          "kind": "scatter_reduce",
+          "name": "reduce_dx_and_restore_dscore",
+          "output_shapes": {
+            "dtop_scores": [
+              4096,
+              6
+            ],
+            "dx": [
+              4096,
+              7168
+            ]
+          }
+        }
+      ],
+      "schedule": {
+        "assignments": 24576,
+        "compact_flop_ratio_vs_current_max": 0.7272727272727273,
+        "current_max_padded_rows": 33792,
+        "experts": 384,
+        "max_per_expert": 88,
+        "nonzero_percentiles": {
+          "p50": 64,
+          "p90": 74,
+          "p95": 78,
+          "p99": 82
+        },
+        "tile_count": 3244,
+        "tile_flop_ratio_vs_current_max": 0.7679924242424242,
+        "tile_m": 8,
+        "tile_row_utilization": 0.9469790382244143,
+        "tile_rows": 25952,
+        "topk": 6
+      },
+      "tokens": 4096,
+      "total_tile_train_gemm_flops": 10286379565056.0
+    }
+  ],
+  "shape_base": {
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tile_m": 8,
+    "topk": 6
+  },
+  "source_artifacts": {
+    "bridge_timing": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/dynamic_moe_bridge_ops_compact_reduce_gpu_s2048_20260531.json",
+    "latency_budget": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_moe_tile8_latency_budget_20260531.json",
+    "paired_s2048": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/paired_compact_reduce_full_layer_s2048_20260531.json",
+    "retained_s4096": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+    "tile_schedule": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_moe_tile_schedule_20260531.json"
+  }
+}

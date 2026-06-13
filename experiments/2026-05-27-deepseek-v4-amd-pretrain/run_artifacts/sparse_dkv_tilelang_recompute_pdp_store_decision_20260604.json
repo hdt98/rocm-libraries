@@ -1,0 +1,85 @@
+{
+  "status": "complete",
+  "scope": "TileLang sparse-MLA compressed-dKV adjacent P/dP slab producer gate",
+  "date": "2026-06-04",
+  "kernel_mode_added": "recompute_pdp_store_limited",
+  "tool": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+  "input_contract": {
+    "route_pattern": "actual_li_panel",
+    "actual_li_input_source": "boundary",
+    "timed_inputs": [
+      "q",
+      "grad_output",
+      "forward_output",
+      "lse",
+      "compressed_kv",
+      "packed_groups",
+      "route_selected_limits"
+    ],
+    "output_layout": "[2, S, topk, H]",
+    "read": "The kernel recomputes sparse attention probabilities and scaled dP once per token/selected tile, then writes one packed BF16 slab containing P and dP. It intentionally does not compute dKV; it tests whether an adjacent producer stage can replace pre-materialized P/dP slabs before the selected-limit dKV consumer."
+  },
+  "baseline_context": {
+    "retained_materialized_input_selected_limit_dkv_ms": 6.910138130187988,
+    "recompute_pdp_sink_best_ms": 8.42343521118164,
+    "all_in_one_recompute_best_ms": 89.06778717041016,
+    "current_sparse_atomic_wall_ms_range": [
+      8.0,
+      8.8
+    ]
+  },
+  "results": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_store_s128_tb16_cap32_20260604.json",
+      "seq_len": 128,
+      "token_block": 16,
+      "selected_window": 32,
+      "block_k": 32,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 1.7506990432739258,
+      "peak_memory_gib": 0.13011503219604492,
+      "correctness_max_abs_diff": 0.001953125,
+      "correctness_mean_abs_diff": 0.0000022463898403657367
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_store_s512_tb16_cap128_k64d64_20260604.json",
+      "seq_len": 512,
+      "token_block": 16,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 3.1825149059295654,
+      "peak_memory_gib": 0.40381956100463867,
+      "correctness_max_abs_diff": 0.3671875,
+      "correctness_mean_abs_diff": 0.0001551574532641098,
+      "read": "Mean error is small, but the max BF16-packed dP diff is too large for promotion-quality numerical validation. Treat this run as a timing/contract gate until the exact outlier is localized."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_store_s4096_tb16_cap512_k128d64_thr512_20260604.json",
+      "seq_len": 4096,
+      "token_block": 16,
+      "selected_window": 512,
+      "block_k": 128,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 8.689334869384766,
+      "peak_memory_gib": 5.1274495124816895,
+      "correctness_checked": false,
+      "read": "Target-shape timing-only adjacent P/dP slab producer."
+    }
+  ],
+  "projected_adjacent_pipeline": {
+    "pdp_store_ms": 8.689334869384766,
+    "selected_limit_dkv_consumer_ms": 6.910138130187988,
+    "sum_ms_before_integration_overheads": 15.599473999023438,
+    "read": "Even if the generated BF16 slabs fed the existing selected-limit dKV consumer perfectly, the adjacent two-kernel path would be about 15.6 ms before launch/integration overhead. That is slower than the current sparse-atomic wall and too far from the old ~5 ms sparse-backward envelope."
+  },
+  "decision": {
+    "promote_to_torchtitan": false,
+    "retain_as_kernel_gate": true,
+    "summary": "The adjacent P/dP slab producer is concrete and much better than all-in-one dKV recompute, but it does not create a speed path. The S4096 store stage alone is 8.689 ms, and store plus existing selected-limit dKV is projected at 15.599 ms.",
+    "next_kernel_contract": "Do not build production as P/dP producer -> materialized slabs -> selected-limit dKV consumer. The next speed branch must consume P/dP on-chip in the selected-limit producer, or move to a HIP/CK/rocWMMA fused segmented producer that can keep row terms and dKV reduction in one schedule without storing full [S, topk, H] slabs."
+  }
+}

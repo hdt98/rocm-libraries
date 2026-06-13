@@ -1,0 +1,48 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_score_page_d512_decomposition",
+  "date": "2026-06-05",
+  "status": "decomposed_not_promoted",
+  "scope": "same source-boundary S4096 layer-2 rocWMMA score-page dKV producer with SCORE_PAGE_MODE 0/1/2",
+  "source_file": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+  "harness": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 32,
+    "selected_block": 64,
+    "block_d": 512,
+    "threads": 64,
+    "k_tile": 16,
+    "h_tile": 16,
+    "schedule_read": "D512 score-page rocWMMA source-boundary rung. One CTA owns a token/selected tile, computes QK and dO.V score pages with rocWMMA from gathered selected KV, forms prob/scaled-dP in shared memory, then sweeps D16 contribution fragments before global dKV atomics. This removes D-block score replay but still does not include dQ or a final production-quality grouped dKV epilogue."
+  },
+  "artifacts": {
+    "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode0_scoreonly_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json",
+    "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode1_contribsink_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json",
+    "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json"
+  },
+  "timing_ms": {
+    "score_page_only": 32.56945037841797,
+    "score_plus_contrib_sink": 62.316837310791016,
+    "full_dkv_atomic": 105.42322540283203,
+    "contribution_sweep_delta": 29.747386932373047,
+    "dkv_global_write_atomic_delta": 43.106388092041016
+  },
+  "comparison": {
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "full_vs_triton_boundary_x": 9.4719879068133,
+    "score_page_only_vs_triton_boundary_x": 2.926275865086969
+  },
+  "read": "The same-kernel split shows the current rocWMMA score-page rung is limited by all three stages: source score-page recompute is already 32.57 ms, contribution sweep adds 29.75 ms, and global dKV atomics/write add 43.11 ms. This confirms the next branch must be a production MFMA/CK schedule, not only a dKV epilogue tweak."
+}

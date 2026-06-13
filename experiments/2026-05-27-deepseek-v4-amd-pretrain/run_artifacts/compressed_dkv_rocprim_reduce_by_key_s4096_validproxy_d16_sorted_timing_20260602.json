@@ -1,0 +1,64 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_floor",
+  "scope": "compressed_shared_kv_dkv_scalar_reduce_by_group_and_d",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "mode": "sorted_balanced",
+  "seed": 1234,
+  "num_pairs": 1572864,
+  "d_tile": 16,
+  "num_items": 25165824,
+  "groups": 1024,
+  "key_space": 16384,
+  "full_d512_multiplier": 32.0,
+  "build_seconds": 0.6074990648776293,
+  "extension_dir": "/tmp/dsv4_compressed_dkv_rocprim_reduce_by_key",
+  "workspace": {
+    "temp_bytes": 105892,
+    "resident_tensor_bytes": 402759080,
+    "resident_tensor_gib": 0.3750986233353615
+  },
+  "parity": null,
+  "timings": {
+    "reduce_only_sorted_keys": {
+      "samples_ms": [
+        0.1329209953546524,
+        0.11096099764108658,
+        0.11076100170612335,
+        0.11048100143671036,
+        0.11020100116729736,
+        0.11060100048780441,
+        0.11016099900007248,
+        0.11100099980831146,
+        0.10916099697351456,
+        0.11052100360393524,
+        0.10964100062847137,
+        0.11280100047588348,
+        0.1119609996676445,
+        0.1103610023856163,
+        0.11108099669218063,
+        0.11008100211620331,
+        0.1098409965634346,
+        0.11088100075721741,
+        0.11152099817991257,
+        0.1124809980392456
+      ],
+      "median_ms": 0.11068100109696388,
+      "min_ms": 0.10916099697351456,
+      "max_ms": 0.1329209953546524,
+      "p90_ms": 0.1125129982829094,
+      "timed_iters": 20,
+      "warmup_iters": 5
+    },
+    "torch_sort_only": null,
+    "torch_sort_reorder_values": null,
+    "torch_sort_reorder_values_plus_reduce": null
+  },
+  "extrapolated": {
+    "full_d512_reduce_only_ms": 3.5417920351028442,
+    "full_d512_sort_reorder_reduce_ms": null
+  },
+  "read": "This is a primitive-floor diagnostic for reducing scalar dKV contributions by compressed group and D offset. It excludes sparse-MLA contribution math. sorted_balanced is an optimistic lower bound where route keys are already grouped; random_sort_reduce includes PyTorch/ROCm sort and value reorder overhead before rocPRIM reduce_by_key."
+}

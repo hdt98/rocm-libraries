@@ -1,0 +1,154 @@
+{
+  "artifact": "hipkittens_sharedkv_route_cull_epilogue_gate_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "operator": "HipKittens SharedKV backward latent-dKV epilogue fork",
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim": 128,
+    "route_mode": "all_cmp",
+    "active_cmp_tiles_in_route_blocks": 16,
+    "active_cmp_rows_in_route_blocks": 1024
+  },
+  "baseline": {
+    "compile_flags": {
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 0
+    },
+    "event_ms": {
+      "median": 4.469598054885864,
+      "mean": 4.471270179748535,
+      "min": 4.42799711227417,
+      "max": 4.5608391761779785
+    },
+    "dCmpKV_nonzero": 524206
+  },
+  "mode_3_block_cull_only": {
+    "description": "Returns early only if the whole four-warp resident compressed-tile CTA has no active sidecar tile. Final stores are not individually gated by sidecar.",
+    "compile_flags": {
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 3
+    },
+    "compiler_resource_report": {
+      "total_sgprs": 105,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    },
+    "results": {
+      "active_tiles_8": {
+        "event_ms_median": 4.46629786491394,
+        "dCmpKV_nonzero": 262104,
+        "dCmpKV_norm": 33.03650665283203
+      },
+      "active_tiles_4": {
+        "event_ms_median": 4.409977436065674,
+        "dCmpKV_nonzero": 131052,
+        "dCmpKV_norm": 23.370710372924805
+      },
+      "active_tiles_1": {
+        "event_ms_median": 4.40999698638916,
+        "dCmpKV_nonzero": 131050,
+        "dCmpKV_norm": 23.371747970581055,
+        "note": "One active warp keeps the whole four-warp CTA alive, so active_tiles_1 matches active_tiles_4."
+      },
+      "active_tiles_0": {
+        "event_ms_median": 0.045159999281167984,
+        "dCmpKV_nonzero": 0,
+        "dQ_nonzero": 0,
+        "note": "All-inactive early-return launch floor."
+      }
+    }
+  },
+  "mode_4_block_cull_plus_warp_store_gate": {
+    "description": "Returns early for all-inactive CTAs and gates final dOriKV/dCmpKV stores per resident warp/tile. QK/P/dP/dQ math is still computed for active CTAs, so this is an epilogue-only route gate, not exact sparse-softmax correctness.",
+    "compile_flags": {
+      "ATTN_ROUTE_MASK_MODE": 4
+    },
+    "compiler_resource_report_query_chunks_8": {
+      "total_sgprs": 106,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    },
+    "results": {
+      "query_chunks_8_active_tiles_8": {
+        "event_ms_median": 4.449202060699463,
+        "event_ms_mean": 4.460549068450928,
+        "dCmpKV_nonzero": 262111,
+        "dCmpKV_norm": 33.036643981933594
+      },
+      "query_chunks_8_active_tiles_1": {
+        "event_ms_median": 4.37152361869812,
+        "event_ms_mean": 4.37084002494812,
+        "dCmpKV_nonzero": 32763,
+        "dCmpKV_norm": 11.683395385742188
+      },
+      "query_chunks_16_active_tiles_1": {
+        "event_ms_median": 4.3958563804626465,
+        "event_ms_mean": 4.392587947845459,
+        "dCmpKV_nonzero": 32763,
+        "dCmpKV_norm": 11.682693481445312
+      },
+      "query_chunks_16_active_tiles_8": {
+        "event_ms_median": 4.524980545043945,
+        "event_ms_mean": 4.528057479858399,
+        "dCmpKV_nonzero": 262121,
+        "dCmpKV_norm": 33.0365104675293
+      },
+      "query_chunks_32_active_tiles_1": {
+        "event_ms_median": 4.473595857620239,
+        "event_ms_mean": 4.4491699695587155,
+        "dCmpKV_nonzero": 32764,
+        "dCmpKV_norm": 11.681002616882324
+      }
+    }
+  },
+  "mode_5_block_cull_plus_warp_store_and_dq_gate": {
+    "description": "Returns early for all-inactive CTAs, gates final dOriKV/dCmpKV stores per resident warp/tile, and also gates the final dQ atomic for inactive resident tiles. The QK/P/dP producer math still runs for active CTAs.",
+    "compile_flags": {
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 5
+    },
+    "compiler_resource_report": {
+      "total_sgprs": 106,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    },
+    "results": {
+      "active_tiles_8": {
+        "event_ms_median": 4.42180061340332,
+        "event_ms_mean": 4.436960887908936,
+        "dCmpKV_nonzero": 262111,
+        "dCmpKV_norm": 33.0363883972168,
+        "dQ_nonzero": 134097853,
+        "dQ_norm": 8.269272804260254
+      },
+      "active_tiles_1": {
+        "event_ms_median": 4.366396903991699,
+        "event_ms_mean": 4.373845720291138,
+        "dCmpKV_nonzero": 32764,
+        "dCmpKV_norm": 11.684037208557129,
+        "dQ_nonzero": 134168572,
+        "dQ_norm": 5.865503787994385
+      }
+    }
+  },
+  "contamination_note": "An earlier query_chunks=16 active_tiles_1/8 timing pair was launched in parallel on the same GPU and discarded. Only sequential reruns are recorded above.",
+  "decision": "reject epilogue-only route culling as a C4 SharedKV latency lever for this HipKittens fork",
+  "read": "The compact route sidecar can gate outputs and all-inactive CTAs cheaply, but any remaining active resident tile still executes the long query-sweep body. Therefore latency stays around 4.37-4.52 ms for D128 even when dCmpKV writes shrink by 2x-16x. Gating dQ atomics as well does not move the wall. The route mask has to enter before the QK/P/dP/dQ and dCmpKV accumulation work, not only at final stores.",
+  "next_gate": "move route masking into the producer math: zero or skip P/dP contributions before dV/dK/dQ accumulation, or write a new source-boundary owner whose compressed-group route is part of the score/prob tile rather than a late epilogue."
+}

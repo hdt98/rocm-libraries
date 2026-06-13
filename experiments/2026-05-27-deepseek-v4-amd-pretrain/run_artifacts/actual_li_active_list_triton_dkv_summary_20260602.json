@@ -1,0 +1,97 @@
+{
+  "artifact": "actual_li_active_list_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Actual LightningIndexer dynamic active-list D16 compressed-dKV accumulator diagnostic on MI350.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+  "read": "The compact active-group metadata path is cheap, but this executable active-list D16 accumulator is not yet the production kernel body. It consumes materialized probs/grad_logits and active group lists, so it isolates the reduced-write accumulator only. S128 is parity-clean and competitive, but S512 exposes scalar active-list loop and indirection overhead: the best u128 point is 3.13 ms for the accumulator alone versus 1.57 ms for the materialized PyTorch reference. The next sparse-attention backward step should keep the active-list metadata but replace this scalar accumulator with an MFMA/TileLang-style streaming D16 schedule or fuse LI/compressor gradients before global dKV writes.",
+  "status": "parity_passed_s512_accumulator_body_not_promoted",
+  "context": {
+    "hard_route": "layer2 CR=4 topk compressed route",
+    "dtype": "bf16",
+    "device": "1xMI350",
+    "metadata_artifact": "run_artifacts/actual_li_active_groups_pack_triton_summary_20260602.json",
+    "metadata_s4096_layer2_flags_plus_pack_ms": 0.8476099967956543,
+    "metadata_s4096_layer2_dense_slot_overhead_x": 1.3438008791924454,
+    "metadata_s4096_layer2_unique_groups_total": 66029
+  },
+  "s128_layer2": {
+    "seq_len": 128,
+    "seq_chunk": 16,
+    "dense_slot_overhead_x": 1.1428571428571428,
+    "atomic_element_reduction_x": 14.0,
+    "active_groups_bytes": 1024,
+    "points": [
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s128_layer2_sc16_u16d16h64k16_20260602.json",
+        "block_u": 16,
+        "status": "ok",
+        "max_abs_diff": 0.0000209808349609375,
+        "candidate_ms": 0.4563249945640564,
+        "reference_ms": 0.4716460108757019
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s128_layer2_sc16_u32d16h64k16_20260602.json",
+        "block_u": 32,
+        "status": "ok",
+        "max_abs_diff": 0.0000171661376953125,
+        "candidate_ms": 0.38616499304771423,
+        "reference_ms": 0.478287011384964
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s128_layer2_sc16_u64d16h64k16_20260602.json",
+        "block_u": 64,
+        "status": "ok",
+        "max_abs_diff": 0.0000171661376953125,
+        "candidate_ms": 0.3897649943828583,
+        "reference_ms": 0.4732069969177246
+      }
+    ],
+    "best_candidate_ms": 0.38616499304771423
+  },
+  "s512_layer2": {
+    "seq_len": 512,
+    "seq_chunk": 32,
+    "dense_slot_overhead_x": 1.0666666666666667,
+    "atomic_element_reduction_x": 30.0,
+    "active_groups_bytes": 8192,
+    "points": [
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s512_layer2_sc32_u32d16h64k16_20260602.json",
+        "block_u": 32,
+        "status": "ok",
+        "max_abs_diff": 0.00003814697265625,
+        "candidate_ms": 7.508425235748291,
+        "reference_ms": 1.5802220106124878
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s512_layer2_sc32_u64d16h64k16_20260602.json",
+        "block_u": 64,
+        "status": "ok",
+        "max_abs_diff": 0.000030517578125,
+        "candidate_ms": 4.0774970054626465,
+        "reference_ms": 1.574902057647705
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_triton_dkv_s512_layer2_sc32_u128d16h64k16_20260602.json",
+        "block_u": 128,
+        "status": "ok",
+        "max_abs_diff": 0.000030517578125,
+        "candidate_ms": 3.1342430114746094,
+        "reference_ms": 1.573701024055481
+      }
+    ],
+    "best_candidate_ms": 3.1342430114746094,
+    "best_reference_ms": 1.573701024055481,
+    "best_candidate_vs_reference_x": 1.9915095350444243
+  },
+  "decision": {
+    "promote_active_list_metadata": true,
+    "promote_this_accumulator_body": false,
+    "next_kernel_direction": [
+      "Keep exact active group list packing as route metadata.",
+      "Replace scalar per-selected/per-active-list loops with an MFMA-friendly streaming D16 accumulator or TileLang/CK schedule.",
+      "Avoid materialized probs/grad_logits in the production path.",
+      "Fuse LI target-probability, KL derivative, compressor gradients, and compressed dKV reduction before global writes where possible."
+    ]
+  }
+}

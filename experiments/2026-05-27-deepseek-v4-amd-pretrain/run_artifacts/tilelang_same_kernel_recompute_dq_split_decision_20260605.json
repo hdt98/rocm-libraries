@@ -1,0 +1,61 @@
+{
+  "scope": "tilelang_same_kernel_recompute_dq_split_decision",
+  "date": "2026-06-05",
+  "artifact": "run_artifacts/tilelang_same_kernel_recompute_dq_split_s4096_layer2_gp256_tb32_k64_d64_20260605.json",
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "packed_topk": 1024,
+    "token_block": 32,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512
+  },
+  "same_kernel_timing_ms": {
+    "direct_source_recompute_only": 9.178067207336426,
+    "direct_source_dq_only": 14.235465049743652,
+    "direct_source_dkv_no_dq_no_write": 14.022382736206055,
+    "direct_source_dq_dkv_no_dkv_write": 16.569921493530273,
+    "direct_source_dq_dkv_full": 16.595640182495117,
+    "same_kernel_dq_over_recompute": 5.057397842407227,
+    "same_kernel_dkv_compute_local_reduce": 2.334456443786621,
+    "same_kernel_global_dkv_write": 0.02571868896484375,
+    "same_kernel_total_dkv_path": 2.360175132751465
+  },
+  "adjacent_materialized_dkv_timing_ms": {
+    "hsk_bf16_source_kernel": 5.9682841300964355,
+    "kernel_only_packed_materialized": 6.8477301597595215,
+    "source_indexed_materialized": 7.721617221832275
+  },
+  "read": "The same-kernel split shows the current TileLang whole-boundary family is not final-dKV-write bound. The final dKV global write is about 0.026 ms, and the dKV compute plus tile-local reduction adds about 2.33 ms when dQ is already present. The producer wall is earlier: recompute-only is already 9.18 ms, and dQ over recompute adds another 5.06 ms. This means loading prepacked route metadata is not the first-order wall in this family; the more important issue is repeating source-boundary QK/PV and dQ work under the D-block/selected-panel decomposition.",
+  "route_metadata_decision": {
+    "load_full_pairslots_as_primary_target": false,
+    "recompute_pairslots_naively_inside_cta": false,
+    "preferred": "load or derive cheap group/local-slot metadata only as an epilogue guide inside a query-major producer",
+    "reason": "Recomputing the complete local slot map inside every CTA risks rebuilding the prepack in the hot path. Route metadata should be compressed or partially derived, but the current measured wall is repeated QK/PV plus dQ, not final scatter metadata traffic."
+  },
+  "closed_branches": [
+    "route_segment_major_scalar_dblock_reducer",
+    "same_kernel_final_dkv_atomic_write_as_primary_wall",
+    "metadata_load_only_as_primary_explanation_for_tilelang_16ms_wall"
+  ],
+  "next_kernel_contract": {
+    "name": "query_major_score_reuse_dq_dkv_epilogue",
+    "description": "Keep token/head/query-major ownership, recompute scores/probs/scaled-dP once per token/head/selected tile, then reuse that state across more D work before dQ and group-aware dKV epilogue writes.",
+    "requirements": [
+      "avoid repeating full QK/PV recompute for every D block when possible",
+      "keep q/dO and selected compressed KV loads coalesced",
+      "use route metadata as a small epilogue map, preferably uint16/int16 or derived group-panel offsets",
+      "preserve local segmented dKV reduction before global writes",
+      "measure S4096 full source-boundary dQ+dKV latency before any e2e promotion"
+    ],
+    "first_gate": "produce a same-boundary kernel below the current 16.60 ms GP256 source-boundary TileLang result, then compare against the Triton 11.13 ms sparse-attention backward boundary and the old 5.07 ms sparse-MLA backward target"
+  }
+}

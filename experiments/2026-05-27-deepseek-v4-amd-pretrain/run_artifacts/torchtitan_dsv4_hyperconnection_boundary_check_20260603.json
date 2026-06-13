@@ -1,0 +1,76 @@
+{
+  "artifact": "torchtitan_dsv4_hyperconnection_boundary_check",
+  "date_utc": "2026-06-03",
+  "scope": "Opt-in TorchTitan DeepSeek-V4 Flash 4-layer Hyper-Connection boundary gate.",
+  "source_edits": [
+    "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+    "sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+    "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sharding.py",
+    "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  ],
+  "default_behavior": {
+    "torchtitan_dsv4_use_hyper_connections_default": false,
+    "reason": "The retained 8xMI350 performance anchor remains plain-residual unless CANARY_USE_HYPER_CONNECTIONS=true forwards TORCHTITAN_DSV4_USE_HYPER_CONNECTIONS=1."
+  },
+  "implementation": {
+    "block_boundary": "hc_pre -> norm/sub-layer -> hc_post around attention and MoE",
+    "model_boundary": "token embeddings expand from [B,S,D] to [B,S,4,D], layers operate rank-4, final hc_head collapses to [B,S,D] before norm/lm_head",
+    "hc_mult": 4,
+    "hc_sinkhorn_iters": 20,
+    "parameter_init": "normal std=0.02 for hc_fn, ones for scales, zeros for bases",
+    "root_sharding": "hc_head_fn, hc_head_scale, and hc_head_base are declared replicated in the root sharding config when HC is enabled"
+  },
+  "launcher_check_config": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "command_shape": "GPUS_PER_NODE=1 CANARY_EP=1 CANARY_DP_SHARD=1 CANARY_GBS=1 CANARY_SEQ_LEN=16 CANARY_STEPS=1 CANARY_MOE_COMM_BACKEND=standard CANARY_USE_HYPER_CONNECTIONS=true launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "status": "passed",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold_hyper_connections_enabled",
+    "model_use_hyper_connections": true,
+    "layer_use_hyper_connections": [true, true, true, true],
+    "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+    "moe_token_dispatcher_config": "AllToAllTokenDispatcher.Config",
+    "router_score_func": "sqrtsoftplus"
+  },
+  "remote_meta_build_smoke": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "status": "passed",
+    "config_use_hyper_connections": true,
+    "model_use_hyper_connections": true,
+    "layer_use_hyper_connections": [true, true, true, true],
+    "hc_head_fn_shape": [4, 16384],
+    "hc_head_scale_shape": [1],
+    "hc_head_base_shape": [4],
+    "layer0_hc_attn_fn_shape": [24, 16384],
+    "layer0_hc_ffn_fn_shape": [24, 16384],
+    "layer0_hc_attn_scale_shape": [3],
+    "layer0_hc_attn_base_shape": [24],
+    "devices": {
+      "hc_head_fn": "meta",
+      "layer0_hc_attn_fn": "meta"
+    }
+  },
+  "remote_init_smoke": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "status": "passed",
+    "verify_module_protocol": "passed",
+    "init_states_on_meta_model": "passed",
+    "model_use_hyper_connections": true,
+    "layer_use_hyper_connections": [true, true, true, true],
+    "hc_head_fn_device_after_meta_init": "meta",
+    "freqs_cis_device_after_meta_init": "cpu"
+  },
+  "read": [
+    "This closes the structural TorchTitan HC-boundary gap that blocked using TorchTitan as an HF/Ascend-like architecture surface.",
+    "This is not yet matched-weight HF numerical parity and not a performance run.",
+    "The retained 58.71 TFLOPs/GPU 8xMI350 systems anchor remains unchanged because HC is opt-in."
+  ],
+  "next_actions": [
+    "Rerun the HF parity preflight so torchtitan_wip_lacks_hc flips false.",
+    "Add a small runtime forward/backward smoke only after deciding a reduced HC-enabled config shape that will not disturb retained performance canaries.",
+    "Run matched-weight HF-vs-local numerical parity before using TorchTitan HC as a training correctness reference."
+  ]
+}

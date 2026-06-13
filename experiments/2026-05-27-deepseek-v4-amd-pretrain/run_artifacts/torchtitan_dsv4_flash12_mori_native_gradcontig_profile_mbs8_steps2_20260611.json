@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "run_id": "torchtitan_dsv4_flash12_mori_native_gradcontig_profile_mbs8_steps2_20260611",
+  "created_at": "2026-06-10T21:19:58+00:00",
+  "host": "do-sonle5-mi350-gpu",
+  "result": "completed_two_steps_diagnostic_profile_only_not_promoted",
+  "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_gradcontig_profile_mbs8_steps2_20260611/docker-run.log",
+  "raw_profile_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_gradcontig_profile_mbs8_steps2_20260611/profile_timing",
+  "raw_additive_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_gradcontig_profile_mbs8_steps2_20260611/additive_timing",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "config": {
+    "optimizer": "adamw",
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_mori_native_role_split": true,
+    "standard_ep_mori_native_reuse_forward_handles_for_backward": true,
+    "standard_ep_mori_native_keep_released_handles": true,
+    "mori_shmem_heap_size": "32G",
+    "grad_contiguous_probe": "only calls contiguous under timed stage if grad is non-contiguous"
+  },
+  "observed_metrics": {
+    "step_2": {
+      "tokens_per_gpu_s": 5701,
+      "tflops_per_gpu": 288.64,
+      "peak_logged_memory_gib_rankmax": 240.54,
+      "loss": 7.28596,
+      "grad_norm": 32.25,
+      "rank_records": 8
+    }
+  },
+  "retained_profile_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608.json",
+    "result": "completed_two_steps_diagnostic_profile_only",
+    "step_2_tokens_per_gpu_s": 6512,
+    "step_2_tflops_per_gpu": 329.72,
+    "step_2_peak_logged_memory_gib_rankmax": 245.6
+  },
+  "additive_step_2_rankmax_ms": {
+    "forward_backward_backward": 6704.928,
+    "forward_backward_loss": 387.627,
+    "forward_backward_model_forward": 2758.705,
+    "rank_step_wall_ms_max": 9945.961,
+    "step_train_step": 9945.292,
+    "train_step_collect_dist_metrics": 3.696,
+    "train_step_forward_backward_call": 9838.34,
+    "train_step_grad_clip": 26.795,
+    "train_step_microbatch_forward_backward": 9838.509,
+    "train_step_optimizer_step": 46.302,
+    "train_step_valid_tokens_all_reduce": 3.226
+  },
+  "profile_step_2_rankmax_ms": {
+    "standard_ep_dispatch": {
+      "total": 606.437,
+      "local_reorder": 18.326,
+      "count_all_to_all": 87.878,
+      "hot_local_reorder": 20.097,
+      "hot_metadata": 15.746,
+      "permute": 8.399,
+      "mori_native_compact_init": 13.605,
+      "mori_native_compact_launch": 426.643
+    },
+    "standard_ep_combine": {
+      "total": 613.685,
+      "mori_native_compact_init": 72.773,
+      "mori_native_compact_launch": 407.322,
+      "allocate_out": 0.934,
+      "native_source_positions": 2.161,
+      "weighted_scatter_add": 156.902
+    },
+    "standard_ep_hot_weight": {
+      "total": 109.52,
+      "w1_forward_all_reduce_hot_weight": 18.096,
+      "w2_forward_all_reduce_hot_weight": 72.972,
+      "w3_forward_all_reduce_hot_weight": 18.017
+    },
+    "standard_ep_hot_split_forward": {
+      "total": 287.994,
+      "broadcast_hot_weights": 120.232,
+      "grouped_w1": 32.396,
+      "grouped_w2": 35.692,
+      "grouped_w3": 34.812,
+      "weighted_scatter_tokens": 73.815
+    },
+    "chunked_ce_loss": 384.873,
+    "module_backward_nested_total": {
+      "total_nested_not_additive": 13129.07,
+      "attention_sum_nested_not_additive": 4207.059,
+      "moe_sum_nested_not_additive": 2378.489,
+      "read": "Nested module hooks are not additive with train-step wall time; use for local ranking only."
+    }
+  },
+  "profile_record_counts_step_2": {
+    "standard_ep_dispatch": 192,
+    "standard_ep_combine": 192,
+    "standard_ep_hot_weight": 576,
+    "standard_ep_hot_split": 192,
+    "chunked_ce_loss": 16,
+    "module_backward": 16
+  },
+  "grad_contiguous_probe_read": {
+    "grad_contiguous_stage_records": {},
+    "grad_rows_was_contiguous_meta_records": {},
+    "read": "No grad_contiguous timing records were emitted at step 2, so the native-MORI regression is not explained by a hidden non-contiguous grad copy in the patched wrapper."
+  },
+  "comparison": {
+    "native_vs_retained_profile_step2": {
+      "tokens_per_gpu_s_delta": -811,
+      "tflops_per_gpu_delta": -41.08,
+      "peak_logged_memory_gib_delta": -5.06,
+      "step_train_step_ms_delta": 1448.511,
+      "model_forward_ms_delta": 711.917,
+      "backward_ms_delta": 745.532,
+      "loss_ms_delta": -21.227,
+      "optimizer_ms_delta": -0.215
+    },
+    "ep_bucket_rankmax_ms": {
+      "native_dispatch": 606.437,
+      "retained_dispatch": 252.493,
+      "dispatch_delta": 353.944,
+      "native_combine": 613.685,
+      "retained_combine": 315.697,
+      "combine_delta": 297.988,
+      "native_dispatch_plus_combine": 1220.122,
+      "retained_dispatch_plus_combine": 568.19,
+      "dispatch_plus_combine_delta": 651.932,
+      "native_hot_weight": 109.52,
+      "retained_hot_weight": 210.508,
+      "hot_weight_delta": -100.988,
+      "native_hot_split_forward": 287.994,
+      "retained_hot_split_forward": 327.043,
+      "hot_split_forward_delta": -39.049
+    }
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "native MORI compact profile is slower than retained standard-EP profile and only two-step diagnostic",
+    "read": [
+      "The current native-MORI path regresses profile step throughput: 5701 tok/GPU/s and 288.64 TFLOPs/GPU versus retained matched profile 6512 tok/GPU/s and 329.72 TFLOPs/GPU.",
+      "Additive timing regresses by about 1.45 s/step: forward +0.712 s and backward +0.746 s.",
+      "The native dispatch+combine bucket is the clearest direct cost: 1.220 s rank-max versus retained standard dispatch+combine 0.568 s, a +0.652 s regression.",
+      "The native compact launch pieces alone are large at the integrated step scope: dispatch launch 426.643 ms and combine launch 407.322 ms across the 12 layers and 2 microbatches.",
+      "Because grad-contiguous instrumentation did not fire, the next source target should be native compact output/staging ABI and final receive/weighted-scatter collapse, not another wrapper-level contiguous-copy patch."
+    ],
+    "next_source_target": "Collapse MORI native compact staging/output into final expert-major or compact-return layout consumed by AITER/helper grouped MLP, and fuse/avoid the source-position weighted scatter path where possible."
+  }
+}

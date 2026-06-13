@@ -1,0 +1,109 @@
+{
+  "artifact": "query_major_token_tile_size_decision_20260605",
+  "status": "kernel_shape_decision",
+  "question": "Does increasing token tile size make group-aware sparse dKV accumulation more valuable, and where should the first no-HSK query-major compact reducer start?",
+  "source_artifact": "run_artifacts/actual_li_tile_segment_lengths_token_sweep_s4096_layer2_20260605.json",
+  "shape": {
+    "hardware": "1xMI350 route-analysis run",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "selected_block_for_main_read": 512
+  },
+  "selected_block_512_token_tile_sweep": [
+    {
+      "token_block": 4,
+      "tile_local_write_reduction_x": 3.04843444037302,
+      "segment_p50": 3.0,
+      "segment_p90": 4.0,
+      "pair_share_ge16": 0.0,
+      "pair_share_ge32": 0.0,
+      "mean_segments_per_tile": 503.701171875,
+      "mean_pairs_per_tile": 1535.5
+    },
+    {
+      "token_block": 8,
+      "tile_local_write_reduction_x": 5.992058108427399,
+      "segment_p50": 6.0,
+      "segment_p90": 8.0,
+      "pair_share_ge16": 0.0,
+      "pair_share_ge32": 0.0,
+      "mean_segments_per_tile": 512.51171875,
+      "mean_pairs_per_tile": 3071.0
+    },
+    {
+      "token_block": 16,
+      "tile_local_write_reduction_x": 11.952959063438367,
+      "segment_p50": 12.0,
+      "segment_p90": 16.0,
+      "pair_share_ge16": 0.37893804949527843,
+      "pair_share_ge32": 0.0,
+      "mean_segments_per_tile": 513.84765625,
+      "mean_pairs_per_tile": 6142.0
+    },
+    {
+      "token_block": 32,
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "segment_p50": 23.0,
+      "segment_p90": 32.0,
+      "pair_share_ge16": 0.9493561238196028,
+      "pair_share_ge32": 0.35116818625854773,
+      "mean_segments_per_tile": 515.8515625,
+      "mean_pairs_per_tile": 12284.0
+    },
+    {
+      "token_block": 64,
+      "tile_local_write_reduction_x": 47.254673318506946,
+      "segment_p50": 45.0,
+      "segment_p90": 64.0,
+      "pair_share_ge16": 0.9985047877320091,
+      "pair_share_ge32": 0.9519624104526213,
+      "mean_segments_per_tile": 519.90625,
+      "mean_pairs_per_tile": 24568.0
+    },
+    {
+      "token_block": 128,
+      "tile_local_write_reduction_x": 93.07162306144193,
+      "segment_p50": 89.0,
+      "segment_p90": 128.0,
+      "pair_share_ge16": 0.9992762434874634,
+      "pair_share_ge32": 0.9968575738765875,
+      "mean_segments_per_tile": 527.9375,
+      "mean_pairs_per_tile": 49136.0
+    }
+  ],
+  "important_invariant": {
+    "overall_pair_over_unique_token_x": 1.0,
+    "duplicate_token_segments": 0,
+    "read": "Increasing token_block creates more tokens per compressed group segment, but still at most one selected row per token per group segment. This means larger token tiles improve cross-token dKV write coalescing, not same-token selected-slot reuse. A group-owned contribution producer still loses q/dO reuse."
+  },
+  "pack_timing_context": {
+    "token_block_32_selected_block_512_pack_event_median_ms": 0.5818870067596436,
+    "token_block_32_selected_block_256_pack_event_median_ms": 0.575685977935791,
+    "read": "Route packing remains cheap enough at the established T32 gates. The missing primitive is not route metadata construction; it is a producer epilogue that reduces by group without serializing the MFMA contribution loop."
+  },
+  "decision": {
+    "start_kernel_gate": {
+      "token_block": 32,
+      "selected_block": 512,
+      "reason": "This is the first shape where almost all pairs participate in useful local reduction: pair_share_ge16 is 94.9%, p50 segment length is 23, and modeled write reduction is 23.8x. It is also the established route-pack/timing contract from prior probes."
+    },
+    "second_gate_if_producer_remains_fast": {
+      "token_block": 64,
+      "selected_block": 512,
+      "reason": "T64 doubles modeled write reduction to 47.3x and makes 95.2% of pairs sit in segments of at least 32, but it also doubles per-tile producer work/state. Only try after the T32 producer keeps query-major MFMA throughput."
+    },
+    "do_not_start_at": {
+      "token_block": 128,
+      "reason": "T128 gives the best modeled write reduction, but each tile has about 49k selected pairs and about 528 active group segments on average. That is too large for a first fused producer and risks recreating the scalar segment-owned failure at a bigger scale."
+    },
+    "next_implementation_cut": "Implement T32 selected512 no-HSK query-major producer with tile-local segmented/grouped dKV epilogue. The kernel must keep q/dO hot and avoid group-owned recompute. Measure isolated S4096 latency first; only run 4x/8x e2e TFLOPs if it beats the current 42.54 ms no-HSK direct atomic whole-boundary path and trends toward the 8.0-8.8 ms compressed dKV atomic slice."
+  },
+  "materialized_e2e_tflops": {
+    "measured": false,
+    "reason": "This artifact is a route-shape decision, not a better latency candidate. No e2e TorchTitan A/B is justified until the T32 no-HSK compact reducer exists and passes the isolated latency gate."
+  }
+}

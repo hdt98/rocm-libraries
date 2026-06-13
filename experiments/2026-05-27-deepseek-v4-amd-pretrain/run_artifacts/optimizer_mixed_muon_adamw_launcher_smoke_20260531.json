@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "validated_at": "2026-05-31",
+  "run_id": "torchtitan_mixed_muon_adamw_smoke_20260530T205625Z",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "torch_version": "2.10.0a0+git449b176",
+  "launcher": "launchers/torchtitan_mixed_muon_adamw_smoke.sh",
+  "source_under_test": "sources/wip/torchtitan",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_mixed_muon_adamw_smoke_20260530T205625Z",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_20260530T205625Z",
+  "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh all",
+  "smoke_results": {
+    "toy": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "muon_params": [
+        "expert_weight",
+        "proj.weight"
+      ],
+      "state_dict_keys": 2
+    },
+    "deepseek_debugmodel": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "param_counts": {
+        "AdamW": 21,
+        "Muon": 62
+      },
+      "stepped_params": [
+        "tok_embeddings.weight",
+        "layers.1.moe.router.gate.weight",
+        "layers.1.moe.experts.w1"
+      ],
+      "state_dict_keys": 2
+    },
+    "unit": {
+      "status": "OK",
+      "tests_run": 14
+    }
+  },
+  "caveats": [
+    "The launcher intentionally tests the local WIP TorchTitan package outside the Primus image-backed training path because the current 8xMI350 canary still depends on the image-bundled TorchTitan job_config API.",
+    "The Muon implementation remains a slow PyTorch reference for bring-up and checkpoint wiring.",
+    "FSDP-sharded matrix updates still need a faithful distributed Muon implementation before this is a production DeepSeek-V4 optimizer path."
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "artifact": "sparse_mla_triton_window_sum_decision",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_attention_triton_window_sum_goal_cont_20260531T1230Z",
+  "local_raw_artifact_dir": "run_artifacts/single_layer_attention_triton_window_sum_goal_cont_20260531",
+  "tested_attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-triton-window-sum",
+  "why_tested": "This variant was not in the canned attention selector sweep and directly toggles the sparse MLA window-gradient reduction to Triton, which targets part of the S4096 attention.sparse_mla.dgrad_qkv cost.",
+  "correctness": {
+    "command": "PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/check_correctness.py --device cuda --dtype bfloat16 --batch 1 --seqlen 16 --checks attention_sparse_gather_match --attention-impl sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-triton-window-sum --rmsnorm-save-policy saved-accum --json",
+    "artifact": "run_artifacts/single_layer_attention_triton_window_sum_goal_cont_20260531/attention_impl_checks/triton_window_sum.json",
+    "ok": true,
+    "dense_impl": "dense-mask",
+    "output_max_abs": 0.0,
+    "max_grad_rel_l2": 0.0
+  },
+  "timing": {
+    "command": "RUN_TAG=retained_attention_triton_window_sum_goal_cont_20260531T1230Z ATTN_IMPL=sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-triton-window-sum experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-4096",
+    "artifact": "run_artifacts/single_layer_attention_triton_window_sum_goal_cont_20260531/full_layer_s4096_summary.json",
+    "shape": {
+      "batch": 1,
+      "seqlen": 4096,
+      "hidden": 7168,
+      "dtype": "bfloat16",
+      "warmup": 2,
+      "iters": 3,
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "boundary_impl": "separate"
+    },
+    "avg_ms": 109.43986797550072,
+    "min_ms": 109.28104899358004,
+    "tokens_per_s": 37426.94573532319,
+    "estimated_tflops": 193.46802421395307
+  },
+  "baseline_comparison": {
+    "retained_bf16_contract_artifact": "run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+    "retained_bf16_contract_avg_ms": 76.57323967820655,
+    "retained_bf16_contract_min_ms": 76.30661700386554,
+    "retained_bf16_contract_tokens_per_s": 53491.27211037617,
+    "slowdown_vs_retained_by_avg": 1.4292246324516196,
+    "target_ms": 32.0,
+    "gap_to_target": 3.4199958742343975
+  },
+  "node_guard": {
+    "pre_run_busy_processes_observed": [
+      "PID 3427892 python3 tools/bench_coda_tilelang_stage1_absmax.py ...",
+      "PID 3430493 python3 tools/dsv4_coda_tilelang_qfp8_dual_value_kpe_attention_probe.py ..."
+    ],
+    "action_taken": "Waited for do-sonle-kernel KFD processes to clear before running; no processes other than gpuagent remained after the benchmark."
+  },
+  "decision": {
+    "status": "demote_triton_window_sum_variant",
+    "read": "The Triton window-gradient reduction variant is numerically correct, but it is about 1.43x slower than the retained bf16_contract S4096 path. The existing PyTorch/as_strided body-tail window reduction remains better in the integrated full-layer contract.",
+    "next_best_actions": [
+      "Do not switch the retained attention implementation to triton-softmax-triton-window-sum.",
+      "The remaining attention work needs a fused sparse MLA backward kernel that covers more than the window-gradient reduction alone.",
+      "Given S4096 block profile weights, keep MoE routed dgrad/wgrad custom grouped GEMM replacement as the larger immediate payoff path."
+    ]
+  }
+}

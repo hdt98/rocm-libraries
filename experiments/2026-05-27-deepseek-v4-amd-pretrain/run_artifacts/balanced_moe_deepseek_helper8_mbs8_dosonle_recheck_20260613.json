@@ -1,0 +1,96 @@
+{
+  "artifact": "balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613.json",
+  "common_surface": {
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "global_batch_size": 128,
+    "hardware": "8xMI350",
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "pytorch_cuda_alloc_conf": "expandable_segments:True",
+    "retained_windows": [
+      "steps_2_to_20",
+      "steps_13_to_20"
+    ],
+    "sequence_length": 4096,
+    "steps": 20
+  },
+  "created_utc": "20260612T215009Z",
+  "findings": [],
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "planned": [
+    {
+      "env": {
+        "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+        "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+        "CANARY_CHECKPOINT_ENABLE": "false",
+        "CANARY_CHUNKED_CE_NUM_CHUNKS": "8",
+        "CANARY_DP_SHARD": "-1",
+        "CANARY_ENABLE_STRUCTURED_LOGGING": "true",
+        "CANARY_EP": "8",
+        "CANARY_GBS": "128",
+        "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+        "CANARY_MBS": "8",
+        "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+        "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "CANARY_REQUIRE_IDLE_GPUS": "true",
+        "CANARY_SEQ_LEN": "4096",
+        "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+        "CANARY_SHAREDKV_BLOCK_D": "128",
+        "CANARY_SHAREDKV_BLOCK_H": "64",
+        "CANARY_SHAREDKV_BLOCK_N": "64",
+        "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+        "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+        "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+        "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+        "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+        "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+        "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+        "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+        "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+        "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+        "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+        "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+        "CANARY_STEPS": "20",
+        "CANARY_TORCHTITAN_CONFIG": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+        "CANARY_TORCHTITAN_MODULE": "deepseek_v4",
+        "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+        "DUMP_FOLDER": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613_deepseek_helper8_mbs8_steps20/outputs",
+        "GPUS_PER_NODE": "8",
+        "IMAGE": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+        "LOG_DIR": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613_deepseek_helper8_mbs8_steps20/logs",
+        "REMOTE_ROOT": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+        "RUN_ID": "balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613_deepseek_helper8_mbs8_steps20",
+        "TARGET_HOST": "do-sonle5-mi350-gpu"
+      },
+      "mbs": 8,
+      "model": "deepseek",
+      "run_id": "balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613_deepseek_helper8_mbs8_steps20",
+      "variant": "helper8"
+    }
+  ],
+  "preflight": {
+    "docker_ps": "b41733e3ec10 nexus-elastic-elastic-gloo-001-lighthouse nexus-titan-lighthouse:v0.1-rc3 Up 19 hours\n",
+    "rocm_smi": "\n\n============================ ROCm System Management Interface ============================\n=================================== % time GPU is busy ===================================\nGPU[0]\t\t: GPU use (%): 0\nGPU[0]\t\t: GFX Activity: 3263663777\nGPU[1]\t\t: GPU use (%): 0\nGPU[1]\t\t: GFX Activity: 3254306707\nGPU[2]\t\t: GPU use (%): 0\nGPU[2]\t\t: GFX Activity: 3083781742\nGPU[3]\t\t: GPU use (%): 0\nGPU[3]\t\t: GFX Activity: 3081521855\nGPU[4]\t\t: GPU use (%): 0\nGPU[4]\t\t: GFX Activity: 1537132075\nGPU[5]\t\t: GPU use (%): 0\nGPU[5]\t\t: GFX Activity: 1540690476\nGPU[6]\t\t: GPU use (%): 0\nGPU[6]\t\t: GFX Activity: 1448950594\nGPU[7]\t\t: GPU use (%): 0\nGPU[7]\t\t: GFX Activity: 1382410720\n==========================================================================================\n=================================== Current Memory Use ===================================\nGPU[0]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[0]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[0]\t\t: Memory Activity: 273441809\nGPU[0]\t\t: Avg. Memory Bandwidth: 0\nGPU[1]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[1]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[1]\t\t: Memory Activity: 272072755\nGPU[1]\t\t: Avg. Memory Bandwidth: 0\nGPU[2]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[2]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[2]\t\t: Memory Activity: 270109959\nGPU[2]\t\t: Avg. Memory Bandwidth: 0\nGPU[3]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[3]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[3]\t\t: Memory Activity: 271592718\nGPU[3]\t\t: Avg. Memory Bandwidth: 0\nGPU[4]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[4]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[4]\t\t: Memory Activity: 122143677\nGPU[4]\t\t: Avg. Memory Bandwidth: 0\nGPU[5]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[5]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[5]\t\t: Memory Activity: 122211996\nGPU[5]\t\t: Avg. Memory Bandwidth: 0\nGPU[6]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[6]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[6]\t\t: Memory Activity: 121239977\nGPU[6]\t\t: Avg. Memory Bandwidth: 0\nGPU[7]\t\t: GPU Memory Allocated (VRAM%): 0\nGPU[7]\t\t: GPU Memory Read/Write Activity (%): 0\nGPU[7]\t\t: Memory Activity: 120274799\nGPU[7]\t\t: Avg. Memory Bandwidth: 0\n==========================================================================================\n================================== End of ROCm SMI Log ===================================\n"
+  },
+  "results": [
+    {
+      "micro_batch_size": 8,
+      "model": "DeepSeek-V4 Flash 12-layer",
+      "model_key": "deepseek",
+      "preflight": {
+        "docker_ps": "b41733e3ec10 nexus-elastic-elastic-gloo-001-lighthouse nexus-titan-lighthouse:v0.1-rc3 Up 19 hours\n",
+        "rocm_smi": "[spawn_error] [Errno 35] Resource temporarily unavailable\n"
+      },
+      "run_id": "balanced_moe_deepseek_helper8_mbs8_dosonle_recheck_20260613_deepseek_helper8_mbs8_steps20",
+      "status": "blocked_node_not_idle_before_run",
+      "variant": "standard-EP top-8 hot-helper retained SDMA",
+      "variant_key": "helper8"
+    }
+  ],
+  "status": "complete"
+}

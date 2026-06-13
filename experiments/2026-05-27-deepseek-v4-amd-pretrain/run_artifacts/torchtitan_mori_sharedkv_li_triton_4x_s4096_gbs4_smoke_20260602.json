@@ -1,0 +1,125 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_li_triton_4x_s4096_gbs4_smoke_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_sparse_sharedkv_likl_4x_s4096_one_step",
+  "purpose": "Record the first integrated TorchTitan DeepSeek-V4 Flash S4096 smoke where compressed layers enter sparse shared-KV attention instead of the dense fallback while MORI+AITER routed padded MoE is enabled.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "attention_backend": {
+    "mode": "shared_kv",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sparse_mla_max_seq_len": 4096,
+    "li_kl_backend": "triton_tl_dot",
+    "read": "This selects the experimental shared latent-KV sparse MLA path for compressed layers and the opt-in Triton tl.dot deferred LI-KL backend. It is still not the final fused sparse MLA/LI/compressor backward."
+  },
+  "layer_smokes": {
+    "layer2": {
+      "artifact": "run_artifacts/torchtitan_dsv4_sharedkv_li_triton_s4096_layer2_smoke_mi350_20260602.json",
+      "status": "passed",
+      "seq_len": 4096,
+      "compress_ratio": 4,
+      "compressed_groups": 1024,
+      "selected_keys": 640,
+      "estimated_selected_state_elements": 139460608,
+      "sparse_used": true,
+      "indexer_grads_present": true,
+      "indexer_any_grad_nonzero": true
+    },
+    "layer3": {
+      "artifact": "run_artifacts/torchtitan_dsv4_sharedkv_li_triton_s4096_layer3_smoke_mi350_20260602.json",
+      "status": "passed",
+      "seq_len": 4096,
+      "compress_ratio": 128,
+      "compressed_groups": 32,
+      "selected_keys": 160,
+      "estimated_selected_state_elements": 136986624,
+      "sparse_used": true,
+      "indexer_grads_present": true,
+      "indexer_any_grad_nonzero": true
+    }
+  },
+  "check_config": {
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_GBS=4 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29575 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "result": "pass",
+    "observed": {
+      "model_spec": "deepseek_v4 flash_4layer",
+      "shape": "1 4 4096 1",
+      "parallelism": "-1 4",
+      "moe_comm_backend": "mori",
+      "mori_aiter_backward_mode": "routed",
+      "mori_aiter_local_vjp_mode": "padded",
+      "mori_aiter_op_cache_mode": "backward",
+      "mori_shmem_heap_size": "32G",
+      "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+      "attention_status_by_layer": [
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "dense_mla_for_uncompressed_dsv4_layer",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+        "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+      ],
+      "attention_compress_ratio_by_layer": [
+        0,
+        0,
+        4,
+        128
+      ],
+      "attention_sparse_threshold_by_layer": [
+        4096,
+        4096,
+        4096,
+        4096
+      ],
+      "attention_sparse_backward_mode_by_layer": [
+        "shared_kv",
+        "shared_kv",
+        "shared_kv",
+        "shared_kv"
+      ],
+      "li_kl_backend": "triton_tl_dot"
+    }
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs4_steps1_20260602T000000",
+    "status": "pass",
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs4_steps1_20260602T000000 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_GBS=4 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29575 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+    "visible_devices": "0,1,2,3",
+    "gpus": 4,
+    "fsdp": 4,
+    "ep": 4,
+    "seq_len": 4096,
+    "global_batch_size": 4,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 1,
+    "tokens_per_step": 16384,
+    "steps": 1,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs4_steps1_20260602T000000/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs4_steps1_20260602T000000",
+    "step1": {
+      "loss": 12.41846,
+      "grad_norm": 12.3125,
+      "memory_gib_range": [
+        96.34,
+        104.2
+      ],
+      "tokens_per_gpu_s": 256,
+      "node_tokens_per_s": 1024,
+      "reported_tflops_per_gpu_range": [
+        4.84,
+        4.85
+      ],
+      "reported_mfu_percent": 0.21,
+      "structured_step_time_ms_rank0": 15611.678092973307,
+      "structured_fwd_bwd_ms_rank0": 15245.15384004917,
+      "structured_optim_ms_rank0": 213.96555192768574,
+      "global_valid_tokens": 16384
+    },
+    "teardown": "process_groups_destroyed_cleanly"
+  },
+  "read": "This is correctness-first integrated sparse-attention evidence at tiny GBS=4. It proves the S4096 TorchTitan compressed layers can execute the shared-KV sparse path with nonzero LI gradients and coexist with MORI+AITER routed padded MoE. It is not target throughput evidence; the full GBS64/128 sparse path and final fused sparse MLA/LI/compressor backward remain pending."
+}

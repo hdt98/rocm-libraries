@@ -1,0 +1,18 @@
+{
+  "diagnostic_backend": "standard_ep",
+  "kind_counts": {
+    "standard_ep_hot_expert_stats": 768
+  },
+  "note": "CANARY_MOE_COMM_BACKEND was left at standard, so this diagnoses skew in the current fast standard EP path but does not enter mori_aiter_moe balanced planner stages.",
+  "numeric_meta_stats": {},
+  "record_count": 768,
+  "run_id": "torchtitan_dsv4_flash12_balanced_moe_plan_top2_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+  "source_timing_jsonl": "/tmp/dsv4_balanced_moe_plan_top2_timing_20260606.jsonl",
+  "step_2_observed": {
+    "grad_norm": 50.5,
+    "loss": 8.05815,
+    "peak_memory_gib": 191.22,
+    "tflops_per_gpu": 379.92,
+    "tok_per_gpu_s": 7504.0
+  }
+}

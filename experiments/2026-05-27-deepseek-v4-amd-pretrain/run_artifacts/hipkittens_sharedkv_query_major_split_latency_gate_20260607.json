@@ -1,0 +1,79 @@
+{
+  "artifact": "hipkittens_sharedkv_query_major_split_latency_gate_20260607",
+  "status": "rejected_not_a_sharedkv_latency_promotion",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "gpu_target": "gfx950",
+  "hipkittens_reference_sha": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946",
+  "source_files": {
+    "contract_wrapper": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/query_major_split_wrapper.cpp",
+    "hip_owner": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip",
+    "probe": "tools/dsv4_runtime_probe/probe_query_major_sharedkv_split.py"
+  },
+  "measurement_scope": "source-boundary synthetic SharedKV backward owner returning dQ, dOriKV, dCmpKV, dSinks; not TorchTitan-integrated",
+  "compile_gate": {
+    "s128_b1_c4_selected640": {
+      "finite_outputs": true,
+      "median_ms": 3.0496718883514404
+    }
+  },
+  "target_shape_measurements": {
+    "c4_b4_s4096_local128_compressed512_selected640": {
+      "finite_outputs": true,
+      "median_ms_by_dkv_mode": {
+        "mode0_dq_dsinks_only": 176.09759521484375,
+        "mode1_dq_dsinks_plus_dkv_contribution_sink_no_final_writes": 269.46337890625,
+        "mode2_full_dq_dorikv_dcmpkv_dsinks": 288.0123291015625
+      },
+      "deltas_ms": {
+        "contribution_body_over_dq": 93.36578369140625,
+        "final_dkv_writes_over_contribution_sink": 18.5489501953125
+      },
+      "current_production_profile_reference_ms": {
+        "sharedkv_c4_per_call_median": 60.642,
+        "sharedkv_c4_per_call_max": 61.244,
+        "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607.json"
+      }
+    },
+    "c128_b4_s4096_local128_compressed32_selected160": {
+      "finite_outputs": true,
+      "median_ms_by_dkv_mode": {
+        "mode0_dq_dsinks_only": 53.113441467285156,
+        "mode1_dq_dsinks_plus_dkv_contribution_sink_no_final_writes": 83.12855529785156,
+        "mode2_full_dq_dorikv_dcmpkv_dsinks": 88.82366180419922
+      },
+      "deltas_ms": {
+        "contribution_body_over_dq": 30.015113830566406,
+        "final_dkv_writes_over_contribution_sink": 5.695106506347656
+      },
+      "current_production_profile_reference_ms": {
+        "sharedkv_c128_per_call_median": 20.107,
+        "sharedkv_c128_per_call_max": 38.903,
+        "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top4_profile_8x_s4096_gbs128_mbs4_steps2_20260607.json"
+      }
+    }
+  },
+  "diagnosis": {
+    "root_cause": "The split-output HIP owner preserves the DSv4 output contract but not the fast production schedule. It is one-token/query-major and replays selected KV windows per token. The no-dKV path is already far slower than the active Triton SharedKV boundary, so final dKV writes are not the leading failure in this candidate.",
+    "hipkittens_source_lesson": "HipKittens dense GQA backward is KV-block-owned: a resident K/V tile streams query tiles, accumulates dK/dV in registers, and stores once at the dKg/dVg epilogue. The DSv4 fork should replace that dense dKg/dVg store point with dOriKV plus route-aware dCmpKV, rather than retrofitting the older rocWMMA token-owned owner.",
+    "important_source_points": {
+      "hipkittens_globals_and_grid": "sources/references/hipkittens/kernels/attn/gqa_backwards/attn_bkwd_non_causal.cpp:37",
+      "hipkittens_register_dk_dv_accumulators": "sources/references/hipkittens/kernels/attn/gqa_backwards/attn_bkwd_non_causal.cpp:129",
+      "hipkittens_dv_dk_store_epilogue": "sources/references/hipkittens/kernels/attn/gqa_backwards/attn_bkwd_non_causal.cpp:3149",
+      "failed_hip_owner_selected_loop": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip:229",
+      "failed_hip_owner_dq_loop": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip:353"
+    }
+  },
+  "decision": {
+    "promote_to_torchtitan": false,
+    "continue_direction": "Fork HipKittens dense GQA backward producer at the dKg/dVg epilogue and add DSv4 sparse route membership plus split dOriKV/dCmpKV outputs. Do not continue tuning the token-owned rocWMMA split owner."
+  },
+  "validation_commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_query_major_sharedkv_split.py",
+    "docker run ... python probe_query_major_sharedkv_split.py --batch 1 --seq 128 --local-count 128 --compressed-topk 512 --compress-ratio 4 --warmup 2 --iters 5 --build-dir /workspace/torch_extensions/query_major_split_s128_gfx950_halfu",
+    "docker run ... python probe_query_major_sharedkv_split.py --batch 4 --seq 4096 --local-count 128 --compressed-topk 512 --compress-ratio 4 --dkv-mode {0,1,2}",
+    "docker run ... python probe_query_major_sharedkv_split.py --batch 4 --seq 4096 --local-count 128 --compressed-topk 32 --compress-ratio 128 --dkv-mode {0,1,2}"
+  ],
+  "dependency_pin_changes": []
+}

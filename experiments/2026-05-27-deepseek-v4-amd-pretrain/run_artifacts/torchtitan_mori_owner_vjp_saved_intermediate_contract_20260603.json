@@ -1,0 +1,142 @@
+{
+  "artifact": "torchtitan_mori_owner_vjp_saved_intermediate_contract",
+  "date_utc": "2026-06-03",
+  "scope": "Decide the next owner-rank MoE VJP optimization branch for the retained TorchTitan DeepSeek-V4-style MI350 canary.",
+  "retained_canary_context": {
+    "artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "shape": {
+      "gpu": "MI350",
+      "gpus": 8,
+      "sequence_length": 4096,
+      "micro_batch_size": 1,
+      "global_batch_size": 128,
+      "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+      "activation_checkpointing": "full"
+    },
+    "step2_tok_per_gpu_s": 3103,
+    "step2_implied_time_s": 21.12,
+    "step2_tflops_per_gpu": 58.71,
+    "retained_moe_path": "MORI dispatch/combine, AITER fused_moe forward, routed padded PyTorch owner-rank VJP backward, Triton SwiGLU, registered backward combine, CE2"
+  },
+  "current_torchtitan_backward_contract": {
+    "source": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "forward_saves": [
+      "x",
+      "w1_local",
+      "w3_local",
+      "w2_local",
+      "topk_weight",
+      "topk_ids"
+    ],
+    "forward_does_not_save": [
+      "MORI packed_x",
+      "MORI packed_weight",
+      "AITER fused_moe post-SwiGLU hidden",
+      "gate pre-activation",
+      "up branch",
+      "unweighted compact expert output"
+    ],
+    "backward_recomputes": [
+      "route-local packing and padding",
+      "W1/W3 forward GEMMs to rebuild gate/up",
+      "SwiGLU forward hidden",
+      "W2 forward GEMM to rebuild unweighted expert output for dTopkWeight",
+      "W2 dgrad",
+      "SwiGLU backward",
+      "W1/W3 wgrad",
+      "W1/W3 xgrad plus token reduction"
+    ],
+    "source_line_evidence": {
+      "save_for_backward": "mori_aiter_moe.py:1964",
+      "recompute_gate_up_hidden_out": "mori_aiter_moe.py:582-594",
+      "dtopk_recomputed_output": "mori_aiter_moe.py:595-599",
+      "dgrad_wgrad_xgrad": "mori_aiter_moe.py:600-626"
+    }
+  },
+  "aiter_public_forward_contract": {
+    "artifact": "run_artifacts/aiter_fused_moe_saved_intermediate_contract_20260602.json",
+    "public_fused_moe_return": "single final moe output tensor only",
+    "public_return_intermediates_flag": false,
+    "two_stage_a2_semantics": "post-activation hidden, equivalent to silu(gate) * up for the separated Silu/SwiGLU path",
+    "missing_for_training_backward": [
+      "gate pre-activation",
+      "up branch",
+      "unweighted compact expert output for dTopkWeight"
+    ]
+  },
+  "standalone_owner_rank_ep8_probe": {
+    "artifact": "run_artifacts/owned_expert_vjp_ep8_stage1_saved_activation_20260602.json",
+    "shape": {
+      "world_size": 8,
+      "tokens_per_rank": 4096,
+      "source_tokens_all_ranks": 32768,
+      "experts": 256,
+      "local_experts": 32,
+      "topk": 6,
+      "hidden": 4096,
+      "intermediate": 2048,
+      "dtype": "bfloat16"
+    },
+    "timing_ms_median": {
+      "retained_triton_swiglu_recompute_full_vjp": 6.577022075653076,
+      "public_stage1_hidden_only": 6.591463088989258,
+      "public_stage1_hidden_plus_unweighted_output": 5.85913610458374,
+      "ideal_gate_up_hidden": 5.387613773345947,
+      "ideal_gate_up_hidden_plus_unweighted_output": 4.77380895614624
+    },
+    "delta_vs_retained_ms": {
+      "public_stage1_hidden_only": -0.01444101333618164,
+      "public_stage1_hidden_plus_unweighted_output": 0.7178859710693359,
+      "ideal_gate_up_hidden": 1.189408302307129,
+      "ideal_gate_up_hidden_plus_unweighted_output": 1.803213119506836
+    },
+    "read": "Saving only AITER stage1/post-SwiGLU hidden is effectively neutral because backward still recomputes gate/up for SwiGLU backward and still needs unweighted output for dTopkWeight. The useful saved-state contract must include gate/up or a fused backward that recomputes gate/up internally once and reuses the result across dgrad, wgrad, and xgrad."
+  },
+  "integrated_ep8_tail_model": {
+    "artifact": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_mori_vjp_tail_components_20260603.json",
+    "baseline_mori_critical_ms": 3762.2228474915028,
+    "tail_component_totals_ms": {
+      "recompute_forward": 1171.8121011257172,
+      "wgrad": 900.096022605896,
+      "xgrad_reduce": 753.732533454895,
+      "w2_dgrad_swiglu": 490.6704161167145,
+      "pack_scatter": 348.2916112691164,
+      "dtopk_weight": 61.19378304481506
+    },
+    "tail_component_pct_of_tail_vjp": {
+      "recompute_forward": 31.384253509900596,
+      "wgrad": 24.106972209605125,
+      "xgrad_reduce": 20.186967591376845,
+      "w2_dgrad_swiglu": 13.141462453256636,
+      "pack_scatter": 9.32817830857081,
+      "dtopk_weight": 1.6389327251897794
+    },
+    "step_time_reference_s": 21.12,
+    "rough_step_savings_if_removed_pct": {
+      "recompute_forward": 5.548352751543167,
+      "wgrad": 4.261818290747614,
+      "xgrad_reduce": 3.570703283404806,
+      "w2_dgrad_swiglu": 2.323250076310201,
+      "pack_scatter": 1.6491004321454375,
+      "dtopk_weight": 0.289744242635488
+    }
+  },
+  "decision": {
+    "do_not_lead_with": [
+      "TorchTitan-side save of only AITER stage1/post-SwiGLU hidden",
+      "another dispatch/pack-only cleanup as the main MoE branch",
+      "AITER public fused_moe forward substitution without a training backward contract"
+    ],
+    "lead_branch": [
+      "Define an AITER/CK training backward contract that exposes or preserves gate, up, post-SwiGLU hidden, and optionally unweighted compact expert output.",
+      "Or implement a fused compact grouped training-GEMM owner VJP that recomputes gate/up once internally and reuses them for W2 dgrad, SwiGLU backward, W1/W3 wgrad, and W1/W3 xgrad/reduce.",
+      "Keep the current routed padded PyTorch VJP as the correctness oracle for gradients and route semantics."
+    ],
+    "first_validation_gate": [
+      "Standalone EP8 owner-rank VJP parity against current PyTorch VJP at the real receive-count distribution.",
+      "Compare retained 6.58 ms local VJP against the new kernel/contract; useful promotion should beat the public stage1-plus-output 5.86 ms point and approach the ideal gate/up/hidden 5.39 ms or better.",
+      "Then run the 4xMI350 S4096 GBS64 and 8xMI350 S4096 GBS128 canaries with the same CE2 retained shape and re-rank MORI tail sidecars."
+    ]
+  },
+  "bottom_line": "The next MoE optimization is not a public AITER forward-intermediate toggle. It needs a training backward contract or fused owner-rank grouped-GEMM VJP that attacks recompute plus wgrad plus xgrad/reduce, because those are about 75% of the EP8 owner-VJP tail."
+}

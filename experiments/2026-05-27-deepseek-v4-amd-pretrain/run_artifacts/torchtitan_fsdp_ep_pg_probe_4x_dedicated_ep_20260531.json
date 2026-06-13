@@ -1,0 +1,85 @@
+{
+  "artifact": "torchtitan_fsdp_ep_pg_probe_4x_dedicated_ep_20260531",
+  "created_at": "2026-05-31",
+  "purpose": "Runtime evidence that the image-bundled TorchTitan path can be patched so the 4x FSDP and EP meshes use distinct ProcessGroup objects.",
+  "run": {
+    "host": "do-sonle5-mi350-gpu",
+    "run_id": "torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T165304Z",
+    "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T165304Z",
+    "remote_json": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T165304Z/torchtitan_pg_probe.json",
+    "launcher": "launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+    "command_shape": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=2,3,4,5 CANARY_DEDICATED_EP_PG=true ... pg-probe",
+    "visible_devices": "2,3,4,5",
+    "result": "passed_probe_with_distinct_fsdp_ep_process_groups"
+  },
+  "runtime": {
+    "image": "rocm/primus:v26.2",
+    "torch_version": "2.10.0a0+git449b176",
+    "torch_hip": "7.2.26015",
+    "device_name": "AMD Instinct MI350X VF",
+    "temporary_patch": {
+      "helper": "tools/dsv4_runtime_probe/patch_torchtitan_dedicated_ep_pg.py",
+      "remote_patch_result": "dedicated_ep_pg_patch=applied path=/workspace/Primus/third_party/torchtitan/torchtitan/distributed/parallel_dims.py",
+      "mechanism": "Add backend_override=\"nccl\" when flattening the EP DeviceMesh so DeviceMesh creates a distinct EP ProcessGroup even when the FSDP and EP rank sets are equal."
+    }
+  },
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "etp": 1,
+    "dp_replicate": 1,
+    "dp_shard": 4,
+    "backend": "nccl"
+  },
+  "evidence": {
+    "rank_count": 4,
+    "fsdp_group_is_ep_group_by_rank": [false, false, false, false],
+    "fsdp_group_ranks_equal_ep_group_ranks_by_rank": [true, true, true, true],
+    "rank0_fsdp": {
+      "mesh_dim_names": ["dp_shard_cp"],
+      "group_ranks": [0, 1, 2, 3],
+      "group_backend": "nccl",
+      "group_object_id": 140344557583408,
+      "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7fa483803c30>"
+    },
+    "rank0_ep": {
+      "mesh_dim_names": ["ep"],
+      "group_ranks": [0, 1, 2, 3],
+      "group_backend": "nccl",
+      "group_object_id": 140344399984176,
+      "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7fa47a1b7630>"
+    },
+    "collective_smoke_rank0": {
+      "fsdp_all_reduce_sum": 6.0,
+      "ep_all_to_all_recv": [0.0, 1.0, 2.0, 3.0]
+    }
+  },
+  "interpretation": {
+    "what_is_proven": "For the 4x FSDP4/EP4 image-backed TorchTitan path, a tiny EP DeviceMesh backend override is sufficient to make FSDP and EP ProcessGroup objects distinct while preserving the same rank set and passing basic collectives.",
+    "what_is_not_proven": [
+      "8x FSDP8/EP8 group identity",
+      "actual RCCL stream overlap or reduced communication exposure",
+      "the newer local WIP TorchTitan source on this same image, because that path still hits the DeviceMesh backend_override=\"fake\" compatibility issue",
+      "the final direct TorchTitan DeepSeek-V4 canary, because torchtitan.models.deepseek_v4 is not materialized yet"
+    ],
+    "execution_policy_read": "This patched probe is useful evidence for the communication-domain fix, but the real DSv4 canary should run direct TorchTitan with torchrun and a real DeepSeek-V4 config rather than the Primus wrapper."
+  },
+  "validation_commands": [
+    {
+      "command": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=2,3,4,5 CANARY_DEDICATED_EP_PG=true bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+      "result": "passed"
+    },
+    {
+      "command": "ssh do-sonle5-mi350-gpu sed -n '1,260p' /local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T165304Z/torchtitan_pg_probe.json",
+      "result": "inspected_remote_json"
+    },
+    {
+      "command": "ssh do-sonle5-mi350-gpu sed -n '1,200p' /local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T165304Z/docker-run.log",
+      "result": "inspected_remote_patch_log"
+    }
+  ],
+  "dependency_pin_changes": []
+}

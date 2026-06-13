@@ -1,0 +1,79 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_routemask_w13_hotweight_bwd_timing_heap80_8x_s4096_gbs128_mbs2_step1_intrusive_20260607",
+  "status": "killed_after_step1_intrusive_timing_not_promoted",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_w13_hotweight_bwd_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "off"
+  },
+  "environment": {
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "2",
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "route_mask",
+    "CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS": "512",
+    "CANARY_MORI_AITER_HOT_SPLIT_W13": "true",
+    "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_aiter_routemask_w13_hotweight_bwd_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "80G"
+  },
+  "step_1": {
+    "loss": 12.19227,
+    "grad_norm": 21.375,
+    "tokens_per_gpu_s": 136.0,
+    "tflops_per_gpu": 6.87,
+    "peak_logged_memory_gib_min": 141.75,
+    "peak_logged_memory_gib_max": 142.31
+  },
+  "why_killed": "The first implementation flushed and synchronized every hot-weight backward timing event whenever TORCHTITAN_MORI_AITER_TIMING_PATH was set. It reached only 136 tok/GPU/s on step 1, so the run was stopped after collecting the diagnostic sidecar. The code now gates these hot-weight backward records behind TORCHTITAN_MORI_AITER_HOT_WEIGHT_BACKWARD_TIMING_LIMIT.",
+  "sidecar_parse": {
+    "local_sidecar_copy": "/tmp/dsv4_mori_hotweight_bwd_timing_heap80_20260607",
+    "jsonl_files": 8,
+    "records": 2432,
+    "events": {
+      "mori_aiter_hot_weight_backward": 1568,
+      "other_mori_timing_events": 864
+    },
+    "hot_weight_backward_step1_rankmax_ms": {
+      "w13_all_reduce_grad_hot_weight": 192.836,
+      "w13_scatter_owner_grad": 15.576,
+      "w2_all_reduce_grad_hot_weight": 102.615,
+      "w2_scatter_owner_grad": 7.908
+    },
+    "hot_weight_backward_step1_rankmean_ms": {
+      "w13_all_reduce_grad_hot_weight": 140.066,
+      "w13_scatter_owner_grad": 15.019,
+      "w2_all_reduce_grad_hot_weight": 91.517,
+      "w2_scatter_owner_grad": 7.512
+    },
+    "hot_weight_backward_calls_per_rank": {
+      "w13": 98,
+      "w2": 98
+    },
+    "hot_weight_payload_mib": {
+      "w13_grad_hot_weight": 64.0,
+      "w2_grad_hot_weight": 32.0
+    },
+    "forward_hot_helper_step1_rankmax_ms": {
+      "plan": 10252.143,
+      "remote_mask": 509.029,
+      "broadcast_w13": 133.662,
+      "broadcast_w2": 72.614,
+      "gather_remote": 35.184,
+      "sort_counts": 399.578,
+      "grouped_rows": 78.492,
+      "scatter_tokens": 8.164
+    }
+  },
+  "read": "The MORI/AITER helper partial dW reduction exists and is measurable. In this W13 route-mask sample, the hot-weight backward all-reduce is much larger than owner scatter, just like standard EP. However, the broader fused-path problem is still not the absence of partial reduction: even this intrusive sidecar shows large plan/remote-mask/sort and the earlier non-intrusive W13 run still ranks owner local VJP and combine_dx wait above helper partial scatter."
+}

@@ -1,0 +1,84 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_8wave_decomposition_decision",
+  "date": "2026-06-05",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "seq_chunk": 32,
+    "selected_block": 64,
+    "threads": 512,
+    "waves": 8
+  },
+  "gate": {
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "read": "This decomposition is for the best measured rocWMMA selected-tile source-boundary path, not a promoted candidate."
+  },
+  "measurements": [
+    {
+      "name": "mode0_score_only",
+      "artifact": "sparse_mla_source_boundary_rocwmma_8wave_mode0_scoreonly_s4096_layer2_timing3_20260605.json",
+      "event_median_ms": 21.455720901489258,
+      "scope": "QK plus dO.V score-page production, softmax row terms, checksum sink"
+    },
+    {
+      "name": "mode1_contribution_sink",
+      "artifact": "sparse_mla_source_boundary_rocwmma_8wave_mode1_contribsink_s4096_layer2_timing3_20260605.json",
+      "event_median_ms": 41.595951080322266,
+      "scope": "mode0 plus D16 contribution MFMA sweep, checksum sink"
+    },
+    {
+      "name": "mode2_dkv_only",
+      "artifact": "sparse_mla_source_boundary_rocwmma_8wave_mode2_dkvonly_s4096_layer2_timing3_20260605.json",
+      "event_median_ms": 53.26873779296875,
+      "scope": "mode1 plus group-aware global dKV atomics, no dQ"
+    },
+    {
+      "name": "mode2_dq_dkv",
+      "artifact": "sparse_mla_source_boundary_rocwmma_dqmfma_8wave_s4096_layer2_compile_timing1_20260605.json",
+      "event_median_ms": 63.68678283691406,
+      "scope": "mode2 plus selected-tile dQ MFMA partial atomics"
+    }
+  ],
+  "derived_deltas_ms": {
+    "score_page_recompute_and_row_terms": 21.455720901489258,
+    "contribution_math_over_score": 20.140230178833008,
+    "dkv_global_write_over_contribution_sink": 11.672786712646484,
+    "dq_partial_over_dkv_only": 10.418045043945312,
+    "full_vs_triton_full_boundary_gap_x": 5.723879858667932
+  },
+  "decision": {
+    "status": "reject_current_rocwmma_selected_tile_score_page_branch",
+    "why": [
+      "The score-page producer alone is 21.46 ms, already 1.93x slower than the 11.13 ms full sparse-attention backward gate.",
+      "The contribution sweep adds another 20.14 ms before any global writes.",
+      "The dKV global-write stage adds 11.67 ms and dQ partial accumulation adds 10.42 ms, but these are not the first wall for this branch.",
+      "Therefore, optimizing only the dKV epilogue or final dQ atomics cannot materialize a competitive full sparse-attention backward kernel from this rocWMMA selected-tile layout."
+    ],
+    "next_kernel_contract": {
+      "keep": [
+        "source-boundary inputs: q, dO, output, lse, compressed KV, LI route",
+        "no materialized selected K/V, probability slab, or scaled-dP slab",
+        "same-workgroup or persistent producer-consumer principle"
+      ],
+      "change": [
+        "Replace this rocWMMA score-page producer with a SGLang/Triton-like query-major online-softmax schedule or a CK block-attention schedule.",
+        "Keep Q/dO and selected KV reuse efficient first; only then add local dQ accumulation and group-aware dKV reduction.",
+        "Treat dKV epilogue work as secondary until the score/contribution producer is below the 8-11 ms band."
+      ],
+      "candidate_next_branch": "CK/HIP block-attention-style producer: token/head/query-major score and dO.V recompute with online row terms, then local dQ accumulation and compact/group-aware dKV partial rows. The first gate should be producer-only latency below the 11.13 ms full-boundary reference before adding final writes."
+    }
+  },
+  "correctness": {
+    "s4096_runs": "timing-only decomposition; correctness skipped because the branch is latency-rejected",
+    "reference_oracle": "reference_dq/reference_dkv in probe_sparse_mla_source_boundary_hip_coop.py remains wired for future correctness gates"
+  },
+  "dependency_pins_changed": false
+}

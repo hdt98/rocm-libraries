@@ -1,0 +1,97 @@
+{
+  "artifact": "muon_prealloc_gramtrace_norm_candidate_1xmi350_20260608",
+  "created_at": "2026-06-08",
+  "question": "Can Muon normalize by reusing the first Gram matrix trace instead of paying a standalone Frobenius vector_norm reduction?",
+  "implementation": {
+    "optimizer_flag": "TORCHTITAN_OPTIMIZER_MUON_NORM_MODE=gram_trace",
+    "default_mode": "vector_norm",
+    "scope": "BatchedMuonExpertParams preallocated workspace path only",
+    "math": "Compute raw Gram = X X^T, derive ||X||_F^2 from trace(raw Gram), scale X and Gram, then reuse the scaled Gram for the first Newton-Schulz iteration.",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+      "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+      "tools/dsv4_optimizer_preflight/probe_muon_correctness.py"
+    ]
+  },
+  "shape": {
+    "device": "1xMI350",
+    "layers": 12,
+    "expert_tensors": 36,
+    "local_experts": 32,
+    "matrix_count": 1152,
+    "dtype": "bfloat16",
+    "chunk_matrices": 4,
+    "muon_ns_steps": 1,
+    "muon_workspace_mode": "prealloc",
+    "muon_ns_compute_dtype": "bfloat16"
+  },
+  "remote_outputs": {
+    "sglang_image": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/muon_prealloc_gramtrace_ns1_sgldev_1xmi350_20260608",
+    "nexus_image": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/muon_prealloc_gramtrace_ns1_nexus_1xmi350_20260608"
+  },
+  "sglang_image_result": {
+    "host": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "actual_step_gpu_ms": {
+      "vector_norm": 583.9767456054688,
+      "gram_trace": 219.00376892089844,
+      "speedup": 2.666565931770655
+    },
+    "phase_vector_norm": {
+      "step_gpu_ms": 612.3087768554688,
+      "ns_total_ms": 499.4635340683162,
+      "non_ns_total_ms": 97.51626673713326,
+      "dominant_stage": "ns_norm_compute",
+      "ns_norm_compute_ms": 371.50266420841217,
+      "ns_baddbmm_ms": 51.89217793941498,
+      "ns_gram_bmm_ms": 29.47011399269104,
+      "ns_gram_square_bmm_ms": 21.820726953446865
+    },
+    "phase_gram_trace": {
+      "step_gpu_ms": 249.50765991210938,
+      "ns_total_ms": 133.3008999461308,
+      "non_ns_total_ms": 97.47095103934407,
+      "ns_raw_gram_bmm_ms": 30.552207998931408,
+      "ns_trace_norm_ms": 5.00387900788337,
+      "ns_rsqrt_norm_ms": 2.5696459840983152,
+      "ns_baddbmm_ms": 48.50645895302296,
+      "ns_gram_square_bmm_ms": 19.503673009574413
+    },
+    "correctness": {
+      "sample_bf16_passed": true,
+      "sample_bf16_max_abs": 0.000244140625,
+      "full_dim_1layer_bf16_passed": true,
+      "full_dim_1layer_bf16_max_abs": 7.62939453125e-06,
+      "tolerance_abs": 0.0005,
+      "reference": "vector_norm workspace=none",
+      "candidate": "prealloc gram_trace"
+    },
+    "read": "This image has a very slow standalone vector_norm reduction. The gram_trace path removes that wall and is a large isolated optimizer-slice win."
+  },
+  "retained_nexus_image_result": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "actual_step_gpu_ms": {
+      "vector_norm": 210.20223999023438,
+      "gram_trace": 210.58323669433594,
+      "gram_trace_delta_pct": 0.1812536776976094
+    },
+    "phase_vector_norm": {
+      "step_gpu_ms": 238.11607360839844,
+      "ns_total_ms": 126.485530115664,
+      "non_ns_total_ms": 96.01578492484987,
+      "ns_norm_compute_ms": 10.635944988578558,
+      "ns_baddbmm_ms": 45.064097076654434,
+      "ns_gram_bmm_ms": 29.512818969786167,
+      "ns_gram_square_bmm_ms": 19.9605650678277,
+      "prealloc_source_update_ms": 43.39132497832179,
+      "param_add_ms": 27.45588294789195
+    },
+    "read": "The retained training image already has a fast vector_norm path. The optimizer slice is now dominated by source update, baddbmm, Gram BMMs, and param add rather than norm reduction."
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "Rejected for the retained Nexus TorchTitan/MORI image: gram_trace is effectively neutral/slightly slower versus vector_norm on the same 1xMI350 optimizer-slice gate. Do not spend an 8x e2e run on this norm-mode candidate.",
+    "next_muon_target": "A real Muon speed promotion now needs lower-level fusion of source update + Newton-Schulz BMM/polynomial + param add, or a larger-MBS materialization that uses Muon memory savings. Norm-only replacement is not the retained-image wall."
+  }
+}

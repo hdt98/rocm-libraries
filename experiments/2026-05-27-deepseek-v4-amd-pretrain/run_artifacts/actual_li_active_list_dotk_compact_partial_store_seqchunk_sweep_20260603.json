@@ -1,0 +1,126 @@
+{
+  "scope": "sparse_mla_shared_latent_kv_actual_li_active_list_dkv_probe",
+  "status": "close_but_not_promoted",
+  "date": "2026-06-03",
+  "device": "MI350",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "layer_id": 2
+  },
+  "kernel_under_test": {
+    "name": "dot_k_compact_partial_store",
+    "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+    "read": "Preserves the fast query-major dot_k producer and writes compact per-seq-tile active-group D16 partial rows before a final index_add fold. It consumes materialized probs/grad_logits in this diagnostic and is not a full sparse-MLA backward kernel."
+  },
+  "fixed_blocks": {
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64,
+    "selected_block": 64,
+    "num_warps": 8
+  },
+  "seq_chunk_sweep": [
+    {
+      "seq_chunk": 16,
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc16_d16h64k64_timing10_20260603.json",
+      "samples": 10,
+      "full_emit_plus_index_add_median_ms": 8.364243984222412,
+      "full_emit_plus_index_add_mean_ms": 8.54199800491333,
+      "emit_only_median_ms": 7.945281028747559,
+      "emit_only_mean_ms": 7.9689806461334225,
+      "compact_partial_slab_elements": 67351040,
+      "modeled_coalesced_write_reduction_x": 11.952959063438367,
+      "peak_memory_gib": 2.835869789123535
+    },
+    {
+      "seq_chunk": 32,
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+      "samples": 10,
+      "full_emit_plus_index_add_median_ms": 8.54106616973877,
+      "full_emit_plus_index_add_mean_ms": 8.76349630355835,
+      "emit_only_median_ms": 8.273122787475586,
+      "emit_only_mean_ms": 8.931657409667968,
+      "compact_partial_slab_elements": 33806848,
+      "modeled_coalesced_write_reduction_x": 23.813051840857806,
+      "peak_memory_gib": 2.7089571952819824
+    },
+    {
+      "seq_chunk": 64,
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc64_d16h64k64_timing_20260603.json",
+      "samples": 3,
+      "full_emit_plus_index_add_median_ms": 10.280047416687012,
+      "full_emit_plus_index_add_mean_ms": 9.954336166381836,
+      "emit_only_median_ms": 8.664986610412598,
+      "emit_only_mean_ms": 8.719814936319986,
+      "compact_partial_slab_elements": 17036288,
+      "modeled_coalesced_write_reduction_x": 47.254673318506946,
+      "peak_memory_gib": 2.645993232727051
+    },
+    {
+      "seq_chunk": 128,
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc128_d16h64k64_timing_20260603.json",
+      "samples": 3,
+      "full_emit_plus_index_add_median_ms": 10.32504653930664,
+      "full_emit_plus_index_add_mean_ms": 10.033283551534018,
+      "emit_only_median_ms": 8.88075065612793,
+      "emit_only_mean_ms": 8.909284591674805,
+      "compact_partial_slab_elements": 8649728,
+      "modeled_coalesced_write_reduction_x": 93.07162306144193,
+      "peak_memory_gib": 2.614506244659424
+    }
+  ],
+  "same_tuple_sparse_atomic_gate": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+    "samples": 10,
+    "seq_chunk": 32,
+    "median_ms": 8.006924390792847,
+    "mean_ms": 8.130669689178466,
+    "peak_memory_gib": 2.5649466514587402,
+    "read": "This direct sparse-atomic kernel keeps one global atomic update per valid selected KxD contribution. It does not achieve the coalesced write target, but it remains the latency gate this diagnostic branch must beat."
+  },
+  "older_gates_for_context": {
+    "same_day_five_sample_atomic_rerun": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_rerun_20260603.json",
+      "median_ms": 8.189546585083008,
+      "samples": 5
+    },
+    "prior_three_sample_atomic": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing_20260602.json",
+      "median_ms": 8.80629825592041,
+      "samples": 3
+    },
+    "prior_sc32_compact_partial_store": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc32_d16h64k64_timing_20260603.json",
+      "full_emit_plus_index_add_median_ms": 8.72913932800293,
+      "emit_only_median_ms": 8.281253814697266,
+      "samples": 3
+    }
+  },
+  "decision": {
+    "best_compact_partial_seq_chunk": 16,
+    "best_compact_partial_full_median_ms": 8.364243984222412,
+    "best_compact_partial_emit_only_median_ms": 7.945281028747559,
+    "same_tuple_sparse_atomic_median_ms": 8.006924390792847,
+    "delta_best_full_vs_atomic_ms": 0.35731959342956543,
+    "delta_best_emit_only_vs_atomic_ms": -0.061643362045288086,
+    "promote_to_integrated_backward": false,
+    "read": "seq_chunk=16 gets the compact partial producer close and its emit-only body is slightly below the same-tuple atomic gate, but the final global partial fold plus extra workspace still makes the full path slower than raw atomics. The compact-row contract is useful evidence; this exact global partial-store plus index_add path is not a latency promotion."
+  },
+  "next_action": {
+    "preferred": "Fuse the reducer into the producer or perform register/warp/tile-local segmented accumulation before global writes, avoiding the HBM partial-store/index_add round trip.",
+    "fallback": "Use the compact partial-store producer as a reducer-contract probe only; do not spend more turns sweeping seq_chunk or selected_block for this same global partial-store body.",
+    "production_kernel_requirements": [
+      "Preserve the fast query-major dot_k or MFMA contribution schedule.",
+      "Reduce multiple (token, head, selected_slot) contributions targeting the same compressed group before global dKV writes.",
+      "Avoid materialized selected K/V, dense route matrices, probabilities, and multi-GiB partial slabs.",
+      "Fuse or near-fuse LI/compressor dKV accumulation if segmented producer reduction still cannot beat the 8.0 ms raw-atomic gate."
+    ]
+  }
+}

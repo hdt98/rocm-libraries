@@ -1,0 +1,54 @@
+{
+  "artifact": "hipkittens_gqa_bwd_dense_synthlse_b1n4096h64hkv8_20260607",
+  "date": "2026-06-07",
+  "node": "do-vunguyen-mi350-gpu",
+  "gpu": "MI350",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "repo": "HazyResearch/HipKittens",
+    "path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/hipkittens",
+    "commit": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_hipkittens_gqa_bwd_synth_lse.py",
+  "command": "docker run --rm --entrypoint bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host -e HIP_VISIBLE_DEVICES=0 -e ROCR_VISIBLE_DEVICES=0 -e CUDA_VISIBLE_DEVICES=0 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace/sources/references/hipkittens/kernels/attn/gqa_backwards onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'export PYTHONPATH=/workspace/sources/references/hipkittens/src/common/pyutils:${PYTHONPATH:-}; python3 /workspace/tools/dsv4_runtime_probe/probe_hipkittens_gqa_bwd_synth_lse.py --batch 1 --seq 4096 --heads 64 --kv-heads 8 --dim 128 --warmup 5 --iters 20'",
+  "shape": {
+    "batch": 1,
+    "seq": 4096,
+    "heads": 64,
+    "kv_heads": 8,
+    "dim": 128,
+    "causal": false
+  },
+  "timed_boundary": "HipKittens dispatch_prep + dispatch_bwd_combined + dispatch_dq_shuffle",
+  "precompute_O_L_ms": 2459.9175269249827,
+  "hk_event_ms": {
+    "median": 2.305877923965454,
+    "mean": 2.3301584482192994,
+    "min": 2.2722580432891846,
+    "max": 2.4616589546203613
+  },
+  "hk_wall_ms": {
+    "median": 2.331037016119808,
+    "mean": 2.3480755218770355,
+    "min": 2.2869730601087213,
+    "max": 2.5137000484392047
+  },
+  "dense_bwd_tflops_at_event_median": 596.037422638767,
+  "finite": {
+    "dQ": true,
+    "dK": true,
+    "dV": true,
+    "delta": true
+  },
+  "norms": {
+    "dQ": 11.694540023803711,
+    "dK": 11.64810562133789,
+    "dV": 46.499168395996094,
+    "delta": 23.49793815612793
+  },
+  "interpretation": {
+    "status": "schedule donor validated, not a SharedKV promotion yet",
+    "why_not_promoted": "This times dense GQA backward with synthetic O/L, not the DSv4 sparse SharedKV backward contract. The next implementation must replace dense dK/dV stores with dOriKV plus sparse route-aware dCmpKV epilogue and then compare against the current C4 SharedKV gate."
+  }
+}

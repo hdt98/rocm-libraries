@@ -1,0 +1,181 @@
+{
+  "probe": "aiter_torchtitan_moe_forward_parity",
+  "shape": {
+    "tokens": 64,
+    "hidden": 1024,
+    "intermediate": 128,
+    "experts": 8,
+    "topk": 2,
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.2
+  },
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF",
+    "interleave_gate_mode": "interleave"
+  },
+  "reference": "TorchTitan SwiGLU: down(silu(w1_gate x) * (w3_up x)), weighted by topk_weight and index-added by token",
+  "reference_precision": "FP32 matmul/activation accumulation, cast back to BF16 output",
+  "reference_stats": {
+    "max_abs": 8.6875,
+    "mean_abs": 1.340544581413269
+  },
+  "best_candidate": "separated_gate_up_preshuffled",
+  "best_max_abs_diff": 0.03125,
+  "best_mean_abs_diff": 0.003096172120422125,
+  "candidates": [
+    {
+      "name": "separated_gate_up",
+      "gate_mode": "separated",
+      "preshuffled": false,
+      "read": "w13 = cat([TorchTitan w1 gate, TorchTitan w3 up])",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 12.296875,
+      "mean_abs_diff": 1.9474005699157715,
+      "max_rel_diff": 61576.03125,
+      "cosine_distance": 0.999393105506897,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.11092100292444229,
+        "min": 0.10332100093364716,
+        "max": 0.1929209977388382,
+        "iters": 5
+      }
+    },
+    {
+      "name": "separated_gate_up_preshuffled",
+      "gate_mode": "separated",
+      "preshuffled": true,
+      "read": "w13 = cat([TorchTitan w1 gate, TorchTitan w3 up]) plus AITER shuffle_weight(layout=(16,16)) for w13/w2",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 0.03125,
+      "mean_abs_diff": 0.003096172120422125,
+      "max_rel_diff": 23.824241638183594,
+      "cosine_distance": 5.4836273193359375e-06,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.11592099815607071,
+        "min": 0.10432100296020508,
+        "max": 0.20840099453926086,
+        "iters": 5
+      }
+    },
+    {
+      "name": "separated_up_gate",
+      "gate_mode": "separated",
+      "preshuffled": false,
+      "read": "w13 = cat([TorchTitan w3 up, TorchTitan w1 gate])",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 12.09375,
+      "mean_abs_diff": 1.9222445487976074,
+      "max_rel_diff": 54372.2734375,
+      "cosine_distance": 1.0020067691802979,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10644099861383438,
+        "min": 0.09884099662303925,
+        "max": 0.13784199953079224,
+        "iters": 5
+      }
+    },
+    {
+      "name": "separated_up_gate_preshuffled",
+      "gate_mode": "separated",
+      "preshuffled": true,
+      "read": "w13 = cat([TorchTitan w3 up, TorchTitan w1 gate]) plus AITER shuffle_weight(layout=(16,16)) for w13/w2",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 7.53125,
+      "mean_abs_diff": 1.112344741821289,
+      "max_rel_diff": 68775.7890625,
+      "cosine_distance": 0.34265202283859253,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10492099821567535,
+        "min": 0.09796100109815598,
+        "max": 0.1531209945678711,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_gate_up",
+      "gate_mode": "interleave",
+      "preshuffled": false,
+      "read": "w13 rows alternate [gate_i, up_i]",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 12.447265625,
+      "mean_abs_diff": 1.9328563213348389,
+      "max_rel_diff": 56534.80078125,
+      "cosine_distance": 0.9983033537864685,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10492099821567535,
+        "min": 0.09864100068807602,
+        "max": 0.1477610021829605,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_gate_up_preshuffled",
+      "gate_mode": "interleave",
+      "preshuffled": true,
+      "read": "w13 rows alternate [gate_i, up_i] plus AITER shuffle_weight(layout=(16,16)) for w13/w2",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 11.15625,
+      "mean_abs_diff": 1.9520606994628906,
+      "max_rel_diff": 156997.328125,
+      "cosine_distance": 1.0038570165634155,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10972099751234055,
+        "min": 0.09824100136756897,
+        "max": 0.15276199579238892,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_up_gate",
+      "gate_mode": "interleave",
+      "preshuffled": false,
+      "read": "w13 rows alternate [up_i, gate_i]",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 10.984375,
+      "mean_abs_diff": 1.8598504066467285,
+      "max_rel_diff": 81018.78125,
+      "cosine_distance": 0.9928052425384521,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.1013609990477562,
+        "min": 0.0976409986615181,
+        "max": 0.16988199949264526,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_up_gate_preshuffled",
+      "gate_mode": "interleave",
+      "preshuffled": true,
+      "read": "w13 rows alternate [up_i, gate_i] plus AITER shuffle_weight(layout=(16,16)) for w13/w2",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 13.0,
+      "mean_abs_diff": 1.9585564136505127,
+      "max_rel_diff": 41390.15625,
+      "cosine_distance": 1.0106595754623413,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.09804099798202515,
+        "min": 0.09508100152015686,
+        "max": 0.1368809938430786,
+        "iters": 5
+      }
+    }
+  ]
+}

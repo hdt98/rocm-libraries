@@ -1,0 +1,129 @@
+{
+  "created_at": "2026-05-31",
+  "decision": {
+    "status": "demote_aiter_dynamic_gmm_tgmm_for_flash_training_moe",
+    "promote": false,
+    "read": "AITER dynamic GMM/TGMM is correct for the compact non-uniform Flash S=4096 routed MoE training contractions, but it is slower than the retained grouped-expert-batches padded torch.bmm(out=) block baseline. The materialized-transpose lhs sweep also worsens wgrad, so the observed gap is not explained only by transposed-view lhs overhead.",
+    "implication": "Do not assume the available AITER/CK fused MoE path solves the small/ragged/padded GEMM bottleneck for this training backward shape. The next MoE backend lever remains a compact-native grouped training GEMM schedule with library-like MFMA efficiency, not a dispatch/combine-only wrapper."
+  },
+  "summary_artifacts": {
+    "aiter_dynamic_transposed_view_checked": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_dynamic_flash_s4096_transposed_view_20260531.json",
+    "aiter_dynamic_materialized_transpose_wgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_dynamic_flash_s4096_materialized_transpose_wgrad_20260531.json",
+    "aiter_config_flash_w2_dgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_config_flash_s4096_20260531.json",
+    "ck_tile_custom_config_flash_w2_dgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/ck_tile_custom_config_flash_s4096_all_20260531.json",
+    "retained_flash_block_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_flash_s4096_split_triton_blocks_20260531.json"
+  },
+  "shape": {
+    "tokens": 4096,
+    "assignments": 24576,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "experts": 256,
+    "topk": 6,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a"
+  },
+  "route_stats": {
+    "assignments": 24576,
+    "touched_experts": 256,
+    "min_per_expert": 73,
+    "mean_per_expert": 96.0,
+    "max_per_expert": 130,
+    "padded_rows_global_max": 33280,
+    "padding_multiplier_global_max": 1.3541666666666667
+  },
+  "correctness": {
+    "aiter_dynamic_transposed_view_ok": true,
+    "checked_ops": [
+      "gmm_fwd_w1",
+      "gmm_fwd_w2",
+      "gmm_dgrad_w2",
+      "gmm_xgrad_w1w3_pair",
+      "ptgmm_wgrad_w2",
+      "nptgmm_wgrad_w2",
+      "ptgmm_wgrad_w1",
+      "nptgmm_wgrad_w1"
+    ],
+    "max_abs_by_op": {
+      "gmm_fwd_w1": 0.015625,
+      "gmm_fwd_w2": 0.00390625,
+      "gmm_dgrad_w2": 0.015625,
+      "gmm_xgrad_w1w3_pair": 0.0078125,
+      "ptgmm_wgrad_w2": 0.0,
+      "nptgmm_wgrad_w2": 0.0,
+      "ptgmm_wgrad_w1": 0.0,
+      "nptgmm_wgrad_w1": 0.0
+    },
+    "pct_close_by_op": {
+      "gmm_fwd_w1": 100.0,
+      "gmm_fwd_w2": 100.0,
+      "gmm_dgrad_w2": 100.0,
+      "gmm_xgrad_w1w3_pair": 100.0,
+      "ptgmm_wgrad_w2": 100.0,
+      "nptgmm_wgrad_w2": 100.0,
+      "ptgmm_wgrad_w1": 100.0,
+      "nptgmm_wgrad_w1": 100.0
+    }
+  },
+  "retained_block_baseline_ms": {
+    "source": "single_layer_flash_s4096_split_triton_blocks_20260531.json backward_attribution.block_ms",
+    "moe_routed_w2_dgrad": 0.9986059740185738,
+    "moe_routed_w1_w3_dgrad": 2.2351620718836784,
+    "moe_routed_w2_wgrad": 1.8104339251294732,
+    "moe_routed_w1_wgrad": 2.0067329751327634,
+    "moe_routed_w3_wgrad": 1.7438950017094612
+  },
+  "aiter_dynamic_transposed_view_median_ms": {
+    "gmm_fwd_w1": 2.3193418979644775,
+    "gmm_fwd_w2": 2.0897209644317627,
+    "gmm_dgrad_w2": 1.9763189554214478,
+    "gmm_xgrad_w1w3_pair": 4.012318134307861,
+    "ptgmm_wgrad_w2": 2.382343053817749,
+    "nptgmm_wgrad_w2": 2.4910221099853516,
+    "ptgmm_wgrad_w1": 2.3689019680023193,
+    "nptgmm_wgrad_w1": 2.356580972671509,
+    "ptgmm_wgrad_w2_lhs_transpose_contiguous_copy": 0.45564401149749756,
+    "nptgmm_wgrad_w2_lhs_transpose_contiguous_copy": 0.487964004278183,
+    "ptgmm_wgrad_w1_lhs_transpose_contiguous_copy": 0.28276199102401733,
+    "nptgmm_wgrad_w1_lhs_transpose_contiguous_copy": 0.28264299035072327
+  },
+  "aiter_dynamic_materialized_transpose_wgrad_median_ms": {
+    "ptgmm_wgrad_w2": 2.7749059200286865,
+    "nptgmm_wgrad_w2": 2.8645899295806885,
+    "ptgmm_wgrad_w1": 2.601227045059204,
+    "nptgmm_wgrad_w1": 2.594266891479492
+  },
+  "other_backend_checks": {
+    "aiter_tuned_compact_w2_dgrad": {
+      "median_ms": 1.48185396194458,
+      "torch_padded_bmm_out_baseline_ms": 1.0687299966812134,
+      "speedup_vs_torch_padded_bmm_out": 0.7212114176748969,
+      "decision": "demoted"
+    },
+    "ck_tile_best_custom_flash_w2_dgrad": {
+      "candidate": "m64n128_v3_padm_true",
+      "median_ms": 2.18577,
+      "tflops": 188.637,
+      "speedup_vs_torch_padded_bmm_out": 0.48894897298490386,
+      "speedup_vs_best_aiter_tuned_compact": 0.6779532968805418,
+      "decision": "demoted"
+    }
+  },
+  "slower_than_retained_block_x": {
+    "aiter_dynamic_transposed_view_w2_dgrad": 1.9790778413515568,
+    "aiter_dynamic_transposed_view_w1_w3_xgrad_pair": 1.7950904700733796,
+    "aiter_dynamic_transposed_view_w2_wgrad_best": 1.31589616210234,
+    "aiter_dynamic_transposed_view_w1_wgrad_best": 1.174337095106338,
+    "aiter_dynamic_transposed_view_w3_wgrad_shape_proxy": 1.3513319152594963,
+    "aiter_dynamic_materialized_transpose_w2_wgrad_best": 1.5327297403743907,
+    "aiter_dynamic_materialized_transpose_w1_wgrad_best": 1.2927813135217245
+  },
+  "next_actions": [
+    "Keep the retained padded torch.bmm(out=) grouped-expert backend as the Flash S=4096 MoE training baseline until a compact backend beats it end to end.",
+    "Treat dispatch/combine as already subdominant for the current measured MoE gap; focus future MoE kernel work on compact-native grouped training GEMM efficiency and layout traffic.",
+    "Do not spend another iteration on AITER dynamic TGMM lhs materialization for this shape; the materialized-transpose sweep regressed wgrad.",
+    "Shift near-term single-layer optimization attention back to sparse MLA backward dgrad_qkv and sink_wgrad, or design a more specialized CK/TileLang/HIP grouped-training-GEMM schedule for the small-M expert shape."
+  ]
+}

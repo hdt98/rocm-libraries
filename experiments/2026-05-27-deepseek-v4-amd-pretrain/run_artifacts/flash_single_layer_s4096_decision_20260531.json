@@ -1,0 +1,112 @@
+{
+  "artifact": "flash_single_layer_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "First DeepSeek V4-Flash-shaped one-MI350 single-layer baseline after retargeting from the prior Pro-sized harness defaults.",
+  "source_artifacts": {
+    "flash_hf_contract": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/deepseek_v4_flash_hf_config_contract_20260531.json",
+    "full_layer_timing": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_flash_s4096_compact_reduce_20260531.json",
+    "block_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_flash_s4096_compact_reduce_blocks_20260531.json",
+    "sparse_mla_backward_probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_backward_flash_s4096_20260531.json",
+    "expert_gemm_m12288_probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/expert_gemm_m12288_flash_20260531.json"
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash",
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden_size": 4096,
+    "num_attention_heads": 64,
+    "kv_dim": 512,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "moe_intermediate": 2048,
+    "num_experts": 256,
+    "routed_top_k": 6,
+    "csa_ratio": 4,
+    "hca_ratio": 128,
+    "dtype": "bfloat16",
+    "expert_dtype": "fp4 packed-sim"
+  },
+  "full_layer_result": {
+    "avg_ms": 31.697463981496792,
+    "min_ms": 31.495711067691445,
+    "tokens_per_s": 129221.69427784556,
+    "estimated_tflops": 280.48244830910835,
+    "target_ms": 24.9,
+    "target_tokens_per_s": 164497.99196787147,
+    "time_gap_multiplier": 1.2729905213452527,
+    "throughput_fraction_of_target": 0.7855524181161797,
+    "gradients_present": [
+      "input",
+      "attention.wq_a",
+      "attention.wq_b",
+      "attention.wkv",
+      "attention.wo_b",
+      "moe.gate",
+      "moe.w1",
+      "moe.w2",
+      "moe.shared_w1"
+    ]
+  },
+  "profile_result": {
+    "phase_total_ms_with_block_overhead": 34.31378211826086,
+    "forward_ms": 13.848819071426988,
+    "backward_ms": 20.366013050079346,
+    "forward_attention_ms": 6.660224054940045,
+    "forward_moe_ms": 6.147766136564314,
+    "forward_boundary_ms": 0.5814890610054135,
+    "attention_dgrad_ms": 8.473509922623634,
+    "attention_wgrad_ms": 8.681330014951527,
+    "moe_dgrad_ms": 10.796785005368292,
+    "moe_wgrad_ms": 10.654996032826602,
+    "sparse_mla_dgrad_qkv_ms": 4.905959009192884,
+    "sparse_mla_sink_wgrad_ms": 4.965819069184363,
+    "routed_moe_dgrad_ms": 9.989417041651905,
+    "routed_moe_wgrad_ms": 9.907177998684347
+  },
+  "sparse_mla_backward_probe": {
+    "standalone_backward_median_ms": 5.068769931793213,
+    "standalone_backward_mean_ms": 5.211424986521403,
+    "modeled_primitive_median_sum_ms": 5.285250008106232,
+    "largest_primitive_medians_ms": {
+      "softmax_backward_scores": 1.2538520097732544,
+      "compressed_grad_probs": 0.7993280291557312,
+      "compressed_grad_from_probs": 0.7925670146942139,
+      "grad_compressed_q_add": 0.5521649718284607,
+      "grad_selected_q_add": 0.5058850049972534,
+      "grad_q_compressed_add": 0.5020449757575989
+    }
+  },
+  "moe_expert_gemms_flash_target": {
+    "target_ms_fwd_bwd_all_experts_grouped": 12.9,
+    "target_scope": "Whole MoE layer routed expert GEMM family in one batched/grouped call across all experts, forward plus backward. This is not a per-expert latency target.",
+    "dense_one_expert_m12288_probe_reference_only": {
+    "layout": "actual",
+    "median_ms": {
+      "fwd_w1": 0.1584019958972931,
+      "w2_dgrad": 0.16296200454235077,
+      "w1w3_xgrad_pair": 0.329243004322052,
+      "w2_wgrad": 0.1798419952392578,
+      "w1_wgrad": 0.18024200201034546,
+      "w3_wgrad": 0.17984099686145782
+    },
+      "read": "This direct dense one-expert M=12288 probe is retained only as a library-GEMM sanity check. It must not be compared to the 12.9 ms whole-MoE target."
+    },
+    "read": "The active MoE anchor is the aggregate routed expert GEMM family for the whole MoE layer, not 1.3 ms per expert. Interpret MoE progress from routed-expert forward plus routed dgrad/wgrad subblock profiles and grouped/ragged GEMM probes."
+  },
+  "decision": {
+    "status": "flash_baseline_established_not_at_target",
+    "read": "Retargeting to the HF Flash config changed the baseline materially: S4096 full layer is 31.70 ms, not the older Pro-sized 76 ms class result. The remaining gap to 24.9 ms is about 6.8 ms.",
+    "next_kernel_priorities": [
+      "Fuse or replace sparse MLA backward softmax-score, compressed-gradient, dQ/dKV, and sink-gradient work; current Flash sparse MLA backward is about 5 ms standalone and about 9.9 ms across dgrad/sink blocks in segmented attribution.",
+      "Keep routed MoE optimization focused on the whole-MoE grouped expert GEMM family. The active anchor is about 12.9 ms fwd+bwd for all experts together; direct one-expert M=12288 GEMM timings are reference-only and should not be used as pass/fail evidence.",
+      "Run rocprofv3 selected-region capture on the Flash-shaped layer next to confirm the timer attribution against real kernel time and launch counts."
+    ],
+    "not_next": [
+      "Using prior Pro-sized S4096 artifacts as pass/fail evidence for the Flash goal",
+      "Optimizing one large expert GEMM in isolation before addressing grouped/ragged routing",
+      "Treating the 8x DeepSeek-V3 16B canary throughput as proof of final V4-Flash training-system completion"
+    ]
+  },
+  "dependency_pin_changes": []
+}

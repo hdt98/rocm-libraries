@@ -1,0 +1,93 @@
+{
+  "status": "retained_speedup_candidate",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_panel_capacity",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "dtype": "bf16 inputs, fp32 dKV partials"
+  },
+  "retained_candidate": {
+    "math_mode": "mfma_reduced",
+    "route_pattern": "panel_capacity_random",
+    "token_block": 32,
+    "group_panel_size": 256,
+    "panel_capacity": 160,
+    "topk_workspace": 640,
+    "block_k": 32,
+    "block_d": 64,
+    "panel_overflow_count_s4096": 0,
+    "write_reduction_x": 16.0,
+    "output_partials_mib": 256.0,
+    "s128_correctness_max_abs_diff": 9.313225746154785e-09,
+    "s4096_median_ms": 10.712961196899414,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s128_valid512_tb32_gps256_cap160_k32d64_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "previous_retained_candidate": {
+    "math_mode": "mfma_reduced",
+    "token_block": 32,
+    "group_panel_size": 128,
+    "panel_capacity": 96,
+    "topk_workspace": 768,
+    "block_k": 32,
+    "block_d": 64,
+    "panel_overflow_count_s4096": 0,
+    "write_reduction_x": 16.0,
+    "output_partials_mib": 256.0,
+    "s4096_median_ms": 11.599525451660156,
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps128_cap96_k32d64_timing10_20260604.json"
+  },
+  "speedup": {
+    "absolute_ms": 0.8865642547607422,
+    "relative_x": 1.0827063805721714,
+    "relative_percent": 7.640878018013582
+  },
+  "other_branches": [
+    {
+      "name": "same_panel_direct_final_atomic",
+      "read": "Correct final [groups, D] output and only 2 MiB final dKV output, but slower than compact partial producer.",
+      "s128_correctness_max_abs_diff": 1.4901161193847656e-08,
+      "s4096_median_ms": 11.473388671875,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s128_valid512_tb32_gps256_cap160_k32d64_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+    },
+    {
+      "name": "wider_capacity_k64",
+      "read": "Correct and zero-overflow, but padding back to 768 selected lanes loses the chunk-count benefit.",
+      "group_panel_size": 256,
+      "panel_capacity": 192,
+      "topk_workspace": 768,
+      "block_k": 64,
+      "block_d": 64,
+      "s128_correctness_max_abs_diff": 9.313225746154785e-09,
+      "s4096_median_ms": 11.191685199737549,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s128_valid512_tb32_gps256_cap192_k64d64_correct_20260604.json",
+      "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps256_cap192_k64d64_timing10_20260604.json"
+    },
+    {
+      "name": "token_block_64_gate",
+      "read": "Correct, halves compact partial rows at S128, but small-shape timing is slower; not promoted without a stronger reason.",
+      "s128_correctness_max_abs_diff": 1.4901161193847656e-08,
+      "s128_median_ms": 1.2534509897232056,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s128_valid512_tb64_gps256_cap160_k32d64_correct_20260604.json"
+    },
+    {
+      "name": "group_panel_512_gate",
+      "read": "Correct and zero-overflow at S128, but the 512-group local active table is slower and carries high shared-memory pressure.",
+      "s128_correctness_max_abs_diff": 8.381903171539307e-09,
+      "s128_median_ms": 1.1175719499588013,
+      "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s128_valid512_tb32_gps512_cap320_k32d64_correct_20260604.json"
+    },
+    {
+      "name": "block_d_128_gate",
+      "read": "Rejected at compile/init: requested dynamic shared memory 172032 exceeds MI350 device limit 163840."
+    }
+  ],
+  "read": "This is real TileLang progress on the compressed dKV many-to-one wall: widening the route panel to 256 groups and using a 160-lane capacity reduces padded selected rows from 768 to 640 per token with zero overflow, improving the compact producer from 11.60 ms to 10.71 ms. It still does not beat the 8.0-8.8 ms Triton sparse-atomic wall, and it still consumes diagnostic materialized probs/grad_logits. The next TileLang kernel step should fuse LI derivative/prob production into the producer and/or avoid the remaining 256 MiB compact partial stream without falling back to slower reduced atomics."
+}

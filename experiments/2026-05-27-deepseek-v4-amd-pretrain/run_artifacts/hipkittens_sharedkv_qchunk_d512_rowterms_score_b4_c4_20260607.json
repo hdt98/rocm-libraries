@@ -1,0 +1,52 @@
+{
+  "dk_scratch": {
+    "abs_max": 16.625,
+    "finite": false,
+    "mean_abs": 0.0010536563349887729,
+    "nonfinite": 475118,
+    "nonzero": 557292
+  },
+  "dv_scratch": {
+    "abs_max": 63488.0,
+    "finite": false,
+    "mean_abs": 9.263879776000977,
+    "nonfinite": 475118,
+    "nonzero": 557292
+  },
+  "latency_ms": {
+    "max": 11.18845272064209,
+    "mean": 11.119007921218872,
+    "median": 11.117344856262207,
+    "min": 11.068602561950684
+  },
+  "shape": {
+    "active_tiles": 16,
+    "batch": 4,
+    "dim": 512,
+    "dot_slice_qo": 16,
+    "heads": 64,
+    "input_scale": 0.01,
+    "kv_heads": 1,
+    "kv_seq": 1024,
+    "kv_tiles": 16,
+    "lse_value": 1.0,
+    "num_warps": 4,
+    "query_chunks": 16,
+    "query_seq": 4096,
+    "query_steps_per_chunk": 256,
+    "scale": 0.044194173824159216,
+    "scratch_rows": 16384,
+    "seq_blocks": 4,
+    "softmax_dot_scale": 0.02,
+    "source_rows": 4096,
+    "tile_rows": 64
+  },
+  "sink": {
+    "abs_max": 256.0,
+    "finite": true,
+    "mean_abs": 256.0,
+    "nonfinite": 0,
+    "nonzero": 256
+  },
+  "timed_boundary": "q-chunk D512 score/row-term producer gate only: QK and dO V^T are accumulated over four D128 chunks before row terms while the kernel owns a compressed KV tile and a chunk of q-head/query tiles. P/dP then feed one D128 dK/dV scratch epilogue, not full SharedKV gradients."
+}

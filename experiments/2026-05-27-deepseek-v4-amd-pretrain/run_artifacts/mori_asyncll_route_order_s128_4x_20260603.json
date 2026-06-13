@@ -1,0 +1,1707 @@
+{
+  "artifact": "probe_mori_asyncll_route_order",
+  "created_unix": 1780454131.148409,
+  "shape": {
+    "tokens_per_rank": 128,
+    "hidden": 8,
+    "experts": 256,
+    "topk": 6,
+    "topk_pattern": "random",
+    "world_size": 4
+  },
+  "mori": {
+    "kernel_type": "asyncll",
+    "block_num": 64,
+    "rdma_block_num": 0,
+    "warp_num_per_block": 8,
+    "max_total_recv_tokens": 1536
+  },
+  "summary": {
+    "all_ordered_route_keys_equal": false,
+    "all_multiset_route_keys_equal": true,
+    "all_ordered_src_pos_equal": false,
+    "all_multiset_src_pos_equal": true,
+    "all_src_pos_matches_payload": false,
+    "recv_count_by_rank": [
+      455,
+      461,
+      459,
+      471
+    ]
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "captures": {
+        "x": {
+          "recv_count": 455,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 30,
+          "ordered_route_key_hash": "8392b07da4d6e7e8d5a713d7ca651c07d6d3e6fe29e73bd65586fd8803c6785f",
+          "ordered_src_pos_hash": "dc1bc0b524d94a52b651b1b2aa47ba26ecb42e56e5a5843fe47699a7bcdbed18",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 112,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 113,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 114,
+              "a": 523,
+              "b": 139
+            },
+            {
+              "idx": 115,
+              "a": 526,
+              "b": 142
+            },
+            {
+              "idx": 116,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 509,
+          "src_pos_min": 0,
+          "src_pos_max": 1661,
+          "token_id_mod_range_check": true
+        },
+        "grad": {
+          "recv_count": 455,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 30,
+          "ordered_route_key_hash": "3a264e891695568fe2a4f825d59de213d9b7aa44743db72f901bb34a153f71af",
+          "ordered_src_pos_hash": "144055efa9808f680582931465ff502e0fe9ad098b1dd45c939b836770930a06",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 112,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 113,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 114,
+              "a": 523,
+              "b": 139
+            },
+            {
+              "idx": 115,
+              "a": 526,
+              "b": 142
+            },
+            {
+              "idx": 116,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 509,
+          "src_pos_min": 0,
+          "src_pos_max": 1661,
+          "token_id_mod_range_check": true
+        },
+        "topk": {
+          "recv_count": 455,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 30,
+          "ordered_route_key_hash": "084712f08ab420a135d02a95868a1ff8889dfe12ca093fe7d77943e355f98bc2",
+          "ordered_src_pos_hash": "b1ff6681ae6ed6322642f66dab37f5618e33f5e055355f6a127caa191739a3ba",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 112,
+              "a": 535,
+              "b": 151
+            },
+            {
+              "idx": 113,
+              "a": 538,
+              "b": 154
+            },
+            {
+              "idx": 114,
+              "a": 536,
+              "b": 152
+            },
+            {
+              "idx": 115,
+              "a": 539,
+              "b": 155
+            },
+            {
+              "idx": 116,
+              "a": 541,
+              "b": 157
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 509,
+          "src_pos_min": 0,
+          "src_pos_max": 1661,
+          "token_id_mod_range_check": true
+        }
+      },
+      "comparisons": {
+        "x_vs_grad": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "8392b07da4d6e7e8d5a713d7ca651c07d6d3e6fe29e73bd65586fd8803c6785f",
+          "route_key_hash_other": "3a264e891695568fe2a4f825d59de213d9b7aa44743db72f901bb34a153f71af",
+          "src_pos_hash_base": "dc1bc0b524d94a52b651b1b2aa47ba26ecb42e56e5a5843fe47699a7bcdbed18",
+          "src_pos_hash_other": "144055efa9808f680582931465ff502e0fe9ad098b1dd45c939b836770930a06",
+          "route_key_first_mismatch": [
+            {
+              "idx": 0,
+              "a": [
+                28,
+                70,
+                127,
+                66,
+                25,
+                48,
+                103
+              ],
+              "b": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "idx": 1,
+              "a": [
+                21,
+                35,
+                63,
+                21,
+                19,
+                153,
+                26
+              ],
+              "b": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ]
+            },
+            {
+              "idx": 2,
+              "a": [
+                23,
+                188,
+                76,
+                9,
+                36,
+                235,
+                179
+              ],
+              "b": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ]
+            },
+            {
+              "idx": 3,
+              "a": [
+                26,
+                159,
+                9,
+                81,
+                201,
+                53,
+                214
+              ],
+              "b": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ]
+            },
+            {
+              "idx": 4,
+              "a": [
+                24,
+                206,
+                23,
+                113,
+                244,
+                55,
+                179
+              ],
+              "b": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 0,
+              "a": 28,
+              "b": 0
+            },
+            {
+              "idx": 1,
+              "a": 21,
+              "b": 38
+            },
+            {
+              "idx": 2,
+              "a": 23,
+              "b": 31
+            },
+            {
+              "idx": 3,
+              "a": 26,
+              "b": 33
+            },
+            {
+              "idx": 4,
+              "a": 24,
+              "b": 36
+            }
+          ]
+        },
+        "x_vs_topk": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "8392b07da4d6e7e8d5a713d7ca651c07d6d3e6fe29e73bd65586fd8803c6785f",
+          "route_key_hash_other": "084712f08ab420a135d02a95868a1ff8889dfe12ca093fe7d77943e355f98bc2",
+          "src_pos_hash_base": "dc1bc0b524d94a52b651b1b2aa47ba26ecb42e56e5a5843fe47699a7bcdbed18",
+          "src_pos_hash_other": "b1ff6681ae6ed6322642f66dab37f5618e33f5e055355f6a127caa191739a3ba",
+          "route_key_first_mismatch": [
+            {
+              "idx": 10,
+              "a": [
+                30,
+                86,
+                180,
+                21,
+                145,
+                52,
+                54
+              ],
+              "b": [
+                0,
+                159,
+                53,
+                15,
+                154,
+                209,
+                5
+              ]
+            },
+            {
+              "idx": 11,
+              "a": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ],
+              "b": [
+                2,
+                186,
+                165,
+                69,
+                70,
+                61,
+                115
+              ]
+            },
+            {
+              "idx": 12,
+              "a": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ],
+              "b": [
+                5,
+                212,
+                108,
+                67,
+                158,
+                79,
+                44
+              ]
+            },
+            {
+              "idx": 13,
+              "a": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ],
+              "b": [
+                8,
+                36,
+                41,
+                192,
+                162,
+                65,
+                219
+              ]
+            },
+            {
+              "idx": 14,
+              "a": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ],
+              "b": [
+                1,
+                129,
+                56,
+                67,
+                4,
+                170,
+                181
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 10,
+              "a": 30,
+              "b": 0
+            },
+            {
+              "idx": 11,
+              "a": 38,
+              "b": 2
+            },
+            {
+              "idx": 12,
+              "a": 31,
+              "b": 5
+            },
+            {
+              "idx": 13,
+              "a": 33,
+              "b": 8
+            },
+            {
+              "idx": 14,
+              "a": 36,
+              "b": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "captures": {
+        "x": {
+          "recv_count": 461,
+          "unique_route_keys": 429,
+          "duplicate_route_key_rows": 32,
+          "ordered_route_key_hash": "3343e37422fbc6f8ceb1234af73bc77fa491b958a22027948f5524f4b071d5fd",
+          "ordered_src_pos_hash": "bd6249932cb7dc82631623870766911f5f811ad7065a2d05668e45700007e343",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 119,
+              "a": 527,
+              "b": 143
+            },
+            {
+              "idx": 120,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 121,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 122,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 123,
+              "a": 526,
+              "b": 142
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "grad": {
+          "recv_count": 461,
+          "unique_route_keys": 429,
+          "duplicate_route_key_rows": 32,
+          "ordered_route_key_hash": "42849fdcac157e20c8b84f01ae5e07d0bdefc51b1a785b17f680d7f67f82e79a",
+          "ordered_src_pos_hash": "f1d15416f7bbfb2433bccd65ffc70c235332d25c8fecc92f6defc742800a83c8",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 119,
+              "a": 527,
+              "b": 143
+            },
+            {
+              "idx": 120,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 121,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 122,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 123,
+              "a": 526,
+              "b": 142
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "topk": {
+          "recv_count": 461,
+          "unique_route_keys": 429,
+          "duplicate_route_key_rows": 32,
+          "ordered_route_key_hash": "1e587c8bff90fb7d44e571e3c8e3e7a82384523a3c32085b2c76542bc8c6877c",
+          "ordered_src_pos_hash": "a2b2b3b2d8e9ff80b30b9975381eb9ab6c47498339605db224909306e70e7251",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 118,
+              "a": 535,
+              "b": 151
+            },
+            {
+              "idx": 119,
+              "a": 540,
+              "b": 156
+            },
+            {
+              "idx": 120,
+              "a": 533,
+              "b": 149
+            },
+            {
+              "idx": 121,
+              "a": 541,
+              "b": 157
+            },
+            {
+              "idx": 122,
+              "a": 538,
+              "b": 154
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        }
+      },
+      "comparisons": {
+        "x_vs_grad": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "3343e37422fbc6f8ceb1234af73bc77fa491b958a22027948f5524f4b071d5fd",
+          "route_key_hash_other": "42849fdcac157e20c8b84f01ae5e07d0bdefc51b1a785b17f680d7f67f82e79a",
+          "src_pos_hash_base": "bd6249932cb7dc82631623870766911f5f811ad7065a2d05668e45700007e343",
+          "src_pos_hash_other": "f1d15416f7bbfb2433bccd65ffc70c235332d25c8fecc92f6defc742800a83c8",
+          "route_key_first_mismatch": [
+            {
+              "idx": 1,
+              "a": [
+                23,
+                188,
+                76,
+                9,
+                36,
+                235,
+                179
+              ],
+              "b": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ]
+            },
+            {
+              "idx": 2,
+              "a": [
+                28,
+                70,
+                127,
+                66,
+                25,
+                48,
+                103
+              ],
+              "b": [
+                35,
+                1,
+                131,
+                114,
+                96,
+                156,
+                164
+              ]
+            },
+            {
+              "idx": 3,
+              "a": [
+                26,
+                159,
+                9,
+                81,
+                201,
+                53,
+                214
+              ],
+              "b": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ]
+            },
+            {
+              "idx": 4,
+              "a": [
+                29,
+                72,
+                142,
+                249,
+                17,
+                245,
+                248
+              ],
+              "b": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ]
+            },
+            {
+              "idx": 5,
+              "a": [
+                24,
+                206,
+                23,
+                113,
+                244,
+                55,
+                179
+              ],
+              "b": [
+                34,
+                108,
+                206,
+                216,
+                34,
+                49,
+                228
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 1,
+              "a": 23,
+              "b": 33
+            },
+            {
+              "idx": 2,
+              "a": 28,
+              "b": 35
+            },
+            {
+              "idx": 3,
+              "a": 26,
+              "b": 38
+            },
+            {
+              "idx": 4,
+              "a": 29,
+              "b": 31
+            },
+            {
+              "idx": 5,
+              "a": 24,
+              "b": 34
+            }
+          ]
+        },
+        "x_vs_topk": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "3343e37422fbc6f8ceb1234af73bc77fa491b958a22027948f5524f4b071d5fd",
+          "route_key_hash_other": "1e587c8bff90fb7d44e571e3c8e3e7a82384523a3c32085b2c76542bc8c6877c",
+          "src_pos_hash_base": "bd6249932cb7dc82631623870766911f5f811ad7065a2d05668e45700007e343",
+          "src_pos_hash_other": "a2b2b3b2d8e9ff80b30b9975381eb9ab6c47498339605db224909306e70e7251",
+          "route_key_first_mismatch": [
+            {
+              "idx": 10,
+              "a": [
+                30,
+                86,
+                180,
+                21,
+                145,
+                52,
+                54
+              ],
+              "b": [
+                3,
+                65,
+                68,
+                128,
+                220,
+                244,
+                175
+              ]
+            },
+            {
+              "idx": 11,
+              "a": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ],
+              "b": [
+                6,
+                113,
+                61,
+                123,
+                215,
+                82,
+                14
+              ]
+            },
+            {
+              "idx": 12,
+              "a": [
+                35,
+                1,
+                131,
+                114,
+                96,
+                156,
+                164
+              ],
+              "b": [
+                8,
+                36,
+                41,
+                192,
+                162,
+                65,
+                219
+              ]
+            },
+            {
+              "idx": 13,
+              "a": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ],
+              "b": [
+                1,
+                129,
+                56,
+                67,
+                4,
+                170,
+                181
+              ]
+            },
+            {
+              "idx": 14,
+              "a": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ],
+              "b": [
+                4,
+                90,
+                234,
+                118,
+                136,
+                193,
+                60
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 10,
+              "a": 30,
+              "b": 3
+            },
+            {
+              "idx": 11,
+              "a": 33,
+              "b": 6
+            },
+            {
+              "idx": 12,
+              "a": 35,
+              "b": 8
+            },
+            {
+              "idx": 13,
+              "a": 38,
+              "b": 1
+            },
+            {
+              "idx": 14,
+              "a": 31,
+              "b": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "captures": {
+        "x": {
+          "recv_count": 459,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 34,
+          "ordered_route_key_hash": "cc35fbaab5fd43bc14e4b87202ac5a79c081e3225a2805b18a9ddbaffdd70030",
+          "ordered_src_pos_hash": "3fa153d232caa22ff6741d18b2d2e4065eade55ae24adbcb8c5d6b4c2bb89bf8",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 119,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 120,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 121,
+              "a": 523,
+              "b": 139
+            },
+            {
+              "idx": 122,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 123,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "grad": {
+          "recv_count": 459,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 34,
+          "ordered_route_key_hash": "510245453ab29c24c125da307466b48e5b4a66c18089e8265aed69b505d7986e",
+          "ordered_src_pos_hash": "7f0136415b134b18697f8f06fa903d21ec11b9d4c5f67bc735c1ac6c4e71211b",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 119,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 120,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 121,
+              "a": 523,
+              "b": 139
+            },
+            {
+              "idx": 122,
+              "a": 528,
+              "b": 144
+            },
+            {
+              "idx": 123,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "topk": {
+          "recv_count": 459,
+          "unique_route_keys": 425,
+          "duplicate_route_key_rows": 34,
+          "ordered_route_key_hash": "e1cac19e4a6e0ea82feeffaf038b5de0051b3a0eedc12eb6d7a9f5be15a90fb2",
+          "ordered_src_pos_hash": "211eaf089a590ef12a20ff02d8a241fbc994eb493ecddd74d5ea2a18d92159bd",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 119,
+              "a": 534,
+              "b": 150
+            },
+            {
+              "idx": 120,
+              "a": 537,
+              "b": 153
+            },
+            {
+              "idx": 121,
+              "a": 540,
+              "b": 156
+            },
+            {
+              "idx": 122,
+              "a": 535,
+              "b": 151
+            },
+            {
+              "idx": 123,
+              "a": 538,
+              "b": 154
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        }
+      },
+      "comparisons": {
+        "x_vs_grad": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "cc35fbaab5fd43bc14e4b87202ac5a79c081e3225a2805b18a9ddbaffdd70030",
+          "route_key_hash_other": "510245453ab29c24c125da307466b48e5b4a66c18089e8265aed69b505d7986e",
+          "src_pos_hash_base": "3fa153d232caa22ff6741d18b2d2e4065eade55ae24adbcb8c5d6b4c2bb89bf8",
+          "src_pos_hash_other": "7f0136415b134b18697f8f06fa903d21ec11b9d4c5f67bc735c1ac6c4e71211b",
+          "route_key_first_mismatch": [
+            {
+              "idx": 1,
+              "a": [
+                23,
+                188,
+                76,
+                9,
+                36,
+                235,
+                179
+              ],
+              "b": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ]
+            },
+            {
+              "idx": 2,
+              "a": [
+                26,
+                159,
+                9,
+                81,
+                201,
+                53,
+                214
+              ],
+              "b": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ]
+            },
+            {
+              "idx": 3,
+              "a": [
+                29,
+                72,
+                142,
+                249,
+                17,
+                245,
+                248
+              ],
+              "b": [
+                39,
+                139,
+                184,
+                255,
+                57,
+                69,
+                148
+              ]
+            },
+            {
+              "idx": 4,
+              "a": [
+                21,
+                35,
+                63,
+                21,
+                19,
+                153,
+                26
+              ],
+              "b": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ]
+            },
+            {
+              "idx": 5,
+              "a": [
+                27,
+                164,
+                98,
+                107,
+                39,
+                220,
+                108
+              ],
+              "b": [
+                32,
+                132,
+                98,
+                153,
+                5,
+                125,
+                248
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 1,
+              "a": 23,
+              "b": 33
+            },
+            {
+              "idx": 2,
+              "a": 26,
+              "b": 36
+            },
+            {
+              "idx": 3,
+              "a": 29,
+              "b": 39
+            },
+            {
+              "idx": 4,
+              "a": 21,
+              "b": 31
+            },
+            {
+              "idx": 5,
+              "a": 27,
+              "b": 32
+            }
+          ]
+        },
+        "x_vs_topk": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "cc35fbaab5fd43bc14e4b87202ac5a79c081e3225a2805b18a9ddbaffdd70030",
+          "route_key_hash_other": "e1cac19e4a6e0ea82feeffaf038b5de0051b3a0eedc12eb6d7a9f5be15a90fb2",
+          "src_pos_hash_base": "3fa153d232caa22ff6741d18b2d2e4065eade55ae24adbcb8c5d6b4c2bb89bf8",
+          "src_pos_hash_other": "211eaf089a590ef12a20ff02d8a241fbc994eb493ecddd74d5ea2a18d92159bd",
+          "route_key_first_mismatch": [
+            {
+              "idx": 9,
+              "a": [
+                30,
+                86,
+                180,
+                21,
+                145,
+                52,
+                54
+              ],
+              "b": [
+                0,
+                159,
+                53,
+                15,
+                154,
+                209,
+                5
+              ]
+            },
+            {
+              "idx": 10,
+              "a": [
+                33,
+                170,
+                124,
+                159,
+                45,
+                78,
+                9
+              ],
+              "b": [
+                5,
+                212,
+                108,
+                67,
+                158,
+                79,
+                44
+              ]
+            },
+            {
+              "idx": 11,
+              "a": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ],
+              "b": [
+                8,
+                36,
+                41,
+                192,
+                162,
+                65,
+                219
+              ]
+            },
+            {
+              "idx": 12,
+              "a": [
+                39,
+                139,
+                184,
+                255,
+                57,
+                69,
+                148
+              ],
+              "b": [
+                1,
+                129,
+                56,
+                67,
+                4,
+                170,
+                181
+              ]
+            },
+            {
+              "idx": 13,
+              "a": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ],
+              "b": [
+                3,
+                65,
+                68,
+                128,
+                220,
+                244,
+                175
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 9,
+              "a": 30,
+              "b": 0
+            },
+            {
+              "idx": 10,
+              "a": 33,
+              "b": 5
+            },
+            {
+              "idx": 11,
+              "a": 36,
+              "b": 8
+            },
+            {
+              "idx": 12,
+              "a": 39,
+              "b": 1
+            },
+            {
+              "idx": 13,
+              "a": 31,
+              "b": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "captures": {
+        "x": {
+          "recv_count": 471,
+          "unique_route_keys": 433,
+          "duplicate_route_key_rows": 38,
+          "ordered_route_key_hash": "e3261c7ee21eb07b8cb5823b397b0234cea5aa497ace85fe3844c4fe67dc00d1",
+          "ordered_src_pos_hash": "98717400846a06812b2c6ac534d6b312327e0811ad3d34f39ce55c603338f732",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 113,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 114,
+              "a": 527,
+              "b": 143
+            },
+            {
+              "idx": 115,
+              "a": 522,
+              "b": 138
+            },
+            {
+              "idx": 116,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 117,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "grad": {
+          "recv_count": 471,
+          "unique_route_keys": 433,
+          "duplicate_route_key_rows": 38,
+          "ordered_route_key_hash": "3c9d53797bae51af612bde1807f362be0ec0054c29358f204c7b36a38c397773",
+          "ordered_src_pos_hash": "765f66a2947a97bee6f1a7dfb857b517dcaa7bc2e690a317cb2f371a47c0d797",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 113,
+              "a": 525,
+              "b": 141
+            },
+            {
+              "idx": 114,
+              "a": 527,
+              "b": 143
+            },
+            {
+              "idx": 115,
+              "a": 522,
+              "b": 138
+            },
+            {
+              "idx": 116,
+              "a": 530,
+              "b": 146
+            },
+            {
+              "idx": 117,
+              "a": 531,
+              "b": 147
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        },
+        "topk": {
+          "recv_count": 471,
+          "unique_route_keys": 433,
+          "duplicate_route_key_rows": 38,
+          "ordered_route_key_hash": "afb62a05fd56cf0c5ab11c7b24d98c11673d59e4a85dc9ce4a3bda4778b43121",
+          "ordered_src_pos_hash": "cf76490d946e97b5c9a22c92fbe99cd67afed985bea29fa51db9485ce544089b",
+          "src_pos_equals_payload_rank_times_tokens": false,
+          "src_pos_payload_first_mismatch": [
+            {
+              "idx": 114,
+              "a": 540,
+              "b": 156
+            },
+            {
+              "idx": 115,
+              "a": 533,
+              "b": 149
+            },
+            {
+              "idx": 116,
+              "a": 535,
+              "b": 151
+            },
+            {
+              "idx": 117,
+              "a": 536,
+              "b": 152
+            },
+            {
+              "idx": 118,
+              "a": 534,
+              "b": 150
+            }
+          ],
+          "payload_source_min": 0,
+          "payload_source_max": 511,
+          "src_pos_min": 0,
+          "src_pos_max": 1663,
+          "token_id_mod_range_check": true
+        }
+      },
+      "comparisons": {
+        "x_vs_grad": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "e3261c7ee21eb07b8cb5823b397b0234cea5aa497ace85fe3844c4fe67dc00d1",
+          "route_key_hash_other": "3c9d53797bae51af612bde1807f362be0ec0054c29358f204c7b36a38c397773",
+          "src_pos_hash_base": "98717400846a06812b2c6ac534d6b312327e0811ad3d34f39ce55c603338f732",
+          "src_pos_hash_other": "765f66a2947a97bee6f1a7dfb857b517dcaa7bc2e690a317cb2f371a47c0d797",
+          "route_key_first_mismatch": [
+            {
+              "idx": 0,
+              "a": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "b": [
+                32,
+                132,
+                98,
+                153,
+                5,
+                125,
+                248
+              ]
+            },
+            {
+              "idx": 1,
+              "a": [
+                25,
+                111,
+                4,
+                255,
+                78,
+                103,
+                73
+              ],
+              "b": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ]
+            },
+            {
+              "idx": 2,
+              "a": [
+                23,
+                188,
+                76,
+                9,
+                36,
+                235,
+                179
+              ],
+              "b": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ]
+            },
+            {
+              "idx": 3,
+              "a": [
+                26,
+                159,
+                9,
+                81,
+                201,
+                53,
+                214
+              ],
+              "b": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ]
+            },
+            {
+              "idx": 4,
+              "a": [
+                24,
+                206,
+                23,
+                113,
+                244,
+                55,
+                179
+              ],
+              "b": [
+                34,
+                108,
+                206,
+                216,
+                34,
+                49,
+                228
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 0,
+              "a": 0,
+              "b": 32
+            },
+            {
+              "idx": 1,
+              "a": 25,
+              "b": 36
+            },
+            {
+              "idx": 2,
+              "a": 23,
+              "b": 38
+            },
+            {
+              "idx": 3,
+              "a": 26,
+              "b": 31
+            },
+            {
+              "idx": 4,
+              "a": 24,
+              "b": 34
+            }
+          ]
+        },
+        "x_vs_topk": {
+          "recv_count_equal": true,
+          "ordered_route_key_equal": false,
+          "multiset_route_key_equal": true,
+          "ordered_src_pos_equal": false,
+          "multiset_src_pos_equal": true,
+          "route_key_hash_base": "e3261c7ee21eb07b8cb5823b397b0234cea5aa497ace85fe3844c4fe67dc00d1",
+          "route_key_hash_other": "afb62a05fd56cf0c5ab11c7b24d98c11673d59e4a85dc9ce4a3bda4778b43121",
+          "src_pos_hash_base": "98717400846a06812b2c6ac534d6b312327e0811ad3d34f39ce55c603338f732",
+          "src_pos_hash_other": "cf76490d946e97b5c9a22c92fbe99cd67afed985bea29fa51db9485ce544089b",
+          "route_key_first_mismatch": [
+            {
+              "idx": 7,
+              "a": [
+                32,
+                132,
+                98,
+                153,
+                5,
+                125,
+                248
+              ],
+              "b": [
+                8,
+                36,
+                41,
+                192,
+                162,
+                65,
+                219
+              ]
+            },
+            {
+              "idx": 8,
+              "a": [
+                36,
+                149,
+                202,
+                190,
+                12,
+                157,
+                71
+              ],
+              "b": [
+                0,
+                159,
+                53,
+                15,
+                154,
+                209,
+                5
+              ]
+            },
+            {
+              "idx": 9,
+              "a": [
+                38,
+                118,
+                16,
+                32,
+                127,
+                243,
+                23
+              ],
+              "b": [
+                3,
+                65,
+                68,
+                128,
+                220,
+                244,
+                175
+              ]
+            },
+            {
+              "idx": 10,
+              "a": [
+                31,
+                24,
+                79,
+                153,
+                251,
+                222,
+                177
+              ],
+              "b": [
+                6,
+                113,
+                61,
+                123,
+                215,
+                82,
+                14
+              ]
+            },
+            {
+              "idx": 11,
+              "a": [
+                34,
+                108,
+                206,
+                216,
+                34,
+                49,
+                228
+              ],
+              "b": [
+                9,
+                12,
+                226,
+                170,
+                83,
+                65,
+                71
+              ]
+            }
+          ],
+          "src_pos_first_mismatch": [
+            {
+              "idx": 7,
+              "a": 32,
+              "b": 8
+            },
+            {
+              "idx": 8,
+              "a": 36,
+              "b": 0
+            },
+            {
+              "idx": 9,
+              "a": 38,
+              "b": 3
+            },
+            {
+              "idx": 10,
+              "a": 31,
+              "b": 6
+            },
+            {
+              "idx": 11,
+              "a": 34,
+              "b": 9
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "read": "If ordered route keys are equal across x/grad/topk handles, then staged AsyncLL can align rows by actual payload route order. If only multisets match, reorder by a stronger key is needed. If route-key multisets differ, separate AsyncLL handles are not safe for the TorchTitan routed backward contract."
+}

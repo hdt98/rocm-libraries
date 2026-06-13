@@ -1,0 +1,102 @@
+{
+  "accum_mode": "flat_gemm",
+  "active_seq_chunk": 128,
+  "backend_path": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "bmm_input_dtype": "bfloat16",
+  "correctness": {
+    "candidate_norm": 966.154541015625,
+    "dkv_atol": 0.2,
+    "max_abs_diff": 0.1440563201904297,
+    "mean_abs_diff": 0.0023541534319519997,
+    "passed": true,
+    "reference_norm": 966.1329956054688
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "math_dtype": "float32",
+  "read": "This is a diagnostic lower-bound for the compressed prefix route, not a production sparse MLA backward. In default mode it materializes [B,H,S,K] scores/probs; in --seq-chunk mode it streams token chunks to bound that slab. The bmm accumulation mode computes the two compressed dKV terms as batched KxS @ SxD GEMMs over heads, then sums the head-local gradients. The flat_gemm mode reshapes heads and tokens into HS rows and computes larger Kx(HS) @ (HS)xD GEMMs that reduce heads directly. The goal is to test whether MFMA-friendly accumulation can beat the query-major per-row atomic dKV path before writing a fused streaming/bucketed kernel.",
+  "scope": "sparse_mla_shared_latent_kv_compressed_prefix_dkv_bmm_floor_probe",
+  "seed": 1234,
+  "seq_chunk": 0,
+  "shape": {
+    "active_chunk_scores_or_probs_fp32_gib": 0.0009765625,
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "full_materialized_scores_or_probs_fp32_gib": 0.0009765625,
+    "heads": 64,
+    "kv_len": 160,
+    "local_count": 0,
+    "materialized_shared_selected_kv_fp32_gib": 0.0078125,
+    "selected_count": 32,
+    "seq_len": 128
+  },
+  "status": "passed",
+  "timing": {
+    "compressed_prefix_dkv_flat_gemm_floor": {
+      "checksum_norm": 966.154541015625,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.7994120121002197,
+        "mean_ms": 0.8894323309262594,
+        "median_ms": 0.4481619894504547,
+        "min_ms": 0.42072299122810364,
+        "samples_ms": [
+          1.7994120121002197,
+          0.4481619894504547,
+          0.42072299122810364
+        ],
+        "stdev_ms": 0.7881849337357055
+      },
+      "label": "compressed_prefix_dkv_flat_gemm_floor",
+      "peak_memory_allocated_bytes": 186094080,
+      "peak_memory_allocated_gib": 0.17331361770629883,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.8799819517880678,
+        "mean_ms": 0.9394929899523655,
+        "median_ms": 0.48278900794684887,
+        "min_ms": 0.45570801012218,
+        "samples_ms": [
+          1.8799819517880678,
+          0.48278900794684887,
+          0.45570801012218
+        ],
+        "stdev_ms": 0.8145998776159328
+      }
+    },
+    "pytorch_reference_dkv": {
+      "checksum_norm": 966.1329956054688,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.3009350299835205,
+        "mean_ms": 1.0451133449872334,
+        "median_ms": 0.432202011346817,
+        "min_ms": 0.4022029936313629,
+        "samples_ms": [
+          2.3009350299835205,
+          0.432202011346817,
+          0.4022029936313629
+        ],
+        "stdev_ms": 1.0876769114246005
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 185213440,
+      "peak_memory_allocated_gib": 0.17249345779418945,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.3319199681282043,
+        "mean_ms": 1.0726853118588526,
+        "median_ms": 0.457717920653522,
+        "min_ms": 0.42841804679483175,
+        "samples_ms": [
+          2.3319199681282043,
+          0.457717920653522,
+          0.42841804679483175
+        ],
+        "stdev_ms": 1.0906275992814312
+      }
+    }
+  }
+}

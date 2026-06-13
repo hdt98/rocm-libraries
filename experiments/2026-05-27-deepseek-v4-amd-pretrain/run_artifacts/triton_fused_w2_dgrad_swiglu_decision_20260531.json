@@ -1,0 +1,74 @@
+{
+  "artifact": "triton_fused_w2_dgrad_swiglu_decision_20260531",
+  "date": "2026-05-31",
+  "scope": "compact routed-MoE W2 dgrad fused with SwiGLU backward epilogue",
+  "probe": {
+    "script": "tools/dsv4_layer_microbench/probe_triton_fused_w2_dgrad_swiglu.py",
+    "contract": "dy_compact [assignments, hidden] x w2 [experts, hidden, intermediate] with SwiGLU backward epilogue -> dgate_compact, dup_compact",
+    "shape": {
+      "tokens": 2048,
+      "assignments": 12288,
+      "hidden": 7168,
+      "intermediate": 3072,
+      "experts": 384,
+      "topk": 6,
+      "dtype": "bfloat16"
+    },
+    "route_stats": {
+      "max_per_expert": 47,
+      "min_per_expert": 15,
+      "mean_per_expert": 32.0,
+      "padded_rows_global_max": 18048,
+      "padding_multiplier_global_max": 1.46875
+    }
+  },
+  "measurements": {
+    "fill_s2048": {
+      "artifact": "triton_fused_w2_dgrad_swiglu_s2048_20260531.json",
+      "torch_padded_w2_dgrad_only_median_ms": 3.027585983276367,
+      "torch_padded_w2_dgrad_swiglu_median_ms": 3.1578280925750732,
+      "torch_padded_w2_dgrad_gather_compact_swiglu_median_ms": 3.033987045288086,
+      "best_triton": {
+        "median_ms": 8.337393760681152,
+        "min_ms": 8.324313163757324,
+        "block_m": 16,
+        "block_n": 64,
+        "block_k": 128,
+        "num_warps": 4,
+        "compact_tflops_median": 64.90827887344349,
+        "speedup_vs_torch_padded_w2_dgrad_swiglu_median": 0.3787548223363608
+      },
+      "check_ok": true
+    },
+    "randn_s2048_best_tile_check": {
+      "artifact": "triton_fused_w2_dgrad_swiglu_s2048_randn_check_20260531.json",
+      "torch_padded_w2_dgrad_swiglu_median_ms": 3.9522370100021362,
+      "best_triton_median_ms": 9.925315380096436,
+      "speedup_vs_torch_padded_w2_dgrad_swiglu_median": 0.3981976248258759,
+      "check_ok": true,
+      "dgate_max_abs": 0.00390625,
+      "dup_max_abs": 0.00390625
+    },
+    "tiny_smoke": {
+      "artifact": "triton_fused_w2_dgrad_swiglu_smoke_20260531.json",
+      "tokens": 128,
+      "hidden": 1024,
+      "intermediate": 512,
+      "experts": 32,
+      "topk": 4,
+      "check_ok": true,
+      "best_triton_speedup_vs_torch_padded_w2_dgrad_swiglu_median": 1.270615101260884
+    }
+  },
+  "decision": {
+    "promote": [
+      "the fused W2 dgrad plus SwiGLU-backward epilogue tensor contract",
+      "the correctness oracle and S2048 benchmark probe"
+    ],
+    "demote": [
+      "the simple Triton compact grouped-M implementation for full DSv4 S2048"
+    ],
+    "reason": "The fused epilogue is numerically correct, including a random-valued S2048 BF16 check, but the best simple Triton schedule is 8.34 ms on fill-valued S2048 and 9.93 ms on random S2048. That is only about 0.38-0.40x of padded torch W2 dgrad plus SwiGLU, so it cannot improve the retained 33 ms fwd+dgrad lower bound.",
+    "next": "Use this probe as the oracle for a CK/CK-Tile or TileLang implementation that maps the small per-expert M distribution onto CDNA4 MFMA more directly. The next candidate should keep the same outputs but avoid the simple Triton per-expert, per-M, per-N launch shape that underutilizes the GPU at M around 15-47."
+  }
+}

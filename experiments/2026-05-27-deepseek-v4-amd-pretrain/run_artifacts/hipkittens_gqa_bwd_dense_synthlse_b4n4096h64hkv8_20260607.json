@@ -1,0 +1,69 @@
+{
+  "artifact": "hipkittens_gqa_bwd_dense_synthlse_b4n4096h64hkv8_20260607",
+  "date": "2026-06-07",
+  "node": "do-vunguyen-mi350-gpu",
+  "gpu": "MI350",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "repo": "HazyResearch/HipKittens",
+    "path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/hipkittens",
+    "commit": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "build": {
+    "target": "tk_kernel_bkwd tk_kernel_bkwd_prep",
+    "command": "make clean; make GPU_TARGET=CDNA4 ATTN_B=4 ATTN_N=4096 ATTN_H=64 ATTN_H_KV=8 tk_kernel_bkwd tk_kernel_bkwd_prep",
+    "combined_kernel_codegen": {
+      "arch": "gfx950",
+      "sgprs": 100,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spills": 0,
+      "vgpr_spills": 0
+    }
+  },
+  "probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_hipkittens_gqa_bwd_synth_lse.py",
+  "command": "docker run --rm --entrypoint bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host -e HIP_VISIBLE_DEVICES=0 -e ROCR_VISIBLE_DEVICES=0 -e CUDA_VISIBLE_DEVICES=0 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace/sources/references/hipkittens/kernels/attn/gqa_backwards onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'export PYTHONPATH=/workspace/sources/references/hipkittens/src/common/pyutils:${PYTHONPATH:-}; python3 /workspace/tools/dsv4_runtime_probe/probe_hipkittens_gqa_bwd_synth_lse.py --batch 4 --seq 4096 --heads 64 --kv-heads 8 --dim 128 --warmup 5 --iters 20'",
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "heads": 64,
+    "kv_heads": 8,
+    "dim": 128,
+    "causal": false
+  },
+  "timed_boundary": "HipKittens dispatch_prep + dispatch_bwd_combined + dispatch_dq_shuffle",
+  "precompute_O_L_ms": 1421.274910098873,
+  "hk_event_ms": {
+    "median": 6.510836124420166,
+    "mean": 6.543036723136902,
+    "min": 6.329654216766357,
+    "max": 6.78001594543457
+  },
+  "hk_wall_ms": {
+    "median": 6.541706447023898,
+    "mean": 6.567931146128103,
+    "min": 6.345644011162221,
+    "max": 6.797788082621992
+  },
+  "dense_bwd_tflops_at_event_median": 844.3705284272679,
+  "finite": {
+    "dQ": true,
+    "dK": true,
+    "dV": true,
+    "delta": true
+  },
+  "norms": {
+    "dQ": 23.353532791137695,
+    "dK": 23.3365535736084,
+    "dV": 92.55933380126953,
+    "delta": 46.45948028564453
+  },
+  "interpretation": {
+    "status": "B4 schedule donor validated, not a DSv4 SharedKV promotion yet",
+    "relevance_to_e2e_sharedkv": "The current e2e SharedKV calls are MBS4. This result shows HipKittens' query-major backward producer remains fast at the same batch size. DSv4 C4 SharedKV still needs D512 sparse selected-key support, dOriKV output, dCmpKV compressed-group epilogue, and dSinks before latency can be promoted.",
+    "next_gate": "Implement a HIP/HipKittens-derived SharedKV owner that consumes q, kv/original window, compressed groups, indices, output/lse, and dO, then compare B4 C4 selected=640 against the e2e per-call C4 hook around 60.6 ms and the old B1 compressed-only C4 gate around 11.0 ms."
+  }
+}

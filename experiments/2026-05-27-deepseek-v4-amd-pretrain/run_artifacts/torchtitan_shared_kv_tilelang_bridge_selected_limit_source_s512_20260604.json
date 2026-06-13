@@ -1,0 +1,77 @@
+{
+  "backend_path": "/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": null,
+    "tilelang_block_k": null,
+    "tilelang_dkv_backend": "selected_limit_source",
+    "tilelang_group_panel_size": null,
+    "tilelang_panel_capacity": null,
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "TileLang compressed-dKV backend is selected by TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND: group_filter, selected_limit_source, or selected_limit_packed.",
+    "The bridge still materializes selected-KV/probs/grad_logits before the TileLang compressed-dKV slice."
+  ],
+  "parity": {
+    "dkv_compressed_candidate_max_abs": 8.4375,
+    "dkv_compressed_max_abs": 0.03125,
+    "dkv_compressed_mean_abs": 0.002375952433794737,
+    "dkv_compressed_ref_max_abs": 8.4375,
+    "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+    "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": 6.177751856739633e-07,
+    "dkv_local_max_abs": 0.0078125,
+    "dkv_max_abs": 0.03125,
+    "dkv_mean_abs": 0.0004753856919705868,
+    "dq_max_abs": 0.0,
+    "dsink_max_abs": 0.0,
+    "enabled": true,
+    "tilelang_bf16_ref_vs_explicit_ref_max_abs": 0.03125,
+    "tilelang_bf16_ref_vs_explicit_ref_mean_abs": 0.002376092365011573
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 128,
+    "dim": 512,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 128,
+    "selected": 256,
+    "seq_len": 512
+  },
+  "timing": {
+    "explicit_pytorch": {
+      "median_ms": 2.0691070556640625,
+      "times_ms": [
+        2.283910036087036,
+        2.0691070556640625,
+        2.0419869422912598
+      ],
+      "wall_median_ms": 2.0915321074426174,
+      "wall_times_ms": [
+        2.3107610177248716,
+        2.0915321074426174,
+        2.064579864963889
+      ]
+    },
+    "explicit_tilelang_dkv": {
+      "median_ms": 3.137676954269409,
+      "times_ms": [
+        3.997607946395874,
+        3.1275579929351807,
+        3.137676954269409
+      ],
+      "wall_median_ms": 3.160421969369054,
+      "wall_times_ms": [
+        4.024222027510405,
+        3.1526898965239525,
+        3.160421969369054
+      ]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "scope": "sparse_mla_split_stream_nozero_decision",
+  "date": "2026-06-05",
+  "status": "rejected_as_materialized_latency_candidate",
+  "question": "Can the sparse-MLA backward boundary split dQ and dKV onto separate streams, avoid an end-of-attention join, and let downstream kernels consume separate dQ and dKV outputs?",
+  "answer": {
+    "no_global_join_required_in_principle": true,
+    "separate_downstream_dependencies_are_valid": true,
+    "measured_two_stream_ab_wins": false,
+    "read": "A global join after sparse attention is not mathematically required if downstream consumers keep dQ and dKV on separate dependency chains. In PyTorch/custom-op practice, however, each consumer must wait on the event for the branch that produced its tensor, and any later node that combines hidden-state gradients or parameter gradients must join the relevant branches. The measured split-stream branches still replay the same QK/softmax/scaled-dP source-boundary work and contend for the same MI350 compute/memory resources, so avoiding an artificial final sync did not produce a promotable latency win."
+  },
+  "patched_probe": {
+    "path": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py",
+    "change": "Removed unused full-size output zeroing from branch timing paths: no-dKV timing now uses dummy grad_kv instead of zeroing the full compressed KV gradient, and dQ is allocated empty when emitted instead of pre-zeroed.",
+    "validation": "python3 -m py_compile passed locally"
+  },
+  "shape": {
+    "gpu": "MI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "window": 128,
+    "compressed_groups": 1024,
+    "compressed_topk": 512,
+    "token_block": 4,
+    "block_u": 256,
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128
+  },
+  "retained_gate": {
+    "sparse_attention_backward_ms": 11.1347,
+    "read": "Current retained single-token selected-slot Triton sparse-attention backward boundary gate."
+  },
+  "artifacts": {
+    "compressed_only_query_major": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_parallel_nozero_t4k512_u256_s4096_layer2_20260605.json",
+    "full_sharedkv_split": "run_artifacts/sparse_mla_full_sharedkv_split_union_compressed_nozero_s4096_layer2_t4_u256_20260605.json"
+  },
+  "compressed_only_query_major_result": {
+    "candidate_full_ms": 14.716812133789062,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "dkv_only_full_ms": 7.6047468185424805,
+    "dkv_only_sink_ms": 6.00801420211792,
+    "dkv_only_global_accum_ms": 1.5967326164245605,
+    "serialized_split_selected_dq_union_dkv_ms": 10.816420555114746,
+    "serialized_split_beats_retained_gate": true,
+    "parallel_stream_wrapper_ms": 16.874549865722656,
+    "parallel_stream_wrapper_beats_retained_gate": false,
+    "branch_event_makespan_ms": 9.85108757019043,
+    "branch_event_dq_ms": 9.806127548217773,
+    "branch_event_dkv_ms": 9.525964736938477,
+    "read": "Compressed-only split still shows an ideal branch-event makespan below the retained gate, but this omits the local shared-KV branch needed by the actual full sparse-MLA backward boundary and does not translate into the full shared-KV result."
+  },
+  "full_sharedkv_result": {
+    "full_dq_no_dkv_ms": 4.308319091796875,
+    "local_dkv_only_full_ms": 2.034619092941284,
+    "compressed_union_dkv_only_full_ms": 7.5953497886657715,
+    "serialized_full_split_boundary_ms": 13.224722862243652,
+    "serialized_full_split_beats_retained_gate": false,
+    "parallel_three_branch_makespan_ms": 12.552521705627441,
+    "parallel_three_branch_beats_retained_gate": false,
+    "parallel_three_branch_dq_ms": 10.53590202331543,
+    "parallel_three_branch_local_dkv_ms": 1.9691779613494873,
+    "parallel_three_branch_compressed_dkv_ms": 10.072657585144043,
+    "best_pair_schedule": "dq_compressed_then_local",
+    "best_pair_schedule_ms": 12.539276123046875,
+    "best_pair_schedule_beats_retained_gate": false,
+    "fused_full_dq_local_dkv_ms": 5.9634552001953125,
+    "fused_local_split_boundary_ms": 13.288923263549805,
+    "fused_local_parallel_branch_events_makespan_ms": 12.298434257507324,
+    "fused_local_parallel_branch_events_beats_retained_gate": false,
+    "read": "With the actual local plus compressed shared-KV contract, removing zero-fill overhead and keeping outputs separate still fails the retained 11.1347 ms boundary. The local dKV branch stays small, but dQ and compressed dKV both inflate under overlap because they duplicate source-boundary recompute and resource use."
+  },
+  "decision": {
+    "promote_to_e2e_tflops_run": false,
+    "reason": "No measured sparse-attention latency improvement was materialized for the actual full shared-KV boundary.",
+    "next_kernel_direction": "Build a true shared-producer sparse-MLA backward owner, likely HIP/CK/rocWMMA, where QK, softmax row terms, scaled-dP, dQ, local dKV, and compressed group-aware dKV epilogue share the same producer instead of running split branches that recompute the same source boundary."
+  },
+  "dependency_pins_changed": false
+}

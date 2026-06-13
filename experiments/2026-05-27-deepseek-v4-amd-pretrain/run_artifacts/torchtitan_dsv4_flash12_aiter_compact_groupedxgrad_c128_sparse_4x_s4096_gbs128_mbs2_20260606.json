@@ -1,0 +1,238 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_aiter_compact_grouped_xgrad_materialization",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_aiter_compact_groupedxgrad_c128_sparse_4x_s4096_gbs128_mbs2_heap40_steps4_module_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_groupedxgrad_c128_sparse_4x_s4096_gbs128_mbs2_heap40_steps4_module_20260606/docker-run.log",
+  "first_attempt_without_kernel_module": {
+    "run_id": "torchtitan_dsv4_flash12_aiter_compact_groupedxgrad_c128_sparse_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+    "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_groupedxgrad_c128_sparse_4x_s4096_gbs128_mbs2_heap40_steps4_20260606/docker-run.log",
+    "result": "failed_before_step1_missing_shared_kv_kernel_module",
+    "error": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=shared_kv requires TORCHTITAN_DSV4_SPARSE_MLA_SHARED_KV_KERNEL_MODULE or TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE"
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "local_vjp_mode": "aiter_compact",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "wgrad_op": "nptgmm",
+    "xgrad_mode": "full",
+    "transpose_cache_size": 0,
+    "dsv4_profile_sharedkv_backward": false,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend"
+  },
+  "check_config": {
+    "attention_compress_ratio_by_layer": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "attention_sparse_threshold_by_layer": [
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096,
+      4096
+    ],
+    "attention_sparse_backward_mode_by_layer": [
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv"
+    ]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "loss": "12.48334",
+      "grad_norm": "nan",
+      "tokens_per_gpu_s_mean": 2413.0,
+      "tokens_per_gpu_s_values": [
+        2412.0,
+        2414.0,
+        2412.0,
+        2414.0
+      ],
+      "node_tokens_s_mean": 9652.0,
+      "tflops_per_gpu_mean": 122.16,
+      "tflops_per_gpu_values": [
+        122.11,
+        122.22,
+        122.11,
+        122.22
+      ],
+      "memory_gib_max": 172.55,
+      "memory_gib_values": [
+        172.55,
+        171.32,
+        171.71,
+        170.4
+      ],
+      "mfu_percent_mean": 5.29
+    },
+    {
+      "step": 2,
+      "loss": "nan",
+      "grad_norm": "nan",
+      "tokens_per_gpu_s_mean": 2467.0,
+      "tokens_per_gpu_s_values": [
+        2467.0,
+        2467.0,
+        2467.0,
+        2467.0
+      ],
+      "node_tokens_s_mean": 9868.0,
+      "tflops_per_gpu_mean": 124.93,
+      "tflops_per_gpu_values": [
+        124.93,
+        124.93,
+        124.93,
+        124.93
+      ],
+      "memory_gib_max": 226.73,
+      "memory_gib_values": [
+        226.73,
+        211.67,
+        211.32,
+        210.89
+      ],
+      "mfu_percent_mean": 5.41
+    },
+    {
+      "step": 3,
+      "loss": "nan",
+      "grad_norm": "nan",
+      "tokens_per_gpu_s_mean": 2488.0,
+      "tokens_per_gpu_s_values": [
+        2488.0,
+        2488.0,
+        2488.0,
+        2488.0
+      ],
+      "node_tokens_s_mean": 9952.0,
+      "tflops_per_gpu_mean": 125.99,
+      "tflops_per_gpu_values": [
+        125.99,
+        125.99,
+        125.99,
+        125.99
+      ],
+      "memory_gib_max": 226.73,
+      "memory_gib_values": [
+        211.67,
+        211.32,
+        226.73,
+        210.89
+      ],
+      "mfu_percent_mean": 5.46
+    },
+    {
+      "step": 4,
+      "loss": "nan",
+      "grad_norm": "nan",
+      "tokens_per_gpu_s_mean": 2491.0,
+      "tokens_per_gpu_s_values": [
+        2491.0,
+        2491.0,
+        2491.0,
+        2491.0
+      ],
+      "node_tokens_s_mean": 9964.0,
+      "tflops_per_gpu_mean": 126.11,
+      "tflops_per_gpu_values": [
+        126.11,
+        126.11,
+        126.11,
+        126.11
+      ],
+      "memory_gib_max": 226.73,
+      "memory_gib_values": [
+        211.32,
+        211.67,
+        210.89,
+        226.73
+      ],
+      "mfu_percent_mean": 5.46
+    }
+  ],
+  "late_step_summary": {
+    "window": "steps_2_to_4",
+    "tokens_per_gpu_s": 2482.0,
+    "node_tokens_s": 9928.0,
+    "tflops_per_gpu": 125.68,
+    "peak_logged_memory_gib": 226.73,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu": 0.203,
+    "retained_c128_expert_loop_tokens_per_gpu_s": 3867.67,
+    "retained_c128_expert_loop_tflops_per_gpu": 195.84,
+    "retained_c128_expert_loop_peak_logged_memory_gib": 218.42,
+    "delta_vs_retained_c128_expert_loop_tokens_per_gpu_pct": -35.83,
+    "delta_vs_retained_c128_expert_loop_tflops_pct": -35.83,
+    "peak_memory_delta_vs_retained_c128_expert_loop_gib": 8.31
+  },
+  "numerics": {
+    "finite_loss_step1": true,
+    "grad_norm_nan_from_step": 1,
+    "loss_nan_from_step": 2,
+    "promotable": false
+  },
+  "decision": {
+    "promote_as_current_12layer_mbs_candidate": false,
+    "read": "Grouped/full compact xgrad removes the isolated streamed-xgrad wall, but the aiter_compact adapter still materializes as an invalid and slower e2e path: grad_norm is NaN at step 1, loss is NaN from step 2, and steps 2-4 are about 35.8% slower than the retained C128 expert_loop candidate with 8.31 GiB higher peak logged memory.",
+    "next_action": "Do not spend more target-shape throughput runs on this Python adapter. Localize why compact/full-xgrad e2e produces NaN despite the owner-VJP oracle passing, or move directly toward fused compact grouped owner backward that avoids the adapter route/sort/recompute structure."
+  }
+}

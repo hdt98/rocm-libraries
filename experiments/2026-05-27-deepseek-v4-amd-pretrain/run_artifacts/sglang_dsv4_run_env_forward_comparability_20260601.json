@@ -1,0 +1,103 @@
+{
+  "artifact": "sglang_dsv4_run_env_forward_comparability_20260601",
+  "date_local": "2026-06-01",
+  "scope": "compare_sglang_dsv4_amd_run_dsv4_runtime_to_torchtitan_single_layer_forward_gap",
+  "status": "source_and_image_runtime_checked",
+  "question": "Does the AMD SGLang run_dsv4.sh runtime justify or contradict the current 22.577 ms TorchTitan single-layer forward latency?",
+  "torchtitan_training_context": {
+    "source_artifact": "run_artifacts/single_layer_gap_attribution_ladder_20260601.json",
+    "current_best_full_layer_ms": 68.2089,
+    "current_forward_ms": 22.577,
+    "current_backward_ms": 45.4889,
+    "target_full_layer_ms": 24.9,
+    "forward_fraction_of_full_target": 0.9067068273092369,
+    "forward_breakdown_ms": {
+      "sparse_mla_forward": 6.987,
+      "routed_moe_forward": 9.6633,
+      "other_forward": 5.9267
+    },
+    "current_attention_boundary_forward_ms": 4.30511999130249,
+    "current_attention_boundary_stage_profile_ms": {
+      "q_projection_rope": 0.8542770519852638,
+      "shared_kv_projection_rope": 0.13224000576883554,
+      "lightning_indexer_topk": 1.2314770137891173,
+      "shared_kv_compress_indices": 0.26046892162412405,
+      "sparse_mla_shared_kv_forward": 1.1802270309999585,
+      "output_projection": 0.8127369219437242,
+      "stage_total": 4.471426946111023
+    }
+  },
+  "sglang_runtime_sources": {
+    "local_run_script": "experiments/2026-05-06-deepseek-v4-amd-port-pr23882-node54/sources/wip/sglang/python/run_dsv4.sh",
+    "remote_run_script": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/sources/wip/sglang/python/run_dsv4.sh",
+    "image_run_script": "/sgl-workspace/sglang/python/run_dsv4.sh inside container b9d33e6e8227 on do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4",
+    "container_checked": "b9d33e6e8227",
+    "source_map": "experiments/2026-05-06-deepseek-v4-amd-port-pr23882-node54/docs/batch_invariance_dual_kernel_source_map.md"
+  },
+  "sglang_run_dsv4_env": {
+    "model": "/dockerx/data/deepseek-ai/DeepSeek-V4-Pro",
+    "commented_model_alternative": "/dockerx/data/sgl-project/DeepSeek-V4-Flash-FP8/",
+    "tp": 8,
+    "attention_backend": "compressed",
+    "max_running_request": 256,
+    "page_size": 256,
+    "chunked_prefill_size": 8192,
+    "disable_shared_experts_fusion": true,
+    "env": {
+      "SGLANG_USE_AITER": "1",
+      "SGLANG_USE_ROCM700A": "1",
+      "SGLANG_FP8_PAGED_MQA_LOGITS_TORCH": "1",
+      "SGLANG_OPT_USE_FUSED_STORE_CACHE": "true",
+      "SGLANG_OPT_USE_FUSED_COMPRESS": "true",
+      "SGLANG_OPT_USE_TILELANG_INDEXER": "true",
+      "SGLANG_HACK_FLASHMLA_BACKEND": "triton",
+      "SGLANG_FORCE_TRITON_MOE_FP8": "0",
+      "SGLANG_OPT_USE_AITER_MHC_PRE": "true",
+      "SGLANG_OPT_USE_AITER_MHC_POST": "true",
+      "SGLANG_OPT_USE_TRITON_SWA_PREPARE": "true",
+      "SGLANG_OPT_USE_FUSED_HASH_TOPK": "true",
+      "SGLANG_OPT_DPSK_V4_RADIX": "1",
+      "SGLANG_OPT_USE_OLD_COMPRESSOR": "false",
+      "SGLANG_OPT_USE_FUSED_PAGED_COMPRESS": "true",
+      "SGLANG_OPT_FUSE_WQA_WKV": "true",
+      "AITER_BF16_FP8_MOE_BOUND": "1"
+    }
+  },
+  "sglang_attention_dispatch": {
+    "compressed_backend_selector": "sglang/srt/layers/attention/attention_registry.py selects DeepseekV4BackendRadix when SGLANG_OPT_DPSK_V4_RADIX=1",
+    "radix_forward_call": "sglang/srt/layers/attention/deepseek_v4_backend_radix.py builds FlashMLA-compatible inputs and calls flash_mla_with_kvcache_entrypoint",
+    "hip_backend_override": "sglang/srt/layers/attention/debug_flash_mla_adapter.py overrides backend from SGLANG_HACK_FLASHMLA_BACKEND on HIP",
+    "triton_entrypoint": "sglang/srt/layers/attention/nsa/triton_decode/__init__.py dispatches to triton_fp8_attention_fwd",
+    "optimized_decode_shape": "sglang/srt/layers/attention/nsa/triton_decode/triton_mla_kernels_decode_optimized.py uses FP8 KV-cache decode/extend kernels with fused gather+attention and split-K/no-split heuristics",
+    "flashmla_metadata_on_hip": "compressed/metadata.py returns None for FlashMLA metadata on HIP, so AMD Triton path is heuristic-driven rather than NVIDIA FlashMLA scheduler-driven"
+  },
+  "comparability": {
+    "is_same_as_torchtitan_training_forward": false,
+    "reason": [
+      "SGLang run_dsv4.sh is inference/server runtime, not a BF16 training layer with autograd and saved-state constraints.",
+      "It runs TP=8 and paged FP8 KV-cache compressed attention, while the single-layer target is one MI350, BF16 hidden-to-hidden fwd+bwd+grads.",
+      "It uses inference-oriented fused compress, TileLang indexer, AITER MHC pre/post, fused WQA/WKV, fused store-cache, and AITER MoE paths that are not equivalent to the current TorchTitan training implementation.",
+      "The SGLang path disables shared-experts fusion and uses DeepSeek-V4-Pro by default, so it is not a direct DeepSeek-V4-Flash single-layer training latency oracle."
+    ],
+    "read": "The 22.577 ms forward number remains justified as the current TorchTitan training proxy measurement. SGLang does not contradict it, but it shows the forward path still has portable fusion ideas and should not be treated as an irreducible lower bound."
+  },
+  "optimization_implications": {
+    "do_not_infer": [
+      "Do not use SGLang decode/prefill throughput as proof that TorchTitan full training forward should already be under the 24.9 ms full-layer target.",
+      "Do not compare SGLang TP8 FP8 inference kernels directly against one-GPU BF16 training fwd+bwd numbers."
+    ],
+    "do_port_or_rebuild": [
+      "Adopt the fused WQA/WKV and shared latent-KV forward boundary pattern into the TorchTitan BF16 training layer where it preserves autograd contracts.",
+      "Keep the SGLang/Triton sparse attention schedule ideas: fused gather+attention, BLOCK_H/BLOCK_N/BLOCK_D tiling, online softmax, and split/no-split heuristics, but build the training backward separately.",
+      "Use the attention-boundary forward stage profile as the current sharper forward guide: attention forward is already about 4.3-4.5 ms, while the full 22.577 ms forward is now dominated by MoE forward plus residual/RMSNorm/projection/bookkeeping."
+    ],
+    "next_forward_rung": "Split current 22.577 ms forward into attention-boundary, routed-MoE forward, and boundary/bookkeeping gates; prioritize MoE forward tile efficiency and SGLang-style forward-boundary fusion after the attention forward is no longer the main forward wall."
+  },
+  "commands": [
+    "sed -n '1,110p' experiments/2026-05-06-deepseek-v4-amd-port-pr23882-node54/sources/wip/sglang/python/run_dsv4.sh",
+    "ssh do-sonle-kernel 'docker exec b9d33e6e8227 sh -lc \"nl -ba /sgl-workspace/sglang/python/run_dsv4.sh | sed -n 1,70p\"'",
+    "rg -n 'flash_mla_with_kvcache_entrypoint|triton_fp8_attention_fwd|DeepseekV4BackendRadix' experiments/2026-05-06-deepseek-v4-amd-port-pr23882-node54/sources/wip/sglang/python/sglang/srt"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,88 @@
+{
+  "artifact": "bucketed_bmm_dgrad_decision_20260531",
+  "date": "2026-05-31",
+  "scope": "count-bucketed PyTorch torch.bmm for routed-MoE W2 dgrad and SwiGLU backward",
+  "probe": {
+    "script": "tools/dsv4_layer_microbench/probe_bucketed_bmm_dgrad.py",
+    "contract": "Compare global max-count padded torch.bmm against count-bucketed torch.bmm for dy [experts, rows, 7168] x w2 [experts, 7168, 3072], with valid-row SwiGLU backward checks."
+  },
+  "measurements": {
+    "s2048": {
+      "artifact": "bucketed_bmm_dgrad_s2048_20260531.json",
+      "route": {
+        "assignments": 12288,
+        "max_per_expert": 47,
+        "min_per_expert": 15,
+        "mean_per_expert": 32.0,
+        "global_padded_rows": 18048,
+        "global_padding_multiplier": 1.46875
+      },
+      "global_baseline": {
+        "bmm_out_median_ms": 3.0017900466918945,
+        "bmm_swiglu_median_ms": 3.2047901153564453
+      },
+      "best_dynamic_bucket": {
+        "bucket_size": 32,
+        "bucket_count": 2,
+        "bucket_padding_multiplier": 1.218505859375,
+        "bucket_vs_global_padded_row_ratio": 0.8296210106382979,
+        "prepacked_bmm_out_median_ms": 2.8415451049804688,
+        "prepacked_bmm_speedup_vs_global_bmm_out": 1.056393594256364,
+        "dynamic_bmm_scatter_median_ms": 9.156722068786621,
+        "dynamic_bmm_swiglu_scatter_median_ms": 9.814208030700684,
+        "dynamic_fused_speedup_vs_global_bmm_swiglu": 0.3265459734836739,
+        "valid_row_check_ok": true
+      },
+      "exact_count_bucket": {
+        "bucket_size": 1,
+        "bucket_count": 30,
+        "bucket_padding_multiplier": 1.0,
+        "dynamic_bmm_swiglu_scatter_median_ms": 13.024961471557617,
+        "dynamic_fused_speedup_vs_global_bmm_swiglu": 0.24604987295775807
+      }
+    },
+    "s4096_trend": {
+      "artifact": "bucketed_bmm_dgrad_s4096_trend_20260531.json",
+      "route": {
+        "assignments": 24576,
+        "max_per_expert": 88,
+        "min_per_expert": 45,
+        "mean_per_expert": 64.0,
+        "global_padded_rows": 33792,
+        "global_padding_multiplier": 1.375
+      },
+      "global_baseline": {
+        "bmm_out_median_ms": 3.537708044052124,
+        "bmm_swiglu_median_ms": 3.7746710777282715
+      },
+      "best_dynamic_bucket": {
+        "bucket_size": 32,
+        "bucket_count": 2,
+        "bucket_padding_multiplier": 1.1796875,
+        "bucket_vs_global_padded_row_ratio": 0.8579545454545454,
+        "prepacked_bmm_out_median_ms": 3.141947031021118,
+        "prepacked_bmm_speedup_vs_global_bmm_out": 1.1259604344451297,
+        "dynamic_bmm_scatter_median_ms": 9.560120582580566,
+        "dynamic_bmm_swiglu_scatter_median_ms": 10.943693161010742,
+        "dynamic_fused_speedup_vs_global_bmm_swiglu": 0.34491748098131514
+      }
+    },
+    "tiny_smoke": {
+      "artifact": "bucketed_bmm_dgrad_smoke_20260531.json",
+      "valid_row_check_ok": true,
+      "note": "Correctness compares valid routed rows only; retained skip-mask padded rows are intentionally not semantically consumed."
+    }
+  },
+  "decision": {
+    "promote": [
+      "row-count bucketing as evidence that some BMM FLOP waste is real",
+      "prepacked bucketed BMM as a lower-bound hint for a future custom scheduler"
+    ],
+    "demote": [
+      "dynamic PyTorch count-bucketed torch.bmm for full-layer integration",
+      "exact-count PyTorch bucketing"
+    ],
+    "reason": "Bucketed BMM reduces padded rows and prepacked BMM alone can be 5.6% faster at S2048 and 12.6% faster at S4096. But the dynamic PyTorch bucket path loses badly after index_select, per-bucket launch overhead, and scatter: about 9.8 ms at S2048 and 10.9 ms at S4096 for BMM+SwiGLU, versus 3.2 ms and 3.8 ms for the current global padded BMM+SwiGLU baselines.",
+    "next": "Do not integrate PyTorch count bucketing into the retained layer. Use the bucket results to shape a CK/CK-Tile or TileLang compact scheduler that preserves the prepacked row-count advantage while avoiding Python loops, index_select copies, and per-bucket scatter."
+  }
+}

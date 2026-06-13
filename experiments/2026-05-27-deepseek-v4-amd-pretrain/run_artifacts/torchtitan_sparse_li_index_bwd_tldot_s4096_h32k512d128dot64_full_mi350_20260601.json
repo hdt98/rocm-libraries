@@ -1,0 +1,91 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "avoided_materialized_selected_index_k_bytes": 536870912,
+    "block_d": 128,
+    "block_h": 32,
+    "block_k": 512,
+    "dot_block_d": 64,
+    "logical_flops": 103045660672,
+    "logical_tflops_at_event_median": 18.05116603672249,
+    "mode": "full",
+    "read": "Given upstream d_index_logits, this probe recomputes gathered LI head logits inside Triton dot tiles and produces gradients for index_q, index_k, and LI weights without writing selected [B,S,K,D] key-index rows. It is a backward slice, not the full SparseLightningIndexerGradKLLoss, because target-prob and KL derivative construction are supplied upstream.",
+    "uses_tl_dot": true,
+    "workspace": {
+      "d_index_k_bytes": 524288,
+      "d_index_q_bytes": 134217728,
+      "d_weights_bytes": 1048576,
+      "head_logits_materialized_bytes": 0,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 1572352
+    }
+  },
+  "max_abs_diff": null,
+  "reference": null,
+  "scope": "triton_gathered_mfma_li_index_backward_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 1024,
+    "head_dim": 128,
+    "index_pattern": "shifted",
+    "n_heads": 64,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_edges": 1572352
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 5.895634174346924,
+      "mean_ms": 5.730591869354248,
+      "median_ms": 5.708532094955444,
+      "min_ms": 5.699391841888428,
+      "samples_ms": [
+        5.895634174346924,
+        5.737633228302002,
+        5.721792221069336,
+        5.720431804656982,
+        5.706632137298584,
+        5.710432052612305,
+        5.704832077026367,
+        5.70595121383667,
+        5.699391841888428,
+        5.703187942504883
+      ],
+      "stdev_ms": 0.05910897336907116
+    },
+    "peak_memory_allocated_bytes": 364642304,
+    "peak_memory_allocated_gib": 0.339599609375,
+    "timed_iters": 10,
+    "wall": {
+      "enabled": true,
+      "max_ms": 5.935101071372628,
+      "mean_ms": 5.751793889794499,
+      "median_ms": 5.728899966925383,
+      "min_ms": 5.718220956623554,
+      "samples_ms": [
+        5.935101071372628,
+        5.756450002081692,
+        5.740742082707584,
+        5.739219952374697,
+        5.725141963921487,
+        5.729359923861921,
+        5.723111913539469,
+        5.728440009988844,
+        5.718220956623554,
+        5.72215102147311
+      ],
+      "stdev_ms": 0.06539704161671676
+    },
+    "warmup_iters": 2
+  },
+  "triton_grad_norms": {
+    "index_k": 80091.9375,
+    "index_q": 80530.125,
+    "weights": 80321.9921875
+  }
+}

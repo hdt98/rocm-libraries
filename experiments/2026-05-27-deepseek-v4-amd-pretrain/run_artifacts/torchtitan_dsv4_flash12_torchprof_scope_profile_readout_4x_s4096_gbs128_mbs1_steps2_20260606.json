@@ -1,0 +1,155 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_torchprof_scope_profile_readout_4x_s4096_gbs128_mbs1_steps2_20260606",
+  "kind": "diagnostic_profile_readout",
+  "run_id": "torchtitan_dsv4_flash12_torchprof_scope_profile_4x_s4096_gbs128_mbs1_steps2_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_torchprof_scope_profile_4x_s4096_gbs128_mbs1_steps2_20260606",
+  "summary_artifact": "run_artifacts/torchtitan_dsv4_flash12_torchprof_scope_profile_4x_s4096_gbs128_mbs1_steps2_20260606.json",
+  "shape": {
+    "model_config": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "gpus": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": "disabled"
+  },
+  "runtime_knobs": {
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "expert_loop",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_save_forward_dispatch": true,
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_aiter_xgrad_mode": "compact",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "torch_profiler": true,
+    "dense_linear_backward_wrapper": false,
+    "dsv4_profile_timing_path": true,
+    "additive_timing_path": true,
+    "mori_aiter_timing_path": true
+  },
+  "status": {
+    "result": "completed_two_steps_not_promoted_profile_only",
+    "process_groups_destroyed": true,
+    "node_after_run": "idle_except_gpuagent",
+    "promotion_decision": "not_promoted",
+    "caveat": "Torch profiler and trace export are highly intrusive. Step throughput is not promotion evidence; use this run for attribution only."
+  },
+  "logged_step_metrics": {
+    "step1": {
+      "loss": 12.30625,
+      "grad_norm": 12.875,
+      "tokens_per_gpu_s": 1586,
+      "tflops_per_gpu": 80.31,
+      "max_logged_memory_gib": 171.61
+    },
+    "step2": {
+      "loss": 9.4133,
+      "grad_norm": 31.0,
+      "tokens_per_gpu_s": 1241,
+      "node_tokens_s": 4964,
+      "tflops_per_gpu": 62.83,
+      "max_logged_memory_gib": 202.29,
+      "target_ratio_tokens_per_gpu": 0.1017
+    }
+  },
+  "trace_selection": {
+    "valid_trace_iteration": 1,
+    "valid_rank_trace_bytes": [
+      2953298494,
+      2943679444,
+      2961335069,
+      2946031222
+    ],
+    "ignored_trace_iteration": 2,
+    "ignored_rank_trace_bytes": [
+      134845,
+      133742,
+      125538,
+      128808
+    ],
+    "reason_iteration2_ignored": "Torch profiler emitted a shutdown trace at step 2 and overwrote the real step-2 files with tiny empty traces. The summary artifact therefore uses step-1 traces plus step-2 sidecars."
+  },
+  "additive_step2_wall_s": {
+    "step_train_step": 62.059,
+    "microbatch_forward_backward": 61.323,
+    "model_forward": 13.696,
+    "loss": 1.524,
+    "backward": 34.765,
+    "microbatch_wrapper_residual": 11.339,
+    "grad_clip": 0.058,
+    "optimizer_step": 0.088,
+    "profiler_step_after_train_step": 30.792,
+    "read": "The profiler_step export is outside the train_step wall but contaminates log-to-log throughput; do not compare this run's tps to no-profiler baselines."
+  },
+  "torchprof_step1_rank_median_kernel_s": {
+    "total_kernel": 43.921,
+    "kernel_families": {
+      "other": 21.191,
+      "gemm_cijk": 8.631,
+      "copy": 7.924,
+      "rccl_nccl": 5.272,
+      "fill": 0.496,
+      "triton": 0.183
+    },
+    "unattributed_gemm": 7.817
+  },
+  "torchprof_step1_top_scoped_kernel_s": {
+    "moe_mori_aiter_bridge": 7.057,
+    "block_attention": 0.46,
+    "block_moe": 0.244,
+    "moe_router": 0.18,
+    "loss_chunk_backward": 0.119
+  },
+  "torchprof_step1_top_cpu_scope_s": {
+    "block_moe": 16.219,
+    "moe_routed_experts": 14.769,
+    "moe_mori_aiter_bridge": 14.746,
+    "block_attention": 3.623,
+    "loss_chunk_backward": 3.58,
+    "attention_q_projection": 2.798,
+    "moe_router": 1.254
+  },
+  "sidecar_step2_rank_median_s": {
+    "mori_local_vjp_expert_loop_total": 12.013,
+    "mori_combine_dx": 2.011,
+    "mori_dispatch_grad_inputs": 0.861,
+    "mori_dispatch_clone_align": 0.252,
+    "mori_dispatch_dtopk_dummy": 0.111,
+    "mori_combine_dtopk": 0.097,
+    "chunked_ce_loss_total": 1.481,
+    "chunked_ce_loss_backward": 1.093,
+    "chunked_ce_lm_head_forward": 0.318,
+    "chunked_ce_cross_entropy_forward": 0.069
+  },
+  "sidecar_step2_rank_max_s": {
+    "mori_local_vjp_expert_loop_total": 12.929,
+    "mori_combine_dx": 3.237,
+    "mori_dispatch_grad_inputs": 0.985,
+    "mori_dispatch_clone_align": 0.28,
+    "mori_dispatch_dtopk_dummy": 0.122,
+    "mori_combine_dtopk": 0.109,
+    "chunked_ce_loss_total": 1.481
+  },
+  "read": [
+    "The active 12-layer probe is still dominated by the backward plus wrapper path: step-2 backward is 34.765s and the fwd/bwd wrapper residual is 11.339s.",
+    "MORI/MoE remains the largest named branch: step-2 rank-median local expert-loop owner VJP is 12.013s, with combine_dx at 2.011s median and 3.237s rank max.",
+    "The named MORI plus loss sidecars do not explain the full backward wall; after local VJP, dX/top-k return, grad dispatch, and loss, roughly 15-18s of backward remains in dense-fallback attention/projection/FSDP/autograd work.",
+    "The step-1 trace also shows large cumulative copy and RCCL/NCCL kernel time plus 7.817s median unattributed GEMM, so the next split should target FSDP/autograd synchronization and dense-fallback backward owners, not only MORI collectives.",
+    "Loss/lm-head is visible but secondary at about 1.48s per step. It should stay on the ladder, behind fused owner-rank MoE backward and wrapper/autograd/FSDP attribution."
+  ],
+  "next_actions": [
+    "Replace Python per-expert owner VJP with compact/AITER-owned fused grouped training backward while preserving AITER fused forward.",
+    "Instrument or split the remaining backward-minus-MORI wall into dense-fallback attention, projection GEMM, FSDP all-gather/reduce, and autograd allocator/free buckets.",
+    "Keep no-profiler materialized throughput runs separate from torch-profiler runs; report token throughput only from low-intrusion or no-profiler candidates."
+  ]
+}

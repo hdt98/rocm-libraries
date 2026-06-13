@@ -1,0 +1,41 @@
+{
+  "status": "rejected_as_primary_speed_lever",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_weight_read_elision",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "token_block": 32,
+    "group_panel_size": 256,
+    "panel_capacity": 160,
+    "topk_workspace": 640,
+    "block_k": 32,
+    "block_d": 64
+  },
+  "baseline_input_weight_path": {
+    "weight_source": "input",
+    "read": "Reads materialized probs and grad_logits_scaled [S, topk, H] tensors from HBM.",
+    "s4096_full_output_median_ms": 10.956138610839844,
+    "s4096_fold_only_median_ms": 0.22918249666690826,
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "constant_weight_diagnostic": {
+    "weight_source": "constant",
+    "read": "Fills P and dP shared tiles from a compile-time constant instead of reading materialized probs/grad_logits. This is not semantic sparse-MLA backward; it is a read-elision upper-bound diagnostic.",
+    "s128_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 10.95940113067627,
+    "s4096_fold_only_median_ms": 0.2284024953842163,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_constw_fold_final_s128_valid512_tb32_gps256_cap160_k32d64_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_constw_fold_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "comparison": {
+    "delta_ms_constant_minus_input": 0.0032625198364257812,
+    "speedup_x_input_over_constant": 0.9997023096284096
+  },
+  "read": "Eliding the two materialized [S, topk, H] weight reads does not move the current TileLang compact producer: constant weights are effectively identical to the real input-weight path at S4096. The current 10.96 ms wall is therefore not mainly HBM reads of probs/grad_logits; it is the MFMA/local active-table/selected-lane producer structure. Fusing LI/probability production may still be required for correctness and memory, but it is not enough by itself to reach the 8.0-8.8 ms sparse-atomic wall. The next speed branch should change producer topology: more parallel segmented/grouped reduction or a CK/rocWMMA schedule that preserves query-major reuse without one CTA carrying a large active table."
+}

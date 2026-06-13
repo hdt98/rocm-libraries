@@ -1,0 +1,84 @@
+{
+  "batch": 1,
+  "candidate": null,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_mode": "fused",
+  "candidate_vs_target_forward_ratio": 24.456091139051647,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "max_output_abs_diff": null,
+  "output_atol": 0.01,
+  "reference": null,
+  "reference_kernel_module": null,
+  "reference_mode": "manual_stream",
+  "scope": "forward_only_no_grad",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "target_forward_ms": 3.6,
+  "timing": {
+    "candidate": {
+      "compressed_groups": 1024,
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 88.31221771240234,
+        "mean_ms": 88.04192810058593,
+        "median_ms": 88.04246520996094,
+        "min_ms": 87.77838897705078,
+        "samples_ms": [
+          87.84536743164062,
+          88.31221771240234,
+          88.07160186767578,
+          88.19091796875,
+          88.21663665771484,
+          87.91000366210938,
+          87.93820190429688,
+          88.14261627197266,
+          87.77838897705078,
+          88.0133285522461
+        ],
+        "stdev_ms": 0.1744407753540438
+      },
+      "enabled": true,
+      "estimated_selected_state_elements": 171798691840,
+      "iters": 10,
+      "last_output_checksum": -0.00027945832698605955,
+      "peak_memory_allocated_bytes": 7434288128,
+      "peak_memory_allocated_gib": 6.923720359802246,
+      "requires_grad": false,
+      "selected_keys": 640,
+      "sparse_skip_reason": null,
+      "sparse_used": true,
+      "wall": {
+        "enabled": true,
+        "max_ms": 88.33734004292637,
+        "mean_ms": 88.07038482045755,
+        "median_ms": 88.06822798214853,
+        "min_ms": 87.79964793939143,
+        "samples_ms": [
+          87.90868800133467,
+          88.33734004292637,
+          88.10202905442566,
+          88.22650904767215,
+          88.24039006140083,
+          87.93194906320423,
+          87.95910910703242,
+          88.16375897731632,
+          87.79964793939143,
+          88.0344269098714
+        ],
+        "stdev_ms": 0.17209357031361763
+      },
+      "warmup_iters": 3
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

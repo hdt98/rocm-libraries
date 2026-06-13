@@ -1,0 +1,89 @@
+{
+  "artifact": "torchtitan_dsv4_mori_registered_neltsruntime_8x_s4096_gbs128_20260603",
+  "created_date": "2026-06-03",
+  "status": "passed",
+  "scope": "8xMI350 target-shape no-timing TorchTitan DeepSeek-V4 Flash canary with MORI routed backward and registered zero-copy backward combine input.",
+  "run": {
+    "run_id": "torchtitan_dsv4_mori_registered_neltsruntime_8x_s4096_gbs128_20260603",
+    "node": "do-sonle5-mi350-gpu",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_registered_neltsruntime_8x_s4096_gbs128_20260603",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  },
+  "shape": {
+    "gpus": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 128,
+    "sequence_length": 4096,
+    "gradient_accumulation_steps": 16,
+    "steps": 2,
+    "tokens_per_step": 524288,
+    "tokens_per_gpu_per_step": 65536
+  },
+  "key_env": {
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "full",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_DEDICATED_EP_PG": "true",
+    "CANARY_ENABLE_PROFILING": "false",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": "1",
+    "CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE": "registered",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_AITER_OP_CACHE_MODE": "backward",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_SHAREDKV_SCATTER_MODE": "auto",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv"
+  },
+  "result": {
+    "passed": true,
+    "clean_process_group_teardown": true,
+    "loss_step1": 12.34467,
+    "loss_step2": 7.21987,
+    "grad_norm_step1": 9.0,
+    "grad_norm_step2": 25.125,
+    "step1_tokens_per_gpu_s_range": [
+      1890,
+      1899
+    ],
+    "step2_tokens_per_gpu_s": 3026,
+    "step2_node_tokens_s": 24208,
+    "step2_implied_step_time_s": 21.653668208856576,
+    "step2_tflops_per_gpu": 57.26,
+    "step2_mfu_pct_reported_by_torchtitan": 2.48,
+    "peak_memory_gib_range": [
+      86.3,
+      158.65
+    ]
+  },
+  "comparison": {
+    "external_no_timing_baseline_artifact": "run_artifacts/torchtitan_dsv4_mori_swiglu_neltsruntime_8x_s4096_gbs128_20260603.json",
+    "external_step2_tokens_per_gpu_s": 2936,
+    "registered_step2_tokens_per_gpu_s": 3026,
+    "registered_delta_tokens_per_gpu_s": 90,
+    "registered_ratio_vs_external": 1.0306539509536785,
+    "registered_step_time_s": 21.653668208856576,
+    "external_implied_step_time_s": 22.321525885558583,
+    "target_tokens_per_gpu_s": "2200-2400",
+    "target_step_time_s": "27-30",
+    "target_status": "passes throughput and step-time target"
+  },
+  "related_profile_artifacts": [
+    "run_artifacts/mori_backward_combine_registered_ab_20260603.json",
+    "run_artifacts/torchtitan_ep4_ep8_target_profile_breakdown_20260603.json"
+  ],
+  "read": [
+    "The EP8 registered-buffer path is now target-shape validated without timing instrumentation: GBS128/S4096 step 2 reaches 3026 tok/GPU/s and about 21.65 s/step.",
+    "This is a small but real uplift over the retained external-buffer no-timing EP8 baseline, 2936 tok/GPU/s and about 22.32 s/step.",
+    "EP4 diagnostics still regress with registered combine input, so this should be treated as an EP8-specific retained canary setting, not a universal default for every shape.",
+    "The run remains a guarded/prototype systems baseline: shared-KV sparse MLA/LI backward and routed MoE VJP are not final fused production kernels."
+  ]
+}

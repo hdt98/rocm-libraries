@@ -1,0 +1,124 @@
+{
+  "probe": "mori_aiter_moe_autograd_bridge",
+  "created_unix": 1780332778.331395,
+  "world_size": 4,
+  "shape": {
+    "tokens_per_rank": 8,
+    "hidden": 128,
+    "intermediate": 64,
+    "experts": 16,
+    "num_local_experts": 4,
+    "topk": 2,
+    "topk_pattern": "random",
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.05,
+    "warmup": 1,
+    "iters": 1
+  },
+  "thresholds": {
+    "output_atol": 0.0625,
+    "grad_atol": 0.0005
+  },
+  "contract": {
+    "forward": "actual MORI dispatch -> local AITER fused_moe with preshuffled w13/w2 -> MORI combine",
+    "backward": "reference PyTorch VJP; all-gather local expert shards, recompute global routed SwiGLU for local tokens, all-reduce dW, return local owner gradients",
+    "scope": "training API semantics probe only; backward is not a performance candidate"
+  },
+  "runtime": {
+    "torch": "2.13.0a0+gitccf72d7",
+    "hip": "7.2.53211",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "summary": {
+    "all_ranks_pass": false,
+    "max_forward_abs_diff_across_ranks": Infinity,
+    "max_grad_abs_diff_across_ranks": Infinity,
+    "bridge_fwd_bwd_ms_rank_median": null
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "passes_atol": false,
+      "error": {
+        "type": "TypeError",
+        "message": "fused_moe() got an unexpected keyword argument 'gate_mode'",
+        "traceback_tail": [
+          "Traceback (most recent call last):",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 574, in main",
+          "    run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 435, in run_bridge",
+          "    out = MoriAiterForwardReferenceBackward.apply(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 625, in apply",
+          "    return super().apply(*args, **kwargs)  # type: ignore[misc]",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 278, in forward",
+          "    moe_out = fused_moe(",
+          "TypeError: fused_moe() got an unexpected keyword argument 'gate_mode'"
+        ]
+      }
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "passes_atol": false,
+      "error": {
+        "type": "TypeError",
+        "message": "fused_moe() got an unexpected keyword argument 'gate_mode'",
+        "traceback_tail": [
+          "Traceback (most recent call last):",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 574, in main",
+          "    run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 435, in run_bridge",
+          "    out = MoriAiterForwardReferenceBackward.apply(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 625, in apply",
+          "    return super().apply(*args, **kwargs)  # type: ignore[misc]",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 278, in forward",
+          "    moe_out = fused_moe(",
+          "TypeError: fused_moe() got an unexpected keyword argument 'gate_mode'"
+        ]
+      }
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "passes_atol": false,
+      "error": {
+        "type": "TypeError",
+        "message": "fused_moe() got an unexpected keyword argument 'gate_mode'",
+        "traceback_tail": [
+          "Traceback (most recent call last):",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 574, in main",
+          "    run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 435, in run_bridge",
+          "    out = MoriAiterForwardReferenceBackward.apply(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 625, in apply",
+          "    return super().apply(*args, **kwargs)  # type: ignore[misc]",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 278, in forward",
+          "    moe_out = fused_moe(",
+          "TypeError: fused_moe() got an unexpected keyword argument 'gate_mode'"
+        ]
+      }
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "passes_atol": false,
+      "error": {
+        "type": "TypeError",
+        "message": "fused_moe() got an unexpected keyword argument 'gate_mode'",
+        "traceback_tail": [
+          "Traceback (most recent call last):",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 574, in main",
+          "    run_bridge(",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 435, in run_bridge",
+          "    out = MoriAiterForwardReferenceBackward.apply(",
+          "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/autograd/function.py\", line 625, in apply",
+          "    return super().apply(*args, **kwargs)  # type: ignore[misc]",
+          "  File \"/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py\", line 278, in forward",
+          "    moe_out = fused_moe(",
+          "TypeError: fused_moe() got an unexpected keyword argument 'gate_mode'"
+        ]
+      }
+    }
+  ]
+}

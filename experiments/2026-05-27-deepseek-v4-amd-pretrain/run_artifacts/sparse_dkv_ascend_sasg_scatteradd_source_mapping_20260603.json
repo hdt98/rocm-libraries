@@ -1,0 +1,148 @@
+{
+  "artifact": "sparse_dkv_ascend_sasg_scatteradd_source_mapping_20260603",
+  "created_at": "2026-06-03",
+  "question": "Map the Ascend SASG ScatterAdd implementation to the AMD sparse-MLA compressed dKV many-to-one wall, and fold the MoE-style routing analogy into the next kernel contract.",
+  "ascend_reference_source": {
+    "recipe_doc": {
+      "path": "sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md",
+      "lines": "295-303",
+      "facts": [
+        "SparseAttnSharedkvGrad is documented as a five-stage backward operator.",
+        "The stages are Gather, Cube12, Process, Cube345, and Scatter.",
+        "The recipe explicitly says the pipeline preloads Gather+Cube12 once to achieve CV pipeline parallelism."
+      ]
+    },
+    "pipeline_driver": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h",
+      "lines": "202-308",
+      "facts": [
+        "AIC runs CubeCompute over t1/n2/selected loops.",
+        "AIV runs VecCompute over the same task stream.",
+        "CubeCompute preloads cube12, signals vector work, waits on the prior vector stage, then runs cube345 for the previous ping-pong slot.",
+        "VecCompute waits for Cube12 output, runs vector Process, signals Cube345, and flips ping-pong state."
+      ]
+    },
+    "cube345_contract": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_op.h",
+      "lines": "265-278, 317-335",
+      "facts": [
+        "Cube345 runs cube5, then cube4, then cube3.",
+        "cube4/cube5 results are written to mm4ResWorkspaceGm and mm5ResWorkspaceGm.",
+        "The workspace allocation reserves the ScatterAdd staging slab before binding mm4ResWorkspaceGm/mm5ResWorkspaceGm."
+      ]
+    },
+    "cube4_cube5_workspace_writes": [
+      {
+        "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube4.h",
+        "lines": "20-105",
+        "facts": [
+          "cube4 computes the ds^T @ query style contribution for dK and writes currentOutGmOffset into mm4ResWorkspaceGm."
+        ]
+      },
+      {
+        "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube5.h",
+        "lines": "20-82",
+        "facts": [
+          "cube5 computes the p^T @ dO style contribution for dV and writes currentOutGmOffset into mm5ResWorkspaceGm."
+        ]
+      }
+    ],
+    "scatteradd_code": {
+      "path": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h",
+      "lines": "853-951",
+      "facts": [
+        "ScatterAdd enables SetAtomicAdd<float>().",
+        "It reads dk rows from mm4ResWorkspaceGm and dv rows from mm5ResWorkspaceGm into UB buffers in 16-row chunks.",
+        "It scales dk by scaleValue, adds the value-side contribution, resolves compressed versus original KV destination through topk indices/original window metadata, and DataCopy writes into dCmpKvOutGm or dOriKvOutGm under atomic-add mode.",
+        "It ends with SetAtomicNone()."
+      ]
+    }
+  },
+  "amd_current_evidence": {
+    "fast_sparse_atomic_gate": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+      "median_ms": 8.0069,
+      "read": "The fast query-major Triton producer performs tl.dot contribution math and immediately atomic-adds each selected KxD contribution to indirect compressed dKV."
+    },
+    "compact_partial_near_miss": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_seqchunk_sweep_20260603.json",
+      "best_emit_only_ms": 7.945,
+      "best_full_emit_plus_index_add_ms": 8.364,
+      "read": "Compact partial-store keeps the fast query-major producer and emits reduced per-seq-tile active-group rows, but the detached global partial write plus final index_add loses the latency race."
+    },
+    "pair_slot_reducer_rejected": {
+      "artifact": "run_artifacts/sparse_dkv_pairslot_local_table_source_diagnosis_20260603.json",
+      "median_ms": 18.447,
+      "read": "The pair-slot reducer validates reduced global writes but regresses because it performs one local-table update per selected contribution before emit."
+    },
+    "group_outer_loop_rejected_for_production": {
+      "artifact": "run_artifacts/sparse_dkv_group_outer_loop_reuse_decision_20260603.json",
+      "read": "Prepacked group segments are good writeback owners but poor contribution-production owners because each group segment has at most one selected row per token in the measured S4096 layer-2 route."
+    }
+  },
+  "moe_routing_lesson": {
+    "transferable": [
+      "Treat (token, selected_slot) -> compressed_group as a routed ownership problem, analogous to (token, selected_slot) -> expert in MoE.",
+      "Prepack routes so the destination owner sees compact rows instead of random global atomics.",
+      "Reduce locally before the final global write."
+    ],
+    "not_transferable": [
+      "Do not make compressed group the outermost contribution-production loop in the same way expert-major MoE kernels make expert the GEMM owner.",
+      "MoE top-k is small and expert compute is a large MLP GEMM; LI layer-2 topk is 512, so group-owned production reloads/recomputes q and dO across many groups and loses the producer reuse."
+    ],
+    "resulting_contract": "Use MoE-style route compaction for reduction/writeback ownership, but keep dense-attention-style query-major MFMA/tl.dot contribution production."
+  },
+  "ascend_to_amd_mapping": {
+    "gather": "Route/topk metadata and selected compressed/original KV fetch. AMD already has cheap actual-LI route packing and active-group metadata, but selected-state materialization is not acceptable for production.",
+    "cube12": "QK and dO/V dot work before softmax/backward row terms. AMD forward/shared-KV schedules are viable; backward must keep the fast query-major dot loop.",
+    "process": "Softmax and row-gradient terms. AMD target-prob and KL derivative probes are already sub-ms; this is not the current wall.",
+    "cube345": "dQ plus dK/dV contribution math. AMD fast dot-K producer maps here and is already close when measured without final many-to-one global accumulation.",
+    "scatter": "Final scaled dk + dv add and atomic writeback. Ascend still has atomic ScatterAdd, but it is fused into the operator pipeline and fed by Cube4/Cube5 workspace rows. AMD detached raw ScatterAdd is negative because it adds HBM partial traffic and no useful overlap."
+  },
+  "next_kernel_rung": {
+    "name": "query_major_segmented_scatteradd_v1",
+    "goal": "Keep the current dot_k_atomic query-major tl.dot producer, but insert sparse keyed segmented accumulation before global dKV writes so ScatterAdd sees fewer already-reduced rows.",
+    "starting_shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "seq_chunk": 32,
+      "selected": 512,
+      "selected_tile_gate": 256,
+      "first_micro_selected_gate": 128,
+      "block_h": 64,
+      "block_d": 16
+    },
+    "mechanism": [
+      "Within the token-major selected-tile loop, compute contrib_kd with the existing tl.dot schedule.",
+      "Use prepacked route metadata to form short sorted or slot-tagged runs for the selected tile.",
+      "Accumulate duplicate compressed groups at lane/warp/block scope before either touching global dKV or a compact partial workspace.",
+      "Emit one/few rows per (seq_tile, selected_tile, compressed_group, d16) instead of one row per (token, selected_slot, d16).",
+      "Use the already-cheap compact reducer only after the producer has reduced the stream enough to beat the direct atomic wall."
+    ],
+    "acceptance_gate": [
+      "S128 parity against the existing dot_k_atomic output within established BF16 tolerance.",
+      "S512 timing does not regress relative to dot_k_atomic.",
+      "S4096 layer-2 median beats the 8.0069 ms same-tuple sparse-atomic gate including route-pack and final reduce cost.",
+      "Promotion target for the sparse-backward ladder is less than 6.5 ms for compressed dKV, with stretch target 3-4 ms to re-approach the old sparse-MLA backward envelope."
+    ],
+    "explicit_non_goals": [
+      "No group-outer contribution-production kernel as the next rung.",
+      "No dense active_group x selected_K route matrix.",
+      "No pair-slot LDS/local-table update per selected contribution.",
+      "No detached raw ScatterAdd HBM round trip as a promoted latency path."
+    ]
+  },
+  "decision": "Ascend source confirms ScatterAdd belongs to the final SASG Scatter stage and still uses atomic add; the optimization is pipeline placement and reduced/structured inputs, not removing the scatter semantics. For AMD, the next speedup candidate should be a query-major segmented ScatterAdd producer: MoE-like routed ownership for writeback, dense-attention-like query-major MFMA reuse for contribution math.",
+  "commands_run": [
+    "sed -n '1,140p' experiments/2026-05-27-deepseek-v4-amd-pretrain/README.md",
+    "sed -n '1,140p' experiments/2026-05-27-deepseek-v4-amd-pretrain/recipe.yaml",
+    "git status --short -- experiments/2026-05-27-deepseek-v4-amd-pretrain",
+    "rg -n 'ScatterAdd|SetAtomicAdd|mm4ResWorkspaceGm|mm5ResWorkspaceGm|Cube345|Cube12|Gather|Process|AtomicAdd|atomic' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad",
+    "sed -n '195,330p' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad/arch22/sasg_basic.h",
+    "sed -n '853,990p' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h",
+    "sed -n '250,285p' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad/arch22/basic_modules/cube_op.h",
+    "sed -n '20,105p' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube4.h",
+    "sed -n '20,82p' sources/references/ascend-cann-dsv4-image-cann900-v30/.../sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube5.h",
+    "rg -n 'dot_k_atomic|compact_partial_store|tl.dot|atomic_add|active_list_dkv_dotk' tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py"
+  ]
+}

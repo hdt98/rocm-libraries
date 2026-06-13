@@ -1,0 +1,202 @@
+{
+  "active_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+  "artifact": "sparse_mla_backward_ops_probe",
+  "correctness": {
+    "split-compressed-triton-softmax": {
+      "attn_sink": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "csa": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "hca": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "kv": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "ok": true,
+      "out": {
+        "atol": 0.02,
+        "max_abs": 0.0001220703125,
+        "ok": true,
+        "rel_l2": 0.0012369902139221234,
+        "rtol": 0.02
+      },
+      "q": {
+        "atol": 0.02,
+        "max_abs": 1.9073486328125e-06,
+        "ok": true,
+        "rel_l2": 0.0016299051356259684,
+        "rtol": 0.02
+      }
+    }
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flags": {
+    "bf16_contracts": true,
+    "body_tail_window_grad_reduce": true,
+    "diagonal_window_grad_reduce": true,
+    "direct_compressed_value_out": true,
+    "direct_scores_out": true,
+    "direct_selected_grad_out": true,
+    "prealloc_scores": true,
+    "softmax_dot_triton": true,
+    "softmax_dot_vecdot": false,
+    "softmax_forward_triton": true,
+    "softmax_sinkgrad_triton": false,
+    "split_compressed_branches": false,
+    "triton_window_grad_reduce": false
+  },
+  "primitive_profile": null,
+  "read": "Backward timing excludes forward graph construction but uses the exact saved-tensor contract produced by the no-kv-cat sparse MLA autograd function. Primitive timings are unfused op timings for prioritizing a fused sparse MLA backward kernel.",
+  "shape": {
+    "batch": 1,
+    "csa_tokens": 64,
+    "hca_tokens": 2,
+    "heads": 8,
+    "keys_excluding_sink": 194,
+    "keys_including_sink": 195,
+    "kv_dim": 128,
+    "seqlen": 256,
+    "window_size": 128
+  },
+  "tensor_meta": {
+    "attn_invalid_mask": {
+      "dtype": "bool",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        1,
+        256,
+        194
+      ],
+      "stride": [
+        49664,
+        49664,
+        194,
+        1
+      ]
+    },
+    "attn_sink": {
+      "dtype": "float32",
+      "is_contiguous": true,
+      "shape": [
+        8
+      ],
+      "stride": [
+        1
+      ]
+    },
+    "csa": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        64,
+        128
+      ],
+      "stride": [
+        8192,
+        128,
+        1
+      ]
+    },
+    "grad_output": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        256,
+        8,
+        128
+      ],
+      "stride": [
+        262144,
+        1024,
+        128,
+        1
+      ]
+    },
+    "hca": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        2,
+        128
+      ],
+      "stride": [
+        256,
+        128,
+        1
+      ]
+    },
+    "kv": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        256,
+        128
+      ],
+      "stride": [
+        32768,
+        128,
+        1
+      ]
+    },
+    "q": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        256,
+        8,
+        128
+      ],
+      "stride": [
+        262144,
+        1024,
+        128,
+        1
+      ]
+    },
+    "sparse_key_indices": {
+      "dtype": "int64",
+      "is_contiguous": true,
+      "shape": [
+        256,
+        194
+      ],
+      "stride": [
+        194,
+        1
+      ]
+    }
+  },
+  "timing": {
+    "backward_ms_max": 0.9196879863739014,
+    "backward_ms_mean": 0.9196879863739014,
+    "backward_ms_median": 0.9196879863739014,
+    "backward_ms_min": 0.9196879863739014
+  },
+  "variant": "retained"
+}

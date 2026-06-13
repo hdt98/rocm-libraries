@@ -1,0 +1,115 @@
+{
+  "artifact": "mori_asyncll_flattened_training_gate_20260603",
+  "date_utc": "2026-06-03",
+  "status": "diagnostic_training_gate_passed_with_heap_caveat",
+  "scope": "TorchTitan DeepSeek-V4 Flash 4-layer MORI+AITER routed padded VJP backward with route-flattened AsyncLL dX/dTopk return.",
+  "source_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "new_mode": "TORCHTITAN_MORI_AITER_DX_RETURN_MODE=asyncll_flattened",
+    "contract": "Expand learned-router [T, K] routes into [T*K, 1] before backward MORI dispatch so source rows identify selected routes uniquely.",
+    "op_shape_change": "Flattened backward x/grad/topk MORI ops use top_k=1 and max_tokens=T*K; retained sync and asyncll_staged contracts are unchanged."
+  },
+  "why": [
+    "Normal MORI dispatch source-position metadata identifies source input rows, not selected top-k route slots.",
+    "At S4096, learned routing can send multiple slots from one token to the same destination rank, so independent AsyncLL handles cannot be aligned safely by src_pos or by reconstructed route_key.",
+    "The prior standalone route-flatten probe showed [T*K, 1] dispatch removes duplicate source rows; this artifact validates the same idea inside TorchTitan autograd."
+  ],
+  "local_checks": [
+    {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "result": "pass"
+    },
+    {
+      "command": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+      "result": "pass"
+    }
+  ],
+  "remote": {
+    "host": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "visible_devices": "0,1,2,3"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_asyncll_flattened_dx_4x_s128_smoke_20260603",
+      "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS4 S128",
+      "activation_checkpointing": "none",
+      "dx_return_mode": "asyncll_flattened",
+      "mori_shmem_heap_size": "32G",
+      "result": "pass",
+      "loss": 12.20844,
+      "grad_norm": 12.1875,
+      "peak_memory_gib": 73.79,
+      "tok_per_gpu_s": 7,
+      "read": "Integrated smoke only; throughput is not meaningful at this one-step short shape."
+    },
+    {
+      "run_id": "torchtitan_dsv4_sync_dx_seeded_ref_4x_s128_20260603",
+      "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS4 S128",
+      "activation_checkpointing": "none",
+      "dx_return_mode": "sync",
+      "mori_shmem_heap_size": "32G",
+      "result": "pass",
+      "loss": 12.20928,
+      "grad_norm": 12.1875,
+      "peak_memory_gib": 73.79,
+      "tok_per_gpu_s": 7,
+      "read": "Same seed and shape sync reference; independent launches are not bit-exact in loss, but grad_norm matches."
+    },
+    {
+      "run_id": "torchtitan_dsv4_asyncll_flattened_dx_4x_s4096_gbs4_20260603",
+      "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS4 S4096",
+      "activation_checkpointing": "full",
+      "dx_return_mode": "asyncll_flattened",
+      "mori_shmem_heap_size": "32G",
+      "result": "fail",
+      "failure": "MORI static heap exhausted before route alignment was tested",
+      "heap_error": {
+        "requested_bytes": 1612185600,
+        "current_heap_bytes": 34359738368
+      },
+      "read": "Failure is capacity from extra flattened AsyncLL buffers, not the previous source-position or route-key mismatch."
+    },
+    {
+      "run_id": "torchtitan_dsv4_asyncll_flattened_dx_4x_s4096_gbs4_heap96g_20260603",
+      "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS4 S4096",
+      "activation_checkpointing": "full",
+      "dx_return_mode": "asyncll_flattened",
+      "mori_shmem_heap_size": "96G",
+      "result": "pass",
+      "loss": 12.27059,
+      "grad_norm": 11.0625,
+      "peak_memory_gib_range": [
+        71.94,
+        73.43
+      ],
+      "tok_per_gpu_s": 127,
+      "read": "Long-sequence route-flattened training gate passes. This proves the flattened route identity contract, not performance."
+    },
+    {
+      "run_id": "torchtitan_dsv4_sync_dx_seeded_ref_4x_s4096_gbs4_20260603_b",
+      "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 GBS4 S4096",
+      "activation_checkpointing": "full",
+      "dx_return_mode": "sync",
+      "mori_shmem_heap_size": "32G",
+      "result": "pass",
+      "loss": 12.27053,
+      "grad_norm": 11.0625,
+      "peak_memory_gib_range": [
+        71.02,
+        73.17
+      ],
+      "tok_per_gpu_s_range": [
+        215,
+        217
+      ],
+      "read": "Seeded sync context run. The route-flattened diagnostic is slower because it duplicates routes and uses larger AsyncLL buffers."
+    }
+  ],
+  "conclusion": {
+    "route_identity": "The [T*K, 1] contract fixes the S4096 independent-handle route identity issue well enough to complete TorchTitan backward.",
+    "performance": "Do not promote asyncll_flattened as a retained performance path; it needs 96G MORI heap at S4096 GBS4 and is slower than sync in this diagnostic shape.",
+    "next_step": "Use this as evidence for the production overlap design: carry explicit per-route identity or shared MORI route/order metadata without materializing duplicated [T*K, H] x/grad dispatches, then retry dX return overlap."
+  }
+}

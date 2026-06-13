@@ -1,0 +1,170 @@
+{
+  "run_id": "compact_moe_kernel_contract_tile_extended_20260531",
+  "date": "2026-05-31",
+  "source_artifact": "run_artifacts/compact_moe_kernel_contract_tile_20260531.json",
+  "method": "derived_from_saved_per_expert_count_histograms",
+  "shape_base": {
+    "dtype": "bfloat16",
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6
+  },
+  "routes": [
+    {
+      "tokens": 2048,
+      "compact_rows": 12288,
+      "max_padded_rows": 18048,
+      "tile_rounding": [
+        {
+          "tile_m": 4,
+          "tile_rounded_rows": 12860,
+          "extra_rows_vs_compact": 572,
+          "saved_rows_vs_max_padded": 5188,
+          "compact_row_utilization": 0.9555209953343702
+        },
+        {
+          "tile_m": 8,
+          "tile_rounded_rows": 13600,
+          "extra_rows_vs_compact": 1312,
+          "saved_rows_vs_max_padded": 4448,
+          "compact_row_utilization": 0.9035294117647059
+        },
+        {
+          "tile_m": 12,
+          "tile_rounded_rows": 14328,
+          "extra_rows_vs_compact": 2040,
+          "saved_rows_vs_max_padded": 3720,
+          "compact_row_utilization": 0.8576214405360134
+        },
+        {
+          "tile_m": 16,
+          "tile_rounded_rows": 15120,
+          "extra_rows_vs_compact": 2832,
+          "saved_rows_vs_max_padded": 2928,
+          "compact_row_utilization": 0.8126984126984127
+        },
+        {
+          "tile_m": 24,
+          "tile_rounded_rows": 17544,
+          "extra_rows_vs_compact": 5256,
+          "saved_rows_vs_max_padded": 504,
+          "compact_row_utilization": 0.7004103967168263
+        },
+        {
+          "tile_m": 32,
+          "tile_rounded_rows": 18016,
+          "extra_rows_vs_compact": 5728,
+          "saved_rows_vs_max_padded": 32,
+          "compact_row_utilization": 0.6820603907637656
+        },
+        {
+          "tile_m": 48,
+          "tile_rounded_rows": 18432,
+          "extra_rows_vs_compact": 6144,
+          "saved_rows_vs_max_padded": -384,
+          "compact_row_utilization": 0.6666666666666666
+        },
+        {
+          "tile_m": 64,
+          "tile_rounded_rows": 24576,
+          "extra_rows_vs_compact": 12288,
+          "saved_rows_vs_max_padded": -6528,
+          "compact_row_utilization": 0.5
+        },
+        {
+          "tile_m": 96,
+          "tile_rounded_rows": 36864,
+          "extra_rows_vs_compact": 24576,
+          "saved_rows_vs_max_padded": -18816,
+          "compact_row_utilization": 0.3333333333333333
+        },
+        {
+          "tile_m": 128,
+          "tile_rounded_rows": 49152,
+          "extra_rows_vs_compact": 36864,
+          "saved_rows_vs_max_padded": -31104,
+          "compact_row_utilization": 0.25
+        }
+      ]
+    },
+    {
+      "tokens": 4096,
+      "compact_rows": 24576,
+      "max_padded_rows": 33792,
+      "tile_rounding": [
+        {
+          "tile_m": 4,
+          "tile_rounded_rows": 25156,
+          "extra_rows_vs_compact": 580,
+          "saved_rows_vs_max_padded": 8636,
+          "compact_row_utilization": 0.9769438702496422
+        },
+        {
+          "tile_m": 8,
+          "tile_rounded_rows": 25952,
+          "extra_rows_vs_compact": 1376,
+          "saved_rows_vs_max_padded": 7840,
+          "compact_row_utilization": 0.9469790382244143
+        },
+        {
+          "tile_m": 12,
+          "tile_rounded_rows": 26640,
+          "extra_rows_vs_compact": 2064,
+          "saved_rows_vs_max_padded": 7152,
+          "compact_row_utilization": 0.9225225225225225
+        },
+        {
+          "tile_m": 16,
+          "tile_rounded_rows": 27488,
+          "extra_rows_vs_compact": 2912,
+          "saved_rows_vs_max_padded": 6304,
+          "compact_row_utilization": 0.8940628637951106
+        },
+        {
+          "tile_m": 24,
+          "tile_rounded_rows": 28800,
+          "extra_rows_vs_compact": 4224,
+          "saved_rows_vs_max_padded": 4992,
+          "compact_row_utilization": 0.8533333333333334
+        },
+        {
+          "tile_m": 32,
+          "tile_rounded_rows": 30464,
+          "extra_rows_vs_compact": 5888,
+          "saved_rows_vs_max_padded": 3328,
+          "compact_row_utilization": 0.8067226890756303
+        },
+        {
+          "tile_m": 48,
+          "tile_rounded_rows": 36432,
+          "extra_rows_vs_compact": 11856,
+          "saved_rows_vs_max_padded": -2640,
+          "compact_row_utilization": 0.6745718050065876
+        },
+        {
+          "tile_m": 64,
+          "tile_rounded_rows": 36352,
+          "extra_rows_vs_compact": 11776,
+          "saved_rows_vs_max_padded": -2560,
+          "compact_row_utilization": 0.676056338028169
+        },
+        {
+          "tile_m": 96,
+          "tile_rounded_rows": 36864,
+          "extra_rows_vs_compact": 12288,
+          "saved_rows_vs_max_padded": -3072,
+          "compact_row_utilization": 0.6666666666666666
+        },
+        {
+          "tile_m": 128,
+          "tile_rounded_rows": 49152,
+          "extra_rows_vs_compact": 24576,
+          "saved_rows_vs_max_padded": -15360,
+          "compact_row_utilization": 0.5
+        }
+      ]
+    }
+  ],
+  "read": "The route histograms make the row-rounding tradeoff explicit. Tile_m=8 is a strong practical target for a compact grouped-MoE training kernel: it keeps row utilization above 90% at S2048 and above 94% at S4096 while staying closer to CDNA-friendly tiling than tile_m=4. Tile_m=16 remains plausible but loses 2832 S2048 rows and 2912 S4096 rows versus ideal compact rows; tile_m>=32 approaches or exceeds the current max-padded bridge at S2048 and is a poor first target."
+}

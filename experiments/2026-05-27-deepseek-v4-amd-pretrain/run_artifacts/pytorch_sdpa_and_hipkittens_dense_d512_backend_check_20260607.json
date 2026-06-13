@@ -1,0 +1,78 @@
+{
+  "artifact": "pytorch_sdpa_and_hipkittens_dense_d512_backend_check_20260607",
+  "date": "2026-06-07",
+  "status": "dense_attention_backend_check",
+  "runtime": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "pytorch_sdpa_d512_profile": {
+    "shape": "B1,S4096,H64,D512 causal BF16",
+    "enabled_backends": {
+      "flash_sdp": true,
+      "mem_efficient_sdp": true,
+      "math_sdp": true
+    },
+    "selected_profile_ops": [
+      {
+        "op": "aten::_scaled_dot_product_flash_attention",
+        "device_ms": 5.004778,
+        "count": 1
+      },
+      {
+        "op": "aten::_flash_attention_forward",
+        "device_ms": 5.004778,
+        "count": 1
+      },
+      {
+        "op": "aten::_scaled_dot_product_flash_attention_backward",
+        "device_ms": 20.197597,
+        "count": 1
+      },
+      {
+        "op": "aten::_flash_attention_backward",
+        "device_ms": 20.197597,
+        "count": 1
+      }
+    ],
+    "read": "For this ROCm image and D512 causal BF16 call, PyTorch SDPA dispatches the flash attention path, not the math fallback."
+  },
+  "pytorch_vs_aiter_reference": {
+    "artifact": "run_artifacts/probe_dense_attention_aiter_backend_20260607.json",
+    "shape": "B4,S4096,H64 causal BF16 fwd+bwd",
+    "d128": {
+      "pytorch_sdpa_ms": 16.8601,
+      "aiter_triton_mha_ms": 12.3774,
+      "aiter_triton_mha_v3_ms": 18.9289,
+      "aiter_ops_mha_status": "failed_jit"
+    },
+    "d512": {
+      "pytorch_sdpa_ms": 100.5621,
+      "aiter_triton_mha_ms": 350.3609,
+      "aiter_triton_mha_v3_ms": 249.3332,
+      "aiter_ops_mha_status": "failed_ck_head_dim_gt_256"
+    }
+  },
+  "hipkittens_dense_gqa_existing_controls": {
+    "note": "Existing HipKittens dense GQA artifacts are D128 backward-only with O/LSE precomputed outside timing and non-causal kernels, so they are not an apples-to-apples D512 dense-layer replacement.",
+    "b4_s4096_h64_hkv8_d128_backward_only_ms": 6.5108,
+    "b4_s4096_h64_hkv1_d128_backward_only_ms": 17.4289
+  },
+  "hipkittens_dense_gqa_d512_scratch_build_attempt": {
+    "scratch_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/tmp/hipkittens_gqa_d512_20260607/gqa_backwards",
+    "shape": "B4,S4096,H64,HKV64,D512",
+    "method": "temporary scratch copy of HipKittens gqa_backwards with ATTN_D constants changed from 128 to 512; vendored reference tree was not modified",
+    "result": "backward_kernel_compile_failed",
+    "failure_summary": "attn_bkwd_non_causal.cpp fails static_assert in HipKittens art register tiling: D128 register range lists provide too few base tiles for D512.",
+    "representative_errors": [
+      "Not enough register ranges provided for all base tiles in art; expression evaluates to 4 == 16",
+      "Not enough register ranges provided for all base tiles in art; expression evaluates to 16 == 64",
+      "Not enough register ranges provided for all base tiles in art; expression evaluates to 8 == 32"
+    ],
+    "prep_kernel": "The prep/shuffle module did compile for D512, but the combined backward kernel did not, so no D512 timing is valid."
+  },
+  "decision": "Do not switch dense DSv4 D512 attention away from PyTorch SDPA today. PyTorch is already using flash SDPA for this shape, stock AITER is slower or unsupported, and the current HipKittens dense sample is D128-only without a D512 backward kernel."
+}

@@ -1,0 +1,54 @@
+{
+  "artifact": "mori_native_balanced_moe_compact_dispatch_api_20260611",
+  "date": "2026-06-11",
+  "goal_alignment": "Expose a MORI-owned balanced-MoE compact dispatch API that consumes the MORI source partition directly, moving training/inference callers away from loose hot/cold adapter arguments.",
+  "status": "api_added_not_yet_e2e_throughput_promotion",
+  "source_changes": [
+    {
+      "file": "sources/references/mori/python/mori/ops/dispatch_combine.py",
+      "change": "Added BalancedMoeCompactDispatchOutput and EpDispatchCombineOp.dispatch_balanced_moe_compact(...), which consumes a BalancedMoeSourcePartition-like object and returns named normal/cold plus helper-hot outputs."
+    },
+    {
+      "file": "sources/references/mori/python/mori/ops/__init__.py",
+      "change": "Exported BalancedMoeCompactDispatchOutput through mori.ops."
+    },
+    {
+      "file": "sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "change": "Added a CPU contract test for BalancedMoeCompactDispatchOutput."
+    }
+  ],
+  "validation": [
+    {
+      "where": "local macOS workspace",
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/dispatch_combine.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/__init__.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "result": "passed"
+    },
+    {
+      "where": "local macOS workspace",
+      "command": "git -C /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/dispatch_combine.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/__init__.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "result": "passed"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "python -m pytest -q tests/python/ops/test_balanced_moe.py",
+      "result": "6 passed in 0.90s"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "from mori.ops import BalancedMoeCompactDispatchOutput, EpDispatchCombineOp; hasattr(EpDispatchCombineOp, 'dispatch_balanced_moe_compact')",
+      "result": "True"
+    }
+  ],
+  "remote_notes": {
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "gpu_throughput_gate": "not_launched",
+    "reason": "This was an API/ABI consolidation step and does not yet change the lower-level compact collective layout."
+  },
+  "next_steps": [
+    "Wire a small TorchTitan opt-in call path through EpDispatchCombineOp.dispatch_balanced_moe_compact for a non-throughput smoke, if needed.",
+    "Move below this Python API into MORI C++/HIP: consume BalancedMoeSourcePartition to produce the final expert-major receive layout directly.",
+    "Add low-intrusion profile counters around native compact body/final layout before any long 8x throughput gate."
+  ]
+}

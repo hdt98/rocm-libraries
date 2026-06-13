@@ -1,0 +1,40 @@
+{
+  "atol": 0.0005,
+  "attention_impl": "sparse-gather-lightning-indexer",
+  "batch": 1,
+  "boundary_impl": "separate",
+  "device": "cpu",
+  "dtype": "float64",
+  "eps": 1e-05,
+  "fast_mode": true,
+  "ok": true,
+  "results": [
+    {
+      "elapsed_s": 0.21846821601502597,
+      "gradcheck": true,
+      "input_shape": [
+        1,
+        4,
+        8
+      ],
+      "name": "attention",
+      "ok": true,
+      "parameter_count": 462
+    },
+    {
+      "elapsed_s": 0.09717331000138074,
+      "gradcheck": true,
+      "input_shape": [
+        1,
+        4,
+        8
+      ],
+      "name": "layer",
+      "ok": true,
+      "parameter_count": 990
+    }
+  ],
+  "rmsnorm_save_policy": "memory-light",
+  "rtol": 0.001,
+  "seqlen": 4
+}

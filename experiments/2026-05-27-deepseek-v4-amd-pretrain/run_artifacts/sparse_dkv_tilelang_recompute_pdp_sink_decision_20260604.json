@@ -1,0 +1,109 @@
+{
+  "status": "complete",
+  "scope": "TileLang sparse-MLA compressed-dKV P/dP recompute-once gate",
+  "date": "2026-06-04",
+  "kernel_mode_added": "recompute_pdp_sink_limited",
+  "tool": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+  "input_contract": {
+    "route_pattern": "actual_li_panel",
+    "actual_li_input_source": "boundary",
+    "timed_inputs": [
+      "q",
+      "grad_output",
+      "forward_output",
+      "lse",
+      "compressed_kv",
+      "packed_groups",
+      "route_selected_limits"
+    ],
+    "output_layout": "[route_tiles, H]",
+    "read": "The kernel computes dO.output once per token, recomputes sparse QK probabilities and scaled dP once per token/selected tile, and writes only a tiny checksum sink. It intentionally does not compute dKV. Materialized probs/grad_logits are only used by correctness references when requested."
+  },
+  "baseline_context": {
+    "retained_materialized_input_selected_limit_ms": 6.910138130187988,
+    "all_in_one_recompute_best_ms": 89.06778717041016,
+    "current_sparse_atomic_wall_ms_range": [
+      8.0,
+      8.8
+    ],
+    "interpretation": "The retained 6.91 ms branch reads materialized P/dP slabs. The all-in-one recompute branch removes those slabs but recomputes full-D attention row terms once per output D block, so it is rejected."
+  },
+  "results": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s128_tb16_cap32_20260604.json",
+      "seq_len": 128,
+      "token_block": 16,
+      "selected_window": 32,
+      "block_k": 32,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 1.734866976737976,
+      "correctness_max_abs_diff": 0.007740020751953125,
+      "correctness_mean_abs_diff": 0.0017668437212705612
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s512_tb16_cap128_k64d64_20260604.json",
+      "seq_len": 512,
+      "token_block": 16,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 3.2686080932617188,
+      "correctness_max_abs_diff": 0.007740020751953125,
+      "correctness_mean_abs_diff": 0.0010504820384085178
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+      "seq_len": 4096,
+      "token_block": 16,
+      "selected_window": 512,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 9.37989330291748,
+      "correctness_checked": false
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s4096_tb16_cap512_k128d64_thr512_20260604.json",
+      "seq_len": 4096,
+      "token_block": 16,
+      "selected_window": 512,
+      "block_k": 128,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 8.42343521118164,
+      "correctness_checked": false,
+      "read": "Best observed S4096 recompute-once sink point."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s4096_tb16_cap512_k256d64_thr512_20260604.json",
+      "seq_len": 4096,
+      "token_block": 16,
+      "selected_window": 512,
+      "block_k": 256,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 11.610594749450684,
+      "correctness_checked": false
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_pdp_recompute_sink_s4096_tb32_cap512_k128d64_thr512_20260604.json",
+      "seq_len": 4096,
+      "token_block": 32,
+      "selected_window": 512,
+      "block_k": 128,
+      "block_d": 64,
+      "threads": 512,
+      "median_ms": 14.102582931518555,
+      "correctness_checked": false,
+      "modeled_write_reduction_x": 23.813773153406938
+    }
+  ],
+  "decision": {
+    "promote_to_torchtitan": false,
+    "retain_as_kernel_gate": true,
+    "summary": "The recompute-once TileLang kernel is concrete and working, and it cuts the slab-free all-in-one recompute from 89.07 ms to 8.42 ms at S4096. However, 8.42 ms is already the current sparse-atomic dKV wall before doing any dKV accumulation or writeback, so this cannot be a detached precursor stage for the final training backward.",
+    "next_kernel_contract": "Fuse probability/dP production with the existing selected-limit dKV producer at the point where P/dP values are immediately consumed. Do not write selected-row P/dP slabs, and do not run a separate P/dP recompute sink before dKV. The TileLang branch should either keep the materialized-input selected-limit producer for latency work while integrating P/dP on-chip, or move the fused segmented producer to HIP/CK/rocWMMA if TileLang cannot express the needed reuse and segmented reduction."
+  }
+}

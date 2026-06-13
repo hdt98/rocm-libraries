@@ -1,0 +1,78 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_mbs8_dense_attention_ac_failure_8x_s4096_gbs128_20260608",
+  "date": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_host_name": "son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_mbs8_dense_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps6_20260608",
+  "result": "rejected_memory_fit_failure_before_first_metric_step",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "optimizer": {
+    "expert_optimizer": "muon",
+    "non_expert_optimizer": "adamw",
+    "muon_impl": "batched",
+    "muon_workspace_mode": "prealloc",
+    "muon_chunk_matrices": 4,
+    "muon_ns_steps": 1,
+    "muon_state_dtype": "bfloat16",
+    "muon_ns_compute_dtype": "bfloat16"
+  },
+  "activation_checkpoint": {
+    "mode": "selective",
+    "scope": "dense_attention_only",
+    "scope_confirmed_in_rank_logs": true
+  },
+  "moe_ep": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd"
+  },
+  "sparse_mla": {
+    "backend": "shared_kv",
+    "backward": "shared_kv_query_recompute",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "failure": {
+    "phase": "step1_forward_backward_backward",
+    "first_failed_rank": 3,
+    "first_failed_local_rank": 3,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "hsa_error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "available_free_memory_at_abort": "170 MB",
+    "python_stack_top": "torch.autograd.backward -> trainer.py:803 forward_backward_step",
+    "completed_metric_steps": 0,
+    "observed_step_events": [
+      "step 1 step_start",
+      "local_valid_tokens=65536",
+      "fwd_bwd_start"
+    ]
+  },
+  "comparison": {
+    "retained_adamw_triton_bwd_attention_only_steps_2_to_20_tok_gpu_s": 8518.8421,
+    "retained_adamw_triton_bwd_attention_only_peak_gib": 251.97,
+    "muon_triton_bwd_attention_only_steps_2_to_20_tok_gpu_s": 8349.6711,
+    "muon_triton_bwd_attention_only_peak_gib": 234.38,
+    "muon_triton_bwd_attention_only_memory_saving_vs_adamw_gib": 17.59,
+    "dense_attention_only_read": "Muon saves optimizer-state memory, but checkpointing only dense attention leaves sparse MLA/LI activations uncheckpointed and does not fit MBS8."
+  },
+  "decision": "reject_dense_attention_only_as_mbs8_recompute_scope",
+  "next_action": "Keep attention_only as the retained MBS8 fit/perf scope. Larger MBS or less recompute requires sparse MLA/LI activation/backward memory reduction, not optimizer-state savings alone."
+}

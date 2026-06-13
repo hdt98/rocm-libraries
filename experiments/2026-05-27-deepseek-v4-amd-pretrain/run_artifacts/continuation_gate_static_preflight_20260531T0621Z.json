@@ -1,0 +1,83 @@
+{
+  "artifact": "continuation_gate_static_preflight",
+  "timestamp_utc": "2026-05-31T06:21:00Z",
+  "goal_lanes_checked": [
+    "mixed_muon_adamw_8xmi350_resume",
+    "single_mi350_layer_microbench"
+  ],
+  "gpu_gate": {
+    "eight_gpu_host": "do-sonle5-mi350-gpu",
+    "eight_gpu_result": "blocked_by_external_torchtitan_llama_ft_run",
+    "eight_gpu_latest_run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+    "eight_gpu_blocking_processes": [
+      {
+        "pid": 3335962,
+        "name": "pt_elastic",
+        "summary": "torchrun --nproc_per_node 2 for Primus TorchTitan Llama3.1 8B fault-tolerance pretraining with --training.steps=20000"
+      },
+      {
+        "pid": 3336399,
+        "name": "python",
+        "summary": "rank process for the same TorchTitan Llama3.1 FT run"
+      },
+      {
+        "pid": 3336400,
+        "name": "python",
+        "summary": "rank process for the same TorchTitan Llama3.1 FT run"
+      }
+    ],
+    "single_gpu_host": "do-sonle-kernel",
+    "single_gpu_result": "blocked_for_clean_timing_by_external_tilelang_coda_run",
+    "single_gpu_blocking_processes": [
+      {
+        "pid": 3247374,
+        "name": "python3",
+        "summary": "tools/bench_coda_tilelang_stage1_absmax.py --preset dsv4-pro-routed --full-path --topk 6 --delayed-scale-stage2 ... dsv4_pro_reusea_dualb_bh128.json"
+      }
+    ],
+    "single_gpu_new_container": "kind_cannon",
+    "decision": "did not co-schedule training, timing, or rocprof work"
+  },
+  "static_preflight": {
+    "compiled": [
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/legacy_torchtitan_optimizer_mixed_muon.py",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/inspect_dcp_checkpoint.py"
+    ],
+    "compiled_status": "passed",
+    "validated_json_artifacts": [
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_mixed_muon_1step_s4096_gbs8_20260531.json",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_mixed_muon_checkpoint_tensor_load_20260531.json",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_mixed_muon_resume_loadstep1_dryrun_20260531.json"
+    ],
+    "validated_json_status": "passed",
+    "local_yaml_parser": "PyYAML not installed in the local host Python; config invariants were checked from the file text instead of installing dependencies"
+  },
+  "mixed_muon_resume_invariants": {
+    "config": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/targets/torchtitan_deepseek_v3_16b_bf16_8xmi350_mixed_muon_canary.yaml",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+    "optimizer_overlay": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/legacy_torchtitan_optimizer_mixed_muon.py",
+    "checkpoint_source": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+    "resume_command": "env CANARY_OPTIMIZER_MODE=mixed-muon-adamw RESUME_LOAD_STEP=1 RESUME_STEPS=2 CANARY_GBS=8 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh run-resume",
+    "dry_run_proved": [
+      "--checkpoint.load_step 1",
+      "--training.steps 2",
+      "--parallelism.tensor_parallel_degree 1",
+      "--parallelism.pipeline_parallel_degree 1",
+      "--parallelism.context_parallel_degree 1",
+      "--parallelism.expert_parallel_degree 8",
+      "--parallelism.data_parallel_shard_degree -1",
+      "optimizer_overlay has_muon=True"
+    ],
+    "checkpoint_selected_load_proved": [
+      "train_state.step=1",
+      "AdamW param-group scalar fields",
+      "Muon param-group scalar fields",
+      "AdamW exp_avg and exp_avg_sq tensor payloads",
+      "Muon momentum_buffer tensor payload"
+    ]
+  },
+  "remaining_required_evidence": [
+    "Run the real mixed Muon/AdamW load_step=1 resume through step 2 on an idle 8xMI350 node.",
+    "Run clean single-MI350 retained/profile work only after do-sonle-kernel has no unrelated KFD workloads."
+  ]
+}

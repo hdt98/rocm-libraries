@@ -1,0 +1,110 @@
+{
+  "best_triton": {
+    "block_k": 64,
+    "block_m": 8,
+    "block_n": 64,
+    "compact_tflops_median": 28.77131574054568,
+    "median_ms": 75.23686218261719,
+    "min_ms": 74.88699340820312,
+    "num_warps": 4,
+    "speedup_vs_torch_padded_xgrad_reduce_median": 0.11881581565218731,
+    "timing_ms": {
+      "triton_fused_bm8_bn64_bk64_w4_ms_max": 75.58673095703125,
+      "triton_fused_bm8_bn64_bk64_w4_ms_mean": 75.23686218261719,
+      "triton_fused_bm8_bn64_bk64_w4_ms_median": 75.23686218261719,
+      "triton_fused_bm8_bn64_bk64_w4_ms_min": 74.88699340820312
+    }
+  },
+  "check": {
+    "atol": 1.0,
+    "config": {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 64,
+      "num_warps": 4
+    },
+    "max_abs": 0.029541015625,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.002030453512688807,
+    "rtol": 0.025
+  },
+  "failed_triton_configs": [],
+  "flops": {
+    "compact_vs_padded_flop_ratio": 0.7272727272727273,
+    "compact_xgrad": 2164663517184.0,
+    "padded_global_max_xgrad": 2976412336128.0
+  },
+  "op_read": "dgate_compact/dup_compact [assignments, intermediate] x w1/w3 [experts, intermediate, hidden] with direct token reduction -> dX [tokens, hidden]",
+  "probe": "triton_fused_xgrad_reduce",
+  "read": "Promote only if the best Triton fused xgrad+reduce kernel is correct and beats padded torch W1/W3 xgrad plus input index_add. If it loses, keep this as the oracle for a CK/TileLang implementation with better tiny-M grouped GEMM utilization.",
+  "route_stats": {
+    "assignments": 24576,
+    "experts": 384,
+    "max_per_expert": 88,
+    "mean_per_expert": 64.0,
+    "min_per_expert": 45,
+    "padded_rows_global_max": 33792,
+    "padding_multiplier_global_max": 1.375
+  },
+  "shape": {
+    "assignments": 24576,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "out_dtype": "float32",
+    "tokens": 4096,
+    "topk": 6
+  },
+  "torch_input_reduce_only": {
+    "median_ms": 1.0352354943752289,
+    "timing_ms": {
+      "torch_input_reduce_only_ms_max": 1.098855972290039,
+      "torch_input_reduce_only_ms_mean": 1.0352354943752289,
+      "torch_input_reduce_only_ms_median": 1.0352354943752289,
+      "torch_input_reduce_only_ms_min": 0.9716150164604187
+    }
+  },
+  "torch_padded_xgrad_only": {
+    "compact_equivalent_tflops_median": 266.18667196207247,
+    "median_ms": 8.132125854492188,
+    "padded_tflops_median": 366.0066739478496,
+    "timing_ms": {
+      "torch_padded_xgrad_only_ms_max": 8.20242691040039,
+      "torch_padded_xgrad_only_ms_mean": 8.132125854492188,
+      "torch_padded_xgrad_only_ms_median": 8.132125854492188,
+      "torch_padded_xgrad_only_ms_min": 8.061824798583984
+    }
+  },
+  "torch_padded_xgrad_reduce": {
+    "compact_equivalent_tflops_median": 242.15055531637907,
+    "median_ms": 8.939329147338867,
+    "padded_tflops_median": 332.9570135600212,
+    "timing_ms": {
+      "torch_padded_xgrad_reduce_ms_max": 9.11665153503418,
+      "torch_padded_xgrad_reduce_ms_mean": 8.939329147338867,
+      "torch_padded_xgrad_reduce_ms_median": 8.939329147338867,
+      "torch_padded_xgrad_reduce_ms_min": 8.762006759643555
+    }
+  },
+  "triton_results": [
+    {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 64,
+      "compact_tflops_median": 28.77131574054568,
+      "median_ms": 75.23686218261719,
+      "min_ms": 74.88699340820312,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_xgrad_reduce_median": 0.11881581565218731,
+      "timing_ms": {
+        "triton_fused_bm8_bn64_bk64_w4_ms_max": 75.58673095703125,
+        "triton_fused_bm8_bn64_bk64_w4_ms_mean": 75.23686218261719,
+        "triton_fused_bm8_bn64_bk64_w4_ms_median": 75.23686218261719,
+        "triton_fused_bm8_bn64_bk64_w4_ms_min": 74.88699340820312
+      }
+    }
+  ]
+}

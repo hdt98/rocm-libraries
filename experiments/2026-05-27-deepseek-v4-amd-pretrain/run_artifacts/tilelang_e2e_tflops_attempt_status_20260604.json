@@ -1,0 +1,102 @@
+{
+  "artifact": "tilelang_e2e_tflops_attempt_status_20260604",
+  "date_utc": "2026-06-04",
+  "scope": "Latest best TileLang sparse-MLA dKV candidate and attempted TorchTitan e2e TFLOPs measurement.",
+  "best_tilelang_candidate": {
+    "backend": "selected_limit_hsk_bf16_scaled_source",
+    "source_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_source_s4096_layer2_gp512_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "compressed_groups": 1024,
+      "actual_li_topk": 512,
+      "valid_pairs": 1572352,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64
+    },
+    "kernel_timing_ms": {
+      "kernel_only_packed": 6.178799152374268,
+      "hsk_bf16_source_kernel": 6.278879165649414,
+      "source_indexed_kernel": 7.285844802856445,
+      "pack_plus_kernel": 8.164091110229492,
+      "hsk_fp32_source_kernel": 8.539493560791016
+    },
+    "flop_model": {
+      "useful_tflop": 0.206091321344,
+      "modeled_executed_tflop": 0.237162725376,
+      "hsk_bf16_source_useful_tflops_per_s": 32.82,
+      "hsk_bf16_source_modeled_tflops_per_s": 37.77
+    },
+    "read": "Best production-shaped TileLang candidate is the BF16 HSK-source selected-limit dKV producer. It is slightly slower than packed kernel-only but avoids the SKH permute/cast feed shape, making it the current backend to wire into TorchTitan."
+  },
+  "e2e_measurement": {
+    "status": "blocked_no_valid_tilelang_e2e_tflops_yet",
+    "latest_successful_e2e_baseline_non_tilelang": {
+      "artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+      "shape": "8xMI350 TP1_PP1_CP1_FSDP8_EP8 MBS1 GBS128 S4096 full activation checkpoint",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "step2_tok_per_gpu_s": 3103,
+      "step2_tflops_per_gpu": 58.71
+    },
+    "attempts": [
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_8x_s4096_gbs128_20260604",
+        "shape": "8xMI350 FSDP8 EP8 GBS128 S4096",
+        "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+        "result": "failed_before_training",
+        "blocker": "TileLang image missing TorchTitan runtime dependency tyro"
+      },
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_overlay_8x_s4096_gbs128_20260604",
+        "shape": "8xMI350 FSDP8 EP8 GBS128 S4096",
+        "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+        "result": "failed_before_training",
+        "blocker": "TorchTitan common attention imports require newer PyTorch attention helpers"
+      },
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_overlay_8x_s4096_gbs128_20260604b",
+        "shape": "8xMI350 FSDP8 EP8 GBS128 S4096",
+        "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+        "result": "failed_before_training",
+        "blocker": "init_process_group private _ranks kwarg unsupported in this PyTorch build"
+      },
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_overlay_4x_s4096_gbs64_20260604",
+        "shape": "4xMI350 visible GPUs 2,3,4,5 FSDP4 EP4 GBS64 S4096",
+        "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+        "result": "failed_before_training",
+        "blocker": "DeviceMesh._unflatten unsupported in this PyTorch build"
+      },
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_overlay_4x_s4096_gbs64_20260604b",
+        "shape": "4xMI350 visible GPUs 2,3,4,5 FSDP4 EP4 GBS64 S4096",
+        "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+        "result": "failed_before_training",
+        "blocker": "activation checkpoint private torch._C._dynamo.eval_frame._set_lru_cache unsupported"
+      },
+      {
+        "run_id": "torchtitan_dsv4_tilelang_hsk_bf16_overlay_4x_s4096_gbs64_20260604c",
+        "shape": "4xMI350 visible GPUs 2,3,4,5 FSDP4 EP4 GBS64 S4096",
+        "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+        "result": "failed_before_training",
+        "blocker": "FSDP private symbol ShardPlacementResult missing from torch.distributed.fsdp._fully_shard._fsdp_common"
+      }
+    ],
+    "decision": "Do not report a TileLang e2e TFLOPs number yet. The best kernel candidate is ready, but the available TileLang-capable image is not TorchTitan e2e-compatible with this WIP source. Use a PyTorch/TorchTitan image that already matches the retained nexus runtime and add TileLang there, or rebuild the TileLang DSv4 image against the retained PyTorch runtime."
+  },
+  "runtime_overlay": {
+    "dockerfile": "launchers/Dockerfile.tilelang_torchtitan_runtime",
+    "image_tag": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+    "base_image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "added_packages": {
+      "torchdata": "0.11.0",
+      "tyro": "1.0.13",
+      "tensorboard": "2.20.0",
+      "wandb": "0.27.0"
+    }
+  }
+}

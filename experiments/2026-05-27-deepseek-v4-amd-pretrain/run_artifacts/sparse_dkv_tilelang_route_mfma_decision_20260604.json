@@ -1,0 +1,71 @@
+{
+  "status": "candidate_not_promoted",
+  "scope": "sparse_dkv_tilelang_reduced_write_kernel_gate",
+  "date": "2026-06-04",
+  "read": "TileLang now has concrete reduced-write dKV branches in the experiment probe. The correct branch is prepacked_scalar_reduced, which owns compact active rows and writes non-atomic partial rows, but it is group-owned scalar math and is far too slow at S4096. The intended route_mfma_reduced branch keeps query-major MFMA contribution math and static compact-row blocks, but the current implementation compiles and runs with NaN output, so it is not correct yet. The actual-LI Triton sink floor shows that removing selected-row writes alone is insufficient: the current producer body plus route traversal is still about 8.38 ms at S4096.",
+  "code": {
+    "tilelang_probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "triton_sink_probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py"
+  },
+  "tilelang_prepacked_scalar_reduced": {
+    "contract": "prepack compact active rows to (token, selected) pair lists; one CTA owns compact output rows; no dynamic output slot and no global atomic in the partial producer",
+    "correctness_smoke": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_prepacked_scalar_reduced_s16_sw64_d16_20260604.json",
+      "seq_len": 16,
+      "max_abs_diff": 4.365528002381325e-05,
+      "median_ms": 2.4671380519866943
+    },
+    "s128_timing": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_prepacked_scalar_reduced_s128_tb32_sw512_d16_20260604.json",
+      "seq_len": 128,
+      "write_reduction_x": 21.508368887430258,
+      "median_ms": 17.873632431030273,
+      "prepack_wall_ms": 198.1417629867792
+    },
+    "s4096_timing": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_prepacked_scalar_reduced_s4096_tb32_sw512_d32_timing_20260604.json",
+      "seq_len": 4096,
+      "write_reduction_x": 21.500210168031906,
+      "median_ms": 994.5082397460938,
+      "prepack_wall_ms": 6203.107530949637,
+      "partials_mib": 190.509765625
+    },
+    "decision": "Correct but not a speed path. Keep only as a TileLang lowering/correctness baseline for static row-owned reduced writes."
+  },
+  "tilelang_route_mfma_reduced": {
+    "contract": "one CTA owns a static compact-row block; compute selected-row dKV contributions with TileLang GEMM; reduce matching route slots into the compact row block; write compact partial rows without atomics",
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_route_mfma_reduced_s16_slot_aligned_sw64_d32_clearcopy_20260604.json",
+    "seq_len": 16,
+    "route_pattern": "slot_aligned",
+    "write_reduction_x": 16.0,
+    "median_ms": 0.33708301186561584,
+    "correct": false,
+    "failure": "candidate output checksum and diff are NaN even after using the vendored FullCol GEMM policy and fragment-to-shared staging",
+    "decision": "Compiled but not correct. Next work should isolate the MFMA contribution body with the exact vendored sparse-MQA input layout, then reintroduce static route-block reduction."
+  },
+  "actual_li_triton_sink_floor": {
+    "contract": "keep current query-major dot-K producer and route-slot traversal, but replace selected-row partial/dKV writes with one diagnostic sink vector per micro tile",
+    "s128": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s128_layer2_sc16_sb128_d16h64k32_20260604.json",
+      "seq_len": 128,
+      "topk": 32,
+      "median_ms": 0.40768301486968994,
+      "actual_write_reduction_x": 252.0
+    },
+    "s4096": {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb128_d16h64k64_timing_20260604.json",
+      "seq_len": 4096,
+      "topk": 512,
+      "valid_pairs": 1572352,
+      "median_ms": 8.383907318115234,
+      "actual_write_reduction_x": 3071.0,
+      "raw_atomic_elements": 805044224
+    },
+    "decision": "The next TileLang speed candidate must improve the contribution schedule as well as writeback. A reduced-write wrapper around the current producer is unlikely to beat the 8 ms wall."
+  },
+  "next_kernel_ladder": [
+    "Add a TileLang MFMA contribution-body sink that mirrors the vendored sparse-MQA layout exactly and proves finite output.",
+    "Once finite, add static route-block reduction with row_block=16 and fragment/shared staging.",
+    "Only after correctness, scale to S4096 and compare against the 8.0-8.8 ms sparse-atomic wall."
+  ]
+}

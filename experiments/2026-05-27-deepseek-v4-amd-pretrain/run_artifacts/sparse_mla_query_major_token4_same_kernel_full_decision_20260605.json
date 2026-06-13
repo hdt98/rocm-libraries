@@ -1,0 +1,72 @@
+{
+  "status": "correct_but_not_promoted",
+  "date": "2026-06-05",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_layer2_s4096_same_kernel_token4_selected_dq_grouped_dkv",
+  "contract": {
+    "source_boundary": "q, kv, grad_output, output, lse, compressed_indices",
+    "kept_fast_path": "selected-slot query-major QK -> P -> scaled_dP -> dQ",
+    "group_aware_only_at": "dKV epilogue",
+    "token_tile": 4,
+    "selected_window": 64,
+    "head_block": 64,
+    "dim_block": 128,
+    "grouping": "exact forward-known compressed-group id sidecar; later token rows in the same token/window tile fold into earlier matching group rows before final global dKV atomic_add"
+  },
+  "artifacts": {
+    "timing": "run_artifacts/sparse_mla_query_major_token4_same_kernel_full_s4096_layer2_timing7_20260605.json",
+    "timing_short": "run_artifacts/sparse_mla_query_major_token4_same_kernel_full_s4096_layer2_20260605.json",
+    "correctness": "run_artifacts/sparse_mla_query_major_token4_same_kernel_full_s4096_layer2_correctness_20260605.json",
+    "benchmark_script": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "latency_gate": {
+    "retained_full_sparse_attention_backward_ms": 11.1347,
+    "same_kernel_token4_full_median_ms": 25.837600708007812,
+    "same_kernel_token4_full_min_ms": 22.773080825805664,
+    "same_kernel_token4_full_samples_ms": [
+      112.12142181396484,
+      24.20297622680664,
+      32.3093376159668,
+      22.79136085510254,
+      22.773080825805664,
+      64.83169555664062,
+      25.837600708007812
+    ],
+    "beats_retained_gate": false,
+    "speedup_vs_retained_gate_x": 0.4309494571819526,
+    "read": "Use the timing artifact for latency. The correctness artifact intentionally ran with no warmup and is retained only for parity because its dKV-only submode timings include no-warmup/JIT outliers."
+  },
+  "same_kernel_dkv_submodes_from_timing": {
+    "dkv_only_sink_median_ms": 5.8687920570373535,
+    "dkv_only_full_median_ms": 11.752104759216309,
+    "modeled_global_accum_delta_ms": 5.883312702178955,
+    "split_schedule_candidate_ms": 13.742396712303162,
+    "split_schedule_beats_matched_single_token": false,
+    "read": "Even the dKV-only same-kernel sidecar schedule does not beat the retained full boundary once it is added to the fast no-dKV path."
+  },
+  "correctness": {
+    "passed": true,
+    "atol": 1.0,
+    "dq_max_abs_diff": 0.0016285479068756104,
+    "dq_mean_abs_diff": 0.000019112272639176808,
+    "dkv_max_abs_diff": 0.08786773681640625,
+    "dkv_mean_abs_diff": 0.00026700340094976127
+  },
+  "conclusion": {
+    "summary": "The multi-token group-aware dKV epilogue is mathematically valid, but this Triton token4 same-kernel implementation loses the fast producer and is rejected for promotion.",
+    "why_it_did_not_materialize": [
+      "The retained fast Triton baseline is effectively single-token and keeps very low live state.",
+      "Token4 grouped epilogue reduces some final dKV atomic pressure, but adds dense N-by-N route folding, additional live accumulators, and heavier producer state.",
+      "The full boundary lands at 25.84 ms median versus the 11.13 ms retained gate, so the added epilogue work costs more than the atomic savings."
+    ],
+    "next_contract": "Keep the selected-slot query-major producer, but implement a lighter epilogue in a lower-level HIP/CK/rocWMMA style or a segmented-reduction topology that avoids dense N-by-N folding and large Triton live-state growth."
+  }
+}

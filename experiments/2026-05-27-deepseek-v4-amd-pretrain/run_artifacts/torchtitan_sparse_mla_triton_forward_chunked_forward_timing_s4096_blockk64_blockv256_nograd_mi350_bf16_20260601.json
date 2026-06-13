@@ -1,0 +1,84 @@
+{
+  "batch": 1,
+  "candidate": null,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_mode": "fused",
+  "candidate_vs_target_forward_ratio": 39.60696241590712,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "256"
+  },
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "max_output_abs_diff": null,
+  "output_atol": 0.01,
+  "reference": null,
+  "reference_kernel_module": null,
+  "reference_mode": "manual_stream",
+  "scope": "forward_only_no_grad",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "target_forward_ms": 3.6,
+  "timing": {
+    "candidate": {
+      "compressed_groups": 1024,
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 142.93795776367188,
+        "mean_ms": 142.58506469726564,
+        "median_ms": 142.52448272705078,
+        "min_ms": 142.2613067626953,
+        "samples_ms": [
+          142.50595092773438,
+          142.529541015625,
+          142.85171508789062,
+          142.51942443847656,
+          142.2613067626953,
+          142.4293975830078,
+          142.93795776367188,
+          142.6844024658203,
+          142.4175567626953,
+          142.71339416503906
+        ],
+        "stdev_ms": 0.208894779953763
+      },
+      "enabled": true,
+      "estimated_selected_state_elements": 171798691840,
+      "iters": 10,
+      "last_output_checksum": -0.0002794579486362636,
+      "peak_memory_allocated_bytes": 7434288128,
+      "peak_memory_allocated_gib": 6.923720359802246,
+      "requires_grad": false,
+      "selected_keys": 640,
+      "sparse_skip_reason": null,
+      "sparse_used": true,
+      "wall": {
+        "enabled": true,
+        "max_ms": 142.96192000620067,
+        "mean_ms": 142.61196289444342,
+        "median_ms": 142.55303697427735,
+        "min_ms": 142.2885359497741,
+        "samples_ms": [
+          142.54911697935313,
+          142.55695696920156,
+          142.87600002717227,
+          142.5439080921933,
+          142.2885359497741,
+          142.45422696694732,
+          142.96192000620067,
+          142.70865893922746,
+          142.44228601455688,
+          142.73801899980754
+        ],
+        "stdev_ms": 0.20744702836557558
+      },
+      "warmup_iters": 3
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

@@ -1,0 +1,3261 @@
+{
+  "all_tiles": [
+    {
+      "empty_tiles": 1792,
+      "max_segment_count_per_tile": {
+        "count": 6400,
+        "max": 4.0,
+        "mean": 3.01671875,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "nonempty_tiles": 6400,
+      "pair_weighted_segment_count_mean": 1.3975204025561707,
+      "pairs_per_tile": {
+        "count": 6400,
+        "max": 256.0,
+        "mean": 245.68,
+        "min": 1.0,
+        "p50": 256.0,
+        "p90": 256.0,
+        "p99": 256.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 1067779,
+        "count_gt32": 0,
+        "count_le16": 1301778,
+        "count_le2": 1270575,
+        "count_le32": 1301778,
+        "count_le4": 1301778,
+        "count_le8": 1301778,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.0,
+        "pairs": 1572352,
+        "segments": 1301778
+      },
+      "segment_count_per_group": {
+        "count": 1301778,
+        "max": 4.0,
+        "mean": 1.2078495718932107,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 2.0,
+        "p99": 3.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 1301778,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 1301778,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 1301778,
+          "max": 4.0,
+          "mean": 1.2078495718932107,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 2.0,
+          "p99": 3.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 6400,
+        "max": 245.0,
+        "mean": 203.4028125,
+        "min": 1.0,
+        "p50": 219.0,
+        "p90": 233.0,
+        "p99": 239.0
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 1.2078495718932107,
+      "tile_p50_segment_count": {
+        "count": 6400,
+        "max": 4.0,
+        "mean": 1.07734375,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 4.0
+      },
+      "tile_p90_segment_count": {
+        "count": 6400,
+        "max": 4.0,
+        "mean": 1.91796875,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 2.0,
+        "p99": 4.0
+      },
+      "tiles": 8192,
+      "token_block": 4,
+      "total_group_segments": 1301778,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 768,
+      "max_segment_count_per_tile": {
+        "count": 3328,
+        "max": 4.0,
+        "mean": 3.5928485576923075,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "nonempty_tiles": 3328,
+      "pair_weighted_segment_count_mean": 1.7557302690491696,
+      "pairs_per_tile": {
+        "count": 3328,
+        "max": 512.0,
+        "mean": 472.46153846153845,
+        "min": 1.0,
+        "p50": 512.0,
+        "p90": 512.0,
+        "p99": 512.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 738553,
+        "count_gt32": 0,
+        "count_le16": 1103081,
+        "count_le2": 1018461,
+        "count_le32": 1103081,
+        "count_le4": 1103081,
+        "count_le8": 1103081,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.0,
+        "pairs": 1572352,
+        "segments": 1103081
+      },
+      "segment_count_per_group": {
+        "count": 1103081,
+        "max": 4.0,
+        "mean": 1.4254184416194278,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 2.0,
+        "p99": 4.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 1103081,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 1103081,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 1103081,
+          "max": 4.0,
+          "mean": 1.4254184416194278,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 2.0,
+          "p99": 4.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 3328,
+        "max": 441.0,
+        "mean": 331.45462740384613,
+        "min": 1.0,
+        "p50": 372.0,
+        "p90": 417.0,
+        "p99": 431.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 1.4254184416194278,
+      "tile_p50_segment_count": {
+        "count": 3328,
+        "max": 4.0,
+        "mean": 1.2932692307692308,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 2.0,
+        "p99": 4.0
+      },
+      "tile_p90_segment_count": {
+        "count": 3328,
+        "max": 4.0,
+        "mean": 2.285456730769231,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 3.0,
+        "p99": 4.0
+      },
+      "tiles": 4096,
+      "token_block": 4,
+      "total_group_segments": 1103081,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 256,
+      "max_segment_count_per_tile": {
+        "count": 1792,
+        "max": 4.0,
+        "mean": 3.9408482142857144,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "nonempty_tiles": 1792,
+      "pair_weighted_segment_count_mean": 2.387492113725171,
+      "pairs_per_tile": {
+        "count": 1792,
+        "max": 1024.0,
+        "mean": 877.4285714285714,
+        "min": 1.0,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 347419,
+        "count_gt32": 0,
+        "count_le16": 824455,
+        "count_le2": 625649,
+        "count_le32": 824455,
+        "count_le4": 824455,
+        "count_le8": 824455,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.0,
+        "pairs": 1572352,
+        "segments": 824455
+      },
+      "segment_count_per_group": {
+        "count": 824455,
+        "max": 4.0,
+        "mean": 1.907141081077803,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 3.0,
+        "p99": 4.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 824455,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 824455,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 824455,
+          "max": 4.0,
+          "mean": 1.907141081077803,
+          "min": 1.0,
+          "p50": 2.0,
+          "p90": 3.0,
+          "p99": 4.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 1792,
+        "max": 724.0,
+        "mean": 460.07533482142856,
+        "min": 1.0,
+        "p50": 520.0,
+        "p90": 674.0,
+        "p99": 701.0899999999999
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 1.907141081077803,
+      "tile_p50_segment_count": {
+        "count": 1792,
+        "max": 4.0,
+        "mean": 2.0625,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "tile_p90_segment_count": {
+        "count": 1792,
+        "max": 4.0,
+        "mean": 3.037388392857143,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "tiles": 2048,
+      "token_block": 4,
+      "total_group_segments": 824455,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 1024,
+        "max": 4.0,
+        "mean": 3.9970703125,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "nonempty_tiles": 1024,
+      "pair_weighted_segment_count_mean": 3.385001577254966,
+      "pairs_per_tile": {
+        "count": 1024,
+        "max": 2048.0,
+        "mean": 1535.5,
+        "min": 1.0,
+        "p50": 2046.5,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 48504,
+        "count_gt32": 0,
+        "count_le16": 515790,
+        "count_le2": 155707,
+        "count_le32": 515790,
+        "count_le4": 515790,
+        "count_le8": 515790,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.0,
+        "pairs": 1572352,
+        "segments": 515790
+      },
+      "segment_count_per_group": {
+        "count": 515790,
+        "max": 4.0,
+        "mean": 3.04843444037302,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 515790,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 515790,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 515790,
+          "max": 4.0,
+          "mean": 3.04843444037302,
+          "min": 1.0,
+          "p50": 3.0,
+          "p90": 4.0,
+          "p99": 4.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 1024,
+        "max": 973.0,
+        "mean": 503.701171875,
+        "min": 1.0,
+        "p50": 512.5,
+        "p90": 886.7,
+        "p99": 954.77
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 3.04843444037302,
+      "tile_p50_segment_count": {
+        "count": 1024,
+        "max": 4.0,
+        "mean": 3.416015625,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "tile_p90_segment_count": {
+        "count": 1024,
+        "max": 4.0,
+        "mean": 3.8857421875,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "tiles": 1024,
+      "token_block": 4,
+      "total_group_segments": 515790,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 896,
+      "max_segment_count_per_tile": {
+        "count": 3200,
+        "max": 8.0,
+        "mean": 4.446875,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 6.0,
+        "p99": 8.0
+      },
+      "nonempty_tiles": 3200,
+      "pair_weighted_segment_count_mean": 1.92739284842071,
+      "pairs_per_tile": {
+        "count": 3200,
+        "max": 512.0,
+        "mean": 491.36,
+        "min": 6.0,
+        "p50": 512.0,
+        "p90": 512.0,
+        "p99": 512.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 688003,
+        "count_gt32": 0,
+        "count_le16": 1057966,
+        "count_le2": 956381,
+        "count_le32": 1057966,
+        "count_le4": 1049332,
+        "count_le8": 1057966,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.006904306414848583,
+        "pairs": 1572352,
+        "segments": 1057966
+      },
+      "segment_count_per_group": {
+        "count": 1057966,
+        "max": 8.0,
+        "mean": 1.4862027702213492,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 2.0,
+        "p99": 4.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 1057966,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 1057966,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 1057966,
+          "max": 8.0,
+          "mean": 1.4862027702213492,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 2.0,
+          "p99": 4.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 3200,
+        "max": 428.0,
+        "mean": 330.614375,
+        "min": 2.0,
+        "p50": 360.0,
+        "p90": 406.0,
+        "p99": 420.0
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 1.4862027702213492,
+      "tile_p50_segment_count": {
+        "count": 3200,
+        "max": 8.0,
+        "mean": 1.3303125,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 2.0,
+        "p99": 8.0
+      },
+      "tile_p90_segment_count": {
+        "count": 3200,
+        "max": 8.0,
+        "mean": 2.504375,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 3.0,
+        "p99": 8.0
+      },
+      "tiles": 4096,
+      "token_block": 8,
+      "total_group_segments": 1057966,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 384,
+      "max_segment_count_per_tile": {
+        "count": 1664,
+        "max": 8.0,
+        "mean": 5.7686298076923075,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "nonempty_tiles": 1664,
+      "pair_weighted_segment_count_mean": 2.763135735509606,
+      "pairs_per_tile": {
+        "count": 1664,
+        "max": 1024.0,
+        "mean": 944.9230769230769,
+        "min": 6.0,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 326109,
+        "count_gt32": 0,
+        "count_le16": 776827,
+        "count_le2": 572041,
+        "count_le32": 776827,
+        "count_le4": 745339,
+        "count_le8": 776827,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.027785126994464344,
+        "pairs": 1572352,
+        "segments": 776827
+      },
+      "segment_count_per_group": {
+        "count": 776827,
+        "max": 8.0,
+        "mean": 2.0240697092145354,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 4.0,
+        "p99": 7.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 776827,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 776827,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 776827,
+          "max": 8.0,
+          "mean": 2.0240697092145354,
+          "min": 1.0,
+          "p50": 2.0,
+          "p90": 4.0,
+          "p99": 7.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 1664,
+        "max": 691.0,
+        "mean": 466.84314903846155,
+        "min": 2.0,
+        "p50": 516.0,
+        "p90": 648.0,
+        "p99": 677.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 2.0240697092145354,
+      "tile_p50_segment_count": {
+        "count": 1664,
+        "max": 8.0,
+        "mean": 2.214543269230769,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 4.0,
+        "p99": 8.0
+      },
+      "tile_p90_segment_count": {
+        "count": 1664,
+        "max": 8.0,
+        "mean": 3.6875,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 5.0,
+        "p99": 8.0
+      },
+      "tiles": 2048,
+      "token_block": 8,
+      "total_group_segments": 776827,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 128,
+      "max_segment_count_per_tile": {
+        "count": 896,
+        "max": 8.0,
+        "mean": 7.178571428571429,
+        "min": 1.0,
+        "p50": 7.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "nonempty_tiles": 896,
+      "pair_weighted_segment_count_mean": 4.2350453333604685,
+      "pairs_per_tile": {
+        "count": 896,
+        "max": 2048.0,
+        "mean": 1754.857142857143,
+        "min": 6.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 74806,
+        "count_gt32": 0,
+        "count_le16": 483580,
+        "count_le2": 189369,
+        "count_le32": 483580,
+        "count_le4": 384917,
+        "count_le8": 483580,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.11112524422012374,
+        "pairs": 1572352,
+        "segments": 483580
+      },
+      "segment_count_per_group": {
+        "count": 483580,
+        "max": 8.0,
+        "mean": 3.2514826915918773,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 6.0,
+        "p99": 8.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 483580,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 483580,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 483580,
+          "max": 8.0,
+          "mean": 3.2514826915918773,
+          "min": 1.0,
+          "p50": 3.0,
+          "p90": 6.0,
+          "p99": 8.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 896,
+        "max": 934.0,
+        "mean": 539.7098214285714,
+        "min": 2.0,
+        "p50": 571.5,
+        "p90": 863.0,
+        "p99": 914.0
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 3.2514826915918773,
+      "tile_p50_segment_count": {
+        "count": 896,
+        "max": 8.0,
+        "mean": 3.880580357142857,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "tile_p90_segment_count": {
+        "count": 896,
+        "max": 8.0,
+        "mean": 5.322544642857143,
+        "min": 1.0,
+        "p50": 5.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "tiles": 1024,
+      "token_block": 8,
+      "total_group_segments": 483580,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 512,
+        "max": 8.0,
+        "mean": 7.994140625,
+        "min": 5.0,
+        "p50": 8.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "nonempty_tiles": 512,
+      "pair_weighted_segment_count_mean": 6.563300075301205,
+      "pairs_per_tile": {
+        "count": 512,
+        "max": 4096.0,
+        "mean": 3071.0,
+        "min": 6.0,
+        "p50": 4091.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 2162,
+        "count_gt32": 0,
+        "count_le16": 262406,
+        "count_le2": 9441,
+        "count_le32": 262406,
+        "count_le4": 62272,
+        "count_le8": 262406,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.442282644089873,
+        "pairs": 1572352,
+        "segments": 262406
+      },
+      "segment_count_per_group": {
+        "count": 262406,
+        "max": 8.0,
+        "mean": 5.992058108427399,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 262406,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 262406,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 262406,
+          "max": 8.0,
+          "mean": 5.992058108427399,
+          "min": 1.0,
+          "p50": 6.0,
+          "p90": 8.0,
+          "p99": 8.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 512,
+        "max": 1020.0,
+        "mean": 512.51171875,
+        "min": 2.0,
+        "p50": 513.0,
+        "p90": 919.7,
+        "p99": 1008.78
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 5.992058108427399,
+      "tile_p50_segment_count": {
+        "count": 512,
+        "max": 8.0,
+        "mean": 6.79296875,
+        "min": 4.0,
+        "p50": 8.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "tile_p90_segment_count": {
+        "count": 512,
+        "max": 8.0,
+        "mean": 7.49609375,
+        "min": 1.0,
+        "p50": 8.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "tiles": 512,
+      "token_block": 8,
+      "total_group_segments": 262406,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 448,
+      "max_segment_count_per_tile": {
+        "count": 1600,
+        "max": 16.0,
+        "mean": 6.71625,
+        "min": 2.0,
+        "p50": 6.0,
+        "p90": 9.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 1600,
+      "pair_weighted_segment_count_mean": 2.987591836942364,
+      "pairs_per_tile": {
+        "count": 1600,
+        "max": 1024.0,
+        "mean": 982.72,
+        "min": 28.0,
+        "p50": 1024.0,
+        "p90": 1024.0,
+        "p99": 1024.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 314856,
+        "count_gt32": 0,
+        "count_le16": 754460,
+        "count_le2": 546173,
+        "count_le32": 754460,
+        "count_le4": 716250,
+        "count_le8": 751379,
+        "pair_share_ge16": 0.005586535330511234,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.03230955918267665,
+        "pairs": 1572352,
+        "segments": 754460
+      },
+      "segment_count_per_group": {
+        "count": 754460,
+        "max": 16.0,
+        "mean": 2.084076027887496,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 4.0,
+        "p99": 7.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 754460,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 754460,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 754460,
+          "max": 16.0,
+          "mean": 2.084076027887496,
+          "min": 1.0,
+          "p50": 2.0,
+          "p90": 4.0,
+          "p99": 7.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 1600,
+        "max": 679.0,
+        "mean": 471.5375,
+        "min": 4.0,
+        "p50": 513.0,
+        "p90": 635.0,
+        "p99": 665.0
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 2.084076027887496,
+      "tile_p50_segment_count": {
+        "count": 1600,
+        "max": 16.0,
+        "mean": 2.279375,
+        "min": 1.0,
+        "p50": 2.0,
+        "p90": 4.0,
+        "p99": 15.009999999999991
+      },
+      "tile_p90_segment_count": {
+        "count": 1600,
+        "max": 16.0,
+        "mean": 4.01,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 6.0,
+        "p99": 16.0
+      },
+      "tiles": 2048,
+      "token_block": 16,
+      "total_group_segments": 754460,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 192,
+      "max_segment_count_per_tile": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 9.334134615384615,
+        "min": 2.0,
+        "p50": 9.0,
+        "p90": 13.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 832,
+      "pair_weighted_segment_count_mean": 4.775733423559101,
+      "pairs_per_tile": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1889.8461538461538,
+        "min": 28.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 78048,
+        "count_gt32": 0,
+        "count_le16": 466675,
+        "count_le2": 186544,
+        "count_le32": 466675,
+        "count_le4": 362044,
+        "count_le8": 454439,
+        "pair_share_ge16": 0.023200911755128624,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.12665866167372192,
+        "pairs": 1572352,
+        "segments": 466675
+      },
+      "segment_count_per_group": {
+        "count": 466675,
+        "max": 16.0,
+        "mean": 3.3692655488294854,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 6.0,
+        "p99": 11.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 466675,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 466675,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 466675,
+          "max": 16.0,
+          "mean": 3.3692655488294854,
+          "min": 1.0,
+          "p50": 3.0,
+          "p90": 6.0,
+          "p99": 11.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 832,
+        "max": 920.0,
+        "mean": 560.9074519230769,
+        "min": 4.0,
+        "p50": 595.0,
+        "p90": 849.0,
+        "p99": 902.6899999999999
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 3.3692655488294854,
+      "tile_p50_segment_count": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 4.115384615384615,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 7.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 6.1766826923076925,
+        "min": 1.0,
+        "p50": 5.0,
+        "p90": 10.0,
+        "p99": 16.0
+      },
+      "tiles": 1024,
+      "token_block": 16,
+      "total_group_segments": 466675,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 64,
+      "max_segment_count_per_tile": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 12.580357142857142,
+        "min": 2.0,
+        "p50": 12.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 448,
+      "pair_weighted_segment_count_mean": 7.9245919488765875,
+      "pairs_per_tile": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3509.714285714286,
+        "min": 28.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 5893,
+        "count_gt32": 0,
+        "count_le16": 252710,
+        "count_le2": 19862,
+        "count_le32": 252710,
+        "count_le4": 81326,
+        "count_le8": 206767,
+        "pair_share_ge16": 0.09418756105503094,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.4456648384076848,
+        "pairs": 1572352,
+        "segments": 252710
+      },
+      "segment_count_per_group": {
+        "count": 252710,
+        "max": 16.0,
+        "mean": 6.221961932650073,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 10.0,
+        "p99": 16.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 252710,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 252710,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 252710,
+          "max": 16.0,
+          "mean": 6.221961932650073,
+          "min": 1.0,
+          "p50": 6.0,
+          "p90": 10.0,
+          "p99": 16.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 448,
+        "max": 1016.0,
+        "mean": 564.0848214285714,
+        "min": 4.0,
+        "p50": 577.5,
+        "p90": 930.0,
+        "p99": 1004.0
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 6.221961932650073,
+      "tile_p50_segment_count": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 7.703125,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 9.741071428571429,
+        "min": 1.0,
+        "p50": 9.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tiles": 512,
+      "token_block": 16,
+      "total_group_segments": 252710,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 15.72265625,
+        "min": 13.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 256,
+      "pair_weighted_segment_count_mean": 12.911607578964507,
+      "pairs_per_tile": {
+        "count": 256,
+        "max": 8192.0,
+        "mean": 6142.0,
+        "min": 28.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 233,
+        "count_gt32": 0,
+        "count_le16": 131545,
+        "count_le2": 276,
+        "count_le32": 131545,
+        "count_le4": 1153,
+        "count_le8": 23528,
+        "pair_share_ge16": 0.37893804949527843,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.9475384646694888,
+        "pairs": 1572352,
+        "segments": 131545
+      },
+      "segment_count_per_group": {
+        "count": 131545,
+        "max": 16.0,
+        "mean": 11.952959063438367,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 131545,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 131545,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 131545,
+          "max": 16.0,
+          "mean": 11.952959063438367,
+          "min": 1.0,
+          "p50": 12.0,
+          "p90": 16.0,
+          "p99": 16.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 256,
+        "max": 1024.0,
+        "mean": 513.84765625,
+        "min": 4.0,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.8
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 11.952959063438367,
+      "tile_p50_segment_count": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 13.5546875,
+        "min": 8.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 14.578125,
+        "min": 9.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tiles": 256,
+      "token_block": 16,
+      "total_group_segments": 131545,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 224,
+      "max_segment_count_per_tile": {
+        "count": 800,
+        "max": 32.0,
+        "mean": 10.5625,
+        "min": 3.0,
+        "p50": 9.0,
+        "p90": 15.0,
+        "p99": 31.00999999999999
+      },
+      "nonempty_tiles": 800,
+      "pair_weighted_segment_count_mean": 5.0936406097362426,
+      "pairs_per_tile": {
+        "count": 800,
+        "max": 2048.0,
+        "mean": 1965.44,
+        "min": 120.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 79448,
+        "count_gt32": 0,
+        "count_le16": 457349,
+        "count_le2": 184872,
+        "count_le32": 458649,
+        "count_le4": 351322,
+        "count_le8": 444368,
+        "pair_share_ge16": 0.022088565410289807,
+        "pair_share_ge32": 0.0047215890589384565,
+        "pair_share_ge8": 0.14848265528329535,
+        "pairs": 1572352,
+        "segments": 458649
+      },
+      "segment_count_per_group": {
+        "count": 458649,
+        "max": 32.0,
+        "mean": 3.428225069715621,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 6.0,
+        "p99": 12.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 458649,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 458649,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 458649,
+          "max": 32.0,
+          "mean": 3.428225069715621,
+          "min": 1.0,
+          "p50": 3.0,
+          "p90": 6.0,
+          "p99": 12.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 800,
+        "max": 908.0,
+        "mean": 573.31125,
+        "min": 8.0,
+        "p50": 605.5,
+        "p90": 841.1,
+        "p99": 892.02
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 3.428225069715621,
+      "tile_p50_segment_count": {
+        "count": 800,
+        "max": 32.0,
+        "mean": 4.2375,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 7.0,
+        "p99": 27.029999999999973
+      },
+      "tile_p90_segment_count": {
+        "count": 800,
+        "max": 32.0,
+        "mean": 6.655,
+        "min": 1.0,
+        "p50": 5.0,
+        "p90": 10.0,
+        "p99": 30.00999999999999
+      },
+      "tiles": 1024,
+      "token_block": 32,
+      "total_group_segments": 458649,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 96,
+      "max_segment_count_per_tile": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 15.576923076923077,
+        "min": 3.0,
+        "p50": 14.0,
+        "p90": 22.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 416,
+      "pair_weighted_segment_count_mean": 8.78641042209378,
+      "pairs_per_tile": {
+        "count": 416,
+        "max": 4096.0,
+        "mean": 3779.6923076923076,
+        "min": 120.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 6966,
+        "count_gt32": 0,
+        "count_le16": 241576,
+        "count_le2": 22842,
+        "count_le32": 246905,
+        "count_le4": 82844,
+        "count_le8": 197052,
+        "pair_share_ge16": 0.09042377279387821,
+        "pair_share_ge32": 0.020840117225659396,
+        "pair_share_ge8": 0.4854033956773038,
+        "pairs": 1572352,
+        "segments": 246905
+      },
+      "segment_count_per_group": {
+        "count": 246905,
+        "max": 32.0,
+        "mean": 6.368246896579656,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 11.0,
+        "p99": 21.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 246905,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 246905,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 246905,
+          "max": 32.0,
+          "mean": 6.368246896579656,
+          "min": 1.0,
+          "p50": 6.0,
+          "p90": 11.0,
+          "p99": 21.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 416,
+        "max": 1015.0,
+        "mean": 593.5216346153846,
+        "min": 8.0,
+        "p50": 610.5,
+        "p90": 932.5,
+        "p99": 1000.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 6.368246896579656,
+      "tile_p50_segment_count": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 8.194711538461538,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 14.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 11.134615384615385,
+        "min": 2.0,
+        "p50": 9.0,
+        "p90": 18.0,
+        "p99": 32.0
+      },
+      "tiles": 512,
+      "token_block": 32,
+      "total_group_segments": 246905,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 32,
+      "max_segment_count_per_tile": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 22.571428571428573,
+        "min": 3.0,
+        "p50": 21.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 224,
+      "pair_weighted_segment_count_mean": 15.284437581406708,
+      "pairs_per_tile": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 524,
+        "count_gt32": 0,
+        "count_le16": 106420,
+        "count_le2": 1110,
+        "count_le32": 127436,
+        "count_le4": 4045,
+        "count_le8": 32111,
+        "pair_share_ge16": 0.35711023994627156,
+        "pair_share_ge32": 0.08647427548029958,
+        "pair_share_ge8": 0.9218114010094431,
+        "pairs": 1572352,
+        "segments": 127436
+      },
+      "segment_count_per_group": {
+        "count": 127436,
+        "max": 32.0,
+        "mean": 12.338365924856399,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 19.0,
+        "p99": 32.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 127436,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 127436,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 127436,
+          "max": 32.0,
+          "mean": 12.338365924856399,
+          "min": 1.0,
+          "p50": 11.0,
+          "p90": 19.0,
+          "p99": 32.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 12.338365924856399,
+      "tile_p50_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 15.366071428571429,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 18.294642857142858,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "total_group_segments": 127436,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 30.453125,
+        "min": 24.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 128,
+      "pair_weighted_segment_count_mean": 25.579777301774666,
+      "pairs_per_tile": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 115,
+        "count_gt32": 0,
+        "count_le16": 9021,
+        "count_le2": 120,
+        "count_le32": 66029,
+        "count_le4": 172,
+        "count_le8": 353,
+        "pair_share_ge16": 0.9493561238196028,
+        "pair_share_ge32": 0.35116818625854773,
+        "pair_share_ge8": 0.9993226707505698,
+        "pairs": 1572352,
+        "segments": 66029
+      },
+      "segment_count_per_group": {
+        "count": 66029,
+        "max": 32.0,
+        "mean": 23.813051840857806,
+        "min": 1.0,
+        "p50": 23.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 66029,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 66029,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 66029,
+          "max": 32.0,
+          "mean": 23.813051840857806,
+          "min": 1.0,
+          "p50": 23.0,
+          "p90": 32.0,
+          "p99": 32.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "tile_p50_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 26.984375,
+        "min": 16.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 28.546875,
+        "min": 20.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "total_group_segments": 66029,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 112,
+      "max_segment_count_per_tile": {
+        "count": 400,
+        "max": 64.0,
+        "mean": 17.2625,
+        "min": 5.0,
+        "p50": 15.0,
+        "p90": 25.0,
+        "p99": 61.00999999999999
+      },
+      "nonempty_tiles": 400,
+      "pair_weighted_segment_count_mean": 9.268230014653208,
+      "pairs_per_tile": {
+        "count": 400,
+        "max": 4096.0,
+        "mean": 3930.88,
+        "min": 496.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 7727,
+        "count_gt32": 598,
+        "count_le16": 238619,
+        "count_le2": 24412,
+        "count_le32": 244010,
+        "count_le4": 84078,
+        "count_le8": 193340,
+        "pair_share_ge16": 0.10331083625040703,
+        "pair_share_ge32": 0.018523205999674372,
+        "pair_share_ge8": 0.5014615048029958,
+        "pairs": 1572352,
+        "segments": 244608
+      },
+      "segment_count_per_group": {
+        "count": 244608,
+        "max": 64.0,
+        "mean": 6.428048142333856,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 11.0,
+        "p99": 21.929999999993015
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 244608,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 244608,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 244608,
+          "max": 64.0,
+          "mean": 6.428048142333856,
+          "min": 1.0,
+          "p50": 6.0,
+          "p90": 11.0,
+          "p99": 21.929999999993015
+        }
+      },
+      "segments_per_tile": {
+        "count": 400,
+        "max": 1008.0,
+        "mean": 611.52,
+        "min": 16.0,
+        "p50": 628.5,
+        "p90": 933.4000000000001,
+        "p99": 1002.02
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 6.428048142333856,
+      "tile_p50_segment_count": {
+        "count": 400,
+        "max": 64.0,
+        "mean": 8.3825,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 14.0,
+        "p99": 47.08999999999992
+      },
+      "tile_p90_segment_count": {
+        "count": 400,
+        "max": 64.0,
+        "mean": 11.885,
+        "min": 3.0,
+        "p50": 9.0,
+        "p90": 19.0,
+        "p99": 53.069999999999936
+      },
+      "tiles": 512,
+      "token_block": 64,
+      "total_group_segments": 244608,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 48,
+      "max_segment_count_per_tile": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 26.89903846153846,
+        "min": 6.0,
+        "p50": 23.0,
+        "p90": 41.30000000000001,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 208,
+      "pair_weighted_segment_count_mean": 16.745965280039076,
+      "pairs_per_tile": {
+        "count": 208,
+        "max": 8192.0,
+        "mean": 7559.384615384615,
+        "min": 496.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 627,
+        "count_gt32": 2444,
+        "count_le16": 102002,
+        "count_le2": 1409,
+        "count_le32": 122663,
+        "count_le4": 5067,
+        "count_le8": 33518,
+        "pair_share_ge16": 0.3973486852816672,
+        "pair_share_ge32": 0.07663233169163139,
+        "pair_share_ge8": 0.9177086301286226,
+        "pairs": 1572352,
+        "segments": 125107
+      },
+      "segment_count_per_group": {
+        "count": 125107,
+        "max": 64.0,
+        "mean": 12.568057742572359,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 20.0,
+        "p99": 41.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 125107,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 125107,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 125107,
+          "max": 64.0,
+          "mean": 12.568057742572359,
+          "min": 1.0,
+          "p50": 11.0,
+          "p90": 20.0,
+          "p99": 41.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 208,
+        "max": 1023.0,
+        "mean": 601.4759615384615,
+        "min": 16.0,
+        "p50": 614.5,
+        "p90": 942.0,
+        "p99": 1022.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 12.568057742572359,
+      "tile_p50_segment_count": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 16.317307692307693,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 28.30000000000001,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 20.591346153846153,
+        "min": 3.0,
+        "p50": 17.0,
+        "p90": 34.30000000000001,
+        "p99": 64.0
+      },
+      "tiles": 256,
+      "token_block": 64,
+      "total_group_segments": 125107,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 16,
+      "max_segment_count_per_tile": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 41.044642857142854,
+        "min": 7.0,
+        "p50": 37.5,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 112,
+      "pair_weighted_segment_count_mean": 29.911003388554217,
+      "pairs_per_tile": {
+        "count": 112,
+        "max": 16384.0,
+        "mean": 14038.857142857143,
+        "min": 496.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 182,
+        "count_gt32": 9779,
+        "count_le16": 12985,
+        "count_le2": 309,
+        "count_le32": 54482,
+        "count_le4": 626,
+        "count_le8": 1406,
+        "pair_share_ge16": 0.9236621316346467,
+        "pair_share_ge32": 0.3088907572859004,
+        "pair_share_ge8": 0.9970477348583523,
+        "pairs": 1572352,
+        "segments": 64261
+      },
+      "segment_count_per_group": {
+        "count": 64261,
+        "max": 64.0,
+        "mean": 24.468215558425793,
+        "min": 1.0,
+        "p50": 22.0,
+        "p90": 37.0,
+        "p99": 64.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 64261,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 64261,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 64261,
+          "max": 64.0,
+          "mean": 24.468215558425793,
+          "min": 1.0,
+          "p50": 22.0,
+          "p90": 37.0,
+          "p99": 64.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 112,
+        "max": 1024.0,
+        "mean": 573.7589285714286,
+        "min": 16.0,
+        "p50": 583.5,
+        "p90": 940.4000000000001,
+        "p99": 1021.24
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 24.468215558425793,
+      "tile_p50_segment_count": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 30.571428571428573,
+        "min": 2.0,
+        "p50": 25.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 34.919642857142854,
+        "min": 4.0,
+        "p50": 30.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tiles": 128,
+      "token_block": 64,
+      "total_group_segments": 64261,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 59.171875,
+        "min": 44.0,
+        "p50": 64.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 64,
+      "pair_weighted_segment_count_mean": 50.79074024137089,
+      "pairs_per_tile": {
+        "count": 64,
+        "max": 32768.0,
+        "mean": 24568.0,
+        "min": 496.0,
+        "p50": 32504.0,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 62,
+        "count_gt32": 29595,
+        "count_le16": 328,
+        "count_le2": 65,
+        "count_le32": 3679,
+        "count_le4": 95,
+        "count_le8": 165,
+        "pair_share_ge16": 0.9985047877320091,
+        "pair_share_ge32": 0.9519624104526213,
+        "pair_share_ge8": 0.9996883649462716,
+        "pairs": 1572352,
+        "segments": 33274
+      },
+      "segment_count_per_group": {
+        "count": 33274,
+        "max": 64.0,
+        "mean": 47.254673318506946,
+        "min": 1.0,
+        "p50": 45.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 33274,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 33274,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 33274,
+          "max": 64.0,
+          "mean": 47.254673318506946,
+          "min": 1.0,
+          "p50": 45.0,
+          "p90": 64.0,
+          "p99": 64.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 64,
+        "max": 1024.0,
+        "mean": 519.90625,
+        "min": 16.0,
+        "p50": 520.0,
+        "p90": 922.5,
+        "p99": 1013.29
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 47.254673318506946,
+      "tile_p50_segment_count": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 53.6875,
+        "min": 32.0,
+        "p50": 62.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 56.171875,
+        "min": 37.0,
+        "p50": 63.5,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tiles": 64,
+      "token_block": 64,
+      "total_group_segments": 33274,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 56,
+      "max_segment_count_per_tile": {
+        "count": 200,
+        "max": 128.0,
+        "mean": 29.355,
+        "min": 12.0,
+        "p50": 25.0,
+        "p90": 43.099999999999994,
+        "p99": 113.11999999999989
+      },
+      "nonempty_tiles": 200,
+      "pair_weighted_segment_count_mean": 17.442009168430477,
+      "pairs_per_tile": {
+        "count": 200,
+        "max": 8192.0,
+        "mean": 7861.76,
+        "min": 2016.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 631,
+        "count_gt32": 2681,
+        "count_le16": 100900,
+        "count_le2": 1556,
+        "count_le32": 122081,
+        "count_le4": 5938,
+        "count_le8": 34841,
+        "pair_share_ge16": 0.41044562540703355,
+        "pair_share_ge32": 0.0848868446760013,
+        "pair_share_ge8": 0.9131358627075871,
+        "pairs": 1572352,
+        "segments": 124762
+      },
+      "segment_count_per_group": {
+        "count": 124762,
+        "max": 128.0,
+        "mean": 12.602811753578814,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 20.0,
+        "p99": 41.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 124762,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 124762,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 124762,
+          "max": 128.0,
+          "mean": 12.602811753578814,
+          "min": 1.0,
+          "p50": 11.0,
+          "p90": 20.0,
+          "p99": 41.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 200,
+        "max": 1021.0,
+        "mean": 623.81,
+        "min": 32.0,
+        "p50": 637.0,
+        "p90": 955.0,
+        "p99": 1021.0
+      },
+      "selected_block": 64,
+      "tile_local_write_reduction_x": 12.602811753578814,
+      "tile_p50_segment_count": {
+        "count": 200,
+        "max": 128.0,
+        "mean": 16.585,
+        "min": 4.0,
+        "p50": 12.0,
+        "p90": 27.19999999999999,
+        "p99": 71.29999999999973
+      },
+      "tile_p90_segment_count": {
+        "count": 200,
+        "max": 128.0,
+        "mean": 21.805,
+        "min": 8.0,
+        "p50": 17.0,
+        "p90": 34.19999999999999,
+        "p99": 109.0
+      },
+      "tiles": 256,
+      "token_block": 128,
+      "total_group_segments": 124762,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 24,
+      "max_segment_count_per_tile": {
+        "count": 104,
+        "max": 128.0,
+        "mean": 48.04807692307692,
+        "min": 13.0,
+        "p50": 41.0,
+        "p90": 74.4,
+        "p99": 128.0
+      },
+      "nonempty_tiles": 104,
+      "pair_weighted_segment_count_mean": 32.418737025805925,
+      "pairs_per_tile": {
+        "count": 104,
+        "max": 16384.0,
+        "mean": 15118.76923076923,
+        "min": 2016.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 160,
+        "count_gt32": 10904,
+        "count_le16": 14063,
+        "count_le2": 319,
+        "count_le32": 52563,
+        "count_le4": 762,
+        "count_le8": 1866,
+        "pair_share_ge16": 0.9160029052018887,
+        "pair_share_ge32": 0.3466704656463693,
+        "pair_share_ge8": 0.9957464995115598,
+        "pairs": 1572352,
+        "segments": 63467
+      },
+      "segment_count_per_group": {
+        "count": 63467,
+        "max": 128.0,
+        "mean": 24.77432366426647,
+        "min": 1.0,
+        "p50": 22.0,
+        "p90": 38.0,
+        "p99": 80.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 63467,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 63467,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 63467,
+          "max": 128.0,
+          "mean": 24.77432366426647,
+          "min": 1.0,
+          "p50": 22.0,
+          "p90": 38.0,
+          "p99": 80.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 104,
+        "max": 1023.0,
+        "mean": 610.2596153846154,
+        "min": 32.0,
+        "p50": 622.5,
+        "p90": 956.7,
+        "p99": 1022.97
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 24.77432366426647,
+      "tile_p50_segment_count": {
+        "count": 104,
+        "max": 128.0,
+        "mean": 32.36538461538461,
+        "min": 5.0,
+        "p50": 24.5,
+        "p90": 57.20000000000002,
+        "p99": 128.0
+      },
+      "tile_p90_segment_count": {
+        "count": 104,
+        "max": 128.0,
+        "mean": 38.875,
+        "min": 8.0,
+        "p50": 31.0,
+        "p90": 64.80000000000001,
+        "p99": 128.0
+      },
+      "tiles": 128,
+      "token_block": 128,
+      "total_group_segments": 63467,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 8,
+      "max_segment_count_per_tile": {
+        "count": 56,
+        "max": 128.0,
+        "mean": 76.64285714285714,
+        "min": 18.0,
+        "p50": 68.0,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "nonempty_tiles": 56,
+      "pair_weighted_segment_count_mean": 58.80575341908173,
+      "pairs_per_tile": {
+        "count": 56,
+        "max": 32768.0,
+        "mean": 28077.714285714286,
+        "min": 2016.0,
+        "p50": 32768.0,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 59,
+        "count_gt32": 26929,
+        "count_le16": 937,
+        "count_le2": 89,
+        "count_le32": 5675,
+        "count_le4": 197,
+        "count_le8": 501,
+        "pair_share_ge16": 0.9955359868528166,
+        "pair_share_ge32": 0.9268051937479649,
+        "pair_share_ge8": 0.9988545821800716,
+        "pairs": 1572352,
+        "segments": 32604
+      },
+      "segment_count_per_group": {
+        "count": 32604,
+        "max": 128.0,
+        "mean": 48.22573917310759,
+        "min": 1.0,
+        "p50": 43.0,
+        "p90": 72.0,
+        "p99": 128.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 32604,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 32604,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 32604,
+          "max": 128.0,
+          "mean": 48.22573917310759,
+          "min": 1.0,
+          "p50": 43.0,
+          "p90": 72.0,
+          "p99": 128.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 56,
+        "max": 1024.0,
+        "mean": 582.2142857142857,
+        "min": 32.0,
+        "p50": 591.5,
+        "p90": 942.0,
+        "p99": 1023.45
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 48.22573917310759,
+      "tile_p50_segment_count": {
+        "count": 56,
+        "max": 128.0,
+        "mean": 60.44642857142857,
+        "min": 7.0,
+        "p50": 49.5,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "tile_p90_segment_count": {
+        "count": 56,
+        "max": 128.0,
+        "mean": 67.41071428571429,
+        "min": 11.0,
+        "p50": 57.5,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "tiles": 64,
+      "token_block": 128,
+      "total_group_segments": 32604,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 32,
+        "max": 128.0,
+        "mean": 115.9375,
+        "min": 84.0,
+        "p50": 126.5,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "nonempty_tiles": 32,
+      "pair_weighted_segment_count_mean": 100.71517700871051,
+      "pairs_per_tile": {
+        "count": 32,
+        "max": 65536.0,
+        "mean": 49136.0,
+        "min": 2016.0,
+        "p50": 64496.0,
+        "p90": 65536.0,
+        "p99": 65536.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 32,
+        "count_gt32": 16566,
+        "count_le16": 166,
+        "count_le2": 35,
+        "count_le32": 328,
+        "count_le4": 53,
+        "count_le8": 87,
+        "pair_share_ge16": 0.9992762434874634,
+        "pair_share_ge32": 0.9968575738765875,
+        "pair_share_ge8": 0.9998403665337023,
+        "pairs": 1572352,
+        "segments": 16894
+      },
+      "segment_count_per_group": {
+        "count": 16894,
+        "max": 128.0,
+        "mean": 93.07162306144193,
+        "min": 1.0,
+        "p50": 89.0,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 16894,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 16894,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 16894,
+          "max": 128.0,
+          "mean": 93.07162306144193,
+          "min": 1.0,
+          "p50": 89.0,
+          "p90": 128.0,
+          "p99": 128.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 32,
+        "max": 1024.0,
+        "mean": 527.9375,
+        "min": 32.0,
+        "p50": 528.0,
+        "p90": 923.9000000000001,
+        "p99": 1014.08
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 93.07162306144193,
+      "tile_p50_segment_count": {
+        "count": 32,
+        "max": 128.0,
+        "mean": 106.3125,
+        "min": 65.0,
+        "p50": 120.5,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "tile_p90_segment_count": {
+        "count": 32,
+        "max": 128.0,
+        "mean": 110.875,
+        "min": 73.0,
+        "p50": 124.0,
+        "p90": 128.0,
+        "p99": 128.0
+      },
+      "tiles": 32,
+      "token_block": 128,
+      "total_group_segments": 16894,
+      "total_pairs": 1572352
+    }
+  ],
+  "artifact": "actual_li_tile_segment_lengths",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "best_by_write_reduction": {
+    "empty_tiles": 0,
+    "max_segment_count_per_tile": {
+      "count": 32,
+      "max": 128.0,
+      "mean": 115.9375,
+      "min": 84.0,
+      "p50": 126.5,
+      "p90": 128.0,
+      "p99": 128.0
+    },
+    "nonempty_tiles": 32,
+    "pair_weighted_segment_count_mean": 100.71517700871051,
+    "pairs_per_tile": {
+      "count": 32,
+      "max": 65536.0,
+      "mean": 49136.0,
+      "min": 2016.0,
+      "p50": 64496.0,
+      "p90": 65536.0,
+      "p99": 65536.0
+    },
+    "segment_count_histogram": {
+      "count_eq1": 32,
+      "count_gt32": 16566,
+      "count_le16": 166,
+      "count_le2": 35,
+      "count_le32": 328,
+      "count_le4": 53,
+      "count_le8": 87,
+      "pair_share_ge16": 0.9992762434874634,
+      "pair_share_ge32": 0.9968575738765875,
+      "pair_share_ge8": 0.9998403665337023,
+      "pairs": 1572352,
+      "segments": 16894
+    },
+    "segment_count_per_group": {
+      "count": 16894,
+      "max": 128.0,
+      "mean": 93.07162306144193,
+      "min": 1.0,
+      "p50": 89.0,
+      "p90": 128.0,
+      "p99": 128.0
+    },
+    "segment_token_reuse": {
+      "duplicate_token_segment_pair_share": 0.0,
+      "duplicate_token_segment_share": 0.0,
+      "duplicate_token_segments": 0,
+      "max_pairs_per_token_per_segment": {
+        "count": 16894,
+        "max": 1.0,
+        "mean": 1.0,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0
+      },
+      "overall_pair_over_unique_token_x": 1.0,
+      "pair_over_unique_token_per_segment": {
+        "count": 16894,
+        "max": 1.0,
+        "mean": 1.0,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0
+      },
+      "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+      "total_unique_group_tokens": 1572352,
+      "unique_tokens_per_segment": {
+        "count": 16894,
+        "max": 128.0,
+        "mean": 93.07162306144193,
+        "min": 1.0,
+        "p50": 89.0,
+        "p90": 128.0,
+        "p99": 128.0
+      }
+    },
+    "segments_per_tile": {
+      "count": 32,
+      "max": 1024.0,
+      "mean": 527.9375,
+      "min": 32.0,
+      "p50": 528.0,
+      "p90": 923.9000000000001,
+      "p99": 1014.08
+    },
+    "selected_block": 512,
+    "tile_local_write_reduction_x": 93.07162306144193,
+    "tile_p50_segment_count": {
+      "count": 32,
+      "max": 128.0,
+      "mean": 106.3125,
+      "min": 65.0,
+      "p50": 120.5,
+      "p90": 128.0,
+      "p99": 128.0
+    },
+    "tile_p90_segment_count": {
+      "count": 32,
+      "max": 128.0,
+      "mean": 110.875,
+      "min": 73.0,
+      "p50": 124.0,
+      "p90": 128.0,
+      "p99": 128.0
+    },
+    "tiles": 32,
+    "token_block": 128,
+    "total_group_segments": 16894,
+    "total_pairs": 1572352
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "pack_timing_ms": [
+    {
+      "checksum_prefix": 2939192,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.9994109869003296,
+        "mean_ms": 0.7164479891459147,
+        "median_ms": 0.575685977935791,
+        "min_ms": 0.5742470026016235,
+        "samples_ms": [
+          0.9994109869003296,
+          0.575685977935791,
+          0.5742470026016235
+        ],
+        "stdev_ms": 0.24505420060902208
+      },
+      "pairs": 1572352,
+      "peak_memory_allocated_bytes": 1236469760,
+      "peak_memory_allocated_gib": 1.1515522003173828,
+      "segments": 127436,
+      "selected_block": 256,
+      "timed_iters": 3,
+      "token_block": 32,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.0856210719794035,
+        "mean_ms": 0.760667414094011,
+        "median_ms": 0.6006411276757717,
+        "min_ms": 0.5957400426268578,
+        "samples_ms": [
+          1.0856210719794035,
+          0.6006411276757717,
+          0.5957400426268578
+        ],
+        "stdev_ms": 0.28142879203892185
+      },
+      "warmup_iters": 1
+    },
+    {
+      "checksum_prefix": 1472824,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.8520900011062622,
+        "mean_ms": 0.6661413311958313,
+        "median_ms": 0.5818870067596436,
+        "min_ms": 0.5644469857215881,
+        "samples_ms": [
+          0.8520900011062622,
+          0.5818870067596436,
+          0.5644469857215881
+        ],
+        "stdev_ms": 0.16127219061123263
+      },
+      "pairs": 1572352,
+      "peak_memory_allocated_bytes": 1236469760,
+      "peak_memory_allocated_gib": 1.1515522003173828,
+      "segments": 66029,
+      "selected_block": 512,
+      "timed_iters": 3,
+      "token_block": 32,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.8975411765277386,
+        "mean_ms": 0.7041240266213814,
+        "median_ms": 0.620970968157053,
+        "min_ms": 0.5938599351793528,
+        "samples_ms": [
+          0.8975411765277386,
+          0.620970968157053,
+          0.5938599351793528
+        ],
+        "stdev_ms": 0.16805177010583125
+      },
+      "warmup_iters": 1
+    }
+  ],
+  "read": "A group segment is one unique compressed group inside a token x selected tile. The segment count is the number of selected rows that would be reduced before one dKV write. High pair_share_ge16 supports warp/block segmented reduction; many count<=1 segments would mean the route is too sparse to coalesce profitably.",
+  "retained_tiles": [
+    {
+      "empty_tiles": 32,
+      "max_segment_count_per_tile": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 22.571428571428573,
+        "min": 3.0,
+        "p50": 21.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 224,
+      "pair_weighted_segment_count_mean": 15.284437581406708,
+      "pairs_per_tile": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 524,
+        "count_gt32": 0,
+        "count_le16": 106420,
+        "count_le2": 1110,
+        "count_le32": 127436,
+        "count_le4": 4045,
+        "count_le8": 32111,
+        "pair_share_ge16": 0.35711023994627156,
+        "pair_share_ge32": 0.08647427548029958,
+        "pair_share_ge8": 0.9218114010094431,
+        "pairs": 1572352,
+        "segments": 127436
+      },
+      "segment_count_per_group": {
+        "count": 127436,
+        "max": 32.0,
+        "mean": 12.338365924856399,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 19.0,
+        "p99": 32.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 127436,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 127436,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 127436,
+          "max": 32.0,
+          "mean": 12.338365924856399,
+          "min": 1.0,
+          "p50": 11.0,
+          "p90": 19.0,
+          "p99": 32.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 12.338365924856399,
+      "tile_p50_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 15.366071428571429,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 18.294642857142858,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "total_group_segments": 127436,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 30.453125,
+        "min": 24.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 128,
+      "pair_weighted_segment_count_mean": 25.579777301774666,
+      "pairs_per_tile": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 115,
+        "count_gt32": 0,
+        "count_le16": 9021,
+        "count_le2": 120,
+        "count_le32": 66029,
+        "count_le4": 172,
+        "count_le8": 353,
+        "pair_share_ge16": 0.9493561238196028,
+        "pair_share_ge32": 0.35116818625854773,
+        "pair_share_ge8": 0.9993226707505698,
+        "pairs": 1572352,
+        "segments": 66029
+      },
+      "segment_count_per_group": {
+        "count": 66029,
+        "max": 32.0,
+        "mean": 23.813051840857806,
+        "min": 1.0,
+        "p50": 23.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "segment_token_reuse": {
+        "duplicate_token_segment_pair_share": 0.0,
+        "duplicate_token_segment_share": 0.0,
+        "duplicate_token_segments": 0,
+        "max_pairs_per_token_per_segment": {
+          "count": 66029,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "overall_pair_over_unique_token_x": 1.0,
+        "pair_over_unique_token_per_segment": {
+          "count": 66029,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "p50": 1.0,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "read": "Values near 1.0 mean each compressed-group segment has almost one selected row per token. In that case, a group-owned segment CTA has little same-token K reuse and cannot naturally recover the query-major KxH by HxD MFMA schedule.",
+        "total_unique_group_tokens": 1572352,
+        "unique_tokens_per_segment": {
+          "count": 66029,
+          "max": 32.0,
+          "mean": 23.813051840857806,
+          "min": 1.0,
+          "p50": 23.0,
+          "p90": 32.0,
+          "p99": 32.0
+        }
+      },
+      "segments_per_tile": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "tile_p50_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 26.984375,
+        "min": 16.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 28.546875,
+        "min": 20.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "total_group_segments": 66029,
+      "total_pairs": 1572352
+    }
+  ],
+  "scope": "Tile-local compressed-group segment lengths for dKV grouped reducers.",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "analyzed"
+}

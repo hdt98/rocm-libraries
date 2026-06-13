@@ -1,0 +1,77 @@
+{
+  "artifact": "torchtitan_mori_aiter_triton_swiglu_vjp_s4096_preflight_20260602",
+  "created_date": "2026-06-02",
+  "status": "check_config_passed_training_deferred_node_busy",
+  "purpose": "Prove the opt-in Triton SwiGLU owner-rank VJP backend is wired for the normalized 4xMI350 S4096 target slice before running an uncontaminated training smoke.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "check_config_command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+  "check_config": {
+    "status": "pass",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "implementation_status": "direct_dsv4_pytorch_sparse_mla_lightning_indexer_for_compressed_layers_dense_fallback_over_seq_threshold",
+    "shape": "1 64 4096 2",
+    "parallelism": "-1 4",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "dispatcher": "MoriEPTokenDispatcher.Config",
+    "moe_score_before_experts": false,
+    "router_score_func": "sqrtsoftplus",
+    "attention_status_by_layer": [
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "dense_mla_for_uncompressed_dsv4_layer",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+    ],
+    "attention_compress_ratio_by_layer": [
+      0,
+      0,
+      4,
+      128
+    ],
+    "attention_sparse_threshold_by_layer": [
+      512,
+      512,
+      512,
+      512
+    ],
+    "attention_sparse_backward_mode_by_layer": [
+      "manual",
+      "manual",
+      "manual",
+      "manual"
+    ],
+    "li_kl_backend": "pytorch"
+  },
+  "node_state_before_training": {
+    "scratch_free": "37T",
+    "root_free": "1.1T",
+    "training_deferred": true,
+    "reason": "The node had active external workloads on both 4-GPU halves: a Qwen3 fault-tolerance TorchTitan job using ROCR_VISIBLE_DEVICES=4,5,6,7 and a Primus/TorchTitan Qwen3-30B-A3B elastic run with large resident GPU memory on the other half, plus active AITER compilation. Starting a target-shape DSv4 run would contaminate correctness and performance evidence.",
+    "observed_gpu_state_summary": "cards 0-3 had about 54-55% VRAM allocated; card4 was active; rocm-smi reported active Python/pt_elastic PIDs tied to the external containers."
+  },
+  "offline_moe_backward_probe_read": {
+    "direct_triton_xgrad_reduce": {
+      "decision_artifact": "run_artifacts/triton_fused_xgrad_reduce_decision_20260531.json",
+      "s4096_artifact": "run_artifacts/triton_fused_xgrad_reduce_s4096_20260531.json",
+      "best_triton_ms": 75.23686218261719,
+      "torch_padded_xgrad_reduce_ms": 8.939329147338867,
+      "promote": false,
+      "read": "Correct but much slower than padded torch; do not integrate direct FP32 atomic xgrad+reduce."
+    },
+    "simple_triton_w2_dgrad_swiglu": {
+      "decision_artifact": "run_artifacts/triton_fused_w2_dgrad_swiglu_decision_20260531.json",
+      "s4096_artifact": "run_artifacts/triton_fused_w2_dgrad_swiglu_s4096_20260531.json",
+      "best_triton_ms": 9.64948844909668,
+      "torch_padded_w2_dgrad_swiglu_ms": 3.52209210395813,
+      "promote": false,
+      "read": "Correct but slower than padded torch; keep as an oracle for a CK/TileLang grouped training-GEMM schedule."
+    }
+  },
+  "next_action": "When do-sonle5-mi350-gpu is idle, run the normalized 4x S4096 GBS64 full-AC training smoke with CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton. For further MoE closure, avoid the already-negative direct Triton xgrad/W2 schedules and target CK/TileLang or another MFMA-efficient grouped training-GEMM backend for owner-rank wgrad/xgrad."
+}

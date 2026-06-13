@@ -1,0 +1,112 @@
+{
+  "artifact": "torchtitan_direct_dsv4_8xmi350_ckptfree_pgfix_20260601",
+  "purpose": "Record the first checkpoint-free direct TorchTitan DeepSeek-V4 Flash 4-layer 8xMI350 smoke after the dedicated EP ProcessGroup fix.",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_cli_used": false,
+  "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_8xmi350_ckptfree_pgfix_20260601Tdirect11",
+  "runtime": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "visible_devices": "all",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_8xmi350_ckptfree_pgfix_20260601Tdirect11/docker-run.log",
+    "dump_folder": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_4layer_bf16_8xmi350_ckptfree_pgfix_20260601Tdirect11"
+  },
+  "model": {
+    "module": "torchtitan.models.deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "implementation_status": "structural_canary_dense_mla_fallback",
+    "attention_status": "dense_mla_fallback_missing_sparse_mla_indexer"
+  },
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "local_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "seq_len": 4096,
+    "precision": "bf16",
+    "optimizer": "AdamW",
+    "activation_checkpoint": "full",
+    "checkpoint_enable": false,
+    "dedicated_ep_pg": true
+  },
+  "direct_process_group_probe": {
+    "artifact": "run_artifacts/torchtitan_direct_fsdp_ep_pg_probe_8x_20260601.json",
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_8xmi350_pg_probe_20260601Tdirect10",
+    "result": "passed_distinct_fsdp_ep_process_groups",
+    "fsdp_group_is_ep_group_by_rank": [false, false, false, false, false, false, false, false],
+    "fsdp_group_ranks_equal_ep_group_ranks_by_rank": [true, true, true, true, true, true, true, true],
+    "fsdp_all_reduce_sum_by_rank": [28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0],
+    "ep_all_to_all_recv_by_rank": [
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    ]
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.35545,
+      "grad_norm": 11.3125,
+      "memory_gib_range": [41.58, 42.22],
+      "tokens_per_gpu_s_range": [2491, 2501],
+      "reported_tflops_per_gpu_range": [46.85, 47.05],
+      "reported_mfu_pct_range": [15.02, 15.08],
+      "note": "warmup step"
+    },
+    {
+      "step": 2,
+      "loss": 8.87418,
+      "grad_norm": 20.375,
+      "memory_gib_range": [51.50, 52.14],
+      "tokens_per_gpu_s": 11032,
+      "node_tokens_per_s": 88256,
+      "implied_step_time_s_at_gbs128": 5.94,
+      "reported_tflops_per_gpu": 207.53,
+      "reported_mfu_pct": 66.52
+    },
+    {
+      "step": 3,
+      "loss": 13.77514,
+      "grad_norm": 45.25,
+      "memory_gib_range": [51.50, 52.14],
+      "tokens_per_gpu_s_range": [10375, 10376],
+      "node_tokens_per_s_range": [83000, 83008],
+      "implied_step_time_s_at_gbs128_range": [6.31, 6.32],
+      "reported_tflops_per_gpu": 195.18,
+      "reported_mfu_pct": 62.56
+    }
+  ],
+  "health": {
+    "finite_loss": true,
+    "finite_grad_norm": true,
+    "training_completed": true,
+    "process_group_destroyed": true,
+    "checkpoint_directory_created": false
+  },
+  "remote_output_size": "2.7M",
+  "filesystem_after_run": {
+    "filesystem": "/dev/vda1",
+    "used": "1.9T",
+    "available": "108G",
+    "use_pct": 95
+  },
+  "updated_target_comparison": {
+    "user_updated_2026_06_01_target_tokens_per_gpu_s_range": [2200, 2400],
+    "target_step_time_s_at_gbs128_range": [27.3, 29.8],
+    "step2_ratio_to_low_target": 5.01,
+    "step2_ratio_to_high_target": 4.60,
+    "step3_ratio_to_low_target": 4.72,
+    "step3_ratio_to_high_target": 4.32,
+    "caveat": "This is the 4-layer structural dense-MLA fallback canary, so treat throughput as training-system smoke evidence rather than final full 43-layer DeepSeek-V4-Flash sparse-MLA performance."
+  },
+  "dependency_pin_changes": []
+}

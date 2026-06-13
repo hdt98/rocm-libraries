@@ -1,0 +1,64 @@
+{
+  "status": "diagnostic_profile_completed",
+  "scope": "sparse_mla_sharedkv_c4_c128_queryrecompute_boundary_gate",
+  "host": "do-vunguyen-mi350-gpu",
+  "date": "2026-06-06",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "dtype": "bf16",
+    "triton_blocks": {
+      "block_h": 64,
+      "block_d": 128,
+      "c4_block_n": 64,
+      "c128_block_n": 32
+    }
+  },
+  "artifacts": {
+    "c4_layer2": "run_artifacts/sparse_mla_sharedkv_queryrecompute_profile_c4_layer2_h64n64d128_s4096_20260606.json",
+    "c128_layer3": "run_artifacts/sparse_mla_sharedkv_queryrecompute_profile_c128_layer3_h64n32d128_s4096_20260606.json"
+  },
+  "c4_layer2": {
+    "compress_ratio": 4,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "median_ms": {
+      "full": 11.01801586151123,
+      "no_dkv": 1.932217001914978,
+      "dkv_reduce_sink": 2.838665008544922
+    },
+    "deltas_ms": {
+      "full_minus_no_dkv": 9.085798859596252,
+      "sink_minus_no_dkv": 0.9064480066299438,
+      "full_minus_sink_global_dkv_accumulation": 8.179350852966309
+    },
+    "write_model": {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 33806848,
+      "modeled_route_atomic_reduction_x": 23.813051840857806
+    }
+  },
+  "c128_layer3": {
+    "compress_ratio": 128,
+    "topk": 32,
+    "valid_pairs": 63520,
+    "median_ms": {
+      "full": 1.0685689449310303,
+      "no_dkv": 0.5413650274276733,
+      "dkv_reduce_sink": 0.8016870021820068
+    },
+    "deltas_ms": {
+      "full_minus_no_dkv": 0.5272039175033569,
+      "sink_minus_no_dkv": 0.2603219747543335,
+      "full_minus_sink_global_dkv_accumulation": 0.26688194274902344
+    },
+    "write_model": {
+      "baseline_atomic_add_elements": 32522240,
+      "coalesced_atomic_add_elements": 1032192,
+      "modeled_route_atomic_reduction_x": 31.50793650793651
+    }
+  },
+  "read": "C4 is dominated by compressed dKV global accumulation even though the no-dKV query-major producer is already fast. C128 is not the sparse-attention backward wall at this boundary. Keep C128 sparse enabled, keep C4 guarded until the C4 dKV compressed-group accumulation epilogue is rewritten, and do not spend more effort on LI/KL or whole-query-recompute attribution as the first C4 lever."
+}

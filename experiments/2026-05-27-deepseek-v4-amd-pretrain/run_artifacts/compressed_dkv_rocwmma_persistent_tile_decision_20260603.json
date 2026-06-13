@@ -1,0 +1,92 @@
+{
+  "artifact": "compressed_dkv_rocwmma_persistent_tile_decision_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Actual LightningIndexer layer-2 compressed dKV ScatterAdd rewrite probe on 1xMI350.",
+  "status": "s128_s512_positive_but_s4096_persistent_cta_rejected",
+  "source_tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "operator_contract": {
+    "sasg_stage": "ScatterAdd",
+    "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} grad_logits[token,h,k] * scale * q[token,h,d] + probs[token,h,k] * grad_output[token,h,d]",
+    "probe_body": "One CTA owns seq_chunk x selected_block x D16, computes K16xD16 contribution tiles with rocWMMA, accumulates duplicate compressed groups in LDS, then emits one global atomic row per touched compressed group and D16 tile.",
+    "diagnostic_limit": "Consumes materialized probs and grad_logits. It isolates the compressed dKV accumulator and is not the final fused sparse-MLA/LI backward."
+  },
+  "source_artifacts": {
+    "s128_parity": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s128_layer2_sb256_20260603.json",
+    "s512_gate": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s512_layer2_sb256_20260603.json",
+    "s4096_32x256_timing": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sb256_timing_20260603.json",
+    "s4096_32x512_timing": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sb512_timing_20260603.json",
+    "next_contract": "run_artifacts/compressed_dkv_mfma_segmented_reducer_next_contract_20260602.json",
+    "sasg_mapping": "run_artifacts/sasg_overlap_dkv_scatter_mapping_20260603.json"
+  },
+  "results": {
+    "s128_32x256": {
+      "status": "passed",
+      "max_abs_diff": 0.06327629089355469,
+      "median_ms": 0.2805219888687134,
+      "pytorch_reference_dkv_median_ms": 0.46864399313926697,
+      "route_atomic_reduction_x": 25.2
+    },
+    "s512_32x256": {
+      "status": "passed",
+      "max_abs_diff": 0.06702613830566406,
+      "median_ms": 1.513255000114441,
+      "pytorch_reference_dkv_median_ms": 1.5837359428405762,
+      "rejected_scalar_local_gate_ms": 3.081876039505005,
+      "passes_s512_gate": true,
+      "route_atomic_reduction_x": 30.0
+    },
+    "s4096_32x256": {
+      "status": "timing_only",
+      "median_ms": 132.95367431640625,
+      "sparse_atomic_wall_gate_ms": 8.80629825592041,
+      "passes_s4096_gate": false,
+      "route_atomic_reduction_x": 12.338365924856399,
+      "coalesced_atomic_add_elements": 65247232
+    },
+    "s4096_32x512": {
+      "status": "timing_only",
+      "median_ms": 136.08460998535156,
+      "sparse_atomic_wall_gate_ms": 8.80629825592041,
+      "passes_s4096_gate": false,
+      "route_atomic_reduction_x": 23.813051840857806,
+      "coalesced_atomic_add_elements": 33806848
+    }
+  },
+  "decision": {
+    "retain": [
+      "The rocWMMA contribution microtile plus LDS grouped accumulation contract is correct and fast at S128/S512.",
+      "The S512 result is the first compressed-dKV coalesced-write branch to pass the scalar-local promotion gate."
+    ],
+    "reject": [
+      "The persistent-CTA wide-tile schedule for S4096. It serializes too much selected-key producer work inside one CTA, so the global write reduction cannot pay for the lost parallelism.",
+      "Widening from selected_block=256 to selected_block=512 does not rescue the schedule: 132.95 ms becomes 136.08 ms despite improving modeled write reduction from 12.34x to 23.81x."
+    ],
+    "read": "This closes the naive 'one CTA owns the whole query tile and local group table' branch. The next branch should keep rocWMMA/MFMA contribution math but split producer parallelism across smaller CTAs or waves, then merge partial grouped rows with a second-stage segmented reducer or in-kernel cooperative reduction. The key is to reduce dKV writes without serializing the K16xD16 producer over the whole 32x512 tile."
+  },
+  "next_branch": {
+    "name": "split_producer_grouped_partial_reduce",
+    "shape_hint": "CTA per token/sub-token x selected_microtile x D16 computes MFMA contribution and writes compact grouped partial rows; a second reducer merges per seq_tile/group/D16 partials.",
+    "must_preserve": [
+      "MFMA-shaped K16xD16 contribution math",
+      "No dense [H,S,G] route matrix",
+      "No selected K/V or probability slab in production",
+      "S4096 timing below the 8.8 ms sparse-atomic wall before integration"
+    ],
+    "risk": "A two-stage partial path can reintroduce memory traffic. It needs a bounded compact partial format keyed by touched compressed groups, not the earlier dense multi-GiB partial slab."
+  },
+  "commands": {
+    "s128": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 128 --layer-id 2 --seq-chunk 32 --selected-block 256 --block-d 16 --threads 256 --warmup-iters 1 --timed-iters 3",
+    "s512": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 512 --layer-id 2 --seq-chunk 32 --selected-block 256 --block-d 16 --threads 256 --warmup-iters 1 --timed-iters 3",
+    "s4096_32x256": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 256 --block-d 16 --threads 256 --warmup-iters 0 --timed-iters 1 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "s4096_32x512": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 512 --block-d 16 --threads 256 --warmup-iters 0 --timed-iters 1 --skip-correctness --skip-reference-timing --allow-large-materialization"
+  },
+  "dependency_pin_changes": []
+}

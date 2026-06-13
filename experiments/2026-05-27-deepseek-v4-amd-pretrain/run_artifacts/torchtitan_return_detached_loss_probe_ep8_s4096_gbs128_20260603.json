@@ -1,0 +1,149 @@
+{
+  "run_id": "torchtitan_dsv4_return_detached_loss_ab_ep8_s4096_gbs128_20260603",
+  "created_at": "2026-06-03T09:50:00+07:00",
+  "purpose": "Negative-control probe for the fwd/bwd wrapper residual: return a detached loss from forward_backward_step while keeping full activation checkpointing enabled.",
+  "shape": {
+    "cluster": "8xMI350",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "grad_accumulation_steps": 16
+  },
+  "settings": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enabled": false,
+    "profiling_enabled": false,
+    "structured_logging_enabled": false,
+    "dense_linear_backward_timing": true,
+    "activation_checkpoint_block_timing": true,
+    "return_detached_loss": true,
+    "moe_comm_backend": "mori",
+    "mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_shmem_heap_size": "32G",
+    "chunked_ce_num_chunks": 2
+  },
+  "remote_artifacts": {
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_return_detached_loss_ab_ep8_s4096_gbs128_20260603/docker-run.log",
+    "timing_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_return_detached_loss_ab_ep8_s4096_gbs128_20260603/timing",
+    "local_parse_copy": "/tmp/dsv4_return_detached_loss_ab_ep8_s4096_gbs128_20260603/timing"
+  },
+  "step_log_metrics": {
+    "step1": {
+      "loss": 12.29612,
+      "grad_norm": 11.5,
+      "tokens_per_gpu_per_s_range": [
+        2024,
+        2027
+      ],
+      "tflops_per_gpu_range": [
+        38.3,
+        38.35
+      ],
+      "mfu_percent_mi350": 1.66,
+      "max_logged_rank_memory_gib": 64.09
+    },
+    "step2": {
+      "loss": 9.69264,
+      "grad_norm": 22.25,
+      "tokens_per_gpu_per_s": 2817,
+      "tflops_per_gpu": 53.3,
+      "mfu_percent_mi350": 2.31,
+      "max_logged_rank_memory_gib": 144.52
+    }
+  },
+  "additive_step2": {
+    "records": 8,
+    "max_rank_phase_ms": {
+      "step_train_step": 21719.88,
+      "microbatch_forward_backward": 21641.905,
+      "forward_backward_call": 21639.089,
+      "model_forward": 2344.857,
+      "loss": 470.518,
+      "backward": 13995.238,
+      "return_loss": 0.896,
+      "release_tensors": 0.53,
+      "forward_backward_call_returned": 1.149,
+      "loss_detach_append": 1.534,
+      "grad_clip": 25.608,
+      "optimizer_step": 17.324
+    },
+    "means_ms": {
+      "step_train_step": 21706.12,
+      "microbatch_forward_backward": 21630.863,
+      "forward_backward_call": 21627.832,
+      "model_forward": 2305.727,
+      "loss": 468.309,
+      "backward": 13994.671,
+      "old_wrapper_residual": 4862.156,
+      "call_boundary_residual": 4849.883,
+      "outer_after_call_residual": 2.216,
+      "return_loss": 0.71,
+      "release_tensors": 0.463
+    },
+    "maxima_ms": {
+      "old_wrapper_residual": {
+        "rank": 6,
+        "value": 4929.059
+      },
+      "call_boundary_residual": {
+        "rank": 6,
+        "value": 4916.281
+      },
+      "outer_after_call_residual": {
+        "rank": 1,
+        "value": 2.535
+      }
+    },
+    "residual_rank_microbatch_call_boundary_summary_ms": {
+      "rank": 6,
+      "min": 280.209,
+      "p50": 306.193,
+      "max": 325.711,
+      "sum": 4916.281,
+      "microbatch0": 306.193,
+      "microbatch1_to_15_p50": 309.336
+    }
+  },
+  "comparison": {
+    "full_ac_callboundary_baseline": {
+      "artifact": "run_artifacts/torchtitan_callboundary_release_ep8_s4096_gbs128_20260603.json",
+      "step2_tflops_per_gpu": 54.12,
+      "microbatch_forward_backward_s": 20.947,
+      "model_forward_s": 2.302,
+      "loss_s": 0.47,
+      "backward_s": 13.654,
+      "call_boundary_residual_s": 4.605,
+      "return_loss_ms": 0.393
+    },
+    "return_detached_loss_probe": {
+      "step2_tflops_per_gpu": 53.3,
+      "microbatch_forward_backward_s": 21.642,
+      "model_forward_s": 2.345,
+      "loss_s": 0.471,
+      "backward_s": 13.995,
+      "call_boundary_residual_s": 4.916,
+      "return_loss_ms": 0.896
+    },
+    "no_activation_checkpoint_perf_branch": {
+      "clean_3step_artifact": "run_artifacts/torchtitan_dsv4_noac_perf_ep8_s4096_gbs128_20260603.json",
+      "alloc_expand_6step_artifact": "run_artifacts/torchtitan_dsv4_noac_alloc_expand_stability6_ep8_s4096_gbs128_20260603.json",
+      "step2_best_tflops_per_gpu": 91.9,
+      "step2_best_uplift_vs_retained_full_ac_percent": 56.5,
+      "late_steps_4_to_6_mean_tflops_per_gpu": 58.65,
+      "retained_full_ac_anchor_tflops_per_gpu": 58.71
+    }
+  },
+  "read": "Returning a detached loss is a negative control: it does not improve step throughput and does not move the hidden fwd/bwd call-boundary residual into forward_backward.return_loss. The no-activation-checkpoint branch has a real early-step TFLOPs uplift, but the 6-step allocator-expanded gate decays to the retained full-AC anchor, so it remains diagnostic rather than promoted."
+}

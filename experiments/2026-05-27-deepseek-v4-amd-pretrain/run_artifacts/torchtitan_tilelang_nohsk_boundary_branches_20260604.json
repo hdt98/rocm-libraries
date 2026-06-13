@@ -1,0 +1,106 @@
+{
+  "schema": "dsv4_amd_pretrain_run_artifact.v1",
+  "created_at": "2026-06-04",
+  "scope": "tilelang_sparse_mla_backward_boundary_decision",
+  "target_shape": {
+    "hardware": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size_4x": 64,
+    "parallelism_4x": {
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "fsdp": 4,
+      "ep": 4
+    }
+  },
+  "baseline_context": {
+    "retained_safe_auto_4x_step2_tflops_per_gpu": 73.81,
+    "target_tflops_per_gpu": 277.0,
+    "read": "A TileLang sparse backward branch is only retained if it improves end-to-end TFLOPs cleanly, not just isolated compressed-dKV microbench latency."
+  },
+  "branches": [
+    {
+      "name": "tilelang_atomic_dkv",
+      "contract": "No-HSK source-boundary TileLang backward consumes q, kv, dO, indices, valid, lse, delta, and attn_sink; computes dQ, dAttnSink, and raw global-atomic full dKV.",
+      "small_shape_verifier": {
+        "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_atomic_dkv_s128_h64_d512_l16_k128_nexusimage_nobranch_20260604.json",
+        "shape": "S128,H64,D512,local16,compressed128,group128",
+        "explicit_pytorch_median_ms": 1.0687,
+        "tilelang_atomic_dkv_median_ms": 0.7541,
+        "dq_max_abs": 0.0078125,
+        "dkv_max_abs": 0.03125,
+        "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+        "dsink_max_abs": 0.0,
+        "status": "passed"
+      },
+      "e2e_4x": {
+        "run_id": "torchtitan_dsv4_tilelang_atomic_dkv_4x_s4096_gbs64_steps3_20260604",
+        "artifact": "run_artifacts/torchtitan_dsv4_tilelang_atomic_dkv_4x_s4096_gbs64_steps3_rank0_20260604.jsonl",
+        "step2_tflops_per_gpu": 66.71,
+        "step2_tokens_per_gpu_s": 3526,
+        "failure": "Step 3 failed with GPU memory access fault during MORI routed VJP reorder.",
+        "status": "rejected"
+      },
+      "decision": "Correct small-shape source boundary, but raw global atomics do not improve end-to-end TFLOPs and the run is not stable."
+    },
+    {
+      "name": "tilelang_source_hsk_dkv",
+      "contract": "TileLang recomputes probability/scaled-dP/dQ and feeds selected-limit dKV from BF16 HSK tensors; this reduces the late PyTorch dKV bridge but still creates an HSK global slab.",
+      "e2e_4x_first_materialization": {
+        "artifact": "run_artifacts/torchtitan_tilelang_source_boundary_materialization_4x_s4096_20260604.json",
+        "run_id": "torchtitan_dsv4_tilelang_source_hsk_exp2f_4x_s4096_gbs64_steps3_20260604",
+        "step2_tflops_per_gpu": 82.50,
+        "relative_step2_uplift_vs_safe_auto_4x": 1.1178,
+        "step3_tflops_per_gpu": 55.95,
+        "step3_loss": 18.06740,
+        "max_logged_memory_gib": 249.46,
+        "status": "materialized_but_rejected"
+      },
+      "durability_rerun": {
+        "run_id": "torchtitan_dsv4_tilelang_source_hsk_allocconf_4x_s4096_gbs64_steps5_20260604",
+        "artifact": "run_artifacts/torchtitan_dsv4_tilelang_source_hsk_allocconf_4x_s4096_gbs64_steps5_rank0_20260604.jsonl",
+        "step2_tflops_per_gpu": 54.91,
+        "step2_tokens_per_gpu_s": 2902,
+        "failure": "Step 3 OOM in MORI local padded VJP dw1 bmm after memory climb.",
+        "status": "rejected"
+      },
+      "correctness": {
+        "dq_max_abs": 0.494140625,
+        "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 1.3828125,
+        "status": "not_clean"
+      },
+      "decision": "This branch proved a possible e2e uplift path but is not retained because it is non-clean and non-durable; it also still pays the HSK materialization bridge."
+    },
+    {
+      "name": "tilelang_source_direct_dkv",
+      "contract": "No-HSK route-owned selected-limit reducer recomputes probability and scaled-dP from source tensors, then reduces by compressed group before global dKV writes.",
+      "small_shape_verifier": {
+        "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_source_direct_dkv_s128_h64_d512_l16_k128_gp4_cap16_nexusimage_20260604.json",
+        "shape": "S128,H64,D512,local16,compressed128,group128,group_panel4,panel_capacity16",
+        "explicit_pytorch_median_ms": 1.132,
+        "tilelang_source_direct_dkv_median_ms": 19.121,
+        "dq_max_abs": 0.494140625,
+        "dkv_max_abs": 0.03125,
+        "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+        "status": "rejected_before_e2e"
+      },
+      "decision": "This branch removes HSK and reduces dKV writes, but making compressed group own full-D contribution production destroys query-major q/dO reuse. Do not run e2e."
+    }
+  ],
+  "retained_next_kernel_contract": {
+    "name": "query_major_nohsk_compact_reducer",
+    "producer": "Keep query-major MFMA contribution production from q, dO, kv, indices, lse, delta, and attn_sink.",
+    "reduction": "Perform lane/warp/block grouped or segmented reduction inside the producer before global memory.",
+    "writeback": "Emit compact reduced partial rows or reduced atomics keyed by compressed_group and D block; avoid raw selected KxD HSK slabs.",
+    "rejected_patterns": [
+      "detached raw ScatterAdd after a global partial slab",
+      "group-major full-D recompute",
+      "raw global atomics per selected row",
+      "source-HSK bridge as production path"
+    ],
+    "reason": "Prepacking routes is cheap, but group-owned contribution production reloads/recomputes q and dO too often. The useful fusion boundary is query-major math plus group-aware writeback, not group-major math."
+  },
+  "decision": "No new retained TFLOPs candidate yet. Continue with query-major no-HSK compact reducer and require a clean 4x S4096 throughput A/B before promotion."
+}

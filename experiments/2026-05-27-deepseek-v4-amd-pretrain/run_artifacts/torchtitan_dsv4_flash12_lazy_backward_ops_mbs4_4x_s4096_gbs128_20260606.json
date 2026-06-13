@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "artifact": "torchtitan_dsv4_flash12_lazy_backward_ops_mbs4_4x_s4096_gbs128_20260606",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "gpus": 4,
+  "visible_devices": "4,5,6,7",
+  "remote_artifact_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "shape": {
+    "target_contract": "flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4
+  },
+  "common_env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": "true",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": "0",
+    "CANARY_MORI_AITER_DX_RETURN_MODE": "sync_dx_first",
+    "CANARY_MORI_AITER_LAZY_BACKWARD_OPS": "true",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "patch_summary": {
+    "mori_aiter_moe_py": [
+      "Adds opt-in TORCHTITAN_MORI_AITER_LAZY_BACKWARD_OPS to construct MORI backward dispatch/combine ops inside backward instead of eagerly in forward.",
+      "Threads the dispatcher through the autograd context so lazy backward op creation can reuse the same process-group/parallelism contract.",
+      "Adds explicit best-effort cleanup for non-cached lazy MORI op handles to release shmem-backed buffers before the next step."
+    ],
+    "launcher": [
+      "Adds CANARY_MORI_AITER_LAZY_BACKWARD_OPS pass-through and logs the selected value."
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_lazybwdops_mbs4_heap40_smoke_4x_s4096_gbs128_steps2_20260606",
+      "activation_checkpointing": "none",
+      "mori_shmem_heap_size": "40G",
+      "swiglu_backend": "torch",
+      "result": "failed_after_step1",
+      "step1": {
+        "loss": 12.36786,
+        "grad_norm": 19.125,
+        "tokens_per_gpu_s_range": [1836, 1839],
+        "tflops_per_gpu_range": [92.97, 93.10],
+        "logged_memory_gib_range": [179.31, 184.65]
+      },
+      "failure": {
+        "class": "torch.OutOfMemoryError",
+        "where": "torch SwiGLU backward temporary",
+        "message_summary": "Tried to allocate 1.32 GiB with only 284 MiB free; PyTorch allocated about 190.49 GiB."
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_lazybwdops_tritonswiglu_mbs4_heap40_smoke_4x_s4096_gbs128_steps2_20260606",
+      "activation_checkpointing": "none",
+      "mori_shmem_heap_size": "40G",
+      "swiglu_backend": "triton",
+      "result": "failed_before_step2",
+      "step1": {
+        "loss": 12.26954,
+        "grad_norm": 20.0,
+        "tokens_per_gpu_s_range": [2836, 2838],
+        "tflops_per_gpu_range": [143.61, 143.69],
+        "logged_memory_gib_range": [180.67, 185.30]
+      },
+      "failure": {
+        "class": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "where": "lazy creation of MORI backward dispatch/combine op for the next step",
+        "message_summary": "Available free memory reached about 44 MB, indicating lazy op handles from the prior step needed explicit release."
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_lazybwdops_cleanup_tritonswiglu_mbs4_heap40_smoke_4x_s4096_gbs128_steps2_20260606",
+      "activation_checkpointing": "none",
+      "mori_shmem_heap_size": "40G",
+      "swiglu_backend": "triton",
+      "lazy_op_cleanup": true,
+      "result": "failed_before_step1_log",
+      "failure": {
+        "class": "torch.OutOfMemoryError",
+        "where": "FSDP post-backward reduce-scatter allocation",
+        "message_summary": "Tried to allocate 6.00 GiB with about 3.36-5.15 GiB free and about 137-138 GiB allocated by PyTorch."
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_lazybwdops_cleanup_tritonswiglu_mbs4_fullac_heap40_smoke_4x_s4096_gbs128_steps2_20260606",
+      "activation_checkpointing": "full",
+      "mori_shmem_heap_size": "40G",
+      "swiglu_backend": "triton",
+      "lazy_op_cleanup": true,
+      "result": "failed_at_optimizer_step_before_step1_log",
+      "failure": {
+        "class": "torch.OutOfMemoryError",
+        "where": "AdamW optimizer state initialization",
+        "message_summary": "Tried to allocate 1024 MiB exp_avg/exp_avg_sq with only about 392-866 MiB free."
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_lazybwdops_cleanup_tritonswiglu_mbs4_fullac_heap32_smoke_4x_s4096_gbs128_steps2_20260606",
+      "activation_checkpointing": "full",
+      "mori_shmem_heap_size": "32G",
+      "swiglu_backend": "triton",
+      "lazy_op_cleanup": true,
+      "result": "failed_at_optimizer_step_before_step1_log",
+      "failure": {
+        "class": "torch.OutOfMemoryError",
+        "where": "AdamW optimizer state initialization",
+        "message_summary": "Tried to allocate 1024 MiB exp_avg/exp_avg_sq with only about 818-874 MiB free on failing ranks; lowering MORI heap from 40G to 32G did not create enough optimizer-state headroom."
+      }
+    }
+  ],
+  "decision": {
+    "promotion": "rejected",
+    "read": "MBS4/GBS128 on 4xMI350 is not yet a stable 12-layer candidate with in-GPU AdamW. Lazy MORI backward-op construction helps move past fixed MORI allocation pressure, and Triton SwiGLU materially improves the first-step no-AC result, but the shape then exposes real FSDP and AdamW optimizer-state memory walls.",
+    "current_retained_12layer_candidate": "torchtitan_dsv4_flash12_allcompressed_h64n64d128_4x_s4096_gbs128_mbs2_heap40_steps6b_20260606",
+    "next_actions": [
+      "Keep the MBS2 all-compressed H64/N64/D128 run as the retained 12-layer baseline until MBS4 gets virtual/offloaded optimizer state or lower-memory owner backward.",
+      "For MBS4 on 4xMI350, test virtual/offloaded AdamW or preinitialized/offloaded optimizer states before more MORI heap sweeps.",
+      "Continue MoE work toward fused compact owner-rank training backward because adapter-level memory fixes alone do not create enough headroom."
+    ]
+  }
+}

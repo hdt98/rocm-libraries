@@ -1,0 +1,68 @@
+{
+  "artifact": "single_layer_retained_bench",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "runner": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+  "checks": {
+    "check_cuda": {
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-cuda",
+      "ok": true,
+      "device": "cuda",
+      "dtype": "float64",
+      "seqlen": 4,
+      "results": [
+        {
+          "name": "moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_dense_wgrad_match",
+          "ok": true,
+          "max_grad_rel_l2": 8.8929235628238e-17,
+          "output_rel_l2": 0.0
+        },
+        {
+          "name": "moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_learned_router_match",
+          "ok": true,
+          "max_grad_rel_l2": 1.0499998855737513e-16,
+          "output_rel_l2": 0.0
+        }
+      ]
+    }
+  },
+  "benchmarks": [
+    {
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-2048",
+      "batch": 1,
+      "seqlen": 2048,
+      "tokens": 2048,
+      "dtype": "bfloat16",
+      "avg_ms": 52.80532899778336,
+      "min_ms": 52.42086702492088,
+      "tokens_per_s": 38783.96440037274,
+      "estimated_tflops": 184.37824692899272,
+      "target_ms": 43.3,
+      "target_status": "missed",
+      "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "fixed_router": false,
+      "rmsnorm_save_policy": "saved-accum",
+      "loss_mean": 1.0037039279937745
+    },
+    {
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-4096",
+      "batch": 1,
+      "seqlen": 4096,
+      "tokens": 4096,
+      "dtype": "bfloat16",
+      "avg_ms": 76.32162899244577,
+      "min_ms": 76.01167797110975,
+      "tokens_per_s": 53667.61760818047,
+      "estimated_tflops": 277.4195900555489,
+      "target_ms": 86.6,
+      "target_status": "passed",
+      "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "fixed_router": false,
+      "rmsnorm_save_policy": "saved-accum",
+      "loss_mean": 1.0032603740692139
+    }
+  ],
+  "summary": "Retained learned-router compact-reduce single-layer CUDA path still misses the 2K development target but clears the 4K parity proxy target on this run."
+}

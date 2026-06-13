@@ -1,0 +1,88 @@
+{
+  "artifact": "grouped_bmm_s4096_backend_sanity_20260531",
+  "date_local": "2026-05-31",
+  "scope": "S=4096 routed-MoE grouped BMM backend sanity check for actual-layout 384-expert, 64-row/expert contractions on one MI350/CDNA4.",
+  "source_artifacts": {
+    "current_existing": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_balanced_actual_20260531.json",
+    "default": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_backend_default_20260531.json",
+    "hipblas": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_backend_hipblas_20260531.json",
+    "hipblaslt": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_backend_hipblaslt_20260531.json"
+  },
+  "operator_contract": {
+    "dtype": "bf16",
+    "tokens": 4096,
+    "tokens_per_group": 64,
+    "experts": 384,
+    "topk": 6,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "layout": "actual",
+    "shape_read": "Balanced grouped BMM floor for current routed-MoE actual operand layouts, with 384 groups and 64 rows/group."
+  },
+  "results": {
+    "default_effective_cublaslt": {
+      "fwd_w1_ms": 2.9675850868225098,
+      "w2_dgrad_ms": 3.210505962371826,
+      "w1w3_xgrad_pair_ms": 6.19460916519165,
+      "w2_wgrad_ms": 4.488516807556152,
+      "w1_wgrad_ms": 4.367636203765869,
+      "w3_wgrad_ms": 4.33427619934082
+    },
+    "hipblas_effective_cublas": {
+      "fwd_w1_ms": 2.947421073913574,
+      "w2_dgrad_ms": 3.1633410453796387,
+      "w1w3_xgrad_pair_ms": 6.272243022918701,
+      "w2_wgrad_ms": 4.494274139404297,
+      "w1_wgrad_ms": 4.389873027801514,
+      "w3_wgrad_ms": 4.378032207489014
+    },
+    "hipblaslt_effective_cublaslt": {
+      "fwd_w1_ms": 2.951785087585449,
+      "w2_dgrad_ms": 3.1959469318389893,
+      "w1w3_xgrad_pair_ms": 6.274252891540527,
+      "w2_wgrad_ms": 4.503438949584961,
+      "w1_wgrad_ms": 4.4089179039001465,
+      "w3_wgrad_ms": 4.374876976013184
+    },
+    "hipblas_minus_default_ms": {
+      "fwd_w1": -0.020164012908935547,
+      "w2_dgrad": -0.0471649169921875,
+      "w1w3_xgrad_pair": 0.07763385772705078,
+      "w2_wgrad": 0.005757331848144531,
+      "w1_wgrad": 0.02223682403564453,
+      "w3_wgrad": 0.04375600814819336
+    },
+    "hipblaslt_minus_default_ms": {
+      "fwd_w1": -0.015800000000000036,
+      "w2_dgrad": -0.014559030532836914,
+      "w1w3_xgrad_pair": 0.07964372634887695,
+      "w2_wgrad": 0.014922142028808594,
+      "w1_wgrad": 0.041281700134277344,
+      "w3_wgrad": 0.04060077667236328
+    },
+    "ck_backend": {
+      "status": "unsupported_for_this_problem",
+      "runtime_error": "wrong! device_gemm with the specified compilation parameters does not support this GEMM problem"
+    }
+  },
+  "decision": {
+    "status": "no_backend_route_promotion",
+    "read": "For the S4096 actual-layout grouped BMM floor, forcing hipBLAS/rocBLAS or explicit hipBLASLt does not materially improve the current Cublaslt/hipBLASLt route. hipBLAS slightly improves fwd_w1 and w2_dgrad, but loses on the W1/W3 xgrad pair and all wgrad contractions; explicit hipBLASLt is within noise and also loses on the larger contractions. The PyTorch CK backend does not support this problem shape. This does not change the earlier conclusion that grouped/ragged scheduling and compact-native kernels are the next lever.",
+    "retain": "current/default Cublaslt route for the retained PyTorch grouped-BMM baseline",
+    "defer": [],
+    "blocked_by_external_workload": {
+      "host": "do-sonle-kernel",
+      "observed_process": "python3 tools/bench_coda_tilelang_moe_swiglu.py --scenario grouped-sorted-token-slot-moe ...",
+      "idle_wait_seconds": 300,
+      "action": "Did not kill or co-schedule with the external process. The node later cleared and the remaining hipblaslt/ck checks were completed cleanly."
+    }
+  },
+  "commands": {
+    "default": "RUN_TAG=grouped_bmm_s4096_backend_default_20260531 GROUPED_BMM_BLAS_BACKEND=default GROUPED_BMM_LAYOUT=actual GROUPED_BMM_ITERS=5 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "hipblas": "RUN_TAG=grouped_bmm_s4096_backend_hipblas_20260531 GROUPED_BMM_BLAS_BACKEND=hipblas GROUPED_BMM_LAYOUT=actual GROUPED_BMM_ITERS=5 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "hipblaslt": "RUN_TAG=grouped_bmm_s4096_backend_hipblaslt_20260531 GROUPED_BMM_BLAS_BACKEND=hipblaslt GROUPED_BMM_LAYOUT=actual GROUPED_BMM_ITERS=5 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "ck": "RUN_TAG=grouped_bmm_s4096_backend_ck_20260531 GROUPED_BMM_BLAS_BACKEND=ck GROUPED_BMM_LAYOUT=actual GROUPED_BMM_ITERS=5 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "idle_wait_after_external_occupancy": "WAIT_IDLE_SECONDS=300 WAIT_IDLE_INTERVAL_SECONDS=30 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh wait-idle"
+  },
+  "dependency_pin_changes": []
+}

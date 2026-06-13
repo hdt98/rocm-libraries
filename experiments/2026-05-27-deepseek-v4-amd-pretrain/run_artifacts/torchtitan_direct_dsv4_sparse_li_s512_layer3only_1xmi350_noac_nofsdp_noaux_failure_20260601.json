@@ -1,0 +1,75 @@
+{
+  "status": "failed_before_first_step_metric_in_loss_backward",
+  "date": "2026-06-01",
+  "experiment": "2026-05-27-deepseek-v4-amd-pretrain",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "purpose": "Isolate whether full-model S512 can train when layer 2 is forced dense and only layer 3 uses the materialized PyTorch sparse MLA/LightningIndexer path.",
+  "run_id": "torchtitan_direct_dsv4_s512_sparse_li_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000",
+  "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512",
+  "command": "env GPUS_PER_NODE=1 CANARY_VISIBLE_DEVICES=0 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SKIP_SINGLE_RANK_FSDP=true CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS=4500000000 MASTER_PORT=29554 RUN_ID=torchtitan_direct_dsv4_s512_sparse_li_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "config_parse_command": "env GPUS_PER_NODE=1 CANARY_VISIBLE_DEVICES=0 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SKIP_SINGLE_RANK_FSDP=true CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS=4500000000 MASTER_PORT=29554 RUN_ID=torchtitan_direct_dsv4_s512_sparse_li_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+  "config_parse": {
+    "model_spec": "deepseek_v4 flash_4layer",
+    "shape": "1 1 512 1",
+    "parallelism": "-1 1",
+    "moe_comm_backend": "standard",
+    "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+    "attention_sparse_threshold_by_layer": [512, 512, 512, 512],
+    "attention_sparse_selected_state_threshold_by_layer": [
+      4500000000,
+      4500000000,
+      4500000000,
+      4500000000
+    ],
+    "attention_indexer_loss_coeff_by_layer": [0.0, 0.0, 0.0, 0.0],
+    "selected_state_estimates": {
+      "layer2_s512": 8589934592,
+      "layer3_s512": 4429185024
+    },
+    "expected_sparse_by_layer": {
+      "layer0": false,
+      "layer1": false,
+      "layer2": false,
+      "layer3": true
+    }
+  },
+  "isolation_controls": {
+    "skip_single_rank_fsdp": true,
+    "dsa_indexer_loss_coeff": 0.0,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "sparse_mla_max_selected_state_elements": 4500000000,
+    "read": "The 4.5B selected-state threshold is above layer 3's S512 estimate and below layer 2's S512 estimate, so this run isolates layer 3 materialized sparse MLA inside the full model."
+  },
+  "observed": {
+    "trainer_initialized": true,
+    "training_started_step": 1,
+    "training_completed": false,
+    "process_group_destroyed": false,
+    "corrected_mi350_peak_flops_logged": "2.310e+15",
+    "memory_gib_for_model": 58.23,
+    "remote_output_size": "156K",
+    "remote_log_size": "16K",
+    "checkpoint_directory_created": false
+  },
+  "failure": {
+    "phase": "loss.backward",
+    "error": "Memory access fault by GPU node-2",
+    "signal": "SIGABRT",
+    "exitcode": -6,
+    "stack_hint": "torch_autograd_engine_backward_materialized_sparse_attention",
+    "traceback_top": [
+      "torch.autograd.graph._engine_run_backward",
+      "torch.autograd.backward",
+      "torch.Tensor.backward",
+      "torchtitan.trainer.forward_backward_step"
+    ]
+  },
+  "remote_paths": {
+    "output": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_sparse_li_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000",
+    "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_sparse_li_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000/docker-run.log"
+  },
+  "read": "Full-model S512 still faults when layer 2 is forced dense and only layer 3 is expected to use materialized sparse MLA. The final fix should not assume a layer-2-only failure; the temporary PyTorch materialized sparse attention backward is unsafe for full-model S512 compressed-layer integration and should be replaced with a fused/backward-safe sparse MLA/LightningIndexer path before S4096 promotion."
+}

@@ -1,0 +1,112 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_mbs16_fit_failures_8x_s4096_gbs128_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does expert-Muon preallocated workspace create enough memory headroom to move the 12-layer flash probe from MBS8/GA2 to MBS16/GA1?",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 16,
+    "gradient_accumulation_steps": 1,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "selective_attention_only",
+    "checkpointing": "disabled"
+  },
+  "shared_env": {
+    "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+    "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+    "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+    "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+    "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_WORKSPACE_MODE": "prealloc",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_mbs16_attention_ac_8x_s4096_gbs128_steps6_20260608",
+      "standard_ep_weighted_scatter_backend": "torch",
+      "result": "failed_before_step1",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs16_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+      "failure": {
+        "type": "gpu_memory_access_fault",
+        "message": "Memory access fault by GPU node-2 on address nil",
+        "phase": "first_forward_standard_ep_combine_weighted_scatter_add",
+        "stack_top": [
+          "torchtitan.ops.scatter_add.deterministic_weighted_scatter_add",
+          "torchtitan.models.common.token_dispatcher._finish_combine_after_all_to_all",
+          "torchtitan.models.common.token_dispatcher.combine"
+        ]
+      },
+      "read": "Default deterministic weighted scatter faults at MBS16 before any step metric, so the first exposed MoE/EP fit wall is the full-slab combine scatter."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_mbs16_chunkedscatter_attention_ac_8x_s4096_gbs128_steps6_20260608",
+      "standard_ep_weighted_scatter_backend": "torch_chunked",
+      "weighted_scatter_probe_artifact": "run_artifacts/standard_ep_weighted_scatter_torch_chunked_mbs16_20260608.json",
+      "result": "failed_before_step1",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs16_chunkedscatter_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+      "failure": {
+        "type": "cuda_out_of_memory",
+        "phase": "first_forward_sparse_attention_lightning_indexer",
+        "allocation_gib": 8.0,
+        "rank": 2,
+        "free_gib_at_failure": 6.64,
+        "allocated_by_pytorch_gib": 266.46,
+        "stack_top": [
+          "torchtitan.models.deepseek_v4.model.DeepSeekV4LightningIndexer.forward_with_scores",
+          "scores = F.relu(scores) * weights.unsqueeze(-1)",
+          "torch.utils.checkpoint checkpoint dispatch"
+        ]
+      },
+      "read": "Exact chunked weighted scatter moves the MBS16 failure past MoE combine. The next fit wall is sparse-attention/LightningIndexer forward memory, not the Muon optimizer state."
+    }
+  ],
+  "weighted_scatter_probe": {
+    "artifact": "run_artifacts/standard_ep_weighted_scatter_torch_chunked_mbs16_20260608.json",
+    "shape": {
+      "rows": 524288,
+      "tokens": 65536,
+      "hidden": 7168,
+      "src_dtype": "bfloat16",
+      "score_dtype": "float32"
+    },
+    "parity": {
+      "out_max_abs_diff": 0.0,
+      "src_grad_max_abs_diff": 0.0,
+      "score_grad_max_abs_diff": 0.0,
+      "finite": true
+    },
+    "timing_ms": {
+      "torch_forward_median": 20.078655242919922,
+      "torch_chunked_forward_median": 27.797779083251953,
+      "torch_forward_backward_median": 45.102684020996094,
+      "torch_chunked_forward_backward_median": 60.79985427856445
+    },
+    "read": "The chunked backend is exact and reduces full-slab forward workspace, but the isolated combine slice is slower. It is a fit diagnostic/backend, not a throughput promotion."
+  },
+  "decision": "Reject MBS16 as a current promotion path. Expert-Muon prealloc is still the best lower-memory MBS8 branch, but the next MBS jump requires reducing sparse-attention/LI forward memory or deeper activation recompute, not optimizer-state savings alone."
+}

@@ -1,0 +1,151 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_fixedcap_noallreduce_steps6_8x_s4096_gbs128_20260610",
+  "date": "2026-06-10",
+  "node": "do-sonle5-mi350-gpu",
+  "hardware": "8xMI350",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_fixedcap131k_noallreduce_attention_ac_steps6_8x_s4096_gbs128_20260610",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_fixedcap131k_noallreduce_attention_ac_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_fixedcap131k_noallreduce_attention_ac_steps6_8x_s4096_gbs128_20260610",
+  "result": "completed_6_steps_not_promoted",
+  "shared_shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 8,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "optimizer": "AdamW",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "checkpoint_enable": false,
+    "sparse_mla": "enabled at S4096 for compress ratios 4,128",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_shape": "H64_N64_D128",
+    "sharedkv_sink_dot_chunk": 32,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weight_order": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_export_compact_route_positions": true,
+    "standard_ep_mori_native_compact_max_peer_rows": 131072,
+    "standard_ep_mori_native_compact_prereset": false,
+    "mori_shmem_heap_size": "48G",
+    "profile_sidecars": false
+  },
+  "source_delta": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "summary": "Fixed-cap native MORI compact dispatch/combine skips per-call scalar max-peer-row all-reduce; auto-cap still synchronizes capacity."
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "tokens_per_gpu_s": 559,
+      "tflops_per_gpu": 28.33,
+      "loss": 12.26985,
+      "grad_norm": 14.8125,
+      "rank_max_memory_gib": 164.0
+    },
+    {
+      "step": 2,
+      "tokens_per_gpu_s": 8093,
+      "tflops_per_gpu": 409.78,
+      "loss": 8.28383,
+      "grad_norm": 101.0,
+      "rank_max_memory_gib": 209.85
+    },
+    {
+      "step": 3,
+      "tokens_per_gpu_s": 8490,
+      "tflops_per_gpu": 429.87,
+      "loss": 10.90193,
+      "grad_norm": 160.0,
+      "rank_max_memory_gib": 216.82
+    },
+    {
+      "step": 4,
+      "tokens_per_gpu_s": 6428,
+      "tflops_per_gpu": 325.46,
+      "loss": 28.25632,
+      "grad_norm": 78.5,
+      "rank_max_memory_gib": 218.18
+    },
+    {
+      "step": 5,
+      "tokens_per_gpu_s": 8680,
+      "tflops_per_gpu": 439.46,
+      "loss": 9.0698,
+      "grad_norm": 27.25,
+      "rank_max_memory_gib": 224.04
+    },
+    {
+      "step": 6,
+      "tokens_per_gpu_s": 8787,
+      "tflops_per_gpu": 444.88,
+      "loss": 8.22989,
+      "grad_norm": 39.0,
+      "rank_max_memory_gib": 224.88
+    }
+  ],
+  "windows": {
+    "steps_2_to_6": {
+      "tokens_per_gpu_s": 8095.6,
+      "node_tokens_s": 64764.8,
+      "tflops_per_gpu": 409.89,
+      "delta_vs_retained_baseline_tokens_per_gpu_pct": -4.9683,
+      "delta_vs_fixedcap_20step_fullwindow_tokens_per_gpu_pct": 1.4419,
+      "delta_vs_fixedcap_same_early_window_tokens_per_gpu_pct": 10.5926
+    },
+    "steps_3_to_6": {
+      "tokens_per_gpu_s": 8096.25,
+      "node_tokens_s": 64770.0,
+      "tflops_per_gpu": 409.9175
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s": 7965.0,
+      "node_tokens_s": 63720.0,
+      "tflops_per_gpu": 403.2667
+    },
+    "steps_5_to_6": {
+      "tokens_per_gpu_s": 8733.5,
+      "node_tokens_s": 69868.0,
+      "tflops_per_gpu": 442.17,
+      "delta_vs_retained_baseline_tokens_per_gpu_pct": 2.5198
+    }
+  },
+  "comparison_baselines": {
+    "retained_standard_ep_current_best": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "steps_2_to_20_tokens_per_gpu_s": 8518.8421,
+      "steps_2_to_20_tflops_per_gpu": 431.3139,
+      "peak_logged_memory_gib": 251.97
+    },
+    "fixedcap_before_noallreduce": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_fixedcap_autocap_8x_s4096_gbs128_20260610.json",
+      "steps_2_to_20_tokens_per_gpu_s": 7980.5263,
+      "steps_2_to_20_tflops_per_gpu": 404.0647,
+      "steps_2_to_6_tokens_per_gpu_s": 7320.2,
+      "peak_logged_memory_gib": 227.32
+    }
+  },
+  "decision": "Short 6-step gate is positive versus the previous fixed-cap early window and uses lower memory than the retained baseline, but it is not a promoted throughput baseline. Step 4 still dips to 6428 tok/GPU/s and the run is much shorter than the retained 20-step comparator.",
+  "blocked_followup": {
+    "attempted_run_id": "torchtitan_dsv4_flash12_mori_native_fixedcap131k_noallreduce_attention_ac_steps20_8x_s4096_gbs128_20260610",
+    "result": "launcher_idle_guard_refused",
+    "reason": "External two-node nexus-titan-training fault-tolerance smoke occupied GPUs 0 and 1 on both do-sonle5-mi350-gpu and do-vunguyen-mi350-gpu immediately after the 6-step gate."
+  },
+  "next_gate": "Run the same fixed-cap noallreduce candidate for 20 non-profiled steps on an idle 8xMI350 node. Promote only if the steps 2-20 and late-window means beat the retained standard-EP baseline without stability faults."
+}

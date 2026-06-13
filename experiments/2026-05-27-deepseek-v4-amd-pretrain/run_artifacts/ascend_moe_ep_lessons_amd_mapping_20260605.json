@@ -1,0 +1,99 @@
+{
+  "artifact": "ascend_moe_ep_lessons_amd_mapping_20260605",
+  "created_at": "2026-06-05",
+  "purpose": "Persist source-backed lessons from the Ascend TorchTitan-NPU/CANN DeepSeek-V4 MoE/EP recipe and map them to the AMD MORI+AITER owner-backward path.",
+  "ascend_sources": {
+    "autofuse_report": "sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md",
+    "gmm_converter": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/gmm.py",
+    "permute_converter": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permute.py",
+    "unpermute_autograd": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permutation.py"
+  },
+  "ascend_lessons": [
+    {
+      "name": "pure_fsdp_plus_large_ep",
+      "read": "Ascend's main recipe uses TP1/PP1 with large EP and FSDP. This supports the AMD TP1/PP1/CP1/FSDP4/EP4 canary path."
+    },
+    {
+      "name": "separate_fsdp_ep_process_groups",
+      "read": "Ascend reports that separating FSDP and EP process groups lets FSDP and EP communication run on independent HCCL streams, reducing MoE communication wait from longest observed 10 ms to about 3 ms."
+    },
+    {
+      "name": "native_grouped_expert_gemm",
+      "read": "Ascend replaces GroupedExperts with npu_grouped_matmul, fuses W1/W3 into W13, runs grouped W13, npu_swiglu, then grouped W2, with grouped matmul backward for dinput and dweight."
+    },
+    {
+      "name": "compact_route_metadata_not_full_routed_output",
+      "read": "Ascend's token unpermute autograd saves sorted_indices and restore_shape, avoiding full routed_output storage during backprop."
+    },
+    {
+      "name": "fine_grained_recompute_future_work",
+      "read": "Ascend tolerates full activation checkpointing, but the report still names finer on-demand recompute as future work to avoid redundant vector recompute."
+    },
+    {
+      "name": "autofuse_vector_clutter_reduction",
+      "read": "Ascend AutoFuse gains come from fusing vector/reduction/cast/broadcast fragments and reducing host-bound dispatch. AMD should map this to fused AITER/CK/Triton/HIP epilogues, not more Python wrappers."
+    },
+    {
+      "name": "ep_compute_comm_pipeline_future_work",
+      "read": "Ascend notes MC2 or EP-domain compute/communication pipeline scheduling is not integrated yet, so AMD should first fix owner VJP math before deeper MORI overlap work."
+    }
+  ],
+  "amd_current_evidence": {
+    "retained_4x_anchor": "run_artifacts/torchtitan_mori_saved_dispatch_reuse_ab_20260605.json",
+    "shape": {
+      "gpus": 4,
+      "gpu": "MI350",
+      "sequence_length": 4096,
+      "global_batch_size": 128,
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 8,
+      "tensor_parallel": 1,
+      "pipeline_parallel": 1,
+      "context_parallel": 1,
+      "fsdp": 4,
+      "expert_parallel": 4
+    },
+    "retained_late_step": {
+      "tokens_per_gpu_s": 12570.33,
+      "node_tokens_s": 50281.32,
+      "tflops_per_gpu": 237.19,
+      "peak_logged_memory_gib": 115.04
+    },
+    "saved_dispatch_uplift": {
+      "late_step_tflops_uplift_percent": 4.4,
+      "late_step_tokens_per_gpu_uplift_percent": 4.69,
+      "peak_logged_memory_delta_gib": 3.79
+    },
+    "remaining_wall": "Python per-expert owner VJP plus dX-return wait/skew; profile shows saved-dispatch overhead itself is tiny.",
+    "stage1_capture": {
+      "artifact": "run_artifacts/aiter_stage1_capture_s4096_h4096_i2048_e64_top6_20260605.json",
+      "stage1_shape": [4096, 6, 2048],
+      "stage1_bytes_mib": 96,
+      "read": "Post-SwiGLU stage1 hidden can be exposed from AITER two-stage forward, but raw gate, raw up, and compact per-route W2 output are still missing."
+    }
+  },
+  "amd_decision": {
+    "do_not_do": [
+      "Do not replace AITER fused forward with a padded PyTorch-style forward just to save activations.",
+      "Do not save padded per-expert slabs."
+    ],
+    "do_next": [
+      "Preserve AITER fused forward.",
+      "Reuse compact forward dispatch state.",
+      "Add AITER/CK training-backward contract that either exposes raw gate/up/hidden/output compact state or recomputes gate/up once inside a fused grouped owner VJP.",
+      "Emit dW13, dW2, dX, and dTopkWeight through a compact owner-rank training backward.",
+      "After owner VJP is fixed, reduce dX-return skew and overlap MORI combine earlier or in chunks."
+    ],
+    "promotion_gate": {
+      "must_beat_current_retained_late_step_tflops_per_gpu": 237.19,
+      "must_preserve_or_improve_peak_memory_gib": 115.04,
+      "must_report": [
+        "materialized_e2e_tflops_per_gpu",
+        "tokens_per_gpu_s",
+        "node_tokens_s",
+        "peak_memory_gib",
+        "late_step_stability"
+      ]
+    }
+  }
+}

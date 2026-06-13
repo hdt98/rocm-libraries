@@ -1,0 +1,204 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "status": "completed_two_step_profile_not_throughput_baseline",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint": "none",
+    "checkpoint": false,
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_split_w13": false,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "instrumentation": {
+    "profile_path_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "torch_reference_profile_path_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_hotweight_reduce_profile_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "raw_jsonl_files": 8,
+    "payload_records_per_rank": 576,
+    "total_payload_records": 4608,
+    "total_stage_records": 9216,
+    "hook": "_StandardEPHotWeightBroadcast",
+    "stages": [
+      "forward.copy_owner",
+      "forward.all_reduce_hot_weight",
+      "backward.all_reduce_grad_hot_weight",
+      "backward.scatter_owner_grad"
+    ],
+    "read": "This opt-in DSv4 timing hook synchronizes CUDA events inside the standard-EP hot-weight autograd function, so the throughput numbers are diagnostic only."
+  },
+  "step_metrics": {
+    "step1": {
+      "loss": 12.34362,
+      "grad_norm": 18.75,
+      "tokens_per_gpu_s": 1647.0,
+      "tflops_per_gpu": 83.40,
+      "peak_logged_memory_gib_rankmax": 156.07
+    },
+    "step2": {
+      "loss": 8.13180,
+      "grad_norm": 41.25,
+      "tokens_per_gpu_s": 7707.0,
+      "tflops_per_gpu": 390.22,
+      "peak_logged_memory_gib_rankmax": 193.93
+    }
+  },
+  "torch_reference_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hotweight_reduce_profile_8x_s4096_gbs128_mbs4_steps2_20260607.json",
+  "comparison_to_torch_hot_weight_profile_ms": {
+    "raw_all_calls_rankmax_sum": {
+      "torch": {
+        "forward_all_reduce_hot_weight_total": 279.472431,
+        "backward_all_reduce_grad_hot_weight_total": 461.728064,
+        "copy_owner_total": 5.366850,
+        "scatter_owner_grad_total": 4.670677,
+        "forward_total": 284.692115,
+        "backward_total": 466.398741
+      },
+      "sdma": {
+        "forward_all_reduce_hot_weight_total": 5215.295393,
+        "backward_all_reduce_grad_hot_weight_total": 569.801496,
+        "copy_owner_total": 5.152006,
+        "scatter_owner_grad_total": 4.554199,
+        "forward_total": 5219.085275,
+        "backward_total": 574.355695
+      },
+      "delta_sdma_minus_torch": {
+        "forward_all_reduce_hot_weight_total": 4935.822962,
+        "backward_all_reduce_grad_hot_weight_total": 108.073432,
+        "copy_owner_total": -0.214844,
+        "scatter_owner_grad_total": -0.116478,
+        "forward_total": 4934.393160,
+        "backward_total": 107.956954
+      },
+      "read": "Raw all-call SDMA timing includes a one-time first-use setup/JIT/handle tax: w2.forward.all_reduce_hot_weight call 1 is about 4.93s on every rank."
+    },
+    "exclude_first_call_id_rankmax_sum": {
+      "torch": {
+        "forward_all_reduce_hot_weight_total": 264.677314,
+        "backward_all_reduce_grad_hot_weight_total": 461.728064,
+        "copy_owner_total": 5.347170,
+        "scatter_owner_grad_total": 4.670677,
+        "forward_total": 269.886437,
+        "backward_total": 466.398741
+      },
+      "sdma": {
+        "forward_all_reduce_hot_weight_total": 285.573713,
+        "backward_all_reduce_grad_hot_weight_total": 569.801496,
+        "copy_owner_total": 5.147326,
+        "scatter_owner_grad_total": 4.554199,
+        "forward_total": 289.352555,
+        "backward_total": 574.355695
+      },
+      "delta_sdma_minus_torch": {
+        "forward_all_reduce_hot_weight_total": 20.896399,
+        "backward_all_reduce_grad_hot_weight_total": 108.073432,
+        "copy_owner_total": -0.199844,
+        "scatter_owner_grad_total": -0.116478,
+        "forward_total": 19.466118,
+        "backward_total": 107.956954
+      }
+    },
+    "approx_step2_call_id_gt288_rankmax_sum": {
+      "torch": {
+        "forward_all_reduce_hot_weight_total": 132.775089,
+        "backward_all_reduce_grad_hot_weight_total": 220.076515,
+        "copy_owner_total": 3.109943,
+        "scatter_owner_grad_total": 2.833219,
+        "forward_total": 134.454391,
+        "backward_total": 222.909734
+      },
+      "sdma": {
+        "forward_all_reduce_hot_weight_total": 137.681866,
+        "backward_all_reduce_grad_hot_weight_total": 211.457494,
+        "copy_owner_total": 2.834299,
+        "scatter_owner_grad_total": 2.291026,
+        "forward_total": 139.582799,
+        "backward_total": 213.748520
+      },
+      "delta_sdma_minus_torch": {
+        "forward_all_reduce_hot_weight_total": 4.906777,
+        "backward_all_reduce_grad_hot_weight_total": -8.619021,
+        "copy_owner_total": -0.275644,
+        "scatter_owner_grad_total": -0.542193,
+        "forward_total": 5.128408,
+        "backward_total": -9.161214
+      },
+      "read": "In the approximate step-2 window, SDMA saves about 8.6 ms rank-max in backward hot-dW all-reduce but adds about 4.9 ms in forward hot-weight all-reduce, so the net hot-weight microstage improvement is only about 3 ms for the profiled step."
+    },
+    "late_window_call_id_gt432_rankmax_sum": {
+      "torch": {
+        "forward_all_reduce_hot_weight_total": 56.163955,
+        "backward_all_reduce_grad_hot_weight_total": 114.563741,
+        "copy_owner_total": 1.574735,
+        "scatter_owner_grad_total": 1.566249,
+        "forward_total": 57.006687,
+        "backward_total": 116.129990
+      },
+      "sdma": {
+        "forward_all_reduce_hot_weight_total": 60.593200,
+        "backward_all_reduce_grad_hot_weight_total": 107.541062,
+        "copy_owner_total": 1.379408,
+        "scatter_owner_grad_total": 1.288618,
+        "forward_total": 61.545446,
+        "backward_total": 108.668030
+      },
+      "delta_sdma_minus_torch": {
+        "forward_all_reduce_hot_weight_total": 4.429245,
+        "backward_all_reduce_grad_hot_weight_total": -7.022679,
+        "copy_owner_total": -0.195327,
+        "scatter_owner_grad_total": -0.277631,
+        "forward_total": 4.538759,
+        "backward_total": -7.461960
+      }
+    }
+  },
+  "largest_sdma_outliers": [
+    {
+      "stage": "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight",
+      "rank": 7,
+      "call_id": 1,
+      "gpu_ms": 4931.500977,
+      "read": "one-time SDMA first-use setup/JIT/handle tax"
+    },
+    {
+      "stage": "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+      "rank": 6,
+      "call_id": 41,
+      "gpu_ms": 131.473633,
+      "read": "early backward w3 tail; not present in the late steady window"
+    },
+    {
+      "stage": "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+      "rank": 1,
+      "call_id": 333,
+      "gpu_ms": 17.516075,
+      "read": "largest approximate step-2 hot dW call"
+    }
+  ],
+  "read": {
+    "materialized_e2e_context": "The six-step no-profile SDMA hot-weight run remains the current retained 12-layer candidate at 8,029.0 tok/GPU/s and 406.522 TFLOPs/GPU, about +0.67% over the previous top-8 standard-EP torch-transport run.",
+    "timing_conclusion": "The timing profile explains why the e2e gain is small. After ignoring one-time SDMA setup, SDMA is not a major transport win for standard-EP hot weights. In the approximate step-2 window, it modestly improves backward hot-dW reduction but slightly worsens forward hot-weight broadcast, for only about 3 ms net rank-max improvement on this microstage.",
+    "optimization_ladder_decision": "Keep the SDMA backend as a retained safe transport edge because the six-step run is slightly positive, but do not spend the next optimization turn on more hot-weight all-reduce tuning. Existing W13 hot-split also regressed top-4 throughput, so the next MoE/EP work should preserve the standard-EP hot/cold/helper row partition and move toward first-class compact-row dispatcher layout, batched helper grouped VJP, or overlap of hot-weight movement with helper/owner math."
+  },
+  "commands": {
+    "run": "env TARGET_HOST=do-vunguyen-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_DP_SHARD=8 CANARY_MBS=4 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_MOE_COMM_BACKEND=standard CANARY_MOE_BALANCED_MOE_MODE=execute CANARY_MOE_BALANCED_MOE_HOT_EXPERTS=8 CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE=false CANARY_STANDARD_EP_HOT_SPLIT_W13=false CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND=grouped_mm CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND=mori_sdma CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND=mori_sdma CANARY_PERSIST_JIT_CACHE=auto CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST=4,128 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_SHAREDKV_BLOCK_H=64 CANARY_SHAREDKV_BLOCK_N=64 CANARY_SHAREDKV_BLOCK_D=128 CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607 RUN_ID=torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "parse": "Copied profile JSONL sidecars to /tmp/dsv4_sdma_hotweight_profile_20260607 and /tmp/dsv4_torch_hotweight_profile_20260607, then aggregated standard_ep_hot_weight records by rank, label, phase, and stage."
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "batch": 1,
+  "candidate": null,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_mode": "fused",
+  "candidate_vs_target_forward_ratio": 27.41894573635525,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "max_output_abs_diff": null,
+  "output_atol": 0.01,
+  "reference": null,
+  "reference_kernel_module": null,
+  "reference_mode": "manual_stream",
+  "scope": "forward_only_no_grad",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "target_forward_ms": 3.6,
+  "timing": {
+    "candidate": {
+      "compressed_groups": 1024,
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 98.93657684326172,
+        "mean_ms": 98.70820465087891,
+        "median_ms": 98.71442413330078,
+        "min_ms": 98.43878173828125,
+        "samples_ms": [
+          98.85517883300781,
+          98.48737335205078,
+          98.84453582763672,
+          98.7124252319336,
+          98.62633514404297,
+          98.93657684326172,
+          98.71642303466797,
+          98.43878173828125,
+          98.68466186523438,
+          98.77975463867188
+        ],
+        "stdev_ms": 0.15852033216673414
+      },
+      "enabled": true,
+      "estimated_selected_state_elements": 171798691840,
+      "iters": 10,
+      "last_output_checksum": -0.000279459374723956,
+      "peak_memory_allocated_bytes": 7434288128,
+      "peak_memory_allocated_gib": 6.923720359802246,
+      "requires_grad": false,
+      "selected_keys": 640,
+      "sparse_skip_reason": null,
+      "sparse_used": true,
+      "wall": {
+        "enabled": true,
+        "max_ms": 98.96223701070994,
+        "mean_ms": 98.73558789258823,
+        "median_ms": 98.73885451816022,
+        "min_ms": 98.46563299652189,
+        "samples_ms": [
+          98.90337591059506,
+          98.51228399202228,
+          98.86877599637955,
+          98.73649501241744,
+          98.6510330112651,
+          98.96223701070994,
+          98.74121402390301,
+          98.46563299652189,
+          98.70984498411417,
+          98.80498598795384
+        ],
+        "stdev_ms": 0.16078377053058932
+      },
+      "warmup_iters": 3
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

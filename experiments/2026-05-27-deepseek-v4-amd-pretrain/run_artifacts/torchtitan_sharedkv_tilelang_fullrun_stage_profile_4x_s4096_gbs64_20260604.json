@@ -1,0 +1,110 @@
+{
+  "status": "profile_complete",
+  "scope": "TorchTitan DeepSeek-V4 shared-KV sparse-MLA TileLang dKV e2e stage profile",
+  "date": "2026-06-04",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_run_id": "torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604",
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpoint": "full",
+    "checkpoint_enabled": false
+  },
+  "active_sparse_mla_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "step_1": {
+      "read": "compile and warmup polluted; do not use for bottleneck ranking",
+      "loss": 12.23701,
+      "grad_norm": 12.3125,
+      "approx_tflops_per_gpu": 21.37
+    },
+    "step_2": {
+      "loss": 8.44845,
+      "grad_norm": 22.625,
+      "tokens_per_gpu_s": 4043,
+      "tflops_per_gpu": 76.5,
+      "mfu_percent_mi350x_bf16_peak": 3.31,
+      "peak_logged_memory_gib": 116.53,
+      "step_wall_max_ms": 16191.02
+    }
+  },
+  "additive_step2_rank_max_wall_ms": {
+    "step.train_step": 16190.44,
+    "train_step.microbatch_forward_backward": 15963.72,
+    "train_step.forward_backward_call": 15961.9,
+    "forward_backward.backward": 11404.79,
+    "forward_backward.model_forward": 1988.42,
+    "forward_backward.loss": 732.07,
+    "train_step.accumulated_loss_reduce": 124.28,
+    "train_step.optimizer_step": 30.94,
+    "train_step.fetch_microbatches": 28.75,
+    "train_step.grad_clip": 21.52,
+    "train_step.valid_tokens_all_reduce": 20.74
+  },
+  "sharedkv_backward_stage_rank_median_ms": {
+    "sharedkv_bwd.compressed_tilelang": 12.094,
+    "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 8.228,
+    "sharedkv_bwd.compressed.plan_b0": 2.492,
+    "sharedkv_bwd.gather_selected_kv_fp32": 2.044,
+    "sharedkv_bwd.grad_logits_terms": 2.372,
+    "sharedkv_bwd.local_scatter": 2.096,
+    "sharedkv_bwd.local_dkv_math": 1.736,
+    "sharedkv_bwd.grad_q": 1.515,
+    "sharedkv_bwd.scores_qk": 1.435,
+    "sharedkv_bwd.grad_attn_sink": 0.696,
+    "sharedkv_bwd.probs": 0.582,
+    "sharedkv_bwd.compressed.pack_hsk_b0": 0.510,
+    "sharedkv_bwd.q_do_cast": 0.278,
+    "sharedkv_bwd.compressed.group_prepare": 0.232,
+    "sharedkv_bwd.compressed.groups_b0": 0.077,
+    "sharedkv_bwd.index_prepare": 0.027,
+    "sharedkv_bwd.grad_kv_zero": 0.008
+  },
+  "single_boundary_reference": {
+    "artifact": "run_artifacts/tilelang_selected_limit_actual_li_bridge_stage_profile_decision_20260604.json",
+    "s4096_layer2_component_median_sum_ms": 21.467,
+    "s4096_layer2_tilelang_dkv_source_indexed_kernel_ms": 7.307,
+    "read": "The isolated actual-LI boundary profile says TileLang's selected-limit dKV body is useful, but the materialized bridge around it is still about 21.5 ms before compressor/LI integration."
+  },
+  "read": "TileLang is promising, but the e2e run shows the win is currently trapped inside a larger backward bridge. At the TorchTitan step boundary, backward is still the dominant wall at 11.4 s of a 16.2 s step. Inside shared-KV sparse attention backward, the TileLang compressed-dKV region is the largest per-call stage, but the surrounding materialized bridge is also large: route planning, selected-KV gather, QK/probability/grad-logit rebuild, dQ, local dKV math, and local scatter add up to roughly another 13 ms per call. That explains why a 6-8 ms TileLang dKV kernel did not move TFLOPs much by itself.",
+  "bottleneck_ranking": [
+    "Whole step: backward dominates, not forward or optimizer.",
+    "Sparse-MLA backward call: compressed TileLang dKV body is still the largest single stage.",
+    "Bridge overhead around TileLang is the next attention-local wall: materialized selected-KV, probability/grad-logit slabs, separate QK/PV/dQ stages, and route planning.",
+    "Therefore the next TileLang work should be a fused/adjacent sparse-MLA backward boundary, not only a faster final dKV store kernel."
+  ],
+  "next_profile_actions": [
+    "Run a no-profile or minimal-profile 4x/8x e2e A/B with TileLang on/off after the first fused bridge change, because this profile intentionally synchronizes many stages.",
+    "Add one attention-layer call counter keyed by layer/compress_ratio so per-call TileLang costs can be mapped to layer 2 versus layer 3 instead of only aggregate stage labels.",
+    "Profile a fused TileLang boundary candidate that consumes q, dO, compressed K/V, top_indices, and row stats directly, avoiding selected-KV/probs/grad_logits HBM slabs.",
+    "Keep the full-step additive timer enabled for 2-step diagnostics only; use profiler-off runs for promoted TFLOPs."
+  ],
+  "negative_control": {
+    "run_id": "torchtitan_dsv4_tilelang_sharedkv_stage_profile_8x_s4096_gbs128_steps2_20260604",
+    "read": "This earlier 8x run was misconfigured: it did not force shared_kv backward mode or the shared-KV kernel module, so it is retained only as negative evidence and not used for TileLang bottleneck ranking."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=2 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604/profiling/profile_timing CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=true CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604/profiling/additive_timing.jsonl experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu 'cd /scratch/sonle5/dsv4_pretrain_canary_20260527 && python3 tools/dsv4_runtime_probe/summarize_full_run_profile.py --run sharedkv4=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_stage_profile_4x_s4096_gbs64_steps2_20260604/profiling --dsv4-steady-after-call-id 0 --pretty'"
+  ]
+}

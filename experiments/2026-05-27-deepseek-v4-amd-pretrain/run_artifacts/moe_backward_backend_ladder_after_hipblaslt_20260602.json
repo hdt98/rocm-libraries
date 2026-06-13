@@ -1,0 +1,174 @@
+{
+  "artifact": "moe_backward_backend_ladder_after_hipblaslt_20260602",
+  "created_at": "2026-06-02",
+  "question": "After splitting the full backward GEMM/BMM bucket and testing hipBLASLt GroupedGemm, which MoE-backward backend branch is still viable for DeepSeek-V4 Flash pretraining on MI350?",
+  "scope": {
+    "experiment": "2026-05-27-deepseek-v4-amd-pretrain",
+    "target_runtime": "TorchTitan direct DeepSeek-V4 Flash BF16, MORI routed EP, FSDP/EP 4x or 8x MI350",
+    "single_layer_trace_scope": "one-MI350 S4096 fixed-router packed-sim full-layer trace",
+    "owner_rank_probe_scope": "EP8 owner-rank local VJP shape: tokens_per_rank=4096, world_size=8, total_experts=256, local_experts=32, topk=6"
+  },
+  "full_backward_cijk_split": {
+    "artifact": "run_artifacts/single_layer_backward_gemm_bucket_split_20260602.json",
+    "phase_backward_cpu_annotation_ms": 46.115512,
+    "cijk_bucket_ms": 36.166029,
+    "moe_cijk_ms": 26.586292,
+    "moe_share_of_cijk_bucket": 0.7351178090356559,
+    "attention_cijk_ms": 9.579737000000002,
+    "attention_share_of_cijk_bucket": 0.2648821909643439,
+    "by_label": {
+      "moe_routed_expert_vjp_ms": 25.453129,
+      "moe_shared_expert_vjp_ms": 1.133163,
+      "attention_sparse_mla_backward_ms": 4.889395,
+      "attention_out_projection_backward_ms": 2.267855,
+      "attention_q_path_backward_ms": 1.7970110000000001,
+      "attention_kv_and_compressor_backward_ms": 0.625476
+    },
+    "read": "The full backward GEMM/BMM-family bucket is mostly MoE routed expert VJP, but attention sparse MLA/projection GEMMs remain a separate second bucket. The MoE backend ladder targets the MoE slice, not the whole 36.17 ms bucket."
+  },
+  "retained_owner_rank_moe_vjp_baseline": {
+    "artifact": "run_artifacts/owned_expert_vjp_ep8_triton_swiglu_detail_20260602.json",
+    "route_stats": {
+      "assignments_to_owner_rank": 24695,
+      "local_experts": 32,
+      "min_per_local_expert": 708,
+      "max_per_local_expert": 816,
+      "mean_per_local_expert": 771.71875,
+      "padded_rows_local_max": 26112,
+      "padding_multiplier_local_max": 1.0573800364446244
+    },
+    "timing_ms": {
+      "torch_padded_full_vjp": 7.498781204223633,
+      "triton_swiglu_padded_full_vjp": 6.433646202087402,
+      "triton_swiglu_forward_recompute": 2.5480339527130127,
+      "triton_swiglu_dgrad_swiglu": 0.7043690085411072,
+      "triton_swiglu_wgrad": 2.244110107421875,
+      "triton_swiglu_xgrad_reduce": 1.5999410152435303,
+      "triton_swiglu_reduce_only": 0.6269689798355103
+    },
+    "read": "The current retained EP8 owner-rank VJP baseline is padded torch grouped expert math plus Triton-fused SwiGLU. It is the benchmark to beat before changing TorchTitan integration."
+  },
+  "saved_activation_upper_bounds": {
+    "artifact": "run_artifacts/owned_expert_vjp_ep8_stage1_saved_activation_20260602.json",
+    "timing_ms": {
+      "triton_swiglu_recompute": 6.577022075653076,
+      "ideal_gate_up_hidden": 5.387613773345947,
+      "ideal_gate_up_hidden_plus_unweighted_output": 4.77380895614624,
+      "aiter_stage1_hidden_only": 6.591463088989258,
+      "aiter_stage1_hidden_plus_unweighted_output": 5.85913610458374
+    },
+    "contract_artifact": "run_artifacts/aiter_fused_moe_saved_intermediate_contract_20260602.json",
+    "read": "The public AITER fused_moe return surface does not expose the ideal gate/up training intermediates. Stage1 post-SwiGLU hidden alone is nearly neutral, so a useful training path needs either a forward API that saves gate/up and unweighted output, or a fused backward that recomputes gate/up internally while avoiding extra memory traffic."
+  },
+  "closed_or_demoted_backend_branches": [
+    {
+      "backend": "hipBLASLt GroupedGemm",
+      "artifacts": [
+        "run_artifacts/hipblaslt_grouped_gemm_moe_backward_decision_20260602.json",
+        "run_artifacts/hipblaslt_grouped_gemm_owner_shape_forward_gate_fp16_smoke_20260602.json"
+      ],
+      "decision": "do_not_wire_into_torchtitan_now",
+      "evidence": "No BF16 grouped solution in the active ROCm image for the tested owner-rank shape; FP16 control worked but was much slower than torch.bmm: 5.069951 ms hipBLASLt versus 0.533568 ms torch for the forward-gate control."
+    },
+    {
+      "backend": "AITER compact GMM/TGMM for training backward",
+      "artifacts": [
+        "run_artifacts/aiter_gmm_dynamic_flash_s4096_decision_20260531.json",
+        "run_artifacts/owned_expert_vjp_ep8_shape_detail_ptgmm_20260602.json"
+      ],
+      "decision": "demote_for_current_moe_backward",
+      "evidence": "AITER dynamic compact GMM/TGMM is correct but slower than retained padded torch at the Flash S4096 shape. At the EP8 owner-rank VJP shape, AITER compact full VJP is 12.168997 ms versus 7.511162 ms padded torch."
+    },
+    {
+      "backend": "stock or lightly wrapped CK Tile grouped GEMM",
+      "artifacts": [
+        "run_artifacts/ck_tile_grouped_gemm_example_s4096_decision_20260531.json",
+        "run_artifacts/ck_tile_custom_config_sweep_s4096_decision_20260531.json",
+        "run_artifacts/ck_tile_custom_config_flash_s4096_all_decision_20260531.json",
+        "run_artifacts/ck_tile_small_m_preshuffle_s4096_decision_20260531.json"
+      ],
+      "decision": "demote_as_drop_in_grouped_gemm",
+      "evidence": "The stock/custom CK Tile grouped GEMM examples can express the W2 dgrad family but remain slower than retained padded torch.bmm. Example S4096 numbers include 5.877-5.879 ms CK versus 4.304 ms padded torch for the DSv4-Pro-shaped W2 dgrad, and the Flash-shape custom sweep also failed to beat padded torch or the best AITER compact config."
+    },
+    {
+      "backend": "TileLang descriptor grouped GEMM",
+      "artifacts": [
+        "run_artifacts/tilelang_descriptor_gemm_dgrad_s4096_decision_20260531.json",
+        "run_artifacts/tilelang_descriptor_gemm_dgrad_decision_20260531.json"
+      ],
+      "decision": "demote_as_drop_in_grouped_gemm",
+      "evidence": "Descriptor TileLang removes the all-expert scan and passes correctness, but S4096 best median is 7.776 ms versus 4.304 ms padded torch. The current onenexus/nexus-titan:rocm722-pytorch-nightly-mori runtime also does not include tilelang."
+    },
+    {
+      "backend": "naive Triton compact grouped GEMM or direct atomic fused xgrad",
+      "artifacts": [
+        "run_artifacts/triton_compact_grouped_gemm_s4096_decision_20260531.json",
+        "run_artifacts/triton_fused_moe_backward_s4096_decision_20260531.json",
+        "run_artifacts/triton_fused_xgrad_reduce_decision_20260531.json"
+      ],
+      "decision": "demote_as_full_vjp_backend_but_keep_correctness_oracles",
+      "evidence": "The tensor contracts are correct, but compact rows alone lose MFMA efficiency. Direct atomic xgrad+reduce is especially bad. Triton remains useful for the already-promoted SwiGLU vector fusion, not as the complete grouped-GEMM backend."
+    },
+    {
+      "backend": "packed W13 padded torch variant",
+      "artifact": "run_artifacts/owned_expert_vjp_ep8_fused_w13_triton_swiglu_strided_20260602.json",
+      "decision": "do_not_promote",
+      "evidence": "Packed W13 marginally improves full VJP from 6.596282 ms to 6.496673 ms in one same-run probe, but wgrad regresses from 2.022586 ms to 2.135225 ms and the win is too small for a TorchTitan layout change."
+    }
+  ],
+  "positive_components_to_keep": [
+    {
+      "component": "MORI routed dispatch/combine plus padded owner-rank VJP shell",
+      "reason": "It passes 4x and 8x target-shape guarded systems canaries with learned routing and loss movement."
+    },
+    {
+      "component": "Triton-fused SwiGLU inside owner-rank VJP",
+      "reason": "It reduces the EP8 owner-rank full VJP from about 7.50 ms to 6.43 ms and is already integrated behind an opt-in TorchTitan env."
+    },
+    {
+      "component": "CK Tile fused_moe and FlatMM source as a schedule reference",
+      "reason": "ROCm libraries do not provide a turnkey MoE training backward, but the fused_moe forward path is still the closest AMD-native schedule/layout reference for a custom training backward."
+    },
+    {
+      "component": "saved-activation contract as an upper-bound guide",
+      "reason": "Ideal gate/up/hidden plus unweighted output would pull the owner-rank VJP to about 4.77 ms, which is the best measured MoE-backward ladder rung so far."
+    }
+  ],
+  "next_viable_backend_candidate": {
+    "name": "custom training MoE backward built around the owner-rank contract, not a generic grouped-GEMM swap",
+    "shape": "EP8 owner-rank local M about 700-800 per expert, H=4096, I=2048, 32 local experts, BF16 inputs with FP32 accumulation where needed",
+    "implementation_direction": [
+      "Use the retained MORI routed backward shell and padded owner-rank layout for integration stability.",
+      "Build a benchmark-only fused VJP backend first, derived from CK Tile fused_moe/FlatMM scheduling ideas or a HIP/CK extension, before touching TorchTitan production paths.",
+      "Fuse or tightly stage forward recompute, W2 dgrad, SwiGLU backward, W1/W3 xgrad, compact-to-token reduction, and W1/W2/W3 wgrad around the owner-rank packed tensors.",
+      "Prefer exposing or preserving gate/up/hidden and unweighted compact expert output in the training forward contract if memory permits; otherwise recompute gate/up inside the fused backward while avoiding extra global-memory materialization.",
+      "Avoid direct token-gradient atomics as the primary xgrad path; use separated grouped GEMM plus reduce or tile-local reduction unless a new split/reduce design proves faster."
+    ],
+    "acceptance_gates": [
+      "Correctness versus tools/dsv4_runtime_probe/probe_owned_expert_vjp_ep_shape.py for dX, dW1, dW2, dW3, and dTopkWeight at EP8 owner-rank shape.",
+      "First promotion gate: beat 6.43 ms full owner-rank VJP median versus the current Triton-SwiGLU padded baseline.",
+      "Useful saved-contract gate: beat 5.86 ms if relying only on AITER-like stage1 hidden plus unweighted output, or approach the 4.77 ms ideal saved gate/up/hidden plus unweighted-output upper bound.",
+      "Integration gate: preserve the existing 4x and 8x TorchTitan MORI target-shape canary behavior before claiming end-to-end improvement."
+    ]
+  },
+  "runtime_availability_check": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "modules": {
+      "torch": true,
+      "triton": true,
+      "aiter": true,
+      "tilelang": false
+    },
+    "read": "TileLang is not present in the active MORI TorchTitan image, so TileLang is not the shortest next runtime path unless the image is extended. AITER and Triton are present; CK/HIP extension work would need an explicit build or mounted prebuilt library."
+  },
+  "decision": {
+    "do_next": "Do not rerun another generic compact grouped-GEMM sweep. Start a benchmark-only custom owner-rank fused-training-backward probe, using the existing padded/Triton-SwiGLU VJP as the oracle and target.",
+    "do_not_do_next": [
+      "Do not wire hipBLASLt GroupedGemm into TorchTitan.",
+      "Do not promote AITER compact GMM/TGMM as the backward backend.",
+      "Do not treat CK Tile or TileLang example grouped GEMM wrappers as solved paths without a new fused owner-rank training-backward contract.",
+      "Do not optimize dispatch/combine alone for this gap; the measured MoE wall is the owner-rank training math and saved-state contract."
+    ]
+  }
+}

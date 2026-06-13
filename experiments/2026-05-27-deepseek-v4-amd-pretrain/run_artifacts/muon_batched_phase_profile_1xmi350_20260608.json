@@ -1,0 +1,41 @@
+{
+  "artifact": "muon_batched_phase_profile_1xmi350_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "command": "docker run --rm --entrypoint /bin/bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --security-opt seccomp=unconfined -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace -e HIP_VISIBLE_DEVICES=0 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True -e TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES=4 -e TORCHTITAN_OPTIMIZER_MUON_NS_COMPUTE_DTYPE=bfloat16 -e PYTHONPATH=/workspace/sources/wip/torchtitan onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc \"python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 12 --modes muon_batched_phase --muon-ns-steps 5 --repeat 1\"",
+  "shape": {
+    "device": "1xMI350",
+    "layers": 12,
+    "expert_tensors_per_layer": 3,
+    "local_experts": 32,
+    "matrix_count": 1152,
+    "dtype": "bfloat16",
+    "chunk_matrices": 4,
+    "chunk_count": 288,
+    "muon_ns_steps": 5,
+    "muon_ns_compute_dtype": "bfloat16"
+  },
+  "result": {
+    "kind": "muon_batched_phase",
+    "step_gpu_ms": 657.7771606445312,
+    "param_bytes_gib": 18.0,
+    "state_after_step_gib": 18.0,
+    "mem_after_step_gib": 54.13671875,
+    "step_peak_allocated_gib": 54.32421922683716,
+    "stage_ms": {
+      "weight_decay": 6.075305998325348,
+      "momentum_update": 10.6508329808712,
+      "make_update": 9.38289700448513,
+      "ns_norm": 42.25827898085117,
+      "ns_gram": 154.01522195339203,
+      "ns_poly_update": 380.98025919497013,
+      "ns_output_cast": 1.3372489917092025,
+      "param_add": 29.05878309905529
+    },
+    "ns_total_ms": 578.5910091209225,
+    "non_ns_total_ms": 55.16781908273697,
+    "ns_fraction_of_step": 0.8794
+  },
+  "read": "The remaining batched expert-Muon wall is Newton-Schulz math, not optimizer-state persistence or a leftover bridge copy. With chunk4/NS5 on the 12-layer expert-bank slice, NS stages account for about 579 ms of a 658 ms step. The previous high-memory native path is fixed by batched chunking, but Python-level Muon remains slower than fused AdamW unless Newton-Schulz is reduced, fused, or implemented in a lower-level batched kernel."
+}

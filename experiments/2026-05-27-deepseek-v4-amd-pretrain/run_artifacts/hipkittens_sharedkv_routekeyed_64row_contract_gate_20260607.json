@@ -1,0 +1,106 @@
+{
+  "artifact_id": "hipkittens_sharedkv_routekeyed_64row_contract_gate_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "gpu": "MI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "workdir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner",
+  "source": {
+    "contract_file": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_routekeyed_64row_contract.cpp",
+    "probe_file": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_contract.py",
+    "make_target": "hk_sharedkv_routekeyed_64row_contract"
+  },
+  "purpose": "Structural gate for a HipKittens SharedKV backward rewrite that uses a route-keyed 64-row resident compressed-group tile instead of the existing 4-warp 256-row KV page.",
+  "static_shape": {
+    "batch": 4,
+    "seq": 4096,
+    "kv_heads": 1,
+    "dim": 128,
+    "kv_tile_rows": 64,
+    "kv_tiles": 64,
+    "num_warps": 1
+  },
+  "build": {
+    "command": "make hk_sharedkv_routekeyed_64row_contract GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H_KV=1 ATTN_N=4096",
+    "offload_arch": "gfx950",
+    "resource_report": {
+      "total_sgprs": 30,
+      "vgprs": 26,
+      "agprs": 8,
+      "scratch_bytes_per_lane": 0,
+      "dynamic_stack": false,
+      "occupancy_waves_per_simd": 8,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    },
+    "status": "passed"
+  },
+  "sweep": [
+    {
+      "active_tiles": 0,
+      "latency_ms": {
+        "median": 0.03270049951970577,
+        "mean": 0.03655424993485212,
+        "min": 0.028040999546647072,
+        "max": 0.11736000329256058
+      },
+      "dq_scratch_nonzero": 0,
+      "sink_nonzero": 0
+    },
+    {
+      "active_tiles": 1,
+      "latency_ms": {
+        "median": 0.0295200003311038,
+        "mean": 0.03234815029427409,
+        "min": 0.026599999517202377,
+        "max": 0.0464400015771389
+      },
+      "dq_scratch_nonzero": 2048,
+      "sink_nonzero": 4
+    },
+    {
+      "active_tiles": 8,
+      "latency_ms": {
+        "median": 0.027880500070750713,
+        "mean": 0.030400449968874456,
+        "min": 0.026000000536441803,
+        "max": 0.04044000059366226
+      },
+      "dq_scratch_nonzero": 16384,
+      "sink_nonzero": 32
+    },
+    {
+      "active_tiles": 16,
+      "latency_ms": {
+        "median": 0.03135999944061041,
+        "mean": 0.03232844974845648,
+        "min": 0.026559999212622643,
+        "max": 0.0517599992454052
+      },
+      "dq_scratch_nonzero": 32768,
+      "sink_nonzero": 64
+    },
+    {
+      "active_tiles": 64,
+      "latency_ms": {
+        "median": 0.029820499941706657,
+        "mean": 0.03291854988783598,
+        "min": 0.028720999136567116,
+        "max": 0.0464010015130043
+      },
+      "dq_scratch_nonzero": 131072,
+      "sink_nonzero": 256
+    }
+  ],
+  "baseline_context": {
+    "current_triton_c4_sharedkv_source_boundary_ms": 11.02,
+    "current_triton_c4_compressed_dcmpkv_accumulation_wall_ms": 8.18,
+    "prior_hipkittens_macro_onewarp_status": "compile_failed_due_256row_tile_contract"
+  },
+  "decision": {
+    "status": "promote_structural_gate_only",
+    "not_a_full_sharedkv_backward_kernel": true,
+    "read": "The 64-row route-keyed HipKittens producer shape now compiles and runs on MI350 with no spills, proving the old 256-row dQ page is not an unavoidable HipKittens constraint. It does not yet compute the full QK/P/dP/dQ/dOriKV/dCmpKV/dSinks SharedKV backward boundary.",
+    "next_step": "Retile the real SharedKV backward producer around this 64-row route-keyed resident tile, then add dQ, dOriKV, dSinks, and route-aware dCmpKV accumulation before comparing against the 11.02 ms C4 Triton boundary."
+  }
+}

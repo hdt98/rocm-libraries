@@ -1,0 +1,359 @@
+{
+  "cases": {
+    "all_empty": {
+      "rank_payloads": [
+        {
+          "kept": [],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 2,
+            "balanced_moe_active_any_selected_after": 0,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 0
+        },
+        {
+          "kept": [],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 2,
+            "balanced_moe_active_any_selected_after": 0,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 1
+        },
+        {
+          "kept": [],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 2,
+            "balanced_moe_active_any_selected_after": 0,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 2
+        },
+        {
+          "kept": [],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 2,
+            "balanced_moe_active_any_selected_after": 0,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 3
+        }
+      ]
+    },
+    "middle_pruned": {
+      "rank_payloads": [
+        {
+          "kept": [
+            10,
+            12
+          ],
+          "mask_true": [
+            0,
+            1
+          ],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              1,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              10,
+              12
+            ],
+            "balanced_moe_active_any_local_counts": [
+              1,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 2,
+            "balanced_moe_active_any_selected_before": 3
+          },
+          "offsets": [
+            0,
+            1
+          ],
+          "positions": [
+            0,
+            1
+          ],
+          "rank": 0
+        },
+        {
+          "kept": [
+            10,
+            12
+          ],
+          "mask_true": [
+            0
+          ],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              1,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              10,
+              12
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 2,
+            "balanced_moe_active_any_selected_before": 3
+          },
+          "offsets": [
+            1
+          ],
+          "positions": [
+            0
+          ],
+          "rank": 1
+        },
+        {
+          "kept": [
+            10,
+            12
+          ],
+          "mask_true": [
+            0
+          ],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              1,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              10,
+              12
+            ],
+            "balanced_moe_active_any_local_counts": [
+              1,
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 2,
+            "balanced_moe_active_any_selected_before": 3
+          },
+          "offsets": [
+            0
+          ],
+          "positions": [
+            0
+          ],
+          "rank": 2
+        },
+        {
+          "kept": [
+            10,
+            12
+          ],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              1,
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              10,
+              12
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 2,
+            "balanced_moe_active_any_selected_before": 3
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 3
+        }
+      ]
+    },
+    "one_hot_active": {
+      "rank_payloads": [
+        {
+          "kept": [
+            11
+          ],
+          "mask_true": [
+            0,
+            1,
+            2
+          ],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              11
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              3
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 1,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [
+            0,
+            0,
+            0
+          ],
+          "positions": [
+            0,
+            1,
+            2
+          ],
+          "rank": 0
+        },
+        {
+          "kept": [
+            11
+          ],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              11
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 1,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 1
+        },
+        {
+          "kept": [
+            11
+          ],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              11
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 1,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 2
+        },
+        {
+          "kept": [
+            11
+          ],
+          "mask_true": [],
+          "meta": {
+            "balanced_moe_active_any_enabled": true,
+            "balanced_moe_active_any_flags": [
+              0,
+              1
+            ],
+            "balanced_moe_active_any_kept_global_ids": [
+              11
+            ],
+            "balanced_moe_active_any_local_counts": [
+              0,
+              0
+            ],
+            "balanced_moe_active_any_pruned": 1,
+            "balanced_moe_active_any_selected_after": 1,
+            "balanced_moe_active_any_selected_before": 2
+          },
+          "offsets": [],
+          "positions": [],
+          "rank": 3
+        }
+      ]
+    }
+  },
+  "status": "passed",
+  "world_size": 4
+}

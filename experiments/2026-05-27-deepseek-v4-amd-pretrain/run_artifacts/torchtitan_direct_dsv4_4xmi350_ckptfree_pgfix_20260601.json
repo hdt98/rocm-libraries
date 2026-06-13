@@ -1,0 +1,116 @@
+{
+  "artifact": "torchtitan_direct_dsv4_4xmi350_ckptfree_pgfix_20260601",
+  "purpose": "Record the first checkpoint-free direct TorchTitan DeepSeek-V4 Flash 4-layer 4xMI350 smoke after promoting dedicated EP ProcessGroup support into the direct WIP path.",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_cli_used": false,
+  "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect09",
+  "failed_launcher_attempts_before_success": [
+    {
+      "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect07",
+      "result": "failed_before_training",
+      "reason": "TorchTitan tyro CLI rejected boolean values passed as '--checkpoint.enable false' and '--checkpoint.last_save_model_only false'."
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect08",
+      "result": "failed_before_training",
+      "reason": "TorchTitan tyro CLI also rejected boolean values passed as '--checkpoint.enable=false' and '--checkpoint.last_save_model_only=false'."
+    }
+  ],
+  "runtime": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "visible_devices": "2,3,6,7",
+    "torch_version_from_pg_probe": "2.13.0a0+gitccf72d7",
+    "torch_hip_from_pg_probe": "7.2.53211",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect09/docker-run.log",
+    "dump_folder": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect09"
+  },
+  "model": {
+    "module": "torchtitan.models.deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "implementation_status": "structural_canary_dense_mla_fallback",
+    "attention_status": "dense_mla_fallback_missing_sparse_mla_indexer"
+  },
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "local_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "seq_len": 4096,
+    "precision": "bf16",
+    "optimizer": "AdamW",
+    "activation_checkpoint": "full",
+    "checkpoint_enable": false
+  },
+  "direct_process_group_probe": {
+    "artifact": "run_artifacts/torchtitan_direct_fsdp_ep_pg_probe_4x_20260601.json",
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_pg_probe_20260601Tdirect06",
+    "result": "passed_distinct_fsdp_ep_process_groups",
+    "fsdp_group_is_ep_group_by_rank": [false, false, false, false],
+    "fsdp_group_ranks_equal_ep_group_ranks_by_rank": [true, true, true, true],
+    "fsdp_all_reduce_sum_by_rank": [6.0, 6.0, 6.0, 6.0],
+    "ep_all_to_all_recv_by_rank": [
+      [0.0, 1.0, 2.0, 3.0],
+      [0.0, 1.0, 2.0, 3.0],
+      [0.0, 1.0, 2.0, 3.0],
+      [0.0, 1.0, 2.0, 3.0]
+    ]
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.32516,
+      "grad_norm": 11.375,
+      "memory_gib": 75.64,
+      "tokens_per_gpu_s_range": [3430, 3447],
+      "reported_tflops_per_gpu_range": [64.52, 64.84],
+      "reported_mfu_pct_range": [20.68, 20.78],
+      "note": "warmup step"
+    },
+    {
+      "step": 2,
+      "loss": 10.13474,
+      "grad_norm": 21.875,
+      "memory_gib_range": [91.59, 91.96],
+      "tokens_per_gpu_s": 9193,
+      "reported_tflops_per_gpu": 172.93,
+      "reported_mfu_pct": 55.43
+    },
+    {
+      "step": 3,
+      "loss": 13.48705,
+      "grad_norm": 36.75,
+      "memory_gib_range": [91.59, 91.96],
+      "tokens_per_gpu_s_range": [9531, 9532],
+      "reported_tflops_per_gpu": 179.30,
+      "reported_mfu_pct": 57.47
+    }
+  ],
+  "health": {
+    "finite_loss": true,
+    "finite_grad_norm": true,
+    "training_completed": true,
+    "process_group_destroyed": true,
+    "checkpoint_directory_created": false
+  },
+  "remote_output_size": "1.4M",
+  "filesystem_after_run": {
+    "filesystem": "/dev/vda1",
+    "used": "1.9T",
+    "available": "108G",
+    "use_pct": 95
+  },
+  "updated_target_comparison": {
+    "user_updated_2026_06_01_target_tokens_per_gpu_s_range": [2200, 2400],
+    "step2_ratio_to_low_target": 4.18,
+    "step2_ratio_to_high_target": 3.83,
+    "step3_ratio_to_low_target": 4.33,
+    "step3_ratio_to_high_target": 3.97,
+    "caveat": "This is the 4-layer structural dense-MLA fallback canary, so treat throughput as systems-smoke evidence rather than final full DeepSeek-V4-Flash sparse-MLA performance."
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "artifact_type": "mori_native_compact_generation_barrier_gate",
+  "status": "completed_not_promoted",
+  "created_at": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_genbarrier_noprereset_mbs8_steps2_heap32_cap65536_20260609",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_genbarrier_noprereset_mbs8_steps2_heap32_cap65536_20260609",
+  "remote_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_genbarrier_noprereset_mbs8_steps2_heap32_cap65536_20260609",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "env": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "TORCHTITAN_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_BLOCKS": "64",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WARPS": "8",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "65536",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "false",
+    "TORCHTITAN_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "false",
+    "MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only"
+  },
+  "implementation_changes": [
+    {
+      "file": "sources/references/mori/src/ops/dispatch_combine/intranode.hpp",
+      "summary": "Changed the native standard-EP compact grid wait from a reset-required barrier to a generation-aware accumulated barrier."
+    },
+    {
+      "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "summary": "Added opt-in pre-reset control for native MORI compact dispatch/combine launches."
+    },
+    {
+      "file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "summary": "Plumbed CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET into the container environment and status echo."
+    },
+    {
+      "file": "tools/probe_standard_ep_mori_native_compact_parity.py",
+      "summary": "Added block/warp launch-shape arguments for native compact parity probes."
+    }
+  ],
+  "validation": [
+    "Remote MORI clean rebuild of mori_ops_kernels plus host libraries passed after refreshing the HSACO and .so files in python/mori.",
+    "4-rank MI350 BF16 parity passed with block_num=64 and warp_per_block=8.",
+    "The 8xMI350 production-shape no-prereset run completed two steps and destroyed process groups cleanly.",
+    "python3 -m py_compile passed for token_dispatcher.py and the parity probe.",
+    "bash -n passed for launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh.",
+    "git diff --check passed for the tracked touched files; direct trailing-whitespace scan passed for the untracked native source, launcher, changeset, and artifact files."
+  ],
+  "step_metrics": {
+    "step_1": {
+      "tokens_per_gpu_s": 1120,
+      "tflops_per_gpu": 56.7,
+      "read": "warmup/JIT step"
+    },
+    "step_2": {
+      "tokens_per_gpu_s": 6852,
+      "node_tokens_s": 54816,
+      "tflops_per_gpu": 346.9,
+      "loss": 8.94092,
+      "grad_norm": 54.5,
+      "peak_logged_memory_gib": 221.97
+    }
+  },
+  "profile_summary": {
+    "native_genbarrier_noprereset": {
+      "standard_ep.dispatch.mori_native_compact.launch": {
+        "calls": 384,
+        "median_ms": 19.96,
+        "p95_ms": 22.05,
+        "max_ms": 56.299,
+        "rank_total_max_ms": 973.048
+      },
+      "standard_ep.combine.mori_native_compact.launch": {
+        "calls": 384,
+        "median_ms": 19.854,
+        "p95_ms": 21.597,
+        "max_ms": 21.725,
+        "rank_total_max_ms": 913.764
+      },
+      "standard_ep.dispatch.mori_native_compact.init": {
+        "calls": 384,
+        "median_ms": 0.283,
+        "p95_ms": 0.863,
+        "rank_total_max_ms": 23005.71,
+        "read": "first handle/build/JIT effect remains in init accounting"
+      },
+      "standard_ep.combine.mori_native_compact.init": {
+        "calls": 384,
+        "median_ms": 1.595,
+        "p95_ms": 6.216,
+        "rank_total_max_ms": 146.793
+      },
+      "standard_ep.combine.weighted_scatter_add": {
+        "calls": 384,
+        "median_ms": 4.97,
+        "p95_ms": 5.51,
+        "rank_total_max_ms": 374.328
+      }
+    },
+    "native_multiblock_prereset_comparison": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_multiblock_mbs8_steps2_heap32_cap65536_20260609",
+      "step_2_tokens_per_gpu_s": 6805,
+      "step_2_tflops_per_gpu": 344.55,
+      "standard_ep.dispatch.mori_native_compact.launch_median_ms": 20.765,
+      "standard_ep.combine.mori_native_compact.launch_median_ms": 20.644,
+      "read": "Generation barrier plus no-prereset is only a small edge improvement over multiblock pre-reset."
+    },
+    "native_single_cta_comparison": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_compactonly_mbs8_steps2_heap32_cap65536_20260609",
+      "step_2_tokens_per_gpu_s": 1903,
+      "step_2_tflops_per_gpu": 96.35,
+      "standard_ep.dispatch.mori_native_compact.launch_median_ms": 240.637,
+      "standard_ep.combine.mori_native_compact.launch_median_ms": 285.78,
+      "read": "The multiblock native protocol fixes the catastrophic single-CTA wall."
+    },
+    "retained_current_best_comparison": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "steps_2_to_20_tokens_per_gpu_s": 8518.84,
+      "steps_2_to_20_tflops_per_gpu": 431.31,
+      "peak_logged_memory_gib": 251.97,
+      "native_step_2_tokens_ratio": 0.8043,
+      "native_step_2_tflops_ratio": 0.8045,
+      "native_memory_delta_gib": -30.0
+    }
+  },
+  "decision": {
+    "what_worked": [
+      "Native compact dispatch/combine is now a real MORI source path, not raw route-mask rediscovery or a post-plan adapter.",
+      "Multiblock native compact kernels recover roughly 3.6x over the conservative single-CTA native compact gate.",
+      "The generation-aware barrier lets the production-shape run complete with per-call pre-reset disabled.",
+      "Native compact remains lower-memory than the retained standard-EP current best in this two-step gate."
+    ],
+    "what_did_not_work": [
+      "Disabling pre-reset is only a small throughput improvement over the multiblock pre-reset gate: about 6852 vs 6805 tok/GPU/s.",
+      "Native compact dispatch/combine launches still cost about 20 ms median per call, around 0.97 s dispatch and 0.91 s combine rank-total in the profiled step.",
+      "The run remains about 20% below the retained current-best standard-EP hot-helper throughput."
+    ],
+    "next_source_target": "Keep the native compact ABI, but replace the remaining staged compact token-movement protocol with direct compact receive/expert-major output plumbing or another multiblock two-phase design that removes the staging/output copy and avoids rediscovering route state."
+  }
+}

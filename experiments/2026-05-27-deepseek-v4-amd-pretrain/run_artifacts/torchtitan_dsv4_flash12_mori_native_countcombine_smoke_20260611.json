@@ -1,0 +1,71 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_countcombine_smoke_20260611",
+  "created_utc": "2026-06-11T00:05:30Z",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_countcombine_smoke_mbs4_noac_steps2_8x_s4096_gbs128_20260611d",
+  "status": "completed_two_step_smoke_not_promoted",
+  "purpose": "Validate rebuilt remote MORI source/pybind ABI and count-aware native compact combine under TorchTitan autograd.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "key_env": {
+    "CANARY_MORI_IMPORT_MODE": "remote",
+    "CANARY_MORI_REBUILD_REMOTE": "false_for_run_after_explicit_stage_rebuild",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND": "triton_flat",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G"
+  },
+  "source_tuple": {
+    "mori_reference_commit": "5dd02d6815e9113381a72f6de6b22034fc09b5a3",
+    "mori_rebuild": "direct CMake build in remote source tree, copied libmori_*.so into python/mori",
+    "mori_third_party_pins": {
+      "spdlog": "4a9ccf7e38e257feecce0c579a782741254eaeef",
+      "msgpack-c": "9b801f087ab7434f2ab1ab3c0f48a966c19d3b70"
+    },
+    "mori_jit": {
+      "shmem_kernels_hash": "7e9a8756934e",
+      "ep_intranode_hash": "dd9e34024c9e"
+    }
+  },
+  "code_change_under_test": {
+    "mori_native_combine": "Pass recv_counts_rank_major into combine_standard_ep_compact_native so the kernel can derive expert-major rows from per-source/per-local-expert counts instead of scanning inputSplits per output row.",
+    "launcher": "Stage vendored MORI source for remote import mode and optionally rebuild the matching pybind/shared libraries before training."
+  },
+  "metrics": {
+    "step_1": {
+      "loss": 12.12742,
+      "grad_norm": 13.0625,
+      "tokens_per_gpu_s_rank_range": [1170, 1172],
+      "tflops_per_gpu_rank_range": [59.26, 59.32],
+      "memory_gib_rank_range": [178.28, 181.51]
+    },
+    "step_2": {
+      "loss": 9.45473,
+      "grad_norm": 25.5,
+      "tokens_per_gpu_s": 5562,
+      "tflops_per_gpu": 281.6,
+      "memory_gib_rank_range": [219.97, 227.06],
+      "mfu_pct": 12.19
+    }
+  },
+  "read": "This closes the source/ABI mismatch that previously caused stale or missing MORI pybind failures. The runtime path reaches finite forward/backward and completes two steps, but it is only a smoke: step 1 includes fresh MORI JIT/cache effects and two steps are not enough for sustained throughput. Next gate should be a 6-step apples-to-apples standard-vs-native profile or non-profiled stability run.",
+  "remote_paths": {
+    "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_countcombine_smoke_mbs4_noac_steps2_8x_s4096_gbs128_20260611d/docker-run.log",
+    "structured_logs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_countcombine_smoke_mbs4_noac_steps2_8x_s4096_gbs128_20260611d/structured_logs"
+  }
+}

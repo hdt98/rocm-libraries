@@ -1,0 +1,72 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "intermediate_max_abs_diff": null,
+  "kernel": {
+    "block_d_index": 64,
+    "block_d_main": 64,
+    "block_k": 64,
+    "read": "Prototype exact SLIG backward schedule. It materializes compact main logits and per-head LI logits, not selected main-K tensors; it reduces LI logits explicitly, honors the reference KL clamp, then computes d_query_index, d_key_index, and d_weights with Triton atomics.",
+    "workspace": {
+      "head_logits_bytes": 268435456,
+      "li_active_p_bytes": 8192,
+      "li_logits_bytes": 4194304,
+      "main_logits_bytes": 268435456,
+      "p_bytes": 4194304,
+      "row_count": 2045
+    }
+  },
+  "max_abs_diff": null,
+  "oracle": null,
+  "scope": "triton_sparse_lightning_indexer_grad_kl_loss_prototype",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 512,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "seq_len": 2048,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 85.29924011230469,
+      "mean_ms": 79.05290222167969,
+      "median_ms": 77.32910919189453,
+      "min_ms": 74.53035736083984,
+      "samples_ms": [
+        77.32910919189453,
+        74.53035736083984,
+        85.29924011230469
+      ],
+      "stdev_ms": 5.587558119236987
+    },
+    "peak_memory_allocated_bytes": 1168009216,
+    "peak_memory_allocated_gib": 1.0877933502197266,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 85.34777106251568,
+      "mean_ms": 79.09713770883779,
+      "median_ms": 77.36865698825568,
+      "min_ms": 74.574985075742,
+      "samples_ms": [
+        77.36865698825568,
+        74.574985075742,
+        85.34777106251568
+      ],
+      "stdev_ms": 5.590524454849904
+    },
+    "warmup_iters": 1
+  },
+  "triton_grad_norms": {
+    "index_k": 4.842527414439246e-05,
+    "index_q": 5.164593312656507e-05,
+    "weights": 4.493527740123682e-05
+  }
+}

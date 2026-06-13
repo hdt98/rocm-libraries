@@ -1,0 +1,98 @@
+{
+  "artifact": "torchtitan_fsdp_ep_pg_probe_4x_20260531",
+  "created_at": "2026-05-31",
+  "purpose": "Runtime process-group evidence for the updated 4x/8x TorchTitan DeepSeek-V4-style canary objective.",
+  "run": {
+    "host": "do-sonle5-mi350-gpu",
+    "run_id": "torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T164718Z",
+    "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T164718Z",
+    "remote_json": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_4xmi350_pg_probe_20260531T164718Z/torchtitan_pg_probe.json",
+    "launcher": "launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+    "command_shape": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=2,3,4,5 ... pg-probe",
+    "visible_devices": "2,3,4,5",
+    "result": "passed_probe_but_process_groups_shared"
+  },
+  "runtime": {
+    "image": "rocm/primus:v26.2",
+    "torch_version": "2.10.0a0+git449b176",
+    "torch_hip": "7.2.26015",
+    "device_name": "AMD Instinct MI350X VF",
+    "parallel_dims_signature_note": "Image-bundled TorchTitan ParallelDims requires etp and uses legacy mesh names such as dp_shard_cp and ep."
+  },
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "etp": 1,
+    "dp_replicate": 1,
+    "dp_shard": 4,
+    "backend": "nccl"
+  },
+  "evidence": {
+    "rank_count": 4,
+    "fsdp_group_is_ep_group_by_rank": [true, true, true, true],
+    "fsdp_group_ranks_equal_ep_group_ranks_by_rank": [true, true, true, true],
+    "rank0_fsdp": {
+      "mesh_dim_names": ["dp_shard_cp"],
+      "group_ranks": [0, 1, 2, 3],
+      "group_backend": "nccl",
+      "group_object_id": 131607202104752,
+      "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x77b2308805b0>"
+    },
+    "rank0_ep": {
+      "mesh_dim_names": ["ep"],
+      "group_ranks": [0, 1, 2, 3],
+      "group_backend": "nccl",
+      "group_object_id": 131607202104752,
+      "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x77b2308805b0>"
+    },
+    "collective_smoke_rank0": {
+      "fsdp_all_reduce_sum": 6.0,
+      "ep_all_to_all_recv": [0.0, 1.0, 2.0, 3.0]
+    }
+  },
+  "interpretation": {
+    "ascend_mapping": "This confirms the Ascend-reported FSDP/EP shared-ProcessGroup risk exists in the active image-backed TorchTitan runtime, at least for the 4x FSDP4/EP4 slice.",
+    "performance_risk": "FSDP all-gather/reduce-scatter and EP all-to-all can contend on the same ProcessGroup/stream domain unless the runtime is patched or moved to a TorchTitan path with explicit PG isolation.",
+    "not_yet_proven": [
+      "8x FSDP8/EP8 group identity",
+      "actual overlap/serialization timing from RCCL or rocprof traces",
+      "whether graph-trainer process-group isolation can be enabled safely on this Primus image path"
+    ]
+  },
+  "launcher_adjustments_validated": {
+    "four_gpu_visible_slice": "CANARY_VISIBLE_DEVICES=2,3,4,5 with only CUDA_VISIBLE_DEVICES works in the image.",
+    "rocr_hip_visible_devices": "ROCR_VISIBLE_DEVICES/HIP_VISIBLE_DEVICES=2,3,4,5 caused PyTorch HIP device-ordinal failures in this image and should not be used for this launcher.",
+    "idle_guard": "The guard passes for visible GPUs 2,3,4,5 and refuses visible GPUs 0,1 where the existing workload is running."
+  },
+  "validation_commands": [
+    {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/inspect_torchtitan_fsdp_ep_groups.py",
+      "result": "passed"
+    },
+    {
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+      "result": "passed"
+    },
+    {
+      "command": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=2,3,4,5 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+      "result": "passed"
+    },
+    {
+      "command": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+      "result": "refused_as_expected"
+    },
+    {
+      "command": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=2,3,4,5 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+      "result": "passed"
+    }
+  ],
+  "next_actions": [
+    "Patch or select a TorchTitan runtime path that gives FSDP and EP distinct ProcessGroups for the canary.",
+    "Rerun pg-probe after the patch and require fsdp_group_is_ep_group=false on every rank.",
+    "Then run a short 4x or 8x RCCL/rocprof communication trace to measure FSDP and EP overlap/serialization."
+  ],
+  "dependency_pin_changes": []
+}

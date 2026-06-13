@@ -1,0 +1,74 @@
+{
+  "backend_path": "/workspace/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "candidate_mode": "tilelang_source_hsk_dkv",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": null,
+    "tilelang_block_k": null,
+    "tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "tilelang_group_panel_size": null,
+    "tilelang_panel_capacity": null,
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "TileLang compressed-dKV backend is selected by TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND: group_filter, selected_limit_hsk_source, selected_limit_source, or selected_limit_packed.",
+    "explicit_tilelang_dkv still materializes selected-KV/probs/grad_logits before the TileLang compressed-dKV slice; tilelang_source_hsk_dkv moves probability/scaled-dP/dQ recompute into TileLang and feeds selected-limit dKV from BF16 HSK tensors."
+  ],
+  "parity": {
+    "dkv_compressed_candidate_max_abs": 5.96875,
+    "dkv_compressed_max_abs": 1.3828125,
+    "dkv_compressed_mean_abs": 0.19808495044708252,
+    "dkv_compressed_ref_max_abs": 6.3125,
+    "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 1.3828125,
+    "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": 0.19805222749710083,
+    "dkv_local_max_abs": 0.015625,
+    "dkv_max_abs": 1.3828125,
+    "dkv_mean_abs": 0.09935881942510605,
+    "dq_max_abs": 0.494140625,
+    "dsink_max_abs": 0.0,
+    "enabled": true,
+    "tilelang_bf16_ref_vs_explicit_ref_max_abs": 0.03125,
+    "tilelang_bf16_ref_vs_explicit_ref_mean_abs": 0.0018935040570795536
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 128,
+    "dim": 512,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 16,
+    "selected": 144,
+    "seq_len": 128
+  },
+  "timing": {
+    "explicit_pytorch": {
+      "median_ms": 1.247209519147873,
+      "times_ms": [
+        1.671733021736145,
+        0.8226860165596008
+      ],
+      "wall_median_ms": 1.2746199499815702,
+      "wall_times_ms": [
+        1.6998068895190954,
+        0.8494330104440451
+      ]
+    },
+    "tilelang_source_hsk_dkv": {
+      "median_ms": 4.54751455783844,
+      "times_ms": [
+        5.243080139160156,
+        3.8519489765167236
+      ],
+      "wall_median_ms": 4.581518471240997,
+      "wall_times_ms": [
+        5.27778104878962,
+        3.8852558936923742
+      ]
+    }
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "mori_compact_hot_helper_profile_delta",
+  "created_at": "2026-06-09",
+  "run_id": "torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "config": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_materialize_backend": "mori_compact",
+    "standard_ep_mori_compact_pack_blocks": 512,
+    "standard_ep_mori_compact_pack_warps": 4,
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128
+  },
+  "raw_artifacts": {
+    "local_profile_timing_dir": "run_artifacts/remote_logs/torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609/profile_timing",
+    "local_additive_timing_dir": "run_artifacts/remote_logs/torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609/additive_timing",
+    "local_log": "run_artifacts/remote_logs/torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_compact_hotrows_mbs8_h64n64d128_timing_steps2_20260609/docker-run.log"
+  },
+  "observed_step2_metrics": {
+    "tokens_per_gpu_s": 6616,
+    "tflops_per_gpu": 334.96,
+    "peak_logged_memory_gib_rankmax": 251.71,
+    "loss": 7.85419,
+    "grad_norm": 43.75
+  },
+  "baseline_profile_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_currentbest_mbs8_hotvjp_detail_8x_s4096_gbs128_steps2_20260608.json",
+    "run_id": "torchtitan_dsv4_flash12_currentbest_mbs8_hotvjp_detail_8x_s4096_gbs128_steps2_20260608",
+    "observed_step2_tokens_per_gpu_s": 6667,
+    "observed_step2_tflops_per_gpu": 337.55,
+    "observed_step2_peak_logged_memory_gib_rankmax": 253.21
+  },
+  "baseline_throughput_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "run_id": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8315.6,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8417.6667,
+    "steps_2_to_20_tokens_per_gpu_s_mean": 8518.8421,
+    "steps_13_to_20_tokens_per_gpu_s_mean": 8630.6563,
+    "peak_logged_memory_gib": 251.97
+  },
+  "non_profile_delta": {
+    "mori_compact_steps_2_to_6_tokens_per_gpu_s_mean": 8235.2,
+    "mori_compact_steps_4_to_6_tokens_per_gpu_s_mean": 8337.0,
+    "delta_vs_retained_steps_2_to_6_pct": -0.9705,
+    "delta_vs_retained_steps_4_to_6_pct": -0.9583,
+    "delta_vs_retained_steps_2_to_20_pct": -3.3296,
+    "delta_vs_retained_steps_13_to_20_pct": -3.4025,
+    "peak_memory_delta_vs_retained_gib": 0.99
+  },
+  "additive_step2_rankmax_delta_vs_hotvjp_profile_ms": {
+    "step_train_step": {
+      "current": 8396.774,
+      "baseline": 8337.247,
+      "delta": 59.527
+    },
+    "train_step_forward_backward_call": {
+      "current": 8206.366,
+      "baseline": 8228.561,
+      "delta": -22.195
+    },
+    "forward_backward_model_forward": {
+      "current": 2080.017,
+      "baseline": 2104.909,
+      "delta": -24.892
+    },
+    "forward_backward_loss": {
+      "current": 409.463,
+      "baseline": 432.815,
+      "delta": -23.352
+    },
+    "forward_backward_backward": {
+      "current": 5749.342,
+      "baseline": 5752.9,
+      "delta": -3.558
+    },
+    "train_step_optimizer_step": {
+      "current": 128.262,
+      "baseline": 46.933,
+      "delta": 81.329
+    }
+  },
+  "profile_late_window": {
+    "max_call_id": 812,
+    "call_id_threshold_exclusive": 406,
+    "late_records": 3248
+  },
+  "profile_stage_delta_vs_hotvjp_profile_ms": {
+    "standard_ep_dispatch_total": {
+      "current": 283.687,
+      "baseline": 275.358,
+      "delta": 8.329
+    },
+    "standard_ep_combine_total": {
+      "current": 322.524,
+      "baseline": 314.218,
+      "delta": 8.306
+    },
+    "standard_ep_hot_split_forward_total": {
+      "current": 346.565,
+      "baseline": 375.118,
+      "delta": -28.553
+    },
+    "standard_ep_hot_split_backward_total": {
+      "current": 729.255,
+      "baseline": 734.761,
+      "delta": -5.506
+    },
+    "standard_ep_hot_weight_forward_plus_backward": {
+      "current": 232.157,
+      "baseline": 249.78,
+      "delta": -17.623
+    }
+  },
+  "profile_current_key_stages_rankmax_ms": {
+    "sharedkv_bwd_query_recompute": 1523.938,
+    "sharedkv_bwd_grad_attn_sink": 172.822,
+    "standard_ep_hot_split_backward_helper_mlp_vjp_to_sorted_x": 278.261,
+    "standard_ep_combine_all_to_all_wait": 199.279,
+    "standard_ep_hot_split_backward_autograd_vjp_w3": 165.739,
+    "standard_ep_combine_weighted_scatter_add": 138.709,
+    "standard_ep_hot_split_broadcast_hot_weights": 125.827,
+    "standard_ep_dispatch_count_all_to_all": 123.168,
+    "standard_ep_dispatch_permute": 81.472,
+    "standard_ep_hot_weight_w3_backward_all_reduce_grad_hot_weight": 80.532,
+    "standard_ep_hot_weight_w2_forward_all_reduce_hot_weight": 78.853,
+    "standard_ep_dispatch_hot_materialize_mori_compact_pack": 5.292,
+    "standard_ep_dispatch_hot_materialize_mori_compact_init": 1.846,
+    "standard_ep_hot_split_use_materialized_rows": 1.082,
+    "standard_ep_hot_split_gather_remote": 0.0,
+    "standard_ep_hot_split_sort_offsets": 0.0,
+    "standard_ep_hot_split_count_offsets": 0.0
+  },
+  "mechanism_read": {
+    "what_mori_buys": [
+      "MORI compact removes the helper-forward torch gather/sort/count path in the hot split consumer; current gather_remote/sort_offsets/count_offsets are zero in the late window.",
+      "In the hot-VJP profile scope, hot-split forward drops by about 28.6 ms and hot-weight forward+backward drops by about 17.6 ms versus the current-best profile reference.",
+      "The compact pack itself is small: about 5.3 ms rank-max for the late step, plus about 1.8 ms init."
+    ],
+    "what_mori_pays": [
+      "Dispatch and combine rise by about 8.3 ms each in the hot-VJP profile scope.",
+      "The path still uses selected-order hot-weight adapters and explicit alignment into owner-compact row groups, so it is not yet a native compact-row dispatcher/helper-VJP ABI.",
+      "The retained standard-EP hot/cold/helper partition is still built first; MORI compact is a replacement row-copy edge after that plan exists, not the dispatcher layout itself."
+    ],
+    "net_read": "Profile-level fwd/bwd is essentially neutral to slightly positive, but the non-profile early-window throughput is still about 1% below retained and logged peak memory is about 1 GiB higher. Keep the retained torch owner-compact materialized path; use MORI compact as evidence for the next native compact-row ABI rather than as a promoted baseline."
+  }
+}

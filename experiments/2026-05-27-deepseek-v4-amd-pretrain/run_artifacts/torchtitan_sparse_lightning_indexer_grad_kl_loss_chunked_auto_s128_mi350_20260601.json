@@ -1,0 +1,92 @@
+{
+  "deferred_forward_loss": 0.0,
+  "deferred_grad_norms": {
+    "index_k": 0.0009135957807302475,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "device": "cuda",
+  "direct_grad_norms": {
+    "index_k": 0.0009140542824752629,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "direct_loss": 0.016752004623413086,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {
+    "index_k": 9.5367431640625e-07,
+    "index_q": 0.0,
+    "weights": 0.0
+  },
+  "li_kl_chunk_size": 0,
+  "li_kl_chunk_size_arg": null,
+  "max_grad_diff": 9.5367431640625e-07,
+  "parity_skipped": false,
+  "read": "The deferred Ascend-style public wrapper intentionally returns a zero scalar in forward, then recomputes the selected sparse LI KL objective in backward and matches the direct oracle parameter gradients.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 32,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 2.408823013305664,
+      "mean_ms": 2.0212053457895913,
+      "median_ms": 1.892137050628662,
+      "min_ms": 1.7626559734344482,
+      "samples_ms": [
+        1.892137050628662,
+        2.408823013305664,
+        1.7626559734344482
+      ],
+      "stdev_ms": 0.3418726801980438
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 0.0009140950860455632,
+      "index_q": 0.0009185621165670455,
+      "weights": 0.000768651079852134
+    },
+    "li_kl_chunk_size": 0,
+    "li_kl_chunk_size_arg": null,
+    "li_kl_chunk_size_env": null,
+    "li_kl_max_selected_main_k_elements_env": null,
+    "peak_memory_allocated_bytes": 1548809728,
+    "peak_memory_allocated_gib": 1.442441463470459,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle in PyTorch.",
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 2.480691997334361,
+      "mean_ms": 2.0774262957274914,
+      "median_ms": 1.9567629788070917,
+      "min_ms": 1.7948239110410213,
+      "samples_ms": [
+        1.9567629788070917,
+        2.480691997334361,
+        1.7948239110410213
+      ],
+      "stdev_ms": 0.3585017224318408
+    },
+    "warmup_iters": 1
+  },
+  "top_indices_equal": true,
+  "top_indices_shape": [
+    1,
+    128,
+    32
+  ]
+}

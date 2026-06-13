@@ -1,0 +1,391 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "peak_memory_allocated_bytes": 235822080,
+  "peak_memory_allocated_gib": 0.21962642669677734,
+  "read": "This profiles the explicit backward math currently used by sparse_mla_shared_kv. It intentionally materializes selected KV and probability tensors to expose which parts need fused Triton/HIP replacement first. scatter_impl=backend uses the loaded backend scatter path, including its Triton atomic CUDA prototype when enabled by the backend.",
+  "scatter_impl": "backend_fused_selected",
+  "scope": "sparse_mla_shared_latent_kv_explicit_backward_component_profile",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.0048828125,
+    "materialized_shared_selected_kv_fp32_gib": 0.0390625,
+    "output_bf16_gib": 0.0078125,
+    "selected_count": 160,
+    "seq_len": 128
+  },
+  "status": "passed",
+  "timed_iters": 3,
+  "timing": {
+    "by_component": {
+      "forward_with_lse": {
+        "enabled": true,
+        "max_ms": 0.2204820066690445,
+        "mean_ms": 0.12972133606672287,
+        "median_ms": 0.0846410021185875,
+        "min_ms": 0.08404099941253662,
+        "samples_ms": [
+          0.2204820066690445,
+          0.0846410021185875,
+          0.08404099941253662
+        ],
+        "stdev_ms": 0.07860161892066322
+      },
+      "fused_selected_grad_scatter": {
+        "enabled": true,
+        "max_ms": 0.18932099640369415,
+        "mean_ms": 0.16692133247852325,
+        "median_ms": 0.15740199387073517,
+        "min_ms": 0.15404100716114044,
+        "samples_ms": [
+          0.18932099640369415,
+          0.15740199387073517,
+          0.15404100716114044
+        ],
+        "stdev_ms": 0.01947133189810009
+      },
+      "gather_selected_kv_fp32": {
+        "enabled": true,
+        "max_ms": 0.23708200454711914,
+        "mean_ms": 0.12129433453083038,
+        "median_ms": 0.07264100015163422,
+        "min_ms": 0.05415999889373779,
+        "samples_ms": [
+          0.23708200454711914,
+          0.07264100015163422,
+          0.05415999889373779
+        ],
+        "stdev_ms": 0.10069992675133545
+      },
+      "grad_attn_sink": {
+        "enabled": true,
+        "max_ms": 0.0342009998857975,
+        "mean_ms": 0.02848033296565215,
+        "median_ms": 0.02563999965786934,
+        "min_ms": 0.025599999353289604,
+        "samples_ms": [
+          0.0342009998857975,
+          0.02563999965786934,
+          0.025599999353289604
+        ],
+        "stdev_ms": 0.004954283249323317
+      },
+      "grad_kv_zero": {
+        "enabled": true,
+        "max_ms": 0.02128100022673607,
+        "mean_ms": 0.016467000047365826,
+        "median_ms": 0.014639999717473984,
+        "min_ms": 0.01348000019788742,
+        "samples_ms": [
+          0.02128100022673607,
+          0.014639999717473984,
+          0.01348000019788742
+        ],
+        "stdev_ms": 0.004209198025347919
+      },
+      "grad_logits": {
+        "enabled": true,
+        "max_ms": 0.027840999886393547,
+        "mean_ms": 0.022480666637420654,
+        "median_ms": 0.02056100033223629,
+        "min_ms": 0.019039999693632126,
+        "samples_ms": [
+          0.027840999886393547,
+          0.02056100033223629,
+          0.019039999693632126
+        ],
+        "stdev_ms": 0.004704066341017289
+      },
+      "grad_output_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.010280000045895576,
+        "mean_ms": 0.009746666687230269,
+        "median_ms": 0.009519999846816063,
+        "min_ms": 0.009440000168979168,
+        "samples_ms": [
+          0.010280000045895576,
+          0.009440000168979168,
+          0.009519999846816063
+        ],
+        "stdev_ms": 0.000463609038644001
+      },
+      "grad_probs_do_v": {
+        "enabled": true,
+        "max_ms": 0.07128000259399414,
+        "mean_ms": 0.060666666676600776,
+        "median_ms": 0.05615999922156334,
+        "min_ms": 0.05455999821424484,
+        "samples_ms": [
+          0.07128000259399414,
+          0.05615999922156334,
+          0.05455999821424484
+        ],
+        "stdev_ms": 0.009226167962780057
+      },
+      "grad_q": {
+        "enabled": true,
+        "max_ms": 0.0658000037074089,
+        "mean_ms": 0.0559870017071565,
+        "median_ms": 0.05144000053405762,
+        "min_ms": 0.050721000880002975,
+        "samples_ms": [
+          0.0658000037074089,
+          0.05144000053405762,
+          0.050721000880002975
+        ],
+        "stdev_ms": 0.00850590949389605
+      },
+      "lse_layout": {
+        "enabled": true,
+        "max_ms": 0.014441000297665596,
+        "mean_ms": 0.010280333459377289,
+        "median_ms": 0.008559999987483025,
+        "min_ms": 0.007840000092983246,
+        "samples_ms": [
+          0.014441000297665596,
+          0.008559999987483025,
+          0.007840000092983246
+        ],
+        "stdev_ms": 0.0036211823161011844
+      },
+      "make_grad_output": {
+        "enabled": true,
+        "max_ms": 0.18632100522518158,
+        "mean_ms": 0.08776033545533816,
+        "median_ms": 0.039400000125169754,
+        "min_ms": 0.03756000101566315,
+        "samples_ms": [
+          0.18632100522518158,
+          0.039400000125169754,
+          0.03756000101566315
+        ],
+        "stdev_ms": 0.08536100174137391
+      },
+      "probs_exp_mask": {
+        "enabled": true,
+        "max_ms": 0.09012000262737274,
+        "mean_ms": 0.05957333371043205,
+        "median_ms": 0.04456000030040741,
+        "min_ms": 0.044039998203516006,
+        "samples_ms": [
+          0.09012000262737274,
+          0.044039998203516006,
+          0.04456000030040741
+        ],
+        "stdev_ms": 0.026455468942849714
+      },
+      "q_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.012120000086724758,
+        "mean_ms": 0.010573666542768478,
+        "median_ms": 0.009879999794065952,
+        "min_ms": 0.009720999747514725,
+        "samples_ms": [
+          0.012120000086724758,
+          0.009879999794065952,
+          0.009720999747514725
+        ],
+        "stdev_ms": 0.001341521831940917
+      },
+      "safe_indices": {
+        "enabled": true,
+        "max_ms": 0.027240000665187836,
+        "mean_ms": 0.018306666985154152,
+        "median_ms": 0.01432000007480383,
+        "min_ms": 0.01336000021547079,
+        "samples_ms": [
+          0.027240000665187836,
+          0.01336000021547079,
+          0.01432000007480383
+        ],
+        "stdev_ms": 0.007751370066742909
+      },
+      "scores_qk": {
+        "enabled": true,
+        "max_ms": 0.20676100254058838,
+        "mean_ms": 0.12077400088310242,
+        "median_ms": 0.07816100120544434,
+        "min_ms": 0.07739999890327454,
+        "samples_ms": [
+          0.20676100254058838,
+          0.07816100120544434,
+          0.07739999890327454
+        ],
+        "stdev_ms": 0.07446789994124547
+      },
+      "sink_probs": {
+        "enabled": true,
+        "max_ms": 0.0225600004196167,
+        "mean_ms": 0.020627000058690708,
+        "median_ms": 0.01984100043773651,
+        "min_ms": 0.01947999931871891,
+        "samples_ms": [
+          0.0225600004196167,
+          0.01947999931871891,
+          0.01984100043773651
+        ],
+        "stdev_ms": 0.0016837304560077312
+      },
+      "softmax_dot": {
+        "enabled": true,
+        "max_ms": 0.13776099681854248,
+        "mean_ms": 0.06508033225933711,
+        "median_ms": 0.028999999165534973,
+        "min_ms": 0.02848000079393387,
+        "samples_ms": [
+          0.13776099681854248,
+          0.028999999165534973,
+          0.02848000079393387
+        ],
+        "stdev_ms": 0.06294383885776603
+      },
+      "valid_mask": {
+        "enabled": true,
+        "max_ms": 0.05820100009441376,
+        "mean_ms": 0.037507666274905205,
+        "median_ms": 0.02876099944114685,
+        "min_ms": 0.025560999289155006,
+        "samples_ms": [
+          0.05820100009441376,
+          0.02876099944114685,
+          0.025560999289155006
+        ],
+        "stdev_ms": 0.017992235788456067
+      }
+    },
+    "component_event_sum": {
+      "enabled": true,
+      "max_ms": 1.6330930227413774,
+      "mean_ms": 1.0422486734266083,
+      "median_ms": 0.7632069932296872,
+      "min_ms": 0.7304460043087602,
+      "samples_ms": [
+        1.6330930227413774,
+        0.7632069932296872,
+        0.7304460043087602
+      ],
+      "stdev_ms": 0.5119483415703815
+    },
+    "component_median_sum_ms": 0.7651279959827662,
+    "iteration_wall": {
+      "enabled": true,
+      "max_ms": 2.1109000081196427,
+      "mean_ms": 1.4537733513861895,
+      "median_ms": 1.1400450021028519,
+      "min_ms": 1.1103750439360738,
+      "samples_ms": [
+        2.1109000081196427,
+        1.1400450021028519,
+        1.1103750439360738
+      ],
+      "stdev_ms": 0.5692817042964484
+    },
+    "last_checksums": {
+      "grad_attn_sink_norm": 0.0008185660117305815,
+      "grad_kv_norm": 0.0017875736812129617,
+      "grad_q_norm": 0.0006079990416765213,
+      "output_mean": -0.0005193048273213208
+    },
+    "ranked_by_median_ms": [
+      {
+        "component": "fused_selected_grad_scatter",
+        "median_ms": 0.15740199387073517,
+        "pct_of_component_median_sum": 20.571982034007355
+      },
+      {
+        "component": "forward_with_lse",
+        "median_ms": 0.0846410021185875,
+        "pct_of_component_median_sum": 11.062332389219485
+      },
+      {
+        "component": "scores_qk",
+        "median_ms": 0.07816100120544434,
+        "pct_of_component_median_sum": 10.215415148291717
+      },
+      {
+        "component": "gather_selected_kv_fp32",
+        "median_ms": 0.07264100015163422,
+        "pct_of_component_median_sum": 9.493967092176613
+      },
+      {
+        "component": "grad_probs_do_v",
+        "median_ms": 0.05615999922156334,
+        "pct_of_component_median_sum": 7.339948285309939
+      },
+      {
+        "component": "grad_q",
+        "median_ms": 0.05144000053405762,
+        "pct_of_component_median_sum": 6.723058207795113
+      },
+      {
+        "component": "probs_exp_mask",
+        "median_ms": 0.04456000030040741,
+        "pct_of_component_median_sum": 5.823862221009501
+      },
+      {
+        "component": "make_grad_output",
+        "median_ms": 0.039400000125169754,
+        "pct_of_component_median_sum": 5.149465230920292
+      },
+      {
+        "component": "softmax_dot",
+        "median_ms": 0.028999999165534973,
+        "pct_of_component_median_sum": 3.7902154041933884
+      },
+      {
+        "component": "valid_mask",
+        "median_ms": 0.02876099944114685,
+        "pct_of_component_median_sum": 3.7589788365023655
+      },
+      {
+        "component": "grad_attn_sink",
+        "median_ms": 0.02563999965786934,
+        "pct_of_component_median_sum": 3.3510732573490696
+      },
+      {
+        "component": "grad_logits",
+        "median_ms": 0.02056100033223629,
+        "pct_of_component_median_sum": 2.6872628423204903
+      },
+      {
+        "component": "sink_probs",
+        "median_ms": 0.01984100043773651,
+        "pct_of_component_median_sum": 2.5931609537109934
+      },
+      {
+        "component": "grad_kv_zero",
+        "median_ms": 0.014639999717473984,
+        "pct_of_component_median_sum": 1.9134053118353986
+      },
+      {
+        "component": "safe_indices",
+        "median_ms": 0.01432000007480383,
+        "pct_of_component_median_sum": 1.8715822908048936
+      },
+      {
+        "component": "q_to_fp32",
+        "median_ms": 0.009879999794065952,
+        "pct_of_component_median_sum": 1.291287189325182
+      },
+      {
+        "component": "grad_output_to_fp32",
+        "median_ms": 0.009519999846816063,
+        "pct_of_component_median_sum": 1.2442362450204336
+      },
+      {
+        "component": "lse_layout",
+        "median_ms": 0.008559999987483025,
+        "pct_of_component_median_sum": 1.1187670602077708
+      }
+    ]
+  },
+  "warmup_iters": 1
+}

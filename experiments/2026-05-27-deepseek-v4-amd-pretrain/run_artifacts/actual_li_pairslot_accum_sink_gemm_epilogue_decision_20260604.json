@@ -1,0 +1,72 @@
+{
+  "scope": "actual_li_sparse_dkv_gemm_epilogue_pairslot_accum_sink_decision",
+  "date": "2026-06-04",
+  "source_idea": {
+    "local_pdf": "/Users/sonle5/Downloads/GEMM-plus-epilogue.pdf",
+    "paper_title": "CODA: Rewriting Transformer Blocks as GEMM-Epilogue Programs",
+    "read": "The applicable lesson is not just to call the sparse dKV body a GEMM epilogue. The useful pattern is to keep MFMA accumulator results on chip, apply cheap tile-local transforms/reductions before global stores, and emit only compact partials for a lightweight auxiliary reducer. If the epilogue itself becomes a dense active-group table, it loses the benefit."
+  },
+  "implemented_probe": {
+    "files": [
+      "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+      "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py"
+    ],
+    "new_branch": "compact_pairslot_accum_sink",
+    "contract": "Same actual-LI pair-slot route metadata and rocWMMA query-major contribution body as compact_pairslot_atomic, but omit final dKV atomic/writeback and instead write a tiny per-CTA sink. This isolates local GEMM-epilogue-style pair-slot accumulation from final global emit."
+  },
+  "remote_validation": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "clean_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_accum_sink_gpu4_w3t5_s4096_layer2_t32k512_20260604.json",
+    "baseline_repeat_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_baseline_repeat_gpu4_s4096_layer2_t32k512_20260604.json",
+    "contaminated_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_accum_sink_s4096_layer2_t32k512_20260604.json",
+    "contaminated_note": "The first accum-sink run landed on GPU0 after another workload occupied GPUs0-3 and doubled contrib/raw timings, so it is kept only as contamination evidence. The clean decision uses GPU4 with 3 warmups and 5 timed iterations.",
+    "shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "token_block": 32,
+      "selected_block": 512,
+      "valid_compressed_selections": 1572352
+    },
+    "write_model": {
+      "raw_scalar_writes": 805044224,
+      "grouped_scalar_writes": 33806848,
+      "modeled_write_reduction_x": 23.813051840857806
+    },
+    "timing_ms": {
+      "contrib_sink": 9.028690338134766,
+      "raw_atomic": 10.0378999710083,
+      "compact_pairslot_accum_sink": 18.849828720092773,
+      "compact_pairslot_atomic": 18.7305850982666
+    },
+    "derived_ms": {
+      "raw_minus_contrib_sink": 1.0092096328735352,
+      "compact_pairslot_accum_sink_minus_contrib_sink": 9.821138381958008,
+      "compact_pairslot_atomic_minus_accum_sink": -0.11924362182617188
+    },
+    "parity": {
+      "raw_vs_compact_pairslot_atomic_max_abs_diff": 0.000118255615234375,
+      "reference_skipped": true
+    }
+  },
+  "decision": {
+    "promote_current_pairslot_local_table": false,
+    "why": [
+      "The local pair-slot accumulation path is already about 18.85 ms without final global dKV atomics.",
+      "The final global emit is effectively not the limiting piece in this topology: compact_pairslot_atomic is about the same as accum_sink.",
+      "Raw atomic remains about 10.04 ms, only about 1.01 ms above contrib_sink, so reducing global writes with a dense local table is the wrong tradeoff.",
+      "This confirms the GEMM+epilogue abstraction only helps if the epilogue reducer is sparse/segmented at warp/block level, not dense active_group x D."
+    ],
+    "next_kernel_contract": [
+      "Keep query-major MFMA contribution production and actual-LI pair-slot metadata.",
+      "Replace dense active-group local tables with warp/lane/block segmented reduction over touched pair slots.",
+      "Emit compact reduced rows or a small final scatter only after segmented reduction.",
+      "If TileLang cannot express that sparse epilogue safely, move this slice to HIP/rocWMMA/CK or rocPRIM-style segmented primitives rather than iterating on dense TileLang tables."
+    ]
+  },
+  "dependency_pin_changes": []
+}

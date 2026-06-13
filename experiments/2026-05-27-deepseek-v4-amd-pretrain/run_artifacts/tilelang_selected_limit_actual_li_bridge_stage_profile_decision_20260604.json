@@ -1,0 +1,107 @@
+{
+  "status": "actual_li_stage_profile_complete",
+  "scope": "TileLang selected-limit compressed-dKV bridge with real TorchTitan layer-2 LI route",
+  "profile_script": "tools/dsv4_runtime_probe/profile_torchtitan_shared_kv_tilelang_bridge.py",
+  "code_change": {
+    "file": "tools/dsv4_runtime_probe/profile_torchtitan_shared_kv_tilelang_bridge.py",
+    "added_mode": "--input-source actual-li-boundary",
+    "read": "The profiler can now capture the real TorchTitan DeepSeek-V4-Flash layer boundary, synthesize the unused local KV prefix, and profile the compressed sparse-MLA/LI branch with the selected-limit TileLang dKV body."
+  },
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "1xMI350",
+    "hip_visible_devices": "0"
+  },
+  "artifacts": {
+    "s128": "run_artifacts/tilelang_selected_limit_actual_li_bridge_stage_profile_s128_layer2_20260604.json",
+    "s4096": "run_artifacts/tilelang_selected_limit_actual_li_bridge_stage_profile_s4096_layer2_20260604.json"
+  },
+  "s128_smoke": {
+    "status": "ok",
+    "seq_len": 128,
+    "compressed_groups": 32,
+    "actual_li_topk": 32,
+    "valid_pairs": 2016,
+    "write_reduction_x": 14.0,
+    "component_median_sum_ms": 2.9142291648313403,
+    "tilelang_dkv_source_indexed_kernel_ms": 0.16668200492858887
+  },
+  "s4096_actual_li_layer2": {
+    "status": "ok",
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "valid_pairs": 1572352,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "write_reduction_x": 11.952959063438367,
+    "route_limit_modeled_chunk_fraction": 0.43017578125,
+    "component_median_sum_ms": 21.466854125261307,
+    "ranked_components_ms": [
+      {
+        "component": "tilelang_dkv_source_indexed_kernel_b0",
+        "median_ms": 7.307250022888184
+      },
+      {
+        "component": "gather_selected_kv_fp32",
+        "median_ms": 2.465670108795166
+      },
+      {
+        "component": "route_plan_b0",
+        "median_ms": 1.7576529644429684
+      },
+      {
+        "component": "grad_q",
+        "median_ms": 1.6856600046157837
+      },
+      {
+        "component": "grad_probs_do_v",
+        "median_ms": 1.6759010553359985
+      },
+      {
+        "component": "scores_qk",
+        "median_ms": 1.6276999711990356
+      },
+      {
+        "component": "forward_with_lse",
+        "median_ms": 1.4352970123291016
+      },
+      {
+        "component": "probs_exp_mask",
+        "median_ms": 0.7511699795722961
+      },
+      {
+        "component": "compressed_grad_logits_pack_input_b0",
+        "median_ms": 0.7062889933586121
+      },
+      {
+        "component": "compressed_probs_pack_input_b0",
+        "median_ms": 0.5473260283470154
+      }
+    ],
+    "materialized_workspace": {
+      "q_bytes": 268435456,
+      "grad_output_bytes": 268435456,
+      "output_bytes": 268435456,
+      "probs_bytes": 536870912,
+      "grad_logits_bytes": 536870912,
+      "safe_groups_bytes": 16777216
+    }
+  },
+  "decision": {
+    "promote_actual_li_profile_mode": true,
+    "promote_tilelang_dkv_body": true,
+    "promote_materialized_bridge_as_final_backward": false,
+    "read": "The actual-LI profile removes the synthetic-route caveat. The selected-limit TileLang dKV body is still the right branch at about 7.31 ms for S4096 layer 2, but the current bridge is about 21.47 ms before compressor/LI integration because it materializes selected KV, per-head probabilities, and grad logits, then computes dQ/PV/QK as separate PyTorch stages.",
+    "next_kernel_work": [
+      "Keep selected_limit_source as the dKV accumulation body.",
+      "Fuse or adjacent-produce QK, softmax row terms, dO.V, grad_logits, dQ, and compressed dKV so selected_kv/probs/grad_logits slabs do not hit HBM.",
+      "Treat route planning as a secondary issue for this branch: S4096 route_plan is 1.76 ms, while materialized selected-state and separate math stages account for most of the remaining non-dKV bridge cost.",
+      "After the fused compressed branch is below the old sparse backward envelope, connect final [compressed_groups,D] dKV into compressor and LightningIndexer backward."
+    ]
+  }
+}

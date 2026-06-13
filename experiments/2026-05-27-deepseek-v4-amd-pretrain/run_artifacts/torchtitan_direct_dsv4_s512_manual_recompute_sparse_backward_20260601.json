@@ -1,0 +1,112 @@
+{
+  "artifact": "torchtitan_direct_dsv4_s512_manual_recompute_sparse_backward_20260601",
+  "date_local": "2026-06-01",
+  "scope": "TorchTitan DeepSeek-V4 sparse-MLA/LightningIndexer manual_recompute backward bridge validation at S512.",
+  "source_snapshot": {
+    "torchtitan_base": "7fcd9beacde733f3ceca4a4da7e2f0518d64f68e",
+    "local_path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan",
+    "changed_file": "torchtitan/models/deepseek_v4/model.py"
+  },
+  "mode": {
+    "env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=manual_recompute",
+    "intent": "Save original Q/K/V, compressed K/V, sparse indices, and masks, then recompute branch-local selected K/V and softmax probabilities during backward instead of saving selected K/V/probs from forward.",
+    "saves_from_forward_to_backward": [
+      "q",
+      "k",
+      "v",
+      "compressed_k",
+      "compressed_v",
+      "local_indices",
+      "csa_indices",
+      "invalid mask"
+    ],
+    "does_not_save_from_forward_to_backward": [
+      "local selected K/V",
+      "compressed selected K/V",
+      "softmax probabilities"
+    ],
+    "still_materializes_transiently": [
+      "local selected K/V during forward",
+      "compressed selected K/V during forward",
+      "softmax probabilities during forward",
+      "the same tensors again during backward recompute"
+    ],
+    "not_final": "This mode reduces saved activation state but still materializes selected state transiently. The final S4096 path still needs a fused sparse MLA/LightningIndexer kernel that streams selected K/V and probabilities without building the large tensors."
+  },
+  "validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+      "result": "passed"
+    },
+    "check_config": {
+      "command": "env CANARY_SPARSE_MLA_BACKWARD_MODE=manual_recompute CANARY_SEQ_LEN=512 CANARY_GBS=64 CANARY_STEPS=1 GPUS_PER_NODE=4 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "passed",
+      "attention_sparse_backward_mode_by_layer": [
+        "manual_recompute",
+        "manual_recompute",
+        "manual_recompute",
+        "manual_recompute"
+      ]
+    },
+    "remote_container_parity": {
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "result": "passed",
+      "check": "Compared _SparseMLARecomputeManualBackward against _SparseMLASplitManualBackward on a mixed-validity CPU sparse pattern.",
+      "outputs_checked": [
+        "output",
+        "q.grad",
+        "k.grad",
+        "v.grad",
+        "compressed_k.grad",
+        "compressed_v.grad"
+      ],
+      "tolerance": {
+        "atol": 1e-6,
+        "rtol": 1e-6
+      },
+      "max_out_abs_diff": 0.0,
+      "max_grad_abs_diff": 0.0
+    },
+    "four_gpu_smoke": {
+      "host": "do-sonle5-mi350-gpu",
+      "run_id": "torchtitan_direct_dsv4_s512_manual_recompute_4xmi350_noac_20260601",
+      "raw_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_recompute_4xmi350_noac_20260601/docker-run.log",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_recompute_4xmi350_noac_20260601",
+      "command_shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512, CANARY_VISIBLE_DEVICES=4,5,6,7, checkpoint disabled, activation_checkpoint=none",
+      "result": "passed",
+      "step": {
+        "loss": 12.18545,
+        "grad_norm": 10.25,
+        "memory_gib": 75.66,
+        "tokens_per_gpu_s": 529,
+        "tflops_per_gpu_range": [
+          7.02,
+          7.03
+        ],
+        "mfu": 0.003
+      },
+      "teardown": "process groups destroyed"
+    }
+  },
+  "comparison": {
+    "manual_split_artifact": "run_artifacts/torchtitan_direct_dsv4_s512_manual_split_sparse_backward_20260601.json",
+    "manual_split_4x_noac_memory_gib": 75.66,
+    "manual_split_4x_noac_tokens_per_gpu_s_range": [
+      536,
+      538
+    ],
+    "manual_recompute_4x_noac_memory_gib": 75.66,
+    "manual_recompute_4x_noac_tokens_per_gpu_s": 529,
+    "read": "Recomputing selected K/V and probabilities in backward is correct but did not reduce the observed S512 4x peak memory; it also slightly reduced throughput. This points at forward-time selected-state/prob materialization as the next barrier, not just saved backward activations."
+  },
+  "decision": {
+    "status": "correct_but_not_preferred_for_short_sequence",
+    "preferred_short_sequence_bridge": "manual_split",
+    "next": [
+      "Do not spend more time on saved-state-only reshuffles.",
+      "Move to a forward+backward fused sparse MLA/LightningIndexer path that avoids transient selected K/V and probability tensors.",
+      "Use manual_recompute only as a diagnostic control for activation-save attribution."
+    ]
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "backend": {
+    "ascend_shared_kv_abi": "sparse_attn_sharedkv(query, ori_kv, cmp_kv, cmp_sparse_indices, sinks, softmax_scale, cmp_ratio, ...)",
+    "env": {
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE": "query_recompute",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT": null,
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_SCATTER_MODE": null,
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": null,
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "128"
+    },
+    "kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "shared_kv_backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "supports_ascend_sparse_attn_sharedkv_abi": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "parity": {
+    "backward": {
+      "ascend_abi_loss": 0.009283408522605896,
+      "enabled": true,
+      "legacy_loss": 0.009283408522605896,
+      "max_cmp_kv_grad_abs_diff": 4.656612873077393e-10,
+      "max_ori_kv_grad_abs_diff": 2.3283064365386963e-10,
+      "max_q_grad_abs_diff": 0.0,
+      "max_sinks_grad_abs_diff": 0.0
+    },
+    "cmp_indices_shape": [
+      1,
+      4096,
+      512
+    ],
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "grad_atol": 0.06,
+    "legacy_indices_shape": [
+      1,
+      4096,
+      640
+    ],
+    "local_count": 128,
+    "max_output_abs_diff": 0.0,
+    "output_atol": 0.0,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "status": "passed"
+  },
+  "read": "The Ascend-style wrapper is compared against the legacy concatenated-bank shared-KV ABI. Backward comparison splits the legacy dKV bank into dOriKv and dCmpKv. With --time-legacy-abi, timing also reports the public wrapper overhead versus a prebuilt concatenated-bank call.",
+  "scope": "sparse_attn_sharedkv_ascend_abi_verifier",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 18.12167739868164,
+      "mean_ms": 18.002787272135418,
+      "median_ms": 17.947036743164062,
+      "min_ms": 17.939647674560547,
+      "samples_ms": [
+        18.12167739868164,
+        17.947036743164062,
+        17.939647674560547
+      ],
+      "stdev_ms": 0.1030281331789513
+    },
+    "enabled": true,
+    "grad_norms": {
+      "cmp_kv": 0.00011177414853591472,
+      "ori_kv": 6.0078109527239576e-05,
+      "q": 2.0397515982040204e-05,
+      "sinks": 2.9542588890763e-05
+    },
+    "legacy_concat_abi": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 17.823488235473633,
+        "mean_ms": 17.738174438476562,
+        "median_ms": 17.75779151916504,
+        "min_ms": 17.633243560791016,
+        "samples_ms": [
+          17.823488235473633,
+          17.633243560791016,
+          17.75779151916504
+        ],
+        "stdev_ms": 0.09662753982342384
+      },
+      "enabled": true,
+      "grad_norms": {
+        "cmp_kv": 0.0001117741412599571,
+        "ori_kv": 6.0078109527239576e-05,
+        "q": 2.0397515982040204e-05,
+        "sinks": 2.9542588890763e-05
+      },
+      "loss": 0.009398140013217926,
+      "peak_memory_allocated_bytes": 3812624896,
+      "peak_memory_allocated_gib": 3.550783634185791,
+      "read": "Prebuilt concatenated-bank ABI timing. Comparing this with the public Ascend-style wrapper isolates wrapper/index/cat overhead from the shared-KV kernel body.",
+      "timed_iters": 3,
+      "wall": {
+        "enabled": true,
+        "max_ms": 17.857662052847445,
+        "mean_ms": 17.765121379246313,
+        "median_ms": 17.780892085283995,
+        "min_ms": 17.656809999607503,
+        "samples_ms": [
+          17.857662052847445,
+          17.656809999607503,
+          17.780892085283995
+        ],
+        "stdev_ms": 0.10135049678896635
+      },
+      "warmup_iters": 1
+    },
+    "loss": 0.009398140013217926,
+    "peak_memory_allocated_bytes": 3291481600,
+    "peak_memory_allocated_gib": 3.0654311180114746,
+    "public_minus_legacy_median_ms": {
+      "cuda_event": 0.18924522399902344,
+      "wall": 0.1903808442875743
+    },
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 18.177513033151627,
+      "mean_ms": 18.037512626809377,
+      "median_ms": 17.97127292957157,
+      "min_ms": 17.96375191770494,
+      "samples_ms": [
+        18.177513033151627,
+        17.97127292957157,
+        17.96375191770494
+      ],
+      "stdev_ms": 0.1213022124153984
+    },
+    "warmup_iters": 1
+  }
+}

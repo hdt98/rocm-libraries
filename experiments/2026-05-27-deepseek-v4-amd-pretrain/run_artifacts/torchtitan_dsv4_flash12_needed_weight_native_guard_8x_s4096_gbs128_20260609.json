@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "mori_standard_ep_hot_helper_needed_weight_guard",
+  "created_at": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "common_config": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_materialize_backend": "mori_compact",
+    "standard_ep_hot_split_weight_layout_requested": "needed",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "activation_checkpoint_scope": "attention_only",
+    "profile_dense_attention_backward": true,
+    "profile_dense_linear_backward": true
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_cached_needed_plan_profile_8x_s4096_gbs128_20260609",
+      "result": "completed_two_steps_rejected",
+      "step2_tokens_per_gpu_s": 5067,
+      "step2_tflops_per_gpu": 256.53,
+      "step2_peak_logged_memory_gib_rankmax": 242.65,
+      "raw_profile_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_cached_needed_plan_profile_8x_s4096_gbs128_20260609",
+      "late_window_call_id_gt": 626,
+      "late_window_rankmax_ms": {
+        "needed_weight_plan": 70.749,
+        "needed_hot_weight_forward": 96.371,
+        "needed_hot_weight_backward": 139.842,
+        "helper_vjp": 230.502,
+        "combine_all_to_all_wait": 185.613,
+        "combine_weighted_scatter_add": 150.018,
+        "dispatch_count_exchange": 201.688,
+        "mori_compact_materialize": 6.486
+      },
+      "read": "Cached owner-compact plan removed repeated per-weight mask construction, but the needed exchange still moved 6-8 of 8 hot rows per rank and added plan plus per-weight all-to-all overhead. Not native enough."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_density_guard_profile_8x_s4096_gbs128_20260609",
+      "result": "completed_two_steps_rejected",
+      "step2_tokens_per_gpu_s": 5119,
+      "step2_tflops_per_gpu": 259.20,
+      "step2_peak_logged_memory_gib_rankmax": 241.77,
+      "raw_profile_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_needed_density_guard_profile_8x_s4096_gbs128_20260609",
+      "late_window_call_id_gt": 626,
+      "fallback_records": {
+        "count": 192,
+        "effective_weight_layout": "selected",
+        "needed_fell_back_to_selected": true,
+        "needed_fallback_reason": "needed_density_exceeds_threshold",
+        "needed_max_count": 8,
+        "owner_shard_active_count": 8
+      },
+      "late_window_rankmax_ms": {
+        "needed_weight_plan_max_count_all_reduce": 82.803,
+        "needed_hot_weight_forward": 0.0,
+        "needed_hot_weight_backward": 0.0,
+        "selected_hot_weight_forward": 56.416,
+        "selected_hot_weight_backward": 109.606,
+        "helper_vjp": 222.926,
+        "combine_all_to_all_wait": 138.659,
+        "combine_weighted_scatter_add": 152.698,
+        "dispatch_count_exchange": 173.178,
+        "mori_compact_materialize": 5.240
+      },
+      "read": "The density guard correctly avoided the needed weight exchange, but a new scalar max-count all-reduce still cost about 83 ms rank-max in the late window."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_static_guard_profile_8x_s4096_gbs128_20260609",
+      "result": "completed_two_steps_rejected_profile_only",
+      "step2_tokens_per_gpu_s": 5109,
+      "step2_tflops_per_gpu": 258.68,
+      "step2_peak_logged_memory_gib_rankmax": 242.45,
+      "raw_profile_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_needed_static_guard_profile_8x_s4096_gbs128_20260609",
+      "late_window_call_id_gt": 626,
+      "fallback_records": {
+        "count": 192,
+        "effective_weight_layout": "selected",
+        "needed_fell_back_to_selected": true,
+        "needed_fallback_reason": "hot_count_not_sparse_for_needed_exchange",
+        "needed_max_count": 0,
+        "owner_shard_active_count": 8
+      },
+      "late_window_rankmax_ms": {
+        "needed_weight_plan": 0.0,
+        "needed_hot_weight_forward": 0.0,
+        "needed_hot_weight_backward": 0.0,
+        "selected_hot_weight_forward": 169.705,
+        "selected_hot_weight_backward": 121.368,
+        "helper_vjp": 241.451,
+        "combine_all_to_all_wait": 168.097,
+        "combine_weighted_scatter_add": 168.400,
+        "dispatch_count_exchange": 131.396,
+        "mori_compact_materialize": 6.705
+      },
+      "read": "The static guard removes the rejection collective for the retained top-8/EP8 shape. It is still diagnostic/profile-only and not promoted; it just prevents the rejected needed-exchange ABI from adding latency on the current shape."
+    }
+  ],
+  "decision": {
+    "promoted": false,
+    "current_best_remains": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608",
+    "keep_for_source": [
+      "StandardEPHotSplitMetadata owner_compact_owner_ranks/local_experts",
+      "needed-exchange static guard for hot_count <= ep_size"
+    ],
+    "rejected_for_current_top8_shape": [
+      "per-rank needed hot-weight all-to-all exchange",
+      "scalar collective density guard"
+    ],
+    "next_native_mori_targets": [
+      "helper owner-compact grouped MLP/VJP without PyTorch autograd islands",
+      "compact dX/dTopK return contract",
+      "hot dW reduce overlapped by owner slot",
+      "dispatcher-native compact row ABI rather than post-dispatch adapters"
+    ]
+  }
+}

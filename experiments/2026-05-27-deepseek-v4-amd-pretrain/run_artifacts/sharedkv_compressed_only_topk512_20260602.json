@@ -1,0 +1,202 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "dkv_atol": 0.5,
+    "dkv_candidate_norm": 1848.9346923828125,
+    "dkv_max_abs_diff": 0.1111602783203125,
+    "dkv_mean_abs_diff": 0.00039356955676339567,
+    "dkv_reference_norm": 1848.951416015625,
+    "dq_atol": 0.5,
+    "dq_candidate_norm": 1321.0528564453125,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00017382641090080142,
+    "dq_reference_norm": 1321.060546875,
+    "passed": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "query_major_correctness": {
+    "dkv_candidate_norm": 1848.9346923828125,
+    "dkv_max_abs_diff": 0.11111068725585938,
+    "dkv_mean_abs_diff": 0.0003935704007744789,
+    "dq_candidate_norm": 1321.0528564453125,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00017382616351824254,
+    "passed": true,
+    "read": "Query-major fused recompute keeps dQ local to the query row and atomically accumulates only dKV."
+  },
+  "read": "This tests whether a single recompute tile can reuse QK/probability work for both dQ and dKV. The original combined line is key-major and atomically accumulates dQ; the newer query-major line keeps dQ local to the query row and atomically accumulates only dKV. The structured query-major variant computes the synthetic route inside the tile to isolate index-load overhead. This is still a diagnostic Triton prototype, and no LightningIndexer parameter gradients are emitted here.",
+  "scope": "sparse_mla_shared_latent_kv_backward_combined_dq_dkv_recompute_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 0,
+    "materialized_probs_fp32_gib": 0.5,
+    "materialized_shared_selected_kv_fp32_gib": 4.0,
+    "selected_count": 512,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "structured_query_major_correctness": {
+    "dkv_candidate_norm": 1848.9346923828125,
+    "dkv_max_abs_diff": 0.11112213134765625,
+    "dkv_mean_abs_diff": 0.00039357124478556216,
+    "dq_candidate_norm": 1321.0528564453125,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dq_mean_abs_diff": 0.00017382616351824254,
+    "passed": true,
+    "read": "Structured query-major recompute computes synthetic local and prefix-compressed indices inside the Triton tile instead of loading the route tensor."
+  },
+  "tile": {
+    "block_d": 512,
+    "block_h": 64,
+    "block_m": 16
+  },
+  "timing": {
+    "triton_dq_dkv_query_major_recompute": {
+      "checksum_norm": {
+        "dkv_norm": 1848.9346923828125,
+        "dq_norm": 1321.0528564453125
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 10.978379249572754,
+        "mean_ms": 10.953179041544596,
+        "median_ms": 10.95469856262207,
+        "min_ms": 10.926459312438965,
+        "samples_ms": [
+          10.95469856262207,
+          10.978379249572754,
+          10.926459312438965
+        ],
+        "stdev_ms": 0.025993300602709497
+      },
+      "label": "triton_dq_dkv_query_major_recompute",
+      "peak_memory_allocated_bytes": 1455426048,
+      "peak_memory_allocated_gib": 1.355471134185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 10.99877490196377,
+        "mean_ms": 10.975082598937055,
+        "median_ms": 10.982706909999251,
+        "min_ms": 10.943765984848142,
+        "samples_ms": [
+          10.982706909999251,
+          10.99877490196377,
+          10.943765984848142
+        ],
+        "stdev_ms": 0.028285912216832975
+      }
+    },
+    "triton_dq_dkv_query_major_structured_recompute": {
+      "checksum_norm": {
+        "dkv_norm": 1848.9346923828125,
+        "dq_norm": 1321.0528564453125
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 10.892136573791504,
+        "mean_ms": 10.829882939656576,
+        "median_ms": 10.81873607635498,
+        "min_ms": 10.778776168823242,
+        "samples_ms": [
+          10.81873607635498,
+          10.778776168823242,
+          10.892136573791504
+        ],
+        "stdev_ms": 0.05749638923219796
+      },
+      "label": "triton_dq_dkv_query_major_structured_recompute",
+      "peak_memory_allocated_bytes": 1455426048,
+      "peak_memory_allocated_gib": 1.355471134185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 10.908037074841559,
+        "mean_ms": 10.861240676604211,
+        "median_ms": 10.88077703025192,
+        "min_ms": 10.794907924719155,
+        "samples_ms": [
+          10.88077703025192,
+          10.794907924719155,
+          10.908037074841559
+        ],
+        "stdev_ms": 0.05904068925106331
+      }
+    },
+    "triton_dq_dkv_recompute_combined": {
+      "checksum_norm": {
+        "dkv_norm": 1848.9346923828125,
+        "dq_norm": 1321.0528564453125
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 68.4404296875,
+        "mean_ms": 68.19553120930989,
+        "median_ms": 68.34561920166016,
+        "min_ms": 67.80054473876953,
+        "samples_ms": [
+          67.80054473876953,
+          68.4404296875,
+          68.34561920166016
+        ],
+        "stdev_ms": 0.34533750301516275
+      },
+      "label": "triton_dq_dkv_recompute_combined",
+      "peak_memory_allocated_bytes": 1455426048,
+      "peak_memory_allocated_gib": 1.355471134185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 68.5023139230907,
+        "mean_ms": 68.26399499550462,
+        "median_ms": 68.40561400167644,
+        "min_ms": 67.88405706174672,
+        "samples_ms": [
+          67.88405706174672,
+          68.5023139230907,
+          68.40561400167644
+        ],
+        "stdev_ms": 0.3325693068091948
+      }
+    },
+    "triton_dq_plus_dkv_separate": {
+      "checksum_norm": {
+        "dkv_norm": 1848.9346923828125,
+        "dq_norm": 1321.0506591796875
+      },
+      "event": {
+        "enabled": true,
+        "max_ms": 15.136260986328125,
+        "mean_ms": 15.06401793162028,
+        "median_ms": 15.099740982055664,
+        "min_ms": 14.95605182647705,
+        "samples_ms": [
+          14.95605182647705,
+          15.136260986328125,
+          15.099740982055664
+        ],
+        "stdev_ms": 0.09526771527051676
+      },
+      "label": "triton_dq_plus_dkv_separate",
+      "peak_memory_allocated_bytes": 1723861504,
+      "peak_memory_allocated_gib": 1.605471134185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 15.188965015113354,
+        "mean_ms": 15.09532235407581,
+        "median_ms": 15.116175985895097,
+        "min_ms": 14.980826061218977,
+        "samples_ms": [
+          14.980826061218977,
+          15.188965015113354,
+          15.116175985895097
+        ],
+        "stdev_ms": 0.10562486214003873
+      }
+    }
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "artifact": "ck_tile_small_m_preshuffle_s4096_decision_20260531",
+  "created_at": "2026-05-31",
+  "probe_artifact": "run_artifacts/ck_tile_preshuffle_gemm_s4096_20260531.json",
+  "operator": "moe_w2_dgrad_grouped_gemm",
+  "shape": {
+    "tokens": 4096,
+    "assignments": 24576,
+    "experts": 384,
+    "topk": 6,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "dtype": "bf16"
+  },
+  "source_audit": {
+    "ck_tile_example_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/sources/wip/rocm-libraries/projects/composablekernel/example/ck_tile/17_grouped_gemm",
+    "stock_binary_tested_previously": {
+      "binary": "tile_example_grouped_gemm",
+      "main_configs": [
+        "GemmConfigComputeV4",
+        "GemmConfigComputeV3_2",
+        "GemmConfigComputeV4_V2"
+      ],
+      "m_tile": 128,
+      "result": "demoted_at_s4096"
+    },
+    "small_m_candidate": {
+      "source": "grouped_gemm_preshuffle.cpp",
+      "config": "GemmConfigPreshuffleDecode",
+      "m_tile": 16,
+      "n_tile": 64,
+      "k_tile_for_bf16": 128,
+      "requires_b_layout": "C",
+      "notes": [
+        "The CMake target tile_example_grouped_gemm_preshuffle exists but was not built in build/bin.",
+        "The existing CMake cache was created at /ck/build, so cmake --build through the mounted long path failed.",
+        "A standalone binary was compiled under /tmp from unchanged CK-Tile source using the container clang++ and gfx950 target."
+      ]
+    }
+  },
+  "baseline": {
+    "name": "retained_global_max_padded_torch_bmm_out",
+    "median_ms": 4.304213047027588
+  },
+  "candidate": {
+    "name": "ck_tile_preshuffle_decode_m16",
+    "binary": "/tmp/tile_example_grouped_gemm_preshuffle_dsv4",
+    "compile_result": "passed",
+    "returncode": 0,
+    "b_layout": "C",
+    "pad_m": 16,
+    "padded_rows": 27488,
+    "padding_multiplier_vs_compact": 1.1184895833333333,
+    "best": {
+      "kernel": "gemm_grouped_bf16_16x64x128_8x8x1_0x0x1_Persistent_NoMultiD_DoubleSmemBuffer",
+      "ms": 8.99715,
+      "tflops_on_padded_work": 134.551,
+      "gb_per_s": 1942.21,
+      "speedup_vs_torch_padded_bmm_out": 0.4783973866199394
+    }
+  },
+  "correctness": {
+    "status": "not_evaluated_in_this_run",
+    "reason": "The run used validate=0 and is a throughput probe. Promotion still requires a PyTorch-bound correctness oracle on compact DSv4 tensors."
+  },
+  "decision": "demote_existing_ck_tile_small_m_preshuffle_for_s4096_w2_dgrad",
+  "read": "The existing CK-Tile small-M preshuffle path greatly reduces row padding compared with the stock M=128 grouped binary, from 2.0x to 1.118x at S4096. It is nevertheless slower: 8.997 ms versus 4.304 ms for retained padded torch.bmm(out=), only 0.478x of the baseline. The bottleneck is now kernel efficiency for very small M, not only row padding.",
+  "next_action": "Do not pursue the existing preshuffle decode config as-is. A custom CK candidate should test an intermediate M tile such as 32 or 64 with N=128 or 256, preserve row-major B if possible to avoid a weight-layout detour, expose a PyTorch-callable binding with compact descriptors, validate against the PyTorch compact oracle, and beat the 4.304 ms S4096 W2 dgrad baseline before any full-layer integration."
+}

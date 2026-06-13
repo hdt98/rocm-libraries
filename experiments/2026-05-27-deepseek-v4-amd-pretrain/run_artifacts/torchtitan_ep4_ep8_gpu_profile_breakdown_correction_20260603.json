@@ -1,0 +1,215 @@
+{
+  "artifact": "torchtitan_ep4_ep8_gpu_profile_breakdown_correction_20260603",
+  "created_date": "2026-06-03",
+  "status": "analysis_complete",
+  "scope": "Corrected GPU-side interpretation of the EP4/EP8 TorchTitan DeepSeek-V4 Flash S4096 profile split.",
+  "source_artifacts": {
+    "ep4_full_run_profile": "run_artifacts/torchtitan_ep4_deeper_mori_ranges_identical_order_20260603.json",
+    "ep8_full_run_profile": "run_artifacts/torchtitan_ep8_deeper_mori_ranges_identical_order_20260603.json",
+    "ep4_ep8_cpu_range_comparison": "run_artifacts/torchtitan_ep4_ep8_deeper_mori_ranges_identical_order_comparison_20260603.json",
+    "owner_rank_local_vjp_probe": "run_artifacts/owned_expert_vjp_ep4_ep8_latency_breakdown_20260602.json"
+  },
+  "profile_shape": {
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "ep4": {
+      "gpus_per_node": 4,
+      "global_batch_size": 64,
+      "fsdp": 4,
+      "ep": 4,
+      "gradient_accumulation_steps": 16,
+      "mori_backward_calls_per_rank": 64,
+      "local_experts_per_rank": 64
+    },
+    "ep8": {
+      "gpus_per_node": 8,
+      "global_batch_size": 128,
+      "fsdp": 8,
+      "ep": 8,
+      "gradient_accumulation_steps": 16,
+      "mori_backward_calls_per_rank": 64,
+      "local_experts_per_rank": 32
+    },
+    "model": {
+      "hidden_size": 4096,
+      "moe_intermediate_size": 2048,
+      "num_experts": 256,
+      "router_topk": 6
+    }
+  },
+  "important_correction": {
+    "cpu_range_warning": "The CPU user-annotation ranges in the full-run traces can make mori_aiter.local_padded_vjp.swiglu_forward/backward appear to dominate. That is a queueing/synchronization artifact for kernel-family attribution.",
+    "gpu_annotation_read": "Use top_gpu_user_annotations/top_kernels for the actual GPU split. On GPU, the pure Triton SwiGLU forward/backward kernels are small; padded GEMM/BMM-family work and MORI combine are the real MoE backward walls.",
+    "do_not_conclude": "Do not spend the next optimization pass only on the Triton SwiGLU elementwise kernels."
+  },
+  "ep8_gpu_annotation_ms_per_rank": {
+    "counts": {
+      "mori_backward_calls": 64
+    },
+    "mori_combine_dx_call": {
+      "total_ms": 2165.518,
+      "per_call_ms": 33.836
+    },
+    "mori_dispatch_x_call": {
+      "total_ms": 199.68,
+      "per_call_ms": 3.12
+    },
+    "mori_dispatch_grad_output_call": {
+      "total_ms": 49.653,
+      "per_call_ms": 0.776
+    },
+    "mori_dispatch_topk_dummy_call": {
+      "total_ms": 37.787,
+      "per_call_ms": 0.59
+    },
+    "mori_combine_dtopk_call": {
+      "total_ms": 16.323,
+      "per_call_ms": 0.255
+    },
+    "local_vjp_gemm_family": {
+      "total_ms": 2059.848,
+      "per_call_ms": 32.185,
+      "components_ms": {
+        "w13_forward_gemm": 485.324,
+        "w2_forward_gemm": 254.554,
+        "w2_dgrad_gemm": 273.717,
+        "w2_wgrad_gemm": 241.713,
+        "w13_wgrad_gemm": 459.725,
+        "w13_xgrad_gemm_reduce": 544.815
+      }
+    },
+    "local_vjp_swiglu_kernels": {
+      "total_ms": 104.062,
+      "per_call_ms": 1.626,
+      "components_ms": {
+        "swiglu_forward": 40.841,
+        "swiglu_backward": 63.221
+      }
+    },
+    "local_vjp_route_pack_scatter_misc": {
+      "total_ms": 242.688,
+      "per_call_ms": 3.792,
+      "components_ms": {
+        "route_pack": 9.133,
+        "sort_counts": 40.421,
+        "gather_scale_scatter": 121.574,
+        "dtopk_weight": 36.022,
+        "scatter_outputs": 35.538
+      }
+    },
+    "attention_reference_points": {
+      "attn_fwd_kernel_mean_ms_per_rank": 362.677,
+      "bwd_kernel_dk_dv_mean_ms_per_rank": 469.484,
+      "bwd_kernel_dq_mean_ms_per_rank": 216.591,
+      "note": "Attention remains meaningful, but in this profile the MoE routed backward path is the larger and more actionable wall."
+    }
+  },
+  "ep4_gpu_annotation_ms_per_rank": {
+    "counts": {
+      "mori_backward_calls": 64
+    },
+    "mori_combine_dx_call": {
+      "total_ms": 1165.715,
+      "per_call_ms": 18.214
+    },
+    "mori_dispatch_x_call": {
+      "total_ms": 79.002,
+      "per_call_ms": 1.234
+    },
+    "mori_dispatch_grad_output_call": {
+      "total_ms": 42.427,
+      "per_call_ms": 0.663
+    },
+    "mori_dispatch_topk_dummy_call": {
+      "total_ms": 20.51,
+      "per_call_ms": 0.32
+    },
+    "local_vjp_gemm_family": {
+      "total_ms": 3409.927,
+      "per_call_ms": 53.28,
+      "components_ms": {
+        "w13_forward_gemm": 738.384,
+        "w2_forward_gemm": 402.672,
+        "w2_dgrad_gemm": 408.325,
+        "w2_wgrad_gemm": 374.135,
+        "w13_wgrad_gemm": 674.196,
+        "w13_xgrad_gemm_reduce": 812.215
+      }
+    },
+    "local_vjp_swiglu_kernels": {
+      "total_ms": 160.303,
+      "per_call_ms": 2.505,
+      "components_ms": {
+        "swiglu_forward": 62.789,
+        "swiglu_backward": 97.514
+      }
+    },
+    "local_vjp_route_pack_scatter_misc": {
+      "total_ms": 261.358,
+      "per_call_ms": 4.084,
+      "components_ms": {
+        "route_pack": 9.016,
+        "sort_counts": 40.153,
+        "gather_scale_scatter": 141.425,
+        "dtopk_weight": 36.128,
+        "scatter_outputs": 34.636
+      }
+    }
+  },
+  "owner_rank_cuda_event_probe_cross_check": {
+    "ep4": {
+      "full_local_vjp_ms": 7.089829,
+      "forward_recompute_ms": 2.666306,
+      "wgrad_ms": 2.370102,
+      "xgrad_plus_reduce_ms": 1.668096,
+      "dgrad_plus_backward_swiglu_ms": 0.732447,
+      "swiglu_forward_only_ms": 0.113121,
+      "swiglu_backward_only_ms": 0.142842,
+      "save_gate_up_hidden_plus_output_ms": 5.211021
+    },
+    "ep8": {
+      "full_local_vjp_ms": 6.691718,
+      "forward_recompute_ms": 2.494708,
+      "wgrad_ms": 2.385388,
+      "xgrad_plus_reduce_ms": 1.649099,
+      "dgrad_plus_backward_swiglu_ms": 0.716528,
+      "swiglu_forward_only_ms": 0.101721,
+      "swiglu_backward_only_ms": 0.137762,
+      "save_gate_up_hidden_plus_output_ms": 5.114699
+    },
+    "read": "The standalone owner-rank probe still shows the ideal compact local VJP is around 6-7 ms, with true SwiGLU kernels around 0.1 ms each. The larger full-run GPU annotation per-call values should be treated as integrated-training profiler evidence with overlap, load imbalance, and profiler overhead, not as a replacement for the microbench floor."
+  },
+  "optimization_ladder": [
+    {
+      "rank": 1,
+      "item": "MORI combine_dx backward",
+      "evidence": "EP8 combine_dx.call is 2165.5 ms/rank over 64 calls, and EpCombineIntraNodeKernel_bf16_nop2p is the top kernel family in the trace.",
+      "next_action": "Avoid another receive-count/source-position sync pass; pursue registered-buffer combine, overlap, or a training combine backward that avoids the current expensive dx combine path."
+    },
+    {
+      "rank": 2,
+      "item": "Local owner-rank MoE VJP GEMM family",
+      "evidence": "EP8 padded local VJP GEMM-family annotations sum to about 2059.8 ms/rank over 64 calls; EP4 sums to about 3409.9 ms/rank because each rank owns 64 experts.",
+      "next_action": "Replace the six padded bmm groups with a training-aware fused MoE backward or a production grouped training GEMM path for w13 forward, w2 dgrad, w2/w13 wgrad, and xgrad."
+    },
+    {
+      "rank": 3,
+      "item": "Forward-intermediate contract",
+      "evidence": "The owner-rank probe saves about 1.58 ms at EP8 and 1.88 ms at EP4 when gate/up/hidden plus compact unweighted output are available. Public AITER stage1-hidden-only saves almost nothing.",
+      "next_action": "Need AITER/MORI forward contract that exposes gate/up/hidden/out_compact, or a fused backward that recomputes them internally without separate padded materialization."
+    },
+    {
+      "rank": 4,
+      "item": "Route pack, gather, dTopk, scatter",
+      "evidence": "EP8 route/pack/scatter misc is about 242.7 ms/rank over 64 calls, smaller than GEMM and combine but still visible.",
+      "next_action": "Keep after the GEMM/combine branch; avoid making it the primary lever."
+    },
+    {
+      "rank": 5,
+      "item": "Pure SwiGLU elementwise kernels",
+      "evidence": "EP8 pure Triton SwiGLU forward+backward is about 104.1 ms/rank over 64 calls, far below the padded GEMM and combine walls.",
+      "next_action": "Do not prioritize standalone SwiGLU kernel tuning now."
+    }
+  ],
+  "bottom_line": "The EP4/EP8 profile pass confirms the next MoE backward work is not dispatch/combine-only and not pure SwiGLU. It is MORI dx combine plus compact/fused training GEMM/VJP for the routed experts, with an AITER-style intermediate contract change needed to harvest the saved-activation floor."
+}

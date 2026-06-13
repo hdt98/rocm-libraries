@@ -1,0 +1,467 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_allcompressed_h64n64d128_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "artifact_kind": "diagnostic_profile_not_promoted",
+  "created_at": "2026-06-06",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_allcompressed_h64n64d128_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_allcompressed_h64n64d128_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+  "mori_timing_source_root_before_copy": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_allcompressed_h64n64d128_profile_4x_s4094096_gbs128_mbs2_heap40_steps2_20260606",
+  "shape": {
+    "gpus": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "compress_ratio_allowlist": "4,128",
+    "sharedkv_blocks": {
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128
+    }
+  },
+  "env_focus": {
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "true",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop"
+  },
+  "step_metrics_from_log": {
+    "1": {
+      "rank_records": 4,
+      "loss": {
+        "n": 4,
+        "min": 12.24825,
+        "median": 12.24825,
+        "max": 12.24825,
+        "mean": 12.24825
+      },
+      "grad_norm": {
+        "n": 4,
+        "min": 19.875,
+        "median": 19.875,
+        "max": 19.875,
+        "mean": 19.875
+      },
+      "memory_gib": {
+        "n": 4,
+        "min": 185.37,
+        "median": 187.37,
+        "max": 189.55,
+        "mean": 187.41500000000002
+      },
+      "tokens_per_gpu_s": {
+        "n": 4,
+        "min": 1421,
+        "median": 1422,
+        "max": 1422,
+        "mean": 1421.75
+      },
+      "node_tokens_s_4x_mean": 5687,
+      "tflops_per_gpu": {
+        "n": 4,
+        "min": 71.95,
+        "median": 72.01,
+        "max": 72.01,
+        "mean": 71.995
+      },
+      "mfu_pct": {
+        "n": 4,
+        "min": 3.12,
+        "median": 3.12,
+        "max": 3.12,
+        "mean": 3.12
+      }
+    },
+    "2": {
+      "rank_records": 4,
+      "loss": {
+        "n": 4,
+        "min": 8.57591,
+        "median": 8.57591,
+        "max": 8.57591,
+        "mean": 8.57591
+      },
+      "grad_norm": {
+        "n": 4,
+        "min": 47.75,
+        "median": 47.75,
+        "max": 47.75,
+        "mean": 47.75
+      },
+      "memory_gib": {
+        "n": 4,
+        "min": 217.82,
+        "median": 218.23,
+        "max": 222.31,
+        "mean": 219.14749999999998
+      },
+      "tokens_per_gpu_s": {
+        "n": 4,
+        "min": 3888,
+        "median": 3888,
+        "max": 3888,
+        "mean": 3888
+      },
+      "node_tokens_s_4x_mean": 15552,
+      "tflops_per_gpu": {
+        "n": 4,
+        "min": 196.84,
+        "median": 196.84,
+        "max": 196.85,
+        "mean": 196.8425
+      },
+      "mfu_pct": {
+        "n": 4,
+        "min": 8.52,
+        "median": 8.52,
+        "max": 8.52,
+        "mean": 8.52
+      }
+    }
+  },
+  "additive_rank_summary_ms": {
+    "step_wall": {
+      "n": 4,
+      "min": 33693.37134889793,
+      "median": 33694.39796946244,
+      "max": 33694.64138196781,
+      "mean": 33694.20216744766
+    },
+    "step_gpu": {
+      "n": 4,
+      "min": 33693.328125,
+      "median": 33694.353515625,
+      "max": 33694.59765625,
+      "mean": 33694.158203125
+    },
+    "microbatch_fwd_bwd_wall": {
+      "n": 4,
+      "min": 33103.99413690902,
+      "median": 33106.94213799434,
+      "max": 33107.87588288076,
+      "mean": 33106.438573944615
+    },
+    "forward_wall": {
+      "n": 4,
+      "min": 6974.042821093462,
+      "median": 6999.3910467019305,
+      "max": 7031.161445891485,
+      "mean": 7000.996590097202
+    },
+    "loss_wall": {
+      "n": 4,
+      "min": 979.211756028235,
+      "median": 981.1062900698744,
+      "max": 982.7815479366109,
+      "mean": 981.0514710261486
+    },
+    "backward_wall": {
+      "n": 4,
+      "min": 19684.335954952985,
+      "median": 19685.158325359225,
+      "max": 19685.931914951652,
+      "mean": 19685.146130155772
+    },
+    "wrapper_residual_wall": {
+      "n": 4,
+      "min": 5405.434300075285,
+      "median": 5442.664149857592,
+      "max": 5466.214930871502,
+      "mean": 5439.244382665493
+    },
+    "optimizer_step_wall": {
+      "n": 4,
+      "min": 84.68235598411411,
+      "median": 86.68240049155429,
+      "max": 88.03550410084426,
+      "mean": 86.52066526701674
+    },
+    "accumulated_loss_reduce_wall": {
+      "n": 4,
+      "min": 362.3877770733088,
+      "median": 362.74462251458317,
+      "max": 364.2194439889863,
+      "mean": 363.02411652286537
+    }
+  },
+  "mori_rank_summary_ms": {
+    "named_backward": {
+      "n": 4,
+      "min": 7118.68120988505,
+      "median": 7148.3471933000255,
+      "max": 7263.536614612676,
+      "mean": 7169.728052774444
+    },
+    "groups": {
+      "align_grad_output": {
+        "n": 4,
+        "min": 133.53744232654572,
+        "median": 144.67267081141472,
+        "max": 150.63620340824127,
+        "mean": 143.3797468394041
+      },
+      "combine_dtopk": {
+        "n": 4,
+        "min": 37.42782587651163,
+        "median": 40.124833452515304,
+        "max": 44.84515587659553,
+        "mean": 40.63066216453444
+      },
+      "combine_dx": {
+        "n": 4,
+        "min": 1258.2861434412189,
+        "median": 1750.5688089616597,
+        "max": 2479.3788502472453,
+        "mean": 1809.7006529029459
+      },
+      "dispatch_grad_output": {
+        "n": 4,
+        "min": 605.0651075839996,
+        "median": 653.3022629022598,
+        "max": 757.5261044502258,
+        "mean": 667.2989344596863
+      },
+      "dispatch_topk_dummy": {
+        "n": 4,
+        "min": 98.55798229575157,
+        "median": 102.78913599252701,
+        "max": 109.20989635586739,
+        "mean": 103.33653765916824
+      },
+      "forward_save_dispatch": {
+        "n": 4,
+        "min": 34.847496062517166,
+        "median": 36.62772700190544,
+        "max": 38.78259390592575,
+        "mean": 36.72138599306345
+      },
+      "local_vjp_total": {
+        "n": 4,
+        "min": 3747.6719903945923,
+        "median": 4453.9739990234375,
+        "max": 4957.369264602661,
+        "mean": 4403.247313261032
+      },
+      "return_casts": {
+        "n": 4,
+        "min": 0.8714089961722493,
+        "median": 0.9067449863068759,
+        "max": 0.9188519851304591,
+        "mean": 0.9009377384791151
+      },
+      "reuse_forward_dispatch": {
+        "n": 4,
+        "min": 1.2200479982420802,
+        "median": 1.2255674987100065,
+        "max": 1.26188800111413,
+        "mean": 1.2332677491940558
+      }
+    },
+    "local_vjp_detail": {
+      "dgrad_swiglu": {
+        "n": 4,
+        "min": 601.1728091239929,
+        "median": 725.8152488470078,
+        "max": 826.9995505809784,
+        "mean": 719.9507143497467
+      },
+      "dtopk_weight": {
+        "n": 4,
+        "min": 166.1962305009365,
+        "median": 206.64353293180466,
+        "max": 243.64989972114563,
+        "mean": 205.78329902142286
+      },
+      "forward_recompute": {
+        "n": 4,
+        "min": 973.0879623889923,
+        "median": 1097.9918452501297,
+        "max": 1199.813784122467,
+        "mean": 1092.2213592529297
+      },
+      "gather_scale": {
+        "n": 4,
+        "min": 148.4221104979515,
+        "median": 183.83992525935173,
+        "max": 214.50945484638214,
+        "mean": 182.65285396575928
+      },
+      "prepare_ops": {
+        "n": 4,
+        "min": 1.2261290014721453,
+        "median": 1.229628499597311,
+        "max": 1.264732004608959,
+        "mean": 1.2375295013189316
+      },
+      "route_pack": {
+        "n": 4,
+        "min": 23.783126048743725,
+        "median": 24.676174975931644,
+        "max": 25.331497982144356,
+        "mean": 24.616743495687842
+      },
+      "sort_counts": {
+        "n": 4,
+        "min": 86.37990525364876,
+        "median": 90.68229760229588,
+        "max": 96.845547914505,
+        "mean": 91.14751209318638
+      },
+      "wgrad": {
+        "n": 4,
+        "min": 1073.4397201538086,
+        "median": 1313.5950644016266,
+        "max": 1443.7405014038086,
+        "mean": 1286.0925875902176
+      },
+      "xgrad": {
+        "n": 4,
+        "min": 651.2519145011902,
+        "median": 789.3623760938644,
+        "max": 900.8504536151886,
+        "mean": 782.7067800760269
+      }
+    }
+  },
+  "dsv4_profile_rank_summary_ms": {
+    "sharedkv_total": {
+      "n": 4,
+      "min": 4715.8538736104965,
+      "median": 4716.885036408901,
+      "max": 4717.977689027786,
+      "mean": 4716.900408864021
+    },
+    "sharedkv_query_total": {
+      "n": 4,
+      "min": 4403.356135368347,
+      "median": 4403.787376880646,
+      "max": 4404.587502479553,
+      "mean": 4403.879597902298
+    },
+    "sharedkv_sink_total": {
+      "n": 4,
+      "min": 312.49773824214935,
+      "median": 313.09765952825546,
+      "max": 313.39018654823303,
+      "mean": 313.0208109617233
+    },
+    "sharedkv_by_cr": {
+      "cr128": {
+        "query_ms": {
+          "n": 4,
+          "min": 998.8723020553589,
+          "median": 999.8937277793884,
+          "max": 1000.7915678024292,
+          "mean": 999.8628313541412
+        },
+        "sink_ms": {
+          "n": 4,
+          "min": 155.58693051338196,
+          "median": 155.77012062072754,
+          "max": 155.8982858657837,
+          "mean": 155.75636440515518
+        },
+        "count": {
+          "n": 4,
+          "min": 116,
+          "median": 116,
+          "max": 116,
+          "mean": 116
+        }
+      },
+      "cr4": {
+        "query_ms": {
+          "n": 4,
+          "min": 3402.6405296325684,
+          "median": 3404.328766822815,
+          "max": 3404.7690029144287,
+          "mean": 3404.0167665481567
+        },
+        "sink_ms": {
+          "n": 4,
+          "min": 156.9108077287674,
+          "median": 157.3182213306427,
+          "max": 157.5105358362198,
+          "mean": 157.26444655656815
+        },
+        "count": {
+          "n": 4,
+          "min": 117,
+          "median": 117,
+          "max": 117,
+          "mean": 117
+        }
+      }
+    },
+    "loss_profile_total": {
+      "n": 4,
+      "min": 1383.9436464309692,
+      "median": 1385.0403745472431,
+      "max": 1386.4436284899712,
+      "mean": 1385.1170060038567
+    }
+  },
+  "rank_decomposition_ms": {
+    "0": {
+      "microbatch_fwd_bwd_wall_ms": 33103.99413690902,
+      "forward_wall_ms": 7031.161445891485,
+      "loss_wall_ms": 982.7815479366109,
+      "backward_wall_ms": 19684.616843005642,
+      "wrapper_residual_wall_ms": 5405.434300075285,
+      "mori_named_backward_gpu_ms": 7129.24300386291,
+      "sharedkv_backward_gpu_ms": 4717.977689027786,
+      "backward_minus_mori_sharedkv_ms_approx": 7837.396150114946
+    },
+    "1": {
+      "microbatch_fwd_bwd_wall_ms": 33107.87588288076,
+      "forward_wall_ms": 6977.1683036815375,
+      "loss_wall_ms": 982.0514559978619,
+      "backward_wall_ms": 19684.335954952985,
+      "wrapper_residual_wall_ms": 5464.320168248378,
+      "mori_named_backward_gpu_ms": 7167.451382737141,
+      "sharedkv_backward_gpu_ms": 4715.8538736104965,
+      "backward_minus_mori_sharedkv_ms_approx": 7801.030698605347
+    },
+    "2": {
+      "microbatch_fwd_bwd_wall_ms": 33106.3507910585,
+      "forward_wall_ms": 6974.042821093462,
+      "loss_wall_ms": 980.1611241418868,
+      "backward_wall_ms": 19685.931914951652,
+      "wrapper_residual_wall_ms": 5466.214930871502,
+      "mori_named_backward_gpu_ms": 7263.536614612676,
+      "sharedkv_backward_gpu_ms": 4716.251000285149,
+      "backward_minus_mori_sharedkv_ms_approx": 7706.1443000538275
+    },
+    "3": {
+      "microbatch_fwd_bwd_wall_ms": 33107.53348493017,
+      "forward_wall_ms": 7021.613789722323,
+      "loss_wall_ms": 979.211756028235,
+      "backward_wall_ms": 19685.69980771281,
+      "wrapper_residual_wall_ms": 5421.008131466806,
+      "mori_named_backward_gpu_ms": 7118.68120988505,
+      "sharedkv_backward_gpu_ms": 4717.519072532654,
+      "backward_minus_mori_sharedkv_ms_approx": 7849.499525295105
+    }
+  },
+  "read": {
+    "profile_step2_tokens_per_gpu_s": 3888,
+    "profile_step2_tflops_per_gpu": 196.8425,
+    "retained_nonprofile_steps2_to6_tokens_per_gpu_s": 4034.4,
+    "retained_nonprofile_steps2_to6_tflops_per_gpu": 204.272,
+    "profile_overhead_vs_retained_tokens_pct": -3.628792385484836,
+    "target_tokens_per_gpu_s": 12200,
+    "profile_target_ratio_tokens": 0.31868852459016395,
+    "retained_target_ratio_tokens": 0.33068852459016396,
+    "headline": "Diagnostic sidecars slow the run slightly, but the same-shape profile keeps the active bottleneck ladder: backward is the largest additive wall, MORI owner VJP/dX return is the largest named backward branch, and shared-KV sparse MLA is now a materialized secondary wall dominated by C4 query-recompute/dKV accumulation. A large backward-minus-MORI/sharedKV remainder remains and needs torch-profiler or narrower linear/FSDP attribution before kernel work can be called complete."
+  }
+}

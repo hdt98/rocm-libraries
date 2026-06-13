@@ -1,0 +1,76 @@
+{
+  "artifact": "torchtitan_mori_native_devdeps_optional_index_smoke_20260611",
+  "date": "2026-06-11",
+  "purpose": "Validate that the MORI native compact path can rebuild and run after adding RDMA/libpci build and runtime dependencies to the TorchTitan base container.",
+  "image": {
+    "base": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "derived_tag": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "dockerfile_remote_path": "/scratch/sonle5/dockerfiles/Dockerfile.nexus-titan-mori-devdeps",
+    "installed_packages": [
+      "libibverbs1",
+      "libibverbs-dev",
+      "librdmacm1",
+      "librdmacm-dev",
+      "rdma-core",
+      "libpci-dev",
+      "pciutils"
+    ],
+    "verified_files": [
+      "/usr/include/infiniband/verbs.h",
+      "/usr/include/x86_64-linux-gnu/pci/pci.h",
+      "/lib/x86_64-linux-gnu/libibverbs.so.1",
+      "/lib/x86_64-linux-gnu/librdmacm.so.1"
+    ],
+    "nodes_built": [
+      "do-sonle5-mi350-gpu",
+      "do-vunguyen-mi350-gpu"
+    ]
+  },
+  "code_change_under_test": {
+    "summary": "Avoid building and saving the full expert-major to rank-major permutation sidecar on the MORI native count-aware compact path. Native combine can consume recv count metadata directly and only requires the fallback permutation tensor when count metadata is unavailable.",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "sources/references/mori/python/mori/ops/dispatch_combine.py"
+    ]
+  },
+  "remote_validation": {
+    "node": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "rebuild_command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 CANARY_MORI_IMPORT_MODE=remote CANARY_MORI_REBUILD_REMOTE=true CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND=mori_native GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh stage",
+    "rebuild_result": "passed; output included rebuilt_mori and has_compact_combine True",
+    "smoke_command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 CANARY_MORI_IMPORT_MODE=remote CANARY_MORI_REBUILD_REMOTE=false GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_DP_SHARD=-1 CANARY_MBS=1 CANARY_GBS=4 CANARY_SEQ_LEN=128 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_USE_HYPER_CONNECTIONS=false CANARY_DSV4_NUM_MTP_MODULES=1 CANARY_MOE_COMM_BACKEND=standard CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND=mori_native CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND=triton_flat CANARY_REQUIRE_IDLE_GPUS=false launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_4xmi350_20260611T035334Z",
+    "shape": {
+      "gpus": 4,
+      "visible_devices": "4,5,6,7",
+      "sequence_length": 128,
+      "micro_batch_size": 1,
+      "global_batch_size": 4,
+      "fsdp": 4,
+      "ep": 4,
+      "mtp_modules": 1,
+      "hyper_connections": false
+    },
+    "result": "passed 1 training step; MORI imported, JIT compiled/cached ep_intranode, loss was finite, backward completed, and process groups were destroyed cleanly",
+    "step_1_metrics": {
+      "loss": 15.91647,
+      "grad_norm": 17.25,
+      "memory_gib": 189.77,
+      "tokens_per_second_logged": 4,
+      "tflops_logged": 0.10
+    },
+    "interpretation": "ABI and environment smoke only. The node was not a clean full 8-GPU performance surface, and S128/1-step timing is not promotable throughput evidence."
+  },
+  "local_validation": {
+    "py_compile": [
+      "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "sources/references/mori/python/mori/ops/dispatch_combine.py"
+    ],
+    "diff_check": "passed for the two changed Python files before artifact write"
+  },
+  "next_steps": [
+    "Run the same native compact path on a clean full 8xMI350 surface with the MORI profiler enabled.",
+    "Use apple-to-apple current-best shape comparisons before claiming any throughput movement.",
+    "Continue removing adapter/layout overhead from the native compact path rather than adding route-mask knobs."
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "artifact": "compressed_dkv_ck_mfma_contrib_tile_decision",
+  "date": "2026-06-05",
+  "status": "ck_raw_attribute_fragment_demoted",
+  "scope": "K16xD16 BF16 MFMA contribution tile for compressed sparse-MLA dKV",
+  "target_kernel_direction": "same-workgroup or persistent producer-consumer sparse-attention backward owner: q,dO,kv,indices,lse/sink -> dQ + group-aware dKV",
+  "why_this_probe_exists": "The prior HIP/rocWMMA score-page probe proved the same-workgroup score-tile idea but was too slow as a dKV-only emitter. This probe checked whether CK Tile's gfx950 BF16 MFMA attribute could be used as the low-level contribution fragment inside the next cooperative owner.",
+  "build_result": {
+    "split_source_raw_hip_build": "works",
+    "reason_for_split_source": "Avoid PyTorch HIP extension Thrust header duplicate-definition collision by compiling the CK/HIP object with raw hipcc, then linking it into a tiny PyTorch binding.",
+    "container": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "evidence": [
+    {
+      "artifact": "compressed_dkv_ck_mfma_contrib_tile_h64_prebuilt_20260605.json",
+      "read": "First split-source CK build ran fast but failed parity with equal reference/candidate norms, suggesting lane-layout mismatch rather than build failure."
+    },
+    {
+      "artifact": "compressed_dkv_ck_mfma_contrib_tile_h64_layoutfix_20260605.json",
+      "read": "C-lane store adjusted from CK constants but still failed parity."
+    },
+    {
+      "artifact": "compressed_dkv_ck_mfma_contrib_tile_h64_abfix_20260605.json",
+      "read": "A/B lane-feed variant made norm drift worse; not the right fix."
+    },
+    {
+      "artifact_glob": "compressed_dkv_ck_mfma_contrib_tile_h64_sm[0-5]_20260605.json",
+      "read": "Six direct C-store layouts all failed parity; median micro timings were around 0.0077-0.0093 ms, but correctness failed for every mode."
+    }
+  ],
+  "store_mode_sweep": [
+    {
+      "store_mode": 0,
+      "status": "failed",
+      "max_abs_diff": 55.28358459472656,
+      "mean_abs_diff": 9.853021621704102,
+      "median_ms": 0.008340500295162201
+    },
+    {
+      "store_mode": 1,
+      "status": "failed",
+      "max_abs_diff": 43.775733947753906,
+      "mean_abs_diff": 13.32952880859375,
+      "median_ms": 0.00774000003002584
+    },
+    {
+      "store_mode": 2,
+      "status": "failed",
+      "max_abs_diff": 56.62589645385742,
+      "mean_abs_diff": 14.191965103149414,
+      "median_ms": 0.00930000003427267
+    },
+    {
+      "store_mode": 3,
+      "status": "failed",
+      "max_abs_diff": 43.825599670410156,
+      "mean_abs_diff": 9.790475845336914,
+      "median_ms": 0.007699999958276749
+    },
+    {
+      "store_mode": 4,
+      "status": "failed",
+      "max_abs_diff": 42.490867614746094,
+      "mean_abs_diff": 12.87445068359375,
+      "median_ms": 0.007819999940693378
+    },
+    {
+      "store_mode": 5,
+      "status": "failed",
+      "max_abs_diff": 56.62590026855469,
+      "mean_abs_diff": 12.581551551818848,
+      "median_ms": 0.007860000245273113
+    }
+  ],
+  "decision": {
+    "do_not_promote": "Do not wire the half-manual CK WarpGemmAttributeMfma fragment into the sparse-attention owner yet.",
+    "continue_with": [
+      "Direct HIP/rocWMMA or direct MFMA intrinsics with an explicitly parity-proven lane layout.",
+      "Or a fuller CK Tile block/warp tensor API path that loads, computes, and stores through CK distributions end-to-end rather than mixing CK MFMA attributes with manual fragment packing."
+    ],
+    "keep_from_this_probe": [
+      "The raw hipcc prebuild plus PyTorch binding pattern works and avoids the PyTorch HIP header collision.",
+      "The correct target is still a cooperative source-boundary sparse backward owner, not a late dKV-only replacement."
+    ],
+    "next_gate": "Build the query-major cooperative source-boundary sparse-MLA backward kernel with resident score/prob/scaled-dP tile and group-aware dKV epilogue; measure actual S4096 sparse-attention backward boundary latency against the 11.13 ms Triton boundary and then e2e TFLOPs."
+  }
+}

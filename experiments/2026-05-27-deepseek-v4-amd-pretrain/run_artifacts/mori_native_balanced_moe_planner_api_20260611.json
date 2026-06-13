@@ -1,0 +1,59 @@
+{
+  "artifact": "mori_native_balanced_moe_planner_api_20260611",
+  "date": "2026-06-11",
+  "goal": "Start moving balanced-MoE policy into the MORI vendor snapshot as an importable native MORI EP feature.",
+  "source_changes": [
+    {
+      "file": "sources/references/mori/python/mori/ops/balanced_moe.py",
+      "change": "Added BalancedMoePlan, BalancedMoeHotExpert, BalancedMoeSourcePartition, MindSpeed-style greedy hot-expert planner, distributed count gather helper, and source-side remote-hot partition builder."
+    },
+    {
+      "file": "sources/references/mori/python/mori/ops/__init__.py",
+      "change": "Exported the balanced-MoE planner API through mori.ops."
+    },
+    {
+      "file": "sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "change": "Added CPU tests for greedy hot-expert selection, threshold rejection, and source-rank remote-hot partition offsets."
+    },
+    {
+      "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "change": "TorchTitan standard-EP balanced-MoE planner now prefers mori.ops.balanced_moe when available, with the old local planner kept as fallback."
+    }
+  ],
+  "reference_mechanism": {
+    "source": "Ascend MindSpeed balanced-MoE token dispatcher",
+    "local_path": "sources/references/ascend-mindspeed-upstream-gitee-lite/mindspeed/core/transformer/moe/moe_feature/balanced_moe/modules/token_dispatcher.py",
+    "policy": "Repeatedly select the max-count expert on the max-load EP rank, model selected expert rows as source/helper-rank execution, and reduce hot expert weight gradients back to the true owner."
+  },
+  "validation": [
+    {
+      "where": "local macOS workspace",
+      "command": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py sources/references/mori/python/mori/ops/balanced_moe.py sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "result": "passed"
+    },
+    {
+      "where": "local macOS workspace",
+      "command": "git diff --check -- sources/references/mori/python/mori/ops/balanced_moe.py sources/references/mori/python/mori/ops/__init__.py sources/references/mori/tests/python/ops/test_balanced_moe.py sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "result": "passed"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "from mori.ops import build_balanced_moe_plan_from_global_counts",
+      "result": "mori.ops balanced_moe export passed"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "pytest -q tests/python/ops/test_balanced_moe.py",
+      "result": "3 passed in 0.88s"
+    }
+  ],
+  "status": "importable_mori_balanced_moe_planner_added_not_yet_final_native_dispatcher",
+  "next_steps": [
+    "Use build_source_partition in TorchTitan so the route-mask/remote-hot tensor construction is MORI-owned.",
+    "Add a MORI EP API that accepts BalancedMoePlan owner-compact metadata and launches normal/cold compact dispatch plus helper-hot compact pack.",
+    "Benchmark standard EP hot-helper versus MORI native balanced-MoE on a small 4x fit surface before trying the 8x throughput gate.",
+    "Promote only after materialized tok/GPU/s, TFLOPs/GPU, and memory improve on flash_12layer_ceiling_probe."
+  ]
+}

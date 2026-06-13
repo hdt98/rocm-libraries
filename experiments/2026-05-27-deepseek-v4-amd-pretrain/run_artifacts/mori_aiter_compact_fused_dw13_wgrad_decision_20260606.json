@@ -1,0 +1,68 @@
+{
+  "schema": "dsv4_mori_aiter_compact_fused_dw13_wgrad_decision_v1",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 4,
+    "tokens": 4096,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "experts": 256,
+    "topk": 6,
+    "topk_pattern": "random",
+    "swiglu_backend": "triton",
+    "wgrad_op": "ptgmm",
+    "compact_recompute_mode": "expert_loop",
+    "xgrad_mode": "full",
+    "dtopk_mode": "out_recompute"
+  },
+  "candidate": {
+    "env": {
+      "TORCHTITAN_MORI_AITER_FUSED_DW13_WGRAD": "true"
+    },
+    "mechanism": "Concatenate compact dgate and dup along intermediate dimension and compute dw1/dw3 with one grouped transpose-GMM, then split the grouped result into dw1 and dw3 views."
+  },
+  "artifacts": {
+    "default": "run_artifacts/mori_aiter_owner_vjp_default_dw13_warm_s4096_ptgmm_4x_20260606.json",
+    "fused": "run_artifacts/mori_aiter_owner_vjp_fuseddw13_warm_s4096_ptgmm_4x_20260606.json"
+  },
+  "correctness": {
+    "default_all_ranks_finite": true,
+    "default_all_ranks_compact_matches_expert_loop": true,
+    "fused_all_ranks_finite": true,
+    "fused_all_ranks_compact_matches_expert_loop": true
+  },
+  "timing_gpu_ms": {
+    "default": {
+      "owner_vjp_total_mean": 5138.931722432375,
+      "owner_vjp_total_rank_max": 5207.476722061634,
+      "wgrad_mean": 214.16598963737488,
+      "wgrad_rank_max": 284.0743713378906
+    },
+    "fused": {
+      "owner_vjp_total_mean": 5500.208787605166,
+      "owner_vjp_total_rank_max": 5608.599264502525,
+      "wgrad_mean": 435.5851516723633,
+      "wgrad_rank_max": 576.330078125
+    },
+    "delta_fused_minus_default": {
+      "owner_vjp_total_mean": 361.27706517279146,
+      "owner_vjp_total_rank_max": 401.12254244089127,
+      "wgrad_mean": 221.4191620349884,
+      "wgrad_rank_max": 292.2557067871094
+    }
+  },
+  "decision": {
+    "result": "rejected_no_e2e",
+    "reason": "The local owner-VJP gate is correct but slower. The concatenated 2I grouped-TGMM shape raises wgrad latency and rank-max owner-VJP latency, so no 12-layer materialized e2e run was launched.",
+    "next_action": "Keep the opt-in branch only as diagnostic evidence. Continue toward a real fused compact grouped owner-rank training backward that controls the grouped matmul schedule instead of adapter-level concatenation."
+  },
+  "validation": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "git diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "4-rank owner-VJP parity/timing probe, default dw1/dw3",
+    "4-rank owner-VJP parity/timing probe, fused dw13"
+  ]
+}

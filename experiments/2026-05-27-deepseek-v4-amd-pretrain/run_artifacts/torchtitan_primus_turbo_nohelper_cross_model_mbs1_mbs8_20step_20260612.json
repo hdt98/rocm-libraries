@@ -1,0 +1,318 @@
+{
+  "artifact": "torchtitan_primus_turbo_nohelper_cross_model_mbs1_mbs8_20step_20260612",
+  "created_utc": "2026-06-12T15:20:00Z",
+  "question": "Were the retained no-helper rows using DeepEP, and can the no-helper baselines run with Primus-Turbo DeepEP/TurboEP-style backend?",
+  "answer": {
+    "retained_no_helper_rows_were_deepep": false,
+    "primus_turbo_no_helper_runs_completed": true,
+    "read": "The retained no-helper rows were plain standard EP. Primus-Turbo's in-tree TurboEPBackend raw-top-k/no-helper path now has 20-step MBS1/2/4/8 evidence for DeepSeek-V4 Flash 12-layer and Qwen3.5-397B-A17B 8-layer. The old Qwen MBS4 row was superseded by a clean rerun at 15745.63 tok/GPU/s. TurboEP is a useful raw-top-k EP baseline, but it does not replace the MindSpeed-style hot-helper partition at the highest retained gates."
+  },
+  "backend_identification": {
+    "backend_name": "Primus-Turbo TurboEPBackend",
+    "external_deepep_backend_available": false,
+    "external_deepep_packages_present": false,
+    "single_node_intranode_only": true,
+    "env": {
+      "TORCHTITAN_MOE_BALANCED_MOE_MODE": "off",
+      "TORCHTITAN_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_TENSORS": "1",
+      "TORCHTITAN_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_VALIDATE": "0",
+      "TORCHTITAN_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_PERMUTE": "1",
+      "TORCHTITAN_MORI_AITER_BALANCED_MOE_PLAN_BACKEND": "primus_turbo"
+    },
+    "read": "All routes remain raw token-major top-k normal EP routes. This does not consume the hot/cold/helper owner-compact partition."
+  },
+  "common_surface": {
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "steps": 20,
+    "retained_window": "steps_2_to_20"
+  },
+  "models": {
+    "deepseek_v4_flash_12layer": {
+      "node": "do-vunguyen-mi350-gpu for MBS1/2, do-sonle5-mi350-gpu for MBS4/8",
+      "topology": "12 layers, 256 routed experts, top-k 6, first-12 compress ratios [1,1,4,128,4,128,4,128,4,128,4,128]",
+      "artifact_sources": [
+        "run_artifacts/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_mbs8_20step_20260612.json"
+      ],
+      "rows": [
+        {
+          "micro_batch_size": 1,
+          "gradient_accumulation_steps": 16,
+          "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 5082.9737,
+            "node_tokens_per_s": 40663.7895,
+            "tflops_per_gpu": 232.7966,
+            "mfu_pct": 10.0789,
+            "peak_logged_memory_gib": 115.98
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 5086.5156,
+            "node_tokens_per_s": 40692.125,
+            "tflops_per_gpu": 232.9583,
+            "mfu_pct": 10.0863,
+            "peak_logged_memory_gib": 115.98
+          },
+          "loss": {
+            "step_1": 12.15972,
+            "step_20": 3.37728
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 3822.38,
+            "plain_standard_ep_no_helper_delta_pct": 32.98,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 4202.72,
+            "standard_ep_top8_helper_delta_pct": 20.94
+          }
+        },
+        {
+          "micro_batch_size": 2,
+          "gradient_accumulation_steps": 8,
+          "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 5898.1579,
+            "node_tokens_per_s": 47185.2632,
+            "tflops_per_gpu": 270.1365,
+            "mfu_pct": 11.6963,
+            "peak_logged_memory_gib": 139.78
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 5944.75,
+            "node_tokens_per_s": 47558.0,
+            "tflops_per_gpu": 272.2703,
+            "mfu_pct": 11.7888,
+            "peak_logged_memory_gib": 139.78
+          },
+          "loss": {
+            "step_1": 12.29518,
+            "step_20": 3.33679
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 4321.64,
+            "plain_standard_ep_no_helper_delta_pct": 36.48,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 5254.38,
+            "standard_ep_top8_helper_delta_pct": 12.25
+          }
+        },
+        {
+          "micro_batch_size": 4,
+          "gradient_accumulation_steps": 4,
+          "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_steps20_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs4_steps20_20260612/docker-run.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 6720.9474,
+            "node_tokens_per_s": 53767.5792,
+            "tflops_per_gpu": 332.7305,
+            "peak_logged_memory_gib": 178.08
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 6638.375,
+            "node_tokens_per_s": 53107.0,
+            "tflops_per_gpu": 328.6363,
+            "peak_logged_memory_gib": 178.08
+          },
+          "loss": {
+            "step_1": 16.00367,
+            "step_20": 4.71222
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 5058.13,
+            "plain_standard_ep_no_helper_delta_pct": 32.87,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 6550.0,
+            "standard_ep_top8_helper_delta_pct": 2.61
+          }
+        },
+        {
+          "micro_batch_size": 8,
+          "gradient_accumulation_steps": 2,
+          "run_id": "torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs8_steps20_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_deepep_nohelper_mbs8_steps20_20260612/docker-run.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 6910.7368,
+            "node_tokens_per_s": 55285.8944,
+            "tflops_per_gpu": 342.1295,
+            "peak_logged_memory_gib": 264.76
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 6837.125,
+            "node_tokens_per_s": 54697.0,
+            "tflops_per_gpu": 338.4887,
+            "peak_logged_memory_gib": 264.76
+          },
+          "loss": {
+            "step_1": 15.97713,
+            "step_20": 4.37063
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_result": "fails_before_first_metric",
+            "standard_ep_top8_helper_tokens_per_gpu_s": 8632.78,
+            "standard_ep_top8_helper_delta_pct": -19.95
+          }
+        }
+      ]
+    },
+    "qwen3_5_397b_a17b_reduced_8layer": {
+      "node": "do-vunguyen-mi350-gpu",
+      "topology": "8 layers, 512 routed experts, top-k 10 plus one shared expert, hidden 4096, GQA 32Q/2KV, head_dim 256",
+      "artifact_sources": [
+        "run_artifacts/torchtitan_qwen397b_a17b_primus_deepep_nohelper_mbs4_mbs8_20step_20260612.json",
+        "run_artifacts/torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612.json"
+      ],
+      "rows": [
+        {
+          "micro_batch_size": 1,
+          "gradient_accumulation_steps": 16,
+          "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs1_retry_steps20_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs1_retry_steps20_20260612/logs/train.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 9355.3158,
+            "node_tokens_per_s": 74842.5263,
+            "tflops_per_gpu": 160.1868,
+            "mfu_pct": 6.9358,
+            "peak_logged_memory_gib": 126.75
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 9373.7656,
+            "node_tokens_per_s": 74990.125,
+            "tflops_per_gpu": 160.5022,
+            "mfu_pct": 6.9513,
+            "peak_logged_memory_gib": 126.75
+          },
+          "loss": {
+            "step_1": 12.18427,
+            "step_20": 3.13112
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 7857.678,
+            "plain_standard_ep_no_helper_delta_pct": 19.06,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 8379.572,
+            "standard_ep_top8_helper_delta_pct": 11.64
+          }
+        },
+        {
+          "micro_batch_size": 2,
+          "gradient_accumulation_steps": 8,
+          "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs2_steps20_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs2_steps20_20260612/logs/train.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 12473.8684,
+            "node_tokens_per_s": 99790.9474,
+            "tflops_per_gpu": 213.5853,
+            "mfu_pct": 9.2484,
+            "peak_logged_memory_gib": 138.19
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 12513.7969,
+            "node_tokens_per_s": 100110.375,
+            "tflops_per_gpu": 214.2691,
+            "mfu_pct": 9.2786,
+            "peak_logged_memory_gib": 138.19
+          },
+          "loss": {
+            "step_1": 12.47679,
+            "step_20": 3.16683
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 10058.388,
+            "plain_standard_ep_no_helper_delta_pct": 24.01,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 11174.086,
+            "standard_ep_top8_helper_delta_pct": 11.63
+          }
+        },
+        {
+          "micro_batch_size": 4,
+          "gradient_accumulation_steps": 4,
+          "run_id": "qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_primus_turbo_nohelper_mbs4_rerun_steps20_20260612T1602/logs/train.log",
+          "supersedes_run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs4_retry_steps20_20260612",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 15745.63,
+            "node_tokens_per_s": 125965.04,
+            "tflops_per_gpu": 269.61,
+            "mfu_pct": 11.67,
+            "peak_logged_memory_gib": 262.8
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 15746.38,
+            "node_tokens_per_s": 125971.04,
+            "tflops_per_gpu": 269.62,
+            "mfu_pct": 11.67,
+            "peak_logged_memory_gib": 262.8
+          },
+          "loss": {
+            "step_1": 12.20839,
+            "step_20": 3.1573
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 12106.349,
+            "plain_standard_ep_no_helper_delta_pct": 30.06,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 13914.217,
+            "standard_ep_top8_helper_delta_pct": 13.16
+          }
+        },
+        {
+          "micro_batch_size": 8,
+          "gradient_accumulation_steps": 2,
+          "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs8_steps20_20260612",
+          "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs8_steps20_20260612/logs/train.log",
+          "completed_steps": 20,
+          "steps_2_20": {
+            "tokens_per_gpu_s": 11650.895,
+            "node_tokens_per_s": 93207.158,
+            "tflops_per_gpu": 199.494,
+            "mfu_pct": 8.638,
+            "peak_logged_memory_gib": 277.96
+          },
+          "steps_13_20": {
+            "tokens_per_gpu_s": 12149.562,
+            "node_tokens_per_s": 97196.5,
+            "tflops_per_gpu": 208.032,
+            "mfu_pct": 9.008,
+            "peak_logged_memory_gib": 277.11
+          },
+          "loss": {
+            "step_1": 9.31578,
+            "step_20": 3.42854
+          },
+          "comparison_steps_2_20": {
+            "plain_standard_ep_no_helper_tokens_per_gpu_s": 12683.539,
+            "plain_standard_ep_no_helper_delta_pct": -8.14,
+            "standard_ep_top8_helper_tokens_per_gpu_s": 15833.914,
+            "standard_ep_top8_helper_delta_pct": -26.42
+          }
+        }
+      ],
+      "invalid_attempts": [
+        {
+          "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs1_steps20_20260612",
+          "result": "invalid_launch_attempt",
+          "reason": "Manual Docker launch omitted ROCm device flags and failed with RuntimeError: No CUDA GPUs are available. The retry with canonical device flags is the retained MBS1 row."
+        },
+        {
+          "run_id": "qwen397b_a17b_primus_deepep_nohelper_mbs4_steps20_20260612",
+          "result": "invalid_contaminated_failure",
+          "reason": "The first MBS4 attempt failed with stale-worker/IPC contamination and is already documented in the MBS4/MBS8 artifact."
+        }
+      ]
+    }
+  },
+  "decision": {
+    "promote_as_raw_topk_no_helper_backend_baseline": true,
+    "promote_over_standard_ep_top8_hot_helper": false,
+    "read": "Primus-Turbo raw-top-k no-helper is worth keeping as a baseline. It improves no-helper DeepSeek and Qwen MBS1/2/4 rows. Qwen MBS8 remains diagnostic because the retained row is allocator-pressure contaminated, and the raw-top-k path still does not reproduce the robust memory/load-placement benefit of hot-helper at the highest gates. Native MORI/Primus-Turbo optimization should target the hot/cold/helper owner-compact partition, not just replace raw top-k dispatch/combine."
+  }
+}

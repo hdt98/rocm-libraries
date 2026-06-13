@@ -1,0 +1,142 @@
+{
+  "status": "profiled",
+  "host": "do-sonle5-mi350-gpu",
+  "device": "MI350X",
+  "physical_gpu": 4,
+  "node_note": "do-sonle-kernel did not have the TorchTitan nexus-titan image available; do-sonle5 GPUs 0-3 were occupied by an SGLang EP4/MORI/TBO serve job, so this non-conflicting single-GPU profile used physical GPU 4.",
+  "raw_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/sparse_mla_forward_s4096_blockk64_blockv512_rocprof_20260601_try2",
+  "raw_profile_files": {
+    "kernel_stats": "rocprof_sparse_mla_s4096_bk64_bv512_kernel_stats.csv",
+    "kernel_trace": "rocprof_sparse_mla_s4096_bk64_bv512_kernel_trace.csv",
+    "hip_api_stats": "rocprof_sparse_mla_s4096_bk64_bv512_hip_api_stats.csv",
+    "memory_copy_stats": "rocprof_sparse_mla_s4096_bk64_bv512_memory_copy_stats.csv",
+    "results_json": "rocprof_sparse_mla_s4096_bk64_bv512_results.json",
+    "prewarm_summary": "prewarm_summary.json",
+    "profiled_summary": "profiled_summary.json"
+  },
+  "shape": {
+    "model_flavor": "deepseek_v4_flash_4layer",
+    "layer_id": 2,
+    "batch": 1,
+    "sequence_length": 4096,
+    "dtype": "bf16",
+    "candidate_mode": "fused",
+    "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+    "scope": "forward_only_no_grad",
+    "selected_keys": 640,
+    "compressed_groups": 1024,
+    "target_forward_ms": 3.6
+  },
+  "environment": {
+    "ROCR_VISIBLE_DEVICES": "4",
+    "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS": "0",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "timing_context": {
+    "prewarm_candidate_cuda_event_mean_ms": 89.2861099243164,
+    "profiled_candidate_cuda_event_samples_ms": [
+      4577.2568359375,
+      89.5588150024414
+    ],
+    "profiled_candidate_cuda_event_mean_ms": 2333.4078254699707,
+    "profiled_timing_note": "The first profiled sample includes rocprof/module-load overhead and is not a steady-state latency estimate. Use the unprofiled timing summary for pass/fail latency and the kernel stats for attribution."
+  },
+  "kernel_stats": {
+    "total_kernel_time_ms": 176.409942,
+    "top_kernels": [
+      {
+        "classification": "fused_sparse_mla_forward_core",
+        "name": "_sparse_mla_forward_kernel",
+        "calls": 2,
+        "total_ms": 158.995587,
+        "avg_ms": 79.4977935,
+        "percentage_of_kernel_time": 90.13
+      },
+      {
+        "classification": "projection_or_output_gemm",
+        "name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64",
+        "calls": 12,
+        "total_ms": 4.263038,
+        "avg_ms": 0.355253166667,
+        "percentage_of_kernel_time": 2.42
+      },
+      {
+        "classification": "torch_cat_copy",
+        "name_prefix": "at::native::CatArrayBatchedCopy",
+        "calls": 4,
+        "total_ms": 1.646215,
+        "avg_ms": 0.41155375,
+        "percentage_of_kernel_time": 0.9332
+      },
+      {
+        "classification": "torch_where_or_mask_index",
+        "name_prefix": "at::native::vectorized_elementwise_kernel where(bool,uint,uint)",
+        "calls": 4,
+        "total_ms": 1.324732,
+        "avg_ms": 0.331183,
+        "percentage_of_kernel_time": 0.7509
+      },
+      {
+        "classification": "torch_bf16_elementwise_mul",
+        "name_prefix": "at::native::elementwise_kernel_manual_unroll bf16 mul",
+        "calls": 8,
+        "total_ms": 1.196891,
+        "avg_ms": 0.149611375,
+        "percentage_of_kernel_time": 0.6785
+      },
+      {
+        "classification": "torch_softmax_aux",
+        "name_prefix": "softmax_warp_forward<float,float,float,10,false,false,64>",
+        "calls": 4,
+        "total_ms": 0.775367,
+        "avg_ms": 0.19384175,
+        "percentage_of_kernel_time": 0.4395
+      },
+      {
+        "classification": "rocclr_copy_buffer",
+        "name": "__amd_rocclr_copyBuffer",
+        "calls": 27,
+        "total_ms": 0.743927,
+        "avg_ms": 0.027552851852,
+        "percentage_of_kernel_time": 0.4217
+      }
+    ]
+  },
+  "domain_stats": {
+    "hip_api_total_ms": 4315.536601,
+    "hip_api_calls": 12329,
+    "kernel_dispatch_total_ms": 176.409942,
+    "kernel_dispatch_calls": 320,
+    "memory_copy_total_ms": 29.357574,
+    "memory_copy_calls": 52,
+    "memory_copy_h2d_ms": 21.724582,
+    "memory_copy_d2h_ms": 7.632992
+  },
+  "hip_api_top": [
+    {
+      "name": "hipModuleLoad",
+      "calls": 2,
+      "total_ms": 2721.053876,
+      "percentage_of_hip_api_time": 63.05
+    },
+    {
+      "name": "hipLaunchKernel",
+      "calls": 265,
+      "total_ms": 1093.804966,
+      "percentage_of_hip_api_time": 25.35
+    },
+    {
+      "name": "hipMemcpyWithStream",
+      "calls": 33,
+      "total_ms": 228.547801,
+      "percentage_of_hip_api_time": 5.3
+    }
+  ],
+  "interpretation": [
+    "The S4096 forward gap is dominated by the current Triton sparse MLA forward kernel itself: _sparse_mla_forward_kernel is 158.996 ms out of 176.410 ms total profiled GPU kernel time across two forwards, or about 90.1%.",
+    "Projection GEMMs are not the measured bottleneck in this probe: the rocBLAS/hipBLASLt-looking GEMM family is 4.263 ms total across 12 calls, about 2.4% of profiled kernel time.",
+    "PyTorch cat/mask/elementwise/copy glue is visible but small compared with the fused sparse MLA kernel body.",
+    "The next optimization lever is the Triton sparse MLA/LightningIndexer schedule: reduce selected-key chunk work, avoid repeated score/value work, improve occupancy/register pressure, and move toward a backward-capable production kernel. Surrounding projection GEMM or dispatch-only changes will not close the 24x forward gap."
+  ]
+}

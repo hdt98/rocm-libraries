@@ -1,0 +1,216 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_weightedscatter_scorerow_rejection_20260611",
+  "date": "2026-06-11",
+  "purpose": "Evaluate whether a row-owned Triton weighted-scatter score-gradient reducer fixes the current-source no-mHC standard-EP fault without falling back to Torch for grad_scores.",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/ops/scatter_add.py",
+    "score_modes_added": [
+      "triton_split",
+      "triton_row",
+      "triton_row_bm4"
+    ],
+    "row_kernel": "_weighted_scatter_score_row_loop_kernel",
+    "row_kernel_contract": "One Triton program owns a row block, loops over hidden-dimension chunks, accumulates grad_scores[row] locally, and writes once instead of cross-column atomic-adding into grad_scores.",
+    "empty_shape_guard": "Return early from weighted-scatter backward when n_rows == 0 or dim == 0."
+  },
+  "isolated_probe": {
+    "production_like_shape": {
+      "rows": 131072,
+      "tokens": 16384,
+      "hidden": 7168
+    },
+    "triton_row_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/weighted_scatter_row_prodshape_20260611.json",
+    "scoretorch_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/weighted_scatter_scoretorch_prodshape_20260611.json",
+    "score_mode_row": {
+      "finite": true,
+      "out_max_abs_diff": 0.1875,
+      "src_grad_max_abs_diff": 0.0,
+      "score_grad_max_abs_diff": 0.000091552734375,
+      "fwd_median_ms": {
+        "torch": 6.773,
+        "triton_row": 6.35
+      },
+      "fwd_bwd_median_ms": {
+        "torch": 13.021,
+        "triton_row": 8.372
+      }
+    },
+    "score_mode_torch": {
+      "fwd_bwd_median_ms": 12.051
+    },
+    "read": "The row-owned reducer is a real single-op speedup in isolation, about 1.44x over the scoretorch split at this synthetic production-like shape."
+  },
+  "production_shape_profile": {
+    "run_id": "torchtitan_dsv4_flash12_scoretorch_shapes_profile_8x_s4096_gbs128_20260611",
+    "score_mode": "torch",
+    "result": "passed",
+    "completed_steps": 1,
+    "profile_timing_jsonl": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_scoretorch_shapes_profile_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+    "standard_ep_combine_records": 384,
+    "standard_ep_combine_shape": {
+      "x_shape": [
+        16384,
+        4096
+      ],
+      "routed_output_hidden": 4096,
+      "top_k": 6
+    },
+    "routed_output_rows": {
+      "min": 56441,
+      "median": 85828,
+      "mean": 84311.15625,
+      "p90": 93220,
+      "max": 102799
+    },
+    "hot_split_remote_rows": {
+      "min": 7075,
+      "median": 14161,
+      "mean": 13992.84375,
+      "p90": 16883,
+      "max": 20463
+    },
+    "combine_stage_gpu_ms_sums_over_profile": {
+      "unpermute": 608.463,
+      "all_to_all": 145.015,
+      "all_to_all_wait": 1092.282,
+      "allocate_out": 8.064,
+      "weighted_scatter_add": 2925.12
+    },
+    "read": "The real production standard-EP combine shape is hidden=4096 with about 56k-103k routed rows, not the earlier synthetic hidden=7168 probe. Weighted scatter remains the largest combine substage in this timing profile."
+  },
+  "exact_shape_isolated_probes": {
+    "shape": {
+      "rows": 102799,
+      "tokens": 16384,
+      "hidden": 4096,
+      "score_dtype": "float32",
+      "src_dtype": "bfloat16"
+    },
+    "single_gpu": {
+      "result": "passed",
+      "score_mode": "row",
+      "finite": true,
+      "out_max_abs_diff": 0.15625,
+      "src_grad_max_abs_diff": 0.0,
+      "score_grad_max_abs_diff": 0.0000457763671875,
+      "fwd_bwd_median_ms": {
+        "torch": 5.903696,
+        "triton_row": 3.799408
+      }
+    },
+    "eight_rank_isolated": {
+      "result": "passed",
+      "score_mode": "row",
+      "rank_count": 8,
+      "score_grad_max_abs_diff_max": 0.0000457763671875,
+      "fwd_bwd_triton_row_median_ms_range": [
+        3.776713,
+        3.820433
+      ],
+      "fwd_bwd_torch_median_ms_range": [
+        5.924434,
+        5.963953
+      ]
+    },
+    "read": "The row-owned reducer passes the actual observed production max-row shape in both single-GPU and eight-rank isolated probes. The integrated training fault is therefore context/lifetime/graph specific rather than a simple dimension or concurrent-rank shape miss."
+  },
+  "score_zero_integrated_diagnostic": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_scorezero_diag_8x_s4096_gbs128_20260611",
+    "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+    "score_mode": "zero",
+    "result": "passed",
+    "completed_steps": 1,
+    "loss": 12.24304,
+    "grad_norm": 19.375,
+    "rank_memory_gib_range": [
+      143.1,
+      144.84
+    ],
+    "tok_per_gpu_s_range": [
+      1897,
+      1901
+    ],
+    "tflops_per_gpu_range": [
+      96.05,
+      96.25
+    ],
+    "read": "Disabling only grad_scores while keeping the Triton grad_src path lets the full training graph complete a step. This isolates the crash to score-gradient production."
+  },
+  "normal_row_hot_torch_custom_integrated_diagnostic": {
+    "run_id": "torchtitan_dsv4_flash12_scorerow_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611",
+    "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+    "normal_weighted_scatter_backend": "triton_bwd",
+    "hot_split_weighted_scatter_backend": "torch_custom",
+    "score_mode": "row",
+    "result": "failed",
+    "completed_metric_steps": 0,
+    "failure": "HSA memory access faults in backward before any metric step; torchrun root local_rank 5 exited with SIGABRT and the other ranks were terminated.",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_scorerow_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_scorerow_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611/docker-run.log",
+    "read": "Forcing the hot-helper weighted scatter to Torch does not rescue row score mode. This rules out the hot-helper scatter caller as the integrated-only culprit and leaves the normal standard-EP combine score-gradient path as the active failing edge."
+  },
+  "row_bm4_integrated_diagnostic": {
+    "run_id": "torchtitan_dsv4_flash12_scorerow_bm4mode_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611",
+    "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+    "normal_weighted_scatter_backend": "triton_bwd",
+    "hot_split_weighted_scatter_backend": "torch_custom",
+    "score_mode": "row_bm4",
+    "score_block_m": 4,
+    "result": "failed",
+    "completed_metric_steps": 0,
+    "failure": "HSA memory access faults in backward before any metric step; torchrun root local_rank 1 exited with SIGABRT and the other ranks were terminated.",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_scorerow_bm4mode_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_scorerow_bm4mode_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611/docker-run.log",
+    "post_run_rocm_smi": "After teardown, all eight GPUs returned to 0% allocated VRAM.",
+    "read": "Batching four score rows per Triton program does not fix the integrated fault. This rejects simple one-row program launch pressure as the root cause and keeps the failing edge narrowed to integrated normal-combine score-gradient production."
+  },
+  "integrated_gates": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_scorerow_smoke_8x_s4096_gbs128_20260611",
+      "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+      "score_mode": "row",
+      "result": "failed",
+      "failure": "HSA memory access fault in backward before completing the first metric step"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_scorerow_emptyguard_smoke_8x_s4096_gbs128_20260611_retry",
+      "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+      "score_mode": "row",
+      "result": "failed",
+      "failure": "HSA memory access fault in backward before completing the first metric step, after adding the empty-shape guard"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_scorerow_bm4mode_normal_only_hotcustom_diag_8x_s4096_gbs128_20260611",
+      "shape": "8xMI350 MBS4 GA4 GBS128 S4096 no-AC standard EP top8 no-mHC",
+      "score_mode": "row_bm4",
+      "score_block_m": 4,
+      "result": "failed",
+      "failure": "HSA memory access fault in backward before completing the first metric step"
+    }
+  ],
+  "post_failure_baseline_sanity": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_scoretorch_postrowfault_smoke_20260611",
+    "score_mode": "torch",
+    "result": "passed",
+    "completed_steps": 1,
+    "loss": 12.35699,
+    "grad_norm": 19.75,
+    "rank_memory_gib_range": [
+      142.8,
+      144.91
+    ],
+    "tok_per_gpu_s_range": [
+      1882,
+      1889
+    ],
+    "tflops_per_gpu_range": [
+      95.31,
+      95.65
+    ],
+    "post_run_rocm_smi": "After a short teardown delay, all eight GPUs returned to about 286 MiB VRAM and 0% GPU use; rocm-smi --showpids reported only gpuagent with 0 VRAM."
+  },
+  "decision": "Do not promote triton_split, triton_row, or triton_row_bm4. The MI350 node is healthy for the stable no-mHC baseline path; the failing edge remains the integrated Triton weighted-scatter score-gradient reducer at production standard-EP normal-combine scale."
+}

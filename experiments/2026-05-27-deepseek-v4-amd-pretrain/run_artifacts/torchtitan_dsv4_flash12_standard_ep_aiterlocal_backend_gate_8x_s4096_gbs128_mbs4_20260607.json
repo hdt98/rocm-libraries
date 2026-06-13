@@ -1,0 +1,114 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_aiterlocal_backend_gate_8x_s4096_gbs128_mbs4_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "date": "2026-06-07",
+  "result": "completed_two_step_negative_gate",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "backend": "standard_ep_grouped_mm",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 7975.8,
+    "steps_2_to_6_tflops_per_gpu_mean": 403.834,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8057.3333,
+    "steps_4_to_6_tflops_per_gpu_mean": 407.96,
+    "peak_logged_memory_gib": 194.62
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_stage1recompute_smoke_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "backend": "aiter_stage1_recompute",
+      "env_delta": {
+        "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "aiter_stage1_recompute"
+      },
+      "step_metrics": {
+        "1": {
+          "tokens_per_gpu_s": 1882,
+          "tflops_per_gpu": 95.31,
+          "loss": 12.15974,
+          "grad_norm": 20.25,
+          "peak_logged_memory_gib": 155.76
+        },
+        "2": {
+          "tokens_per_gpu_s": 7731,
+          "tflops_per_gpu": 391.44,
+          "loss": 8.01251,
+          "grad_norm": 41.75,
+          "peak_logged_memory_gib": 195.10
+        }
+      },
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_stage1recompute_smoke_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_stage1recompute_smoke_8x_s4096_gbs128_mbs4_steps2_20260607/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_compact_smoke_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "backend": "aiter_compact",
+      "env_delta": {
+        "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "aiter_compact"
+      },
+      "step_metrics": {
+        "1": {
+          "tokens_per_gpu_s": 1834,
+          "tflops_per_gpu": 92.87,
+          "loss": 12.29131,
+          "grad_norm": 19.75,
+          "peak_logged_memory_gib": 157.08
+        },
+        "2": {
+          "tokens_per_gpu_s": 7688,
+          "tflops_per_gpu": 389.23,
+          "loss": 9.13927,
+          "grad_norm": 63.25,
+          "peak_logged_memory_gib": 193.83
+        }
+      },
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_compact_smoke_8x_s4096_gbs128_mbs4_steps2_20260607",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_aiterlocal_compact_smoke_8x_s4096_gbs128_mbs4_steps2_20260607/docker-run.log"
+    }
+  ],
+  "common_env": {
+    "CANARY_EP": 8,
+    "CANARY_DP_SHARD": 8,
+    "CANARY_MBS": 4,
+    "CANARY_GBS": 128,
+    "CANARY_SEQ_LEN": 4096,
+    "CANARY_STEPS": 2,
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "false",
+    "CANARY_PERSIST_JIT_CACHE": "auto",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": 4096,
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false"
+  },
+  "read": "Both opt-in AITER local expert backends completed the 8x standard-EP top8 two-step smoke, but neither beat the retained grouped_mm standard-EP local expert path. Stage1 recompute landed at 7731 tok/GPU/s and 391.44 TFLOPs/GPU on step 2; compact landed at 7688 tok/GPU/s and 389.23 TFLOPs/GPU. This supports the current diagnosis: the materialized standard-EP advantage comes from making hot/cold/helper rows part of the dispatcher layout. A local expert backend swap alone is not enough; the next MORI/AITER target remains a first-class hot/cold/helper dispatcher layout with preallocated partitions and overlapped backward consumers."
+}

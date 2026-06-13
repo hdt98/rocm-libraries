@@ -1,0 +1,56 @@
+{
+  "artifact": "sparse_mla_query_major_scorepage_valid_dkv_split_decision",
+  "date": "2026-06-05",
+  "status": "ordinary_same_workgroup_query_major_scorepage_rejected_triton_shaped_ck_epilogue_branch_selected",
+  "scope": "HIP/CK source-boundary compressed sparse-MLA backward dKV path on 1xMI350, layer 2, S4096, H64, D512, topk512, compressed_groups1024",
+  "kernel_source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+  "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "seq_chunk": 1,
+    "selected_block": 512,
+    "threads": 256,
+    "mode6_threads": 512
+  },
+  "results_ms": {
+    "producer_mode0_scorepage_skeleton_event_median_ms": 2.2478649616241455,
+    "producer_mode1_qk_score_event_median_ms": 3.7804839611053467,
+    "producer_mode2_qk_dov_prob_dp_checksum_event_median_ms": 7.075130939483643,
+    "producer_mode4_contribution_and_cta_reduce_no_dkv_write_event_median_ms": 21.769060134887695,
+    "producer_mode3_valid_dkv_event_median_ms": 25.937744140625,
+    "producer_mode5_512thread_dparallel_contribution_no_dkv_write_event_median_ms": 23.649564743041992,
+    "producer_mode5_1024thread_dparallel_contribution_no_dkv_write_event_median_ms": 31.362939834594727,
+    "producer_mode6_512thread_dparallel_valid_dkv_event_median_ms": 24.257568359375,
+    "mode3_minus_mode4_global_dkv_write_estimate_ms": 4.16868310546875,
+    "mode6_512thread_minus_mode5_512thread_global_dkv_write_estimate_ms": 0.6080036163330078,
+    "mode4_minus_mode2_contribution_consumer_estimate_ms": 14.693929195404053,
+    "mode5_512thread_minus_mode4_regression_ms": 1.8805046081542969,
+    "mode5_minus_mode4_extra_waves_regression_ms": 9.593879699707031,
+    "triton_full_sparse_attention_backward_gate_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041
+  },
+  "correctness": {
+    "s128_mode3_passed": true,
+    "s128_mode3_max_abs_diff": 0.06327152252197266,
+    "s128_mode3_artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s128_layer2_sb512_sc1_mode3_20260605.json"
+  },
+  "artifacts": {
+    "mode3_s4096_valid_dkv": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode3_20260605.json",
+    "mode6_s4096_512thread_valid_dkv": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode6_thr512_20260605.json",
+    "mode4_s4096_contrib_no_write": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode4_20260605.json",
+    "mode5_s4096_512thread_contrib_no_write": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode5_thr512_20260605.json",
+    "mode5_s4096_1024thread_contrib_no_write": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode5_20260605.json",
+    "mode0_s4096_prior": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode0_20260605.json",
+    "mode1_s4096_prior": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode1_20260605.json",
+    "mode2_s4096_prior": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_dotpart4_20260605.json"
+  },
+  "read": "The valid dKV mode proves the source-boundary HIP/CK score page can be consumed inside the same workgroup with correct dKV on S128, but the S4096 latency is 25.94 ms and fails the 11.13 ms Triton full-boundary gate. The 256-thread split shows global dKV writes add about 4.17 ms, while the contribution-consumer side adds about 14.69 ms over the mode-2 score/prob/dP producer. The newer 512-thread mode6 valid-dKV result is 24.26 ms versus 23.65 ms for matching no-write mode5, so final global dKV write/atomic overhead is only about 0.61 ms after this same-CTA widening. A 1024-thread four-D16 no-write variant regresses further to 31.36 ms. The problem is therefore not just atomics; ordinary one-CTA score-page reuse either serializes D consumption or becomes too heavy when widened.",
+  "decision": "Do not promote this ordinary same-workgroup mode. Return to the Triton baseline's query-major decomposition as the schedule contract, then implement it in CK/rocWMMA/HIP specifically to control the dKV epilogue: token/head/selected-window tiles keep q and grad_output hot, the score/prob/scaled-dP page is consumed before HBM, and selected-slot contributions are reduced by compressed group before global writes. TileLang and late dKV-only reducers remain secondary until this source-boundary producer-consumer layout beats the 11.13 ms boundary gate."
+}

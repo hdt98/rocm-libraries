@@ -1,0 +1,72 @@
+{
+  "artifact": "actual_li_ck_pair_reduced_epilogue_decision_20260605",
+  "status": "rejected_as_next_sparse_mla_backward_epilogue",
+  "question": "Does a same-workgroup token-tile pairwise segmented epilogue improve the CK direct-fragment compressed dKV producer on the actual S4096 LightningIndexer route?",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "token_block": 8,
+    "selected_block": 512,
+    "valid_compressed_selections": 1572352
+  },
+  "source_artifacts": {
+    "s4096_timing": "run_artifacts/actual_li_ck_pair_reduced_s4096_layer2_t8k512_timing5_20260605.json",
+    "s512_smoke": "run_artifacts/actual_li_ck_pair_reduced_smoke_s512_layer2_t8k512_20260605.json",
+    "prior_ck_raw_decision": "run_artifacts/actual_li_ck_route_grid_materialization_decision_20260605.json"
+  },
+  "implementation": {
+    "producer": "CK Tile BF16 M16N16K32 direct-fragment dKV contribution producer",
+    "epilogue": "same-CTA LDS page over token_block x K16 x D16, pairwise leader scan by compressed group, reduced global atomicAdd",
+    "patched_files": [
+      "tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py",
+      "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py"
+    ],
+    "source_boundary": false,
+    "read": "This diagnostic still consumes materialized probs and scaled grad logits. It isolates whether the local segmented epilogue is worth lifting into the no-HSK source-boundary sparse-MLA backward owner."
+  },
+  "timing_ms": {
+    "s4096_ck_raw_atomic_median": 5.743497848510742,
+    "s4096_ck_contrib_sink_median": 6.753827095031738,
+    "s4096_ck_pair_reduced_median": 51.40591049194336,
+    "s4096_pair_reduced_minus_raw": 45.66241264343262,
+    "s4096_pair_reduced_vs_raw_speedup_x": 0.11172835562188704,
+    "s512_ck_raw_atomic_median": 0.23916249722242355,
+    "s512_ck_pair_reduced_median": 3.094910502433777,
+    "s512_pair_reduced_vs_raw_speedup_x": 0.07727606243681388
+  },
+  "correctness": {
+    "s4096_raw_vs_pair_reduced_max_abs_diff": 0.0001068115234375,
+    "s512_raw_vs_pair_reduced_max_abs_diff": 0.00003814697265625,
+    "read": "The reduced epilogue matches the raw atomic control closely enough for this timing gate; the rejection is performance, not math."
+  },
+  "route_model": {
+    "raw_scalar_writes": 805044224,
+    "coalesced_scalar_writes_model": 134351872,
+    "modeled_write_reduction_x": 5.992058108427399,
+    "k16_unique_valid_route_contract": true,
+    "read": "The write-reduction opportunity exists, but this pairwise leader-scan implementation serializes too much epilogue work per token tile and is far slower than raw atomics."
+  },
+  "decision": {
+    "do_not_promote_to_source_boundary": true,
+    "do_not_integrate_e2e": true,
+    "keep": "CK direct-fragment raw atomic dKV producer remains the best isolated dKV slice to lift into the source-boundary rewrite.",
+    "reject": "Naive same-workgroup pairwise segmented reduction over token_block x K16 entries.",
+    "next_sparse_mla_kernel_step": "Move CK direct-fragment contribution math into the source-boundary recompute owner and focus on avoiding repeated QK/dO.V score recompute. If local reduction is revisited, it needs a warp/block segmented primitive or compact active-slot table with O(1) slot lookup, not per-entry leader scans."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py",
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --kernel-backend ck --seq-len 512 --layer-id 2 --token-block 8 --selected-block 512 --include-ck-pair-reduced --include-contrib-sink --skip-reference --warmup-iters 1 --timed-iters 2 ...",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --kernel-backend ck --seq-len 4096 --layer-id 2 --token-block 8 --selected-block 512 --include-ck-pair-reduced --include-contrib-sink --skip-reference --allow-large-materialization --warmup-iters 2 --timed-iters 5 ..."
+  ],
+  "dependency_pin_changes": []
+}

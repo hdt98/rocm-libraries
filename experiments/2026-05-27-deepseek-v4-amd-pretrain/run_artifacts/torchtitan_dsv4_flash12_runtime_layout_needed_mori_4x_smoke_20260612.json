@@ -1,0 +1,122 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_runtime_layout_needed_mori_4x_smoke_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Correctness-only integration smoke after wiring TorchTitan standard-EP hot-helper dispatch to consume MORI's build_balanced_moe_runtime_layout handoff.",
+  "source_change": {
+    "torchtitan_file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "summary": [
+      "_build_standard_ep_balanced_moe_plan can optionally retain the native MORI BalancedMoePlan object for runtime use without exposing it in JSON timing payloads.",
+      "Standard-EP hot-helper dispatch now tries mori.ops.balanced_moe.build_balanced_moe_runtime_layout to build the source partition plus owner-compact exchange runtime plan in one native MORI handoff.",
+      "If the runtime-layout helper is unavailable or rejects the inputs, the existing TorchTitan fallback source-partition and exchange-plan builders remain in place."
+    ]
+  },
+  "validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile token_dispatcher.py balanced_moe.py __init__.py test_balanced_moe.py",
+      "result": "pass"
+    },
+    "remote_pytest": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "command": "PYTHONPATH=/work/sources/references/mori/python pytest -q tests/python/ops/test_balanced_moe.py",
+      "result": "18 passed in 1.12s"
+    },
+    "remote_torchtitan_py_compile": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "command": "PYTHONPATH=/work/sources/wip/torchtitan:/work/sources/references/mori/python python3 -m py_compile token_dispatcher.py moe.py",
+      "result": "pass"
+    }
+  },
+  "integration_smoke": {
+    "status": "pass",
+    "classification": "correctness_smoke_only_not_perf_promotion",
+    "reason_not_perf": "The node was shared: an unrelated 4-rank Primus/Qwen3 job occupied GPUs 0-3, so this run used only visible GPUs 4,5,6,7 and CPU/network resources were contaminated.",
+    "run_id": "torchtitan_dsv4_flash12_runtime_layout_needed_mori_4x_mbs2_smoke_gpus4567_20260612",
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "visible_devices": "4,5,6,7",
+    "shape": {
+      "model": "deepseek_v4 flash_12layer_ceiling_probe",
+      "gpus": 4,
+      "sequence_length": 4096,
+      "global_batch_size": 128,
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 16,
+      "fsdp": 4,
+      "ep": 4,
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "steps": 2
+    },
+    "key_knobs": {
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "needed",
+      "CANARY_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL": "mori",
+      "CANARY_STANDARD_EP_NEEDED_WEIGHT_MAX_DENSITY": 1.0,
+      "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+      "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+      "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+      "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+      "CANARY_CHUNKED_CE_NUM_CHUNKS": 8,
+      "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+      "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+      "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+    },
+    "logged_steps": [
+      {
+        "step": 1,
+        "loss": 16.01627,
+        "grad_norm": 14.875,
+        "rank_memory_gib_range": [
+          222.89,
+          223.18
+        ],
+        "tok_per_gpu_s_range": [
+          2961,
+          2966
+        ],
+        "tflops_per_gpu_range": [
+          146.59,
+          146.86
+        ]
+      },
+      {
+        "step": 2,
+        "loss": 11.85891,
+        "grad_norm": 39.0,
+        "rank_memory_gib_range": [
+          250.35,
+          250.77
+        ],
+        "tok_per_gpu_s_range": [
+          4449,
+          4450
+        ],
+        "tflops_per_gpu": 220.28
+      }
+    ],
+    "teardown": "Training completed; process groups destroyed cleanly."
+  },
+  "next_gate": {
+    "need_clean_node": true,
+    "shape": "8xMI350, flash_12layer_ceiling_probe, S4096, GBS128, MBS8, FSDP8/EP8, attention-only AC, CE8",
+    "compare": [
+      "retained selected owner-compact standard-EP hot-helper top-8",
+      "needed layout + local exchange",
+      "needed layout + MORI runtime-layout/runtime-plan exchange"
+    ],
+    "promotion_requires": [
+      "20-step late-window tok/GPU/s",
+      "TFLOPs/GPU",
+      "peak logged memory",
+      "low-intrusion timing profile if throughput moves"
+    ]
+  },
+  "dependency_pin_changes": "none"
+}

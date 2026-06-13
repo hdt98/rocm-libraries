@@ -1,0 +1,274 @@
+{
+  "best": {
+    "compact_tflops_median": 94.41252600694543,
+    "config": {
+      "block_K": 64,
+      "block_M": 32,
+      "block_N": 256,
+      "num_stages": 1,
+      "threads": 256
+    },
+    "config_index": 7,
+    "median_ms": 5.731928825378418,
+    "min_ms": 5.579768180847168,
+    "speedup_vs_torch_padded_bmm_out": 0.676398829821094,
+    "timing_ms": {
+      "tilelang_cfg_007_ms_max": 6.187972068786621,
+      "tilelang_cfg_007_ms_mean": 5.833223025004069,
+      "tilelang_cfg_007_ms_median": 5.731928825378418,
+      "tilelang_cfg_007_ms_min": 5.579768180847168
+    }
+  },
+  "check": {
+    "atol": 0.5,
+    "max_abs": 0.0,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.0,
+    "rtol": 0.025
+  },
+  "failure_count": 0,
+  "failures": [],
+  "flops": {
+    "compact": 541165879296.0,
+    "compact_vs_padded_flop_ratio": 0.6808510638297872,
+    "padded_global_max": 794837385216.0
+  },
+  "op": "bwd_w2_dgrad",
+  "probe": "tilelang_grouped_gemm_dgrad",
+  "read": "Promote only if the TileLang compact grouped GEMM is correct and beats the retained padded torch.bmm(out=) baseline. This isolated dgrad win would still need full-layer integration and adjacent timing.",
+  "route_stats": {
+    "assignments": 12288,
+    "experts": 384,
+    "max_per_expert": 47,
+    "mean_per_expert": 32.0,
+    "min_per_expert": 15,
+    "padded_rows_global_max": 18048,
+    "padding_multiplier_global_max": 1.46875,
+    "touched_experts": 384
+  },
+  "shape": {
+    "assignments": 12288,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tokens": 2048,
+    "topk": 6
+  },
+  "sweep_count": 12,
+  "top_results": [
+    {
+      "compact_tflops_median": 94.41252600694543,
+      "config": {
+        "block_K": 64,
+        "block_M": 32,
+        "block_N": 256,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 7,
+      "median_ms": 5.731928825378418,
+      "min_ms": 5.579768180847168,
+      "speedup_vs_torch_padded_bmm_out": 0.676398829821094,
+      "timing_ms": {
+        "tilelang_cfg_007_ms_max": 6.187972068786621,
+        "tilelang_cfg_007_ms_mean": 5.833223025004069,
+        "tilelang_cfg_007_ms_median": 5.731928825378418,
+        "tilelang_cfg_007_ms_min": 5.579768180847168
+      }
+    },
+    {
+      "compact_tflops_median": 94.02864322856041,
+      "config": {
+        "block_K": 64,
+        "block_M": 64,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 9,
+      "median_ms": 5.7553300857543945,
+      "min_ms": 5.540687084197998,
+      "speedup_vs_torch_padded_bmm_out": 0.6736485818077215,
+      "timing_ms": {
+        "tilelang_cfg_009_ms_max": 6.133612155914307,
+        "tilelang_cfg_009_ms_mean": 5.809876441955566,
+        "tilelang_cfg_009_ms_median": 5.7553300857543945,
+        "tilelang_cfg_009_ms_min": 5.540687084197998
+      }
+    },
+    {
+      "compact_tflops_median": 90.84518601953171,
+      "config": {
+        "block_K": 64,
+        "block_M": 64,
+        "block_N": 256,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 11,
+      "median_ms": 5.957012176513672,
+      "min_ms": 5.844770908355713,
+      "speedup_vs_torch_padded_bmm_out": 0.6508413673199517,
+      "timing_ms": {
+        "tilelang_cfg_011_ms_max": 6.391495227813721,
+        "tilelang_cfg_011_ms_mean": 6.064426104227702,
+        "tilelang_cfg_011_ms_median": 5.957012176513672,
+        "tilelang_cfg_011_ms_min": 5.844770908355713
+      }
+    },
+    {
+      "compact_tflops_median": 89.60275854583149,
+      "config": {
+        "block_K": 64,
+        "block_M": 32,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 128
+      },
+      "config_index": 4,
+      "median_ms": 6.03961181640625,
+      "min_ms": 5.858730792999268,
+      "speedup_vs_torch_padded_bmm_out": 0.6419402550958536,
+      "timing_ms": {
+        "tilelang_cfg_004_ms_max": 6.449375152587891,
+        "tilelang_cfg_004_ms_mean": 6.11590592066447,
+        "tilelang_cfg_004_ms_median": 6.03961181640625,
+        "tilelang_cfg_004_ms_min": 5.858730792999268
+      }
+    },
+    {
+      "compact_tflops_median": 88.7894709206614,
+      "config": {
+        "block_K": 64,
+        "block_M": 32,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 5,
+      "median_ms": 6.094933032989502,
+      "min_ms": 5.877291202545166,
+      "speedup_vs_torch_padded_bmm_out": 0.6361136257147844,
+      "timing_ms": {
+        "tilelang_cfg_005_ms_max": 6.585337162017822,
+        "tilelang_cfg_005_ms_mean": 6.185853799184163,
+        "tilelang_cfg_005_ms_median": 6.094933032989502,
+        "tilelang_cfg_005_ms_min": 5.877291202545166
+      }
+    },
+    {
+      "compact_tflops_median": 80.88137743760542,
+      "config": {
+        "block_K": 64,
+        "block_M": 16,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 1,
+      "median_ms": 6.690858840942383,
+      "min_ms": 6.565417766571045,
+      "speedup_vs_torch_padded_bmm_out": 0.5794577411167875,
+      "timing_ms": {
+        "tilelang_cfg_001_ms_max": 7.233303070068359,
+        "tilelang_cfg_001_ms_mean": 6.829859892527263,
+        "tilelang_cfg_001_ms_median": 6.690858840942383,
+        "tilelang_cfg_001_ms_min": 6.565417766571045
+      }
+    },
+    {
+      "compact_tflops_median": 80.38257489629905,
+      "config": {
+        "block_K": 64,
+        "block_M": 16,
+        "block_N": 256,
+        "num_stages": 1,
+        "threads": 256
+      },
+      "config_index": 3,
+      "median_ms": 6.732378005981445,
+      "min_ms": 6.627777099609375,
+      "speedup_vs_torch_padded_bmm_out": 0.5758841744565055,
+      "timing_ms": {
+        "tilelang_cfg_003_ms_max": 7.145541191101074,
+        "tilelang_cfg_003_ms_mean": 6.835232098897298,
+        "tilelang_cfg_003_ms_median": 6.732378005981445,
+        "tilelang_cfg_003_ms_min": 6.627777099609375
+      }
+    },
+    {
+      "compact_tflops_median": 79.22646761050204,
+      "config": {
+        "block_K": 64,
+        "block_M": 32,
+        "block_N": 256,
+        "num_stages": 1,
+        "threads": 128
+      },
+      "config_index": 6,
+      "median_ms": 6.830619812011719,
+      "min_ms": 6.699018955230713,
+      "speedup_vs_torch_padded_bmm_out": 0.5676014851955148,
+      "timing_ms": {
+        "tilelang_cfg_006_ms_max": 7.200422763824463,
+        "tilelang_cfg_006_ms_mean": 6.910020510355632,
+        "tilelang_cfg_006_ms_median": 6.830619812011719,
+        "tilelang_cfg_006_ms_min": 6.699018955230713
+      }
+    },
+    {
+      "compact_tflops_median": 78.91134770597165,
+      "config": {
+        "block_K": 64,
+        "block_M": 16,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 128
+      },
+      "config_index": 0,
+      "median_ms": 6.85789680480957,
+      "min_ms": 6.678374767303467,
+      "speedup_vs_torch_padded_bmm_out": 0.5653438744346078,
+      "timing_ms": {
+        "tilelang_cfg_000_ms_max": 7.313300132751465,
+        "tilelang_cfg_000_ms_mean": 6.949857234954834,
+        "tilelang_cfg_000_ms_median": 6.85789680480957,
+        "tilelang_cfg_000_ms_min": 6.678374767303467
+      }
+    },
+    {
+      "compact_tflops_median": 78.36101368214952,
+      "config": {
+        "block_K": 64,
+        "block_M": 64,
+        "block_N": 128,
+        "num_stages": 1,
+        "threads": 128
+      },
+      "config_index": 8,
+      "median_ms": 6.906060218811035,
+      "min_ms": 6.868740081787109,
+      "speedup_vs_torch_padded_bmm_out": 0.5614011212272988,
+      "timing_ms": {
+        "tilelang_cfg_008_ms_max": 7.219302177429199,
+        "tilelang_cfg_008_ms_mean": 6.998034159342448,
+        "tilelang_cfg_008_ms_median": 6.906060218811035,
+        "tilelang_cfg_008_ms_min": 6.868740081787109
+      }
+    }
+  ],
+  "torch_padded_bmm_out": {
+    "compact_equivalent_tflops_median": 139.58114923397684,
+    "median_ms": 3.8770699501037598,
+    "padded_tflops_median": 205.00981293740347,
+    "timing_ms": {
+      "torch_padded_bmm_out_ms_max": 3.9132699966430664,
+      "torch_padded_bmm_out_ms_mean": 3.8356833457946777,
+      "torch_padded_bmm_out_ms_median": 3.8770699501037598,
+      "torch_padded_bmm_out_ms_min": 3.716710090637207
+    }
+  }
+}

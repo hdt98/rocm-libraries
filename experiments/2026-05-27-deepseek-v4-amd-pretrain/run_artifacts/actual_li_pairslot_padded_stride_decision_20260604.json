@@ -1,0 +1,94 @@
+{
+  "scope": "actual_li_sparse_dkv_pairslot_padded_stride_decision",
+  "date": "2026-06-04",
+  "track": "single_gpu_sparse_mla_backward_boundary",
+  "source_branch": {
+    "files": [
+      "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+      "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py"
+    ],
+    "idea": "Pad the dense pair-slot LDS accumulator from D16 to D17 to test whether the old compact_pairslot wall was primarily LDS bank conflict rather than dense local-table work.",
+    "new_kernels": [
+      "compressed_dkv_route_grid_compact_pairslot_padded_atomic_bf16",
+      "compressed_dkv_route_grid_compact_pairslot_padded_accum_sink_bf16"
+    ]
+  },
+  "remote_validation": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "runtime": {
+      "torch": "2.13.0a0+gitccf72d7",
+      "hip": "7.2.53211",
+      "device": "AMD Instinct MI350X VF",
+      "gpu": 4
+    },
+    "s128_bisect": {
+      "status": "both_padded_subbranches_passed_after_isolation",
+      "read": "The earlier combined coredump did not reproduce. padded_accum_sink, padded_atomic, and combined S128 all ran cleanly.",
+      "padded_combined_artifact_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/rocwmma_pairslot_padded_20260604/actual_li_rocwmma_pairslot_padded_combined_s128_20260604.json",
+      "timing_ms": {
+        "raw_atomic": 0.08730100095272064,
+        "contrib_sink": 0.037481000646948814,
+        "compact_pairslot_padded_accum_sink": 0.0642005018889904,
+        "compact_pairslot_padded_atomic": 0.06850100308656693
+      },
+      "parity": {
+        "raw_vs_compact_pairslot_padded_atomic_max_abs_diff": 1.33514404296875e-05
+      }
+    },
+    "s4096": {
+      "artifact": "run_artifacts/actual_li_rocwmma_pairslot_padded_s4096_layer2_t32k512_20260604.json",
+      "remote_artifact": "/scratch/sonle5/dsv4_pretrain_canary_20260527/rocwmma_pairslot_padded_20260604/actual_li_rocwmma_pairslot_padded_s4096_layer2_t32k512_20260604.json",
+      "shape": {
+        "seq_len": 4096,
+        "layer_id": 2,
+        "heads": 64,
+        "dim": 512,
+        "topk": 512,
+        "compressed_groups": 1024,
+        "token_block": 32,
+        "selected_block": 512,
+        "valid_compressed_selections": 1572352
+      },
+      "write_model": {
+        "raw_scalar_writes": 805044224,
+        "grouped_scalar_writes": 33806848,
+        "modeled_write_reduction_x": 23.813051840857806
+      },
+      "timing_ms": {
+        "contrib_sink": 9.047042846679688,
+        "raw_atomic": 10.079337120056152,
+        "compact_pairslot_accum_sink": 18.666532516479492,
+        "compact_pairslot_atomic": 18.66025161743164,
+        "compact_pairslot_padded_accum_sink": 18.7974910736084,
+        "compact_pairslot_padded_atomic": 18.00072479248047
+      },
+      "derived_ms": {
+        "raw_minus_contrib_sink": 1.0322942733764648,
+        "compact_pairslot_accum_sink_minus_contrib_sink": 9.619489669799805,
+        "compact_pairslot_padded_accum_sink_minus_contrib_sink": 9.750448226928711,
+        "compact_pairslot_padded_atomic_vs_raw_speedup_x": 0.5599406266278035,
+        "compact_pairslot_padded_atomic_vs_unpadded_speedup_x": 1.0366389038527315
+      },
+      "parity": {
+        "raw_vs_compact_pairslot_atomic_max_abs_diff": 0.000118255615234375,
+        "raw_vs_compact_pairslot_padded_atomic_max_abs_diff": 0.00011444091796875
+      }
+    }
+  },
+  "decision": {
+    "promote_pairslot_padded_stride": false,
+    "why": [
+      "D17 padding is correct and gives a small 3.7% improvement over the unpadded pair-slot atomic at S4096, but it remains much slower than the raw atomic path.",
+      "The dense active-group x D local table is still the dominant cost: padded accum_sink is about 18.80 ms, while contrib_sink is about 9.05 ms.",
+      "The final global atomic emit is not the main limiter for this topology; the local dense table epilogue itself costs about 9.7 ms."
+    ],
+    "next_kernel_contract": [
+      "Keep query-major MFMA contribution production.",
+      "Fuse from the sparse-MLA backward boundary inputs instead of using materialized probs/grad_logits.",
+      "Use route-aware warp/block segmented reduction for touched compressed groups, not a dense active_group x D table.",
+      "Measure the result first as full sparse-MLA backward-boundary latency at S4096, then only promote if it materializes into 4x/8x end-to-end TFLOPs."
+    ]
+  },
+  "dependency_pin_changes": []
+}

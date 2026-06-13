@@ -1,0 +1,160 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mhc_bmm_chunk1024_mbs8_fit_vs_nodecheck_20260610",
+  "created_utc": "2026-06-10T16:28:17Z",
+  "purpose": "Answer whether the no-mHC retained MBS8 baseline is healthy on the node, then record the follow-up mHC post-bmm/chunk memory-fit gate.",
+  "node": "do-sonle5-mi350-gpu",
+  "post_failure_node_state": {
+    "training_processes": "none found by pgrep torchrun|torchtitan/train.py after failure",
+    "gpu_use_percent_after_failure": 0,
+    "vram_used_after_failure_gib_approx": 0.279,
+    "xgmi_topology_visible": true,
+    "scratch_free_tib_approx": 34,
+    "root_free_gib_approx": 719
+  },
+  "common_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_balanced_moe_mode": "execute",
+    "moe_balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot",
+    "activation_checkpoint_scope_for_mhc_bmm_chunk_runs": "attention_and_hyper_connections",
+    "checkpointing_enabled": false,
+    "hc_chunk_tokens": 1024
+  },
+  "nomhc_control_from_existing_nodecheck": {
+    "artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_mhc_nodecheck_20260610.json",
+    "run_id": "torchtitan_dsv4_flash12_nomHC_nodecheck_mbs8_6step_8x_s4096_gbs128_20260610",
+    "status": "completed",
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 8228.0,
+      "tflops_per_gpu": 416.594
+    },
+    "steps_4_to_6_mean": {
+      "tok_per_gpu_s": 8319.6667,
+      "tflops_per_gpu": 421.24
+    },
+    "peak_logged_memory_gib": 245.99,
+    "read": "Same node and retained MBS8/GBS128/S4096 shape runs cleanly when hyper-connections are disabled."
+  },
+  "previous_mhc_immediate_oor_from_existing_nodecheck": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_mbs8_fit3_8x_s4096_gbs128_20260610b",
+    "status": "failed_before_first_completed_step",
+    "failure": {
+      "phase": "backward",
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "free_memory_marker": "Available Free mem : 0 MB",
+      "completed_metric_steps": 0
+    }
+  },
+  "mhc_bmm_chunk_fit3_no_checkpoint": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_hcpost_bmm_chunk1024_mbs8_nockpt_fit3_8x_s4096_gbs128_20260610",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_hcpost_bmm_chunk1024_mbs8_nockpt_fit3_8x_s4096_gbs128_20260610/docker-run.log",
+    "steps": [
+      {
+        "step": 1,
+        "loss": 12.20498,
+        "grad_norm": 18.625,
+        "rank_count": 8,
+        "memory_gib_min": 235.33,
+        "memory_gib_max": 238.88,
+        "tok_per_gpu_s_min": 1287.0,
+        "tok_per_gpu_s_max": 1295.0,
+        "tok_per_gpu_s_mean": 1290.25,
+        "tflops_per_gpu_min": 65.26,
+        "tflops_per_gpu_max": 65.62,
+        "tflops_per_gpu_mean": 65.41
+      },
+      {
+        "step": 2,
+        "loss": 9.07639,
+        "grad_norm": 89.5,
+        "rank_count": 8,
+        "memory_gib_min": 261.51,
+        "memory_gib_max": 269.98,
+        "tok_per_gpu_s_min": 3685.0,
+        "tok_per_gpu_s_max": 3685.0,
+        "tok_per_gpu_s_mean": 3685.0,
+        "tflops_per_gpu_min": 186.77,
+        "tflops_per_gpu_max": 186.78,
+        "tflops_per_gpu_mean": 186.78
+      },
+      {
+        "step": 3,
+        "loss": 19.47186,
+        "grad_norm": 123.0,
+        "rank_count": 8,
+        "memory_gib_min": 266.05,
+        "memory_gib_max": 270.29,
+        "tok_per_gpu_s_min": 3570.0,
+        "tok_per_gpu_s_max": 3571.0,
+        "tok_per_gpu_s_mean": 3570.38,
+        "tflops_per_gpu_min": 180.97,
+        "tflops_per_gpu_max": 180.99,
+        "tflops_per_gpu_mean": 180.98
+      }
+    ],
+    "failure": null,
+    "status": "completed_3_steps_fit_only",
+    "steps_2_to_3_mean": {
+      "steps": [
+        2,
+        3
+      ],
+      "tok_per_gpu_s_mean": 3627.69,
+      "tflops_per_gpu_mean": 183.88,
+      "peak_memory_gib": 270.29
+    },
+    "peak_logged_memory_gib": 270.29
+  },
+  "mhc_bmm_chunk_steps6_no_checkpoint": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_hcpost_bmm_chunk1024_mbs8_nockpt_steps6_8x_s4096_gbs128_20260610",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_hcpost_bmm_chunk1024_mbs8_nockpt_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "steps": [
+      {
+        "step": 1,
+        "loss": 12.31967,
+        "grad_norm": 18.75,
+        "rank_count": 8,
+        "memory_gib_min": 234.57,
+        "memory_gib_max": 238.55,
+        "tok_per_gpu_s_min": 1416.0,
+        "tok_per_gpu_s_max": 1420.0,
+        "tok_per_gpu_s_mean": 1417.62,
+        "tflops_per_gpu_min": 71.8,
+        "tflops_per_gpu_max": 71.96,
+        "tflops_per_gpu_mean": 71.85
+      }
+    ],
+    "failure": {
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "free_memory_marker": "Available Free mem : 156 MB",
+      "root_rank": 4,
+      "root_local_rank": 4
+    },
+    "status": "failed_after_one_completed_step",
+    "peak_logged_memory_gib_before_failure": 238.55
+  },
+  "read": [
+    "The no-mHC retained-shape control is node-valid: six steps complete at about 8.23k tok/GPU/s and 245.99 GiB peak logged memory.",
+    "The corrected mHC post path using bmm plus token chunking moves the failure from immediate backward OOR to a runnable three-step fit gate, but peak logged memory reaches about 270.29 GiB.",
+    "The longer six-step gate still fails after one completed metric step with HSA_STATUS_ERROR_OUT_OF_RESOURCES and only 156 MB free on the failing rank, so MBS8 mHC is still not stable.",
+    "This is a memory-fit/lifetime issue introduced by mHC at the retained MBS8 shape, not evidence that the MI350 node or the no-mHC baseline is broken."
+  ],
+  "decision": "Do not promote MBS8 mHC bmm+chunk as a corrected baseline. Keep MBS4 attention_and_hyper_connections as the corrected mHC fit baseline until mHC activation lifetime/headroom is reduced further."
+}

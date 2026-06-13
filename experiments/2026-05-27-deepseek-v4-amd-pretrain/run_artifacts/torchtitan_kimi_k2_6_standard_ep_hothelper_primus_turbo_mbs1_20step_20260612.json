@@ -1,0 +1,209 @@
+{
+  "artifact": "torchtitan_kimi_k2_6_standard_ep_hothelper_primus_turbo_mbs1_20step_20260612",
+  "created_local": "2026-06-12",
+  "question": "Can the no-helper Kimi-K2.6 reduced MBS1 baseline run with the Primus-Turbo DeepEP/TurboEP-style backend, and how does it compare with plain standard EP and standard-EP top-8 hot-helper?",
+  "answer": {
+    "retained_no_helper_rows_used_deepep": false,
+    "primus_turbo_no_helper_completed": true,
+    "external_deepep_completed": false,
+    "read": "The plain no-helper row is standard EP. The Primus-backed Kimi row uses Primus-Turbo's in-tree TurboEPBackend raw top-k dispatch/combine path via normal-topk-dispatch tensors and permutation, with hot-helper disabled. Optional external DeepEPBackend remains unavailable in the current images because deep_ep/deepep/uccl/rocshmem are absent."
+  },
+  "surface": {
+    "model": "Kimi-K2.6 reduced 6-layer",
+    "topology": "6 layers, 384 routed experts, top-k 8 plus one shared expert, moe_intermediate_size 2048, native hidden 7168",
+    "hardware": "8xMI350",
+    "node": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "steps": 20,
+    "retained_windows": [
+      "steps_2_to_20",
+      "steps_13_to_20"
+    ]
+  },
+  "runs": {
+    "plain_standard_ep_no_helper": {
+      "run_id": "kimi_k2_6_reduced_native7168_standard_ep_nohelper_mbs1_retainedknobs_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/kimi_k2_6_reduced_native7168_standard_ep_nohelper_mbs1_retainedknobs_steps20_20260612/docker-run.log",
+      "completed_steps": 20,
+      "env_knobs": {
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_MOE_BALANCED_MOE_MODE": "off",
+        "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+        "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+        "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch"
+      },
+      "first_step": {
+        "step": 1,
+        "loss": 12.43634,
+        "grad_norm": 12.3125,
+        "tokens_per_gpu_s": 1831.375,
+        "tflops_per_gpu": 59.71125,
+        "mfu_pct": 2.58625,
+        "max_memory_gib": 149.39
+      },
+      "last_step": {
+        "step": 20,
+        "loss": 3.15169,
+        "grad_norm": 4.5938,
+        "tokens_per_gpu_s": 4251.0,
+        "tflops_per_gpu": 138.61,
+        "mfu_pct": 6.0,
+        "max_memory_gib": 204.02
+      },
+      "steps_2_to_20": {
+        "tokens_per_gpu_s": 4319.8947,
+        "node_tokens_per_s": 34559.1579,
+        "tflops_per_gpu": 140.8543,
+        "mfu_pct": 6.0984,
+        "peak_memory_gib": 204.02,
+        "min_step_tokens_per_gpu_s": 4139.0,
+        "max_step_tokens_per_gpu_s": 4661.0
+      },
+      "steps_13_to_20": {
+        "tokens_per_gpu_s": 4245.375,
+        "node_tokens_per_s": 33963.0,
+        "tflops_per_gpu": 138.4228,
+        "mfu_pct": 5.9938,
+        "peak_memory_gib": 204.02,
+        "min_step_tokens_per_gpu_s": 4182.0,
+        "max_step_tokens_per_gpu_s": 4286.0
+      }
+    },
+    "standard_ep_top8_hot_helper": {
+      "run_id": "kimi_k2_6_reduced_native7168_standard_ep_top8_helper_mbs1_retainedknobs_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/kimi_k2_6_reduced_native7168_standard_ep_top8_helper_mbs1_retainedknobs_steps20_20260612/docker-run.log",
+      "completed_steps": 20,
+      "env_knobs": {
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+        "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+        "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+        "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+        "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+        "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd"
+      },
+      "first_step": {
+        "step": 1,
+        "loss": 12.35947,
+        "grad_norm": 12.1875,
+        "tokens_per_gpu_s": 1745.125,
+        "tflops_per_gpu": 56.90125,
+        "mfu_pct": 2.46375,
+        "max_memory_gib": 155.39
+      },
+      "last_step": {
+        "step": 20,
+        "loss": 3.2185,
+        "grad_norm": 4.2812,
+        "tokens_per_gpu_s": 4616.0,
+        "tflops_per_gpu": 150.505,
+        "mfu_pct": 6.52,
+        "max_memory_gib": 205.03
+      },
+      "steps_2_to_20": {
+        "tokens_per_gpu_s": 4556.4737,
+        "node_tokens_per_s": 36451.7895,
+        "tflops_per_gpu": 148.5653,
+        "mfu_pct": 6.4332,
+        "peak_memory_gib": 205.03,
+        "min_step_tokens_per_gpu_s": 4348.0,
+        "max_step_tokens_per_gpu_s": 4643.0
+      },
+      "steps_13_to_20": {
+        "tokens_per_gpu_s": 4625.625,
+        "node_tokens_per_s": 37005.0,
+        "tflops_per_gpu": 150.8206,
+        "mfu_pct": 6.5312,
+        "peak_memory_gib": 205.03,
+        "min_step_tokens_per_gpu_s": 4609.0,
+        "max_step_tokens_per_gpu_s": 4643.0
+      }
+    },
+    "primus_turbo_no_helper_raw_topk": {
+      "run_id": "kimi_k2_6_reduced_native7168_primus_turbo_nohelper_mbs1_retainedknobs_steps20_20260612",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/kimi_k2_6_reduced_native7168_primus_turbo_nohelper_mbs1_retainedknobs_steps20_20260612/docker-run.log",
+      "completed_steps": 20,
+      "backend_identification": {
+        "backend_name": "Primus-Turbo in-tree TurboEPBackend",
+        "external_deepep_backend_available": false,
+        "hot_helper": false,
+        "raw_topk_dispatch": true
+      },
+      "env_knobs": {
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_MOE_BALANCED_MOE_MODE": "off",
+        "CANARY_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_TENSORS": "1",
+        "CANARY_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_VALIDATE": "0",
+        "CANARY_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_PERMUTE": "1",
+        "CANARY_MORI_AITER_BALANCED_MOE_PLAN_BACKEND": "primus_turbo",
+        "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+        "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+        "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch"
+      },
+      "first_step": {
+        "step": 1,
+        "loss": 12.45226,
+        "grad_norm": 12.3125,
+        "tokens_per_gpu_s": 1878.125,
+        "tflops_per_gpu": 61.23375,
+        "mfu_pct": 2.65,
+        "max_memory_gib": 148.39
+      },
+      "last_step": {
+        "step": 20,
+        "loss": 3.35442,
+        "grad_norm": 3.8906,
+        "tokens_per_gpu_s": 4867.0,
+        "tflops_per_gpu": 158.69,
+        "mfu_pct": 6.87,
+        "max_memory_gib": 198.02
+      },
+      "steps_2_to_20": {
+        "tokens_per_gpu_s": 4836.6316,
+        "node_tokens_per_s": 38693.0526,
+        "tflops_per_gpu": 157.6955,
+        "mfu_pct": 6.8279,
+        "peak_memory_gib": 198.02,
+        "min_step_tokens_per_gpu_s": 4764.0,
+        "max_step_tokens_per_gpu_s": 4882.0
+      },
+      "steps_13_to_20": {
+        "tokens_per_gpu_s": 4867.75,
+        "node_tokens_per_s": 38942.0,
+        "tflops_per_gpu": 158.7102,
+        "mfu_pct": 6.8725,
+        "peak_memory_gib": 198.02,
+        "min_step_tokens_per_gpu_s": 4855.0,
+        "max_step_tokens_per_gpu_s": 4882.0
+      }
+    }
+  },
+  "comparison": {
+    "steps_2_to_20": {
+      "standard_ep_top8_helper_vs_plain_pct": 5.48,
+      "primus_turbo_no_helper_vs_plain_pct": 11.96,
+      "primus_turbo_no_helper_vs_top8_helper_pct": 6.15,
+      "primus_turbo_peak_memory_delta_vs_plain_gib": -6.0,
+      "primus_turbo_peak_memory_delta_vs_top8_helper_gib": -7.01
+    },
+    "steps_13_to_20": {
+      "standard_ep_top8_helper_vs_plain_pct": 8.96,
+      "primus_turbo_no_helper_vs_plain_pct": 14.66,
+      "primus_turbo_no_helper_vs_top8_helper_pct": 5.23
+    }
+  },
+  "decision": {
+    "promote_kimi_mbs1_primus_turbo_no_helper_column": true,
+    "promote_external_deepep_column": false,
+    "read": "Kimi now has a real 20-step MBS1 retained gate. Top-8 standard-EP hot-helper helps over plain standard EP, but Primus-Turbo raw top-k no-helper is faster and lower-memory at MBS1. This does not invalidate the hot-helper mechanism at larger MBS, because the Kimi MBS2/4/8 ladder is not measured yet and DeepSeek MBS8 still favors hot-helper. Next Kimi work should extend the MBS ladder before claiming cross-model highest-MBS behavior."
+  }
+}

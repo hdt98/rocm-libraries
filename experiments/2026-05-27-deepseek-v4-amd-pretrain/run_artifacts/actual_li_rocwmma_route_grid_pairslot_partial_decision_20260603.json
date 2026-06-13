@@ -1,0 +1,70 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_pairslot_partial_decision",
+  "created_at": "2026-06-03",
+  "status": "rejected_for_s4096_latency",
+  "scope": "Actual-LI compressed dKV accumulation for sparse-MLA backward, layer 2 CR=4/topk512 hard route",
+  "backend": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "extension_source": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+    "branch": "compact_pairslot_partial",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "input_contract": {
+    "shape": "B=1, S=4096, H=64, D=512, CR=4, compressed_groups=1024, topk=512",
+    "valid_compressed_selections": 1572352,
+    "baseline_scalar_dkv_atomic_add_elements": 805044224,
+    "coalesced_scalar_dkv_elements": 33806848,
+    "modeled_write_reduction_x": 23.813051840857806,
+    "read": "The model reduces one dKV D16 row per unique compressed group inside each token_block=32, selected_block=512 route tile before final accumulation."
+  },
+  "measurements": {
+    "s128_layer2_t32k32": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s128_layer2_t32k32_20260603.json",
+      "raw_atomic_ms": 0.15848200023174286,
+      "compact_pairslot_atomic_ms": 0.12140200287103653,
+      "compact_pairslot_partial_emit_ms": 0.11176099628210068,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 0.11840199679136276,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.0000152587890625,
+      "read": "Small-shape parity and latency are positive."
+    },
+    "s512_layer2_t32k128": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s512_layer2_t32k128_20260603.json",
+      "raw_atomic_ms": 0.7231690287590027,
+      "compact_pairslot_atomic_ms": 0.5360860228538513,
+      "compact_pairslot_partial_emit_ms": 0.5037260055541992,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 0.5134459733963013,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.0000286102294921875,
+      "read": "Medium-shape parity and latency are still positive."
+    },
+    "s4096_layer2_t32k512": {
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s4096_layer2_t32k512_20260603.json",
+      "raw_atomic_ms": 10.02436637878418,
+      "grouped_atomic_ms": 19.696327209472656,
+      "compact_pairslot_atomic_ms": 18.38819122314453,
+      "compact_pairslot_partial_emit_ms": 18.223827362060547,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 18.314308166503906,
+      "contrib_sink_ms": 8.997513771057129,
+      "raw_vs_compact_pairslot_atomic_max_abs_diff": 0.000125885009765625,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.0001220703125,
+      "read": "The target shape flips negative: write reduction is real, but the producer body and local pair-slot/LDS schedule take about 18.3 ms, slower than both the same-run raw atomic baseline and the prior 8.19-8.81 ms sparse-atomic gate."
+    }
+  },
+  "decision": {
+    "promote_to_torchtitan": false,
+    "keep_as_contract_probe": true,
+    "reason": "The compact pair-slot partial path validates that reducing before global ScatterAdd can be numerically consistent, but it does not make the target-shape producer cheaper. The S4096 bottleneck is still the per-contribution local grouping/LDS schedule, not the final index_add reducer.",
+    "next_branch": "Keep the fast query-major dot-K/MFMA producer shape, but replace per-contribution LDS table updates with warp/lane segmented accumulation or a split producer that emits compact rows cheaply into the already-viable rocPRIM/CK-style reducer. Do not retry this exact pair-slot partial body with more block-shape sweeps."
+  },
+  "commands": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --seq-len 128 --layer-id 2 --token-block 32 --selected-block 32 --skip-reference --include-contrib-sink --include-compact-pairslot-atomic --include-compact-pairslot-partial ...",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --seq-len 512 --layer-id 2 --token-block 32 --selected-block 128 --skip-reference --include-contrib-sink --include-compact-pairslot-atomic --include-compact-pairslot-partial ...",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --seq-len 4096 --layer-id 2 --token-block 32 --selected-block 512 --allow-large-materialization --skip-reference --include-contrib-sink --include-compact-pairslot-atomic --include-compact-pairslot-partial ..."
+  ],
+  "notes": [
+    "The S128/S512 runs use raw-vs-candidate diffs because the PyTorch reference path faulted separately in this refreshed extension tuple; prior raw/pair-slot parity artifacts already cover the raw kernel against reference.",
+    "The S4096 same-run raw atomic value is 10.024 ms, slightly slower than the retained 8.190 ms direct sparse-atomic rerun, so the rejection is conservative: the pair-slot partial branch is still about 2x slower than the retained gate."
+  ]
+}

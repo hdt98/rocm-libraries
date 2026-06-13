@@ -1,0 +1,97 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top16_8x_s4096_gbs128_mbs4_steps6_20260607",
+  "date": "2026-06-07",
+  "status": "completed_six_steps_not_promoted",
+  "run": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top16_8x_s4096_gbs128_mbs4_steps6_20260607",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top16_8x_s4096_gbs128_mbs4_steps6_20260607",
+    "structured_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top16_8x_s4096_gbs128_mbs4_steps6_20260607/structured_logs",
+    "outcome": "completed"
+  },
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "none",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "hot_experts": 16,
+    "moe_force_load_balance": false,
+    "data": "tests/assets/c4_test"
+  },
+  "step_metrics": {
+    "1": {
+      "tokens_per_gpu_s": 1886.0,
+      "tflops_per_gpu": 95.47,
+      "loss": 12.33666,
+      "grad_norm": 19.625,
+      "peak_logged_memory_gib": 159.33
+    },
+    "2": {
+      "tokens_per_gpu_s": 7592.0,
+      "tflops_per_gpu": 384.37,
+      "loss": 7.59630,
+      "grad_norm": 42.0,
+      "peak_logged_memory_gib": 198.83
+    },
+    "3": {
+      "tokens_per_gpu_s": 7888.0,
+      "tflops_per_gpu": 399.40,
+      "loss": 16.45407,
+      "grad_norm": 123.5,
+      "peak_logged_memory_gib": 198.83
+    },
+    "4": {
+      "tokens_per_gpu_s": 7831.0,
+      "tflops_per_gpu": 396.48,
+      "loss": 12.05164,
+      "grad_norm": 89.5,
+      "peak_logged_memory_gib": 198.84
+    },
+    "5": {
+      "tokens_per_gpu_s": 8024.0,
+      "tflops_per_gpu": 406.25,
+      "loss": 8.98400,
+      "grad_norm": 58.0,
+      "peak_logged_memory_gib": 198.84
+    },
+    "6": {
+      "tokens_per_gpu_s": 8061.0,
+      "tflops_per_gpu": 408.16,
+      "loss": 6.70495,
+      "grad_norm": 37.5,
+      "peak_logged_memory_gib": 198.84
+    }
+  },
+  "summary": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 7879.2,
+    "steps_2_to_6_node_tokens_s_mean": 63033.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 398.932,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 7972.0,
+    "steps_4_to_6_node_tokens_s_mean": 63776.0,
+    "steps_4_to_6_tflops_per_gpu_mean": 403.63,
+    "peak_logged_memory_gib": 198.84,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_steps_2_to_6": 0.6458,
+    "comparison_top8_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top8_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "comparison_top8_steps_2_to_6_tokens_per_gpu_s_mean": 7975.8,
+    "comparison_top8_steps_4_to_6_tokens_per_gpu_s_mean": 8057.33,
+    "delta_vs_top8_steps_2_to_6_tokens_per_gpu_pct": -1.21,
+    "delta_vs_top8_steps_4_to_6_tokens_per_gpu_pct": -1.06,
+    "delta_vs_top8_peak_memory_gib": 4.22
+  },
+  "read": {
+    "decision": "Do not promote top-16 hot-helper execution. It completed cleanly but loses slightly to top-8 and uses more memory.",
+    "reason": "Increasing hot expert count past top-8 adds helper work and memory without enough owner-tail reduction to improve sustained tok/GPU/s."
+  },
+  "command_shape": "env TARGET_HOST=do-vunguyen-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_DP_SHARD=8 CANARY_MBS=4 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_MOE_COMM_BACKEND=standard CANARY_MOE_BALANCED_MOE_MODE=execute CANARY_MOE_BALANCED_MOE_HOT_EXPERTS=16 CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE=false CANARY_STANDARD_EP_HOT_SPLIT_W13=false CANARY_PERSIST_JIT_CACHE=auto CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST=4,128 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_SHAREDKV_BLOCK_H=64 CANARY_SHAREDKV_BLOCK_N=64 CANARY_SHAREDKV_BLOCK_D=128 CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false MASTER_PORT=29561 RUN_ID=torchtitan_dsv4_flash12_standard_ep_hot_execute_top16_8x_s4096_gbs128_mbs4_steps6_20260607 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "dependency_pin_changes": "none"
+}

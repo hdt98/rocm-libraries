@@ -1,0 +1,129 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_decision_20260608",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_8x_s4096_gbs128_mbs4_steps6_20260608",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_six_steps_neutral_not_promoted",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env_delta_vs_retained_top8_sdma": {
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact"
+  },
+  "retained_common_env": {
+    "CANARY_EP": 8,
+    "CANARY_DP_SHARD": 8,
+    "CANARY_MBS": 4,
+    "CANARY_GBS": 128,
+    "CANARY_SEQ_LEN": 4096,
+    "CANARY_STEPS": 6,
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "false",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": 4096,
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false"
+  },
+  "step_metrics": {
+    "1": {"tokens_per_gpu_s": 1586, "node_tokens_s": 12688, "tflops_per_gpu": 80.30, "mfu_pct": 3.48, "loss": 12.23059, "grad_norm": 20.125, "memory_gib_min": 153.86, "memory_gib_max": 155.73},
+    "2": {"tokens_per_gpu_s": 7640, "node_tokens_s": 61120, "tflops_per_gpu": 386.81, "mfu_pct": 16.75, "loss": 8.74515, "grad_norm": 69.5, "memory_gib_min": 190.93, "memory_gib_max": 194.12},
+    "3": {"tokens_per_gpu_s": 8044, "node_tokens_s": 64352, "tflops_per_gpu": 407.26, "mfu_pct": 17.63, "loss": 18.55424, "grad_norm": 124.0, "memory_gib_min": 191.48, "memory_gib_max": 194.28},
+    "4": {"tokens_per_gpu_s": 8129, "node_tokens_s": 65032, "tflops_per_gpu": 411.58, "mfu_pct": 17.82, "loss": 16.91422, "grad_norm": 54.5, "memory_gib_min": 191.48, "memory_gib_max": 194.28},
+    "5": {"tokens_per_gpu_s": 8165, "node_tokens_s": 65320, "tflops_per_gpu": 413.41, "mfu_pct": 17.90, "loss": 7.12172, "grad_norm": 27.875, "memory_gib_min": 192.22, "memory_gib_max": 194.28},
+    "6": {"tokens_per_gpu_s": 8169, "node_tokens_s": 65352, "tflops_per_gpu": 413.60, "mfu_pct": 17.91, "loss": 5.82636, "grad_norm": 26.75, "memory_gib_min": 192.23, "memory_gib_max": 194.28}
+  },
+  "summary": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8029.4,
+    "steps_2_to_6_node_tokens_s_mean": 64235.2,
+    "steps_2_to_6_tflops_per_gpu_mean": 406.532,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8154.3333,
+    "steps_4_to_6_node_tokens_s_mean": 65234.6667,
+    "steps_4_to_6_tflops_per_gpu_mean": 412.8633,
+    "peak_logged_memory_gib": 194.28,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_steps_2_to_6": 0.6581
+  },
+  "comparison": {
+    "retained_standard_ep_top8_sdma_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "retained_steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+    "retained_steps_2_to_6_tflops_per_gpu_mean": 406.522,
+    "retained_steps_4_to_6_tokens_per_gpu_s_mean": 8134.0,
+    "retained_steps_4_to_6_tflops_per_gpu_mean": 411.8467,
+    "retained_peak_logged_memory_gib": 193.80,
+    "delta_steps_2_to_6_tokens_per_gpu_s": 0.4,
+    "delta_steps_2_to_6_tokens_per_gpu_pct": 0.005,
+    "delta_steps_2_to_6_tflops_per_gpu_pct": 0.0025,
+    "delta_steps_4_to_6_tokens_per_gpu_pct": 0.25,
+    "delta_steps_4_to_6_tflops_per_gpu_pct": 0.247,
+    "delta_peak_logged_memory_gib": 0.48
+  },
+  "timing_followup": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_timing_8x_s4096_gbs128_mbs4_steps2_20260608",
+    "step2_tokens_per_gpu_s": 7629,
+    "step2_tflops_per_gpu": 386.25,
+    "profile_dir_local": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_timing_8x_s4096_gbs128_mbs4_steps2_20260608.profile_timing",
+    "summary_artifact": "run_artifacts/standard_ep_ownercompact_rows_selected_weight_timing_summary_20260608.json",
+    "late_window_call_id_gt_288_rankmax_ms": {
+      "moved_helper_stage_sum": 0.3518,
+      "use_materialized_rows": 0.5863,
+      "hot_weight_broadcast": 196.4299,
+      "helper_grouped_mlp": 162.5254,
+      "helper_scatter": 117.0570,
+      "dispatch_hot_metadata": 31.8757,
+      "dispatch_permute": 105.7570,
+      "dispatch_count_all_to_all": 115.4603
+    },
+    "baseline_presort_off_late_window_rankmax_ms": {
+      "moved_helper_stage_sum": 46.5327,
+      "hot_weight_broadcast": 206.5877,
+      "helper_grouped_mlp": 158.4501,
+      "helper_scatter": 102.7972
+    },
+    "baseline_presort_selected_late_window_rankmax_ms": {
+      "moved_helper_stage_sum": 26.8643,
+      "hot_weight_broadcast": 199.2449,
+      "helper_grouped_mlp": 175.2318,
+      "helper_scatter": 124.9118
+    },
+    "read": "Owner-compact materialization does consume the materialized row path: helper gather/sort/count work drops to near zero and records show remote_rows_materialized_by=owner_compact. The e2e result is neutral because that moved bucket was small, while hot-weight movement, grouped helper MLP/VJP, token weighted scatter, and dispatcher metadata remain the larger costs."
+  },
+  "source_artifacts": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_8x_s4096_gbs128_mbs4_steps6_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_8x_s4096_gbs128_mbs4_steps6_20260608/docker-run.log",
+    "remote_timing_profile": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_timing_8x_s4096_gbs128_mbs4_steps2_20260608",
+    "structured_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_rows_selected_weight_8x_s4096_gbs128_mbs4_steps6_20260608/structured_logs"
+  },
+  "decision": "Keep the owner-compact row materialization code path because it is correct and removes the intended helper-side transform, but do not treat it as a promoted performance baseline. The next material path is not another row presort knob; it is reducing/overlapping the remaining hot-weight movement, helper grouped VJP, and token weighted-scatter costs, or making compact hot/cold/helper rows the first-class dispatcher ABI with batched backward consumers."
+}

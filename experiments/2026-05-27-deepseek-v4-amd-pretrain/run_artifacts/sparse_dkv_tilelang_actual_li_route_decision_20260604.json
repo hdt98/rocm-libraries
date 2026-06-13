@@ -1,0 +1,157 @@
+{
+  "status": "actual_li_tilelang_route_candidate_working_not_promoted",
+  "scope": "sparse_mla_backward_compressed_dkv_actual_li_tilelang_reduced_atomic",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "new_route_patterns": [
+      "actual_li",
+      "actual_li_panel"
+    ],
+    "new_fold_backend": "tilelang_panel_sparse",
+    "new_math_path": "actual_li_panel + mfma_panel_atomic_final"
+  },
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 512,
+    "panel_count": 2,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512
+  },
+  "small_correctness": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_sparse_fold_s128_g32_tb128_k32d64_thr512_correct_20260604.json",
+    "route_pattern": "actual_li",
+    "seq_len": 128,
+    "compressed_groups": 32,
+    "topk": 32,
+    "fold_backend": "tilelang_panel_sparse",
+    "max_abs_diff": 1.862645149230957e-8,
+    "median_ms": 0.763401985168457
+  },
+  "s4096_results": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_sparse_fold_s4096_tb256_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_reduced",
+      "fold_backend": "tilelang_panel_sparse",
+      "token_block": 256,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 180.7508909070008,
+      "median_ms": 20.883968353271484,
+      "fold_only_median_ms": 7.542004108428955
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_torch_fold_s4096_tb256_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_reduced",
+      "fold_backend": "torch",
+      "token_block": 256,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 180.7508909070008,
+      "median_ms": 13.424017906188965,
+      "fold_only_median_ms": 0.023919999599456787
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 256,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 180.7508909070008,
+      "median_ms": 13.255995750427246
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb128_cap512_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 128,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 16887,
+      "write_reduction_x": 93.11020311482206,
+      "median_ms": 13.065073013305664
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb64_cap512_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 64,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 33268,
+      "write_reduction_x": 47.26319586389323,
+      "median_ms": 12.791094303131104
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb32_cap512_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 32,
+      "panel_capacity": 512,
+      "overflow_fraction": 0.0,
+      "active_partial_rows": 66027,
+      "write_reduction_x": 23.813773153406938,
+      "median_ms": 12.735137939453125
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap448_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 256,
+      "panel_capacity": 448,
+      "overflow_fraction": 0.01088305926408336,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 178.78376824922404,
+      "median_ms": 11.797181606292725,
+      "read": "Overflow branch is not correctness-preserving without a spill path."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap384_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 256,
+      "panel_capacity": 384,
+      "overflow_fraction": 0.04592419509117551,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 172.4500517300839,
+      "median_ms": 10.251991271972656,
+      "read": "Overflow branch is not correctness-preserving without a spill path."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb256_cap320_k64d64_thr512_timing10_20260604.json",
+      "math_mode": "mfma_panel_atomic_final",
+      "token_block": 256,
+      "panel_capacity": 320,
+      "overflow_fraction": 0.11036078435363074,
+      "active_partial_rows": 8699,
+      "write_reduction_x": 160.80308081388665,
+      "median_ms": 8.707921028137207,
+      "read": "Overflow branch is not correctness-preserving without a spill path."
+    }
+  ],
+  "best_correct_s4096": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb32_cap512_k64d64_thr512_timing10_20260604.json",
+    "median_ms": 12.735137939453125,
+    "token_block": 32,
+    "panel_capacity": 512,
+    "overflow_fraction": 0.0,
+    "read": "This is a real actual-LI route final-dKV TileLang kernel, but it is not a latency promotion because the retained synthetic panel-dense branch is 7.990 ms and the Triton sparse-atomic wall is around 8.0-8.8 ms."
+  },
+  "decision": {
+    "promote_to_torchtitan": false,
+    "read": "The actual-LI TileLang route is now executable and correctness-smoked, but the correctness-preserving full-capacity path remains 12.735 ms at S4096. The naive sparse TileLang fold is rejected because it spends 7.542 ms scanning active groups; reduced final atomics are currently better. Capacity-limited panel routes show the speed target is reachable only by dropping 1-11% of valid pairs, so the next real kernel needs a main panel path plus a correctness-preserving overflow/spill path, or a true sparse segmented reducer that avoids padding 512 slots per group panel.",
+    "next_kernel_ladder": [
+      "Keep actual_li_panel + mfma_panel_atomic_final as the real-route TileLang baseline.",
+      "Add overflow spill for cap448/cap384 and measure full correctness-preserving latency.",
+      "Replace panel padding with a prepacked active-pair TileLang/HIP segmented producer if TileLang can express it without recomputing contribution math.",
+      "Do not promote tilelang_panel_sparse fold; torch index_add and reduced final atomics are both much faster for the current compact row count."
+    ]
+  }
+}

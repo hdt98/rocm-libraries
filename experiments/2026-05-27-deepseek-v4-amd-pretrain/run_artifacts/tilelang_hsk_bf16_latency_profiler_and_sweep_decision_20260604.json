@@ -1,0 +1,130 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_latency_profiler_and_sweep_decision",
+  "created_at": "2026-06-04",
+  "read": "TileLang remains the right sparse-dKV branch, but the current latency wall is inside the HSK BF16 source-fed selected-limit producer body. rocprof trace proves the producer dispatch itself is about 5.10 ms. SQ counters point at heavy LDS active-group accumulation pressure, especially LDS bank conflicts, not only final global write volume. Simple retunes that shrink panels or token blocks reduce route-planning time but regress the kernel body.",
+  "canonical_shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "valid_pairs": 1572352,
+    "input_layout": "bshd",
+    "source_contract": "HSK BF16 probabilities plus HSK BF16 scaled grad logits"
+  },
+  "best_kernel_candidate": {
+    "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_kernel_repro_do_sonle_kernel_20260604.json",
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "hsk_bf16_source_kernel_ms": 5.113724231719971,
+    "warmed_plan_ms": 10.477010726928711,
+    "write_reduction_x": 11.953140798066032,
+    "active_rows": 131543
+  },
+  "rocprof_trace": {
+    "artifact": "run_artifacts/tilelang_hsk_bf16_rocprof_kernel_trace_summary_do_sonle_kernel_20260604.json",
+    "raw_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_hsk_bf16_rocprof_cached_20260604",
+    "kernel_name": "mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim_kernel",
+    "dispatch_count": 4,
+    "dispatch_median_ms": 5.101026,
+    "dispatch_samples_ms": [
+      5.170646,
+      5.102246,
+      5.099806,
+      5.097486
+    ],
+    "workgroup_size": [
+      512,
+      1,
+      1
+    ],
+    "grid_size": [
+      4096,
+      256,
+      2
+    ],
+    "vgpr_count": 76,
+    "sgpr_count": 48,
+    "scratch_size": 0
+  },
+  "rocprof_sq_counters": {
+    "artifact": "run_artifacts/tilelang_hsk_bf16_rocprof_sq_counter_summary_do_sonle_kernel_20260604.json",
+    "raw_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_hsk_bf16_rocpctr_sq_20260604",
+    "dispatch_median_ms": 5.093127,
+    "counter_medians": {
+      "SQ_WAVES": 32768.0,
+      "SQ_INSTS_LDS": 217475704.0,
+      "SQ_INSTS_VMEM_RD": 39248824.0,
+      "SQ_INSTS_VMEM_WR": 1052344.0,
+      "SQ_LDS_BANK_CONFLICT": 330771584.0
+    },
+    "derived": {
+      "lds_insts_per_wave": 6636.831787109375,
+      "lds_bank_conflicts_per_wave": 10094.34765625,
+      "lds_bank_conflict_per_lds_inst": 1.5209587917922087,
+      "vmem_rd_insts_per_wave": 1197.779052734375,
+      "vmem_wr_insts_per_wave": 32.114990234375,
+      "vmem_wr_per_vmem_rd_inst": 0.026812115440707218
+    },
+    "tcc_counter_pass": "inconclusive_no_output_after_ssh_timeout"
+  },
+  "retune_checks": [
+    {
+      "name": "baseline_gp512_tb16",
+      "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_kernel_repro_do_sonle_kernel_20260604.json",
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "token_block": 16,
+      "hsk_bf16_source_kernel_ms": 5.113724231719971,
+      "warmed_plan_ms": 10.477010726928711,
+      "write_reduction_x": 11.953140798066032,
+      "read": "best retained kernel body"
+    },
+    {
+      "name": "gp256_cap256_tb16",
+      "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_gp256_cap256_timing_do_sonle_kernel_20260604.json",
+      "group_panel_size": 256,
+      "panel_capacity": 256,
+      "token_block": 16,
+      "hsk_bf16_source_kernel_ms": 5.905696868896484,
+      "warmed_plan_ms": 7.874755859375,
+      "write_reduction_x": 11.953140798066032,
+      "read": "route planning improves, kernel body regresses by about 0.79 ms"
+    },
+    {
+      "name": "gp512_cap512_tb8",
+      "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb8_gp512_cap512_timing_do_sonle_kernel_20260604.json",
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "token_block": 8,
+      "hsk_bf16_source_kernel_ms": 5.303692817687988,
+      "warmed_plan_ms": 7.432754039764404,
+      "write_reduction_x": 5.992446329686077,
+      "read": "more token CTAs reduce planning time but lose write reduction and regress kernel body"
+    }
+  ],
+  "decision": {
+    "keep": "GP512/Cap512/TB16 HSK BF16 source-fed TileLang producer",
+    "reject_for_kernel_latency": [
+      "smaller group_panel_size=256",
+      "smaller token_block=8",
+      "materialized pack bridge"
+    ],
+    "separate_issue": "route planning is still 7-10 ms and must be cached/static in TorchTitan integration; the fastest kernel body should not be sacrificed to reduce planning time."
+  },
+  "next_kernel_work": [
+    "Rewrite the active-group accumulation layout inside mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim_kernel to reduce LDS traffic and bank conflicts.",
+    "Try warp-local or lane-local accumulation before shared-memory writes, then one grouped shared-memory write per active row/D lane.",
+    "Swizzle/pad the LDS accumulator rows or split accumulator banks so ActiveGroups rows do not collide under the current 512-thread access pattern.",
+    "Keep HSK BF16 source feeding and static/cached route metadata; do not optimize the Python materialized pack bridge."
+  ],
+  "commands": [
+    "rocprofv3 --kernel-trace --memory-copy-trace --stats around cached TileLang benchmark",
+    "rocprofv3 --pmc SQ_WAVES SQ_INSTS_LDS SQ_INSTS_VMEM_RD SQ_INSTS_VMEM_WR SQ_LDS_BANK_CONFLICT with kernel include regex",
+    "benchmark_tilelang_selected_limit_adapter.py GP256/Cap256/TB16 timing",
+    "benchmark_tilelang_selected_limit_adapter.py GP512/Cap512/TB8 timing"
+  ],
+  "dependency_pin_changes": []
+}

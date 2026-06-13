@@ -1,0 +1,97 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "expect_not_promotable": true,
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "metadata": {
+    "backend_kind": "experimental_triton_forward_reference_backward",
+    "backend_name": "triton_forward_manual_stream_backward",
+    "has_sparse_mla": true,
+    "is_production_backend": false,
+    "is_reference_backend": false,
+    "materializes_selected_state": false,
+    "max_promoted_seq_len": 32,
+    "promotion_blockers": [
+      "Forward-only Triton bring-up kernel; backward recomputes manual_stream.",
+      "Recomputes scores once per value-dimension tile and is not S4096 efficient.",
+      "Limited to small selected-key counts during ABI/perf bring-up."
+    ],
+    "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', v: 'torch.Tensor', compressed_k: 'torch.Tensor', compressed_v: 'torch.Tensor', local_indices: 'torch.Tensor', csa_indices: 'torch.Tensor', invalid: 'torch.Tensor', scale: 'float') -> 'torch.Tensor'",
+    "signature_matches_required_abi": true,
+    "signature_parameters": [
+      "q",
+      "k",
+      "v",
+      "compressed_k",
+      "compressed_v",
+      "local_indices",
+      "csa_indices",
+      "invalid",
+      "scale"
+    ],
+    "supports_backward": true,
+    "supports_long_sequence": false
+  },
+  "module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "promotable_for_s4096": false,
+  "promotion_blockers": [
+    "module does not mark IS_PRODUCTION_BACKEND=True",
+    "module does not mark SUPPORTS_LONG_SEQUENCE=True",
+    "MAX_PROMOTED_SEQ_LEN=32 is below 4096",
+    "Forward-only Triton bring-up kernel; backward recomputes manual_stream.",
+    "Recomputes scores once per value-dimension tile and is not S4096 efficient.",
+    "Limited to small selected-key counts during ABI/perf bring-up."
+  ],
+  "promotion_seq_len": 4096,
+  "promotion_shape_estimate": {
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "layer_id": 2,
+    "li_topk_config": 512,
+    "li_topk_promoted_shape": 512,
+    "local_keys": 128,
+    "materialized_probability_fp32_gib": 0.625,
+    "materialized_selected_kv_bf16_gib": 320.0,
+    "qk_head_dim": 512,
+    "qk_nope_head_dim": 448,
+    "qk_rope_head_dim": 64,
+    "selected_keys": 640,
+    "v_head_dim": 512
+  },
+  "require_production": true,
+  "required_abi": "sparse_mla(q, k, v, compressed_k, compressed_v, local_indices, csa_indices, invalid, scale) -> Tensor with autograd support",
+  "required_production_contract": [
+    "IS_PRODUCTION_BACKEND=True",
+    "SUPPORTS_BACKWARD=True",
+    "SUPPORTS_LONG_SEQUENCE=True",
+    "MATERIALIZES_SELECTED_STATE=False",
+    "signature matches the required ABI",
+    "small fused-mode ABI smoke passes"
+  ],
+  "smoke": {
+    "batch": 1,
+    "compressed_groups": 8,
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "estimated_selected_state_elements": 83886080,
+    "expect_missing": false,
+    "flavor": "flash_4layer",
+    "input_grad_norm": 0.002654165029525757,
+    "layer_id": 2,
+    "loss": 0.06161362677812576,
+    "module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+    "output_shape": [
+      1,
+      32,
+      4096
+    ],
+    "selected_keys": 40,
+    "seq_len": 32,
+    "sparse_used": true,
+    "status": "passed_backend_abi"
+  },
+  "smoke_seq_len": 32,
+  "status": "failed_production_preflight"
+}

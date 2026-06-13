@@ -1,0 +1,369 @@
+{
+  "artifact": "sparse_mla_sharedkv_sasg_overlap_probe",
+  "correctness": {
+    "chunked_detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "chunked_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.0413714335300028e-07
+    },
+    "detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "passed": true,
+    "pingpong_detached_scatter_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.21465291158529e-07
+    },
+    "pingpong_vs_full": {
+      "max_abs_diff": 3.814697265625e-06,
+      "mean_abs_diff": 1.0413714335300028e-07
+    },
+    "selected_row_scatter_vs_full": {
+      "max_abs_diff": 1.52587890625e-05,
+      "mean_abs_diff": 5.462737817651941e-07
+    }
+  },
+  "derived": {
+    "chunked_detached_scatter_vs_chunked_pytorch_reduce_speedup_x": 1.0293360048373972,
+    "chunked_pingpong_stream_detached_scatter_ms": 1.3173370361328125,
+    "chunked_pingpong_stream_overlap_ms": 1.3482580184936523,
+    "chunked_sequential_emit_detached_scatter_ms": 0.14044199883937836,
+    "chunked_sequential_emit_reduce_ms": 0.1445620059967041,
+    "detached_scatter_vs_pytorch_reduce_speedup_x": 1.3196681300690538,
+    "pingpong_detached_scatter_vs_chunked_detached_scatter_speedup_x": 0.10661052941444754,
+    "pingpong_detached_scatter_vs_single_detached_scatter_speedup_x": 0.05699452469833378,
+    "pingpong_vs_chunked_sequential_speedup_x": 0.10722132115202748,
+    "pingpong_vs_single_full_speedup_x": 0.0734889013783191,
+    "selected_row_emit_only_ms": 0.05316099897027016,
+    "selected_row_emit_scatter_ms": 0.07696100324392319,
+    "selected_row_scatter_only_fraction_of_selected_row_total": 0.5628824774329058,
+    "selected_row_scatter_only_ms": 0.04332000017166138,
+    "selected_row_scatter_vs_detached_group_scatter_speedup_x": 0.9755719790182149,
+    "single_full_emit_detached_scatter_ms": 0.0750809982419014,
+    "single_full_emit_reduce_ms": 0.09908200055360794
+  },
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "read": "Benchmark-only SASG overlap probe. It uses materialized actual-LI probs/grad_logits and the existing dot-K partial-store producer, then compares PyTorch partial reduction with a detached Triton ScatterAdd/reduce kernel and host-level ping-pong producer/scatter overlap. A positive signal here would justify moving the same contract into a persistent HIP/CK segmented/MFMA accumulator; a negative signal means detaching ScatterAdd as a wrapper-level kernel is not the lever. The selected-row variant mirrors Ascend SASG more literally: Cube345 emits per selected-row partials, then a separate ScatterAdd kernel uses top-k indices to accumulate into compressed grad_kv.",
+  "scope": "actual_li_compressed_dkv_sasg_style_producer_detached_scatteradd_overlap",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 32,
+    "compressed_groups": 32,
+    "dim": 512,
+    "heads": 64,
+    "layer_id": 2,
+    "num_pipeline_chunks": 2,
+    "pipeline_chunk_tokens": 64,
+    "scatter_block_pairs": 128,
+    "scatter_block_seq_tiles": 0,
+    "seq_chunk": 16,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "chunked_pingpong_stream_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.014906883239746,
+        "mean_ms": 1.5100733041763306,
+        "median_ms": 1.3173370361328125,
+        "min_ms": 1.197975993156433,
+        "samples_ms": [
+          2.014906883239746,
+          1.197975993156433,
+          1.3173370361328125
+        ],
+        "stdev_ms": 0.4412532963702205
+      },
+      "label": "chunked_pingpong_stream_detached_scatter",
+      "peak_memory_allocated_bytes": 474749952,
+      "peak_memory_allocated_gib": 0.44214534759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.03158613294363,
+        "mean_ms": 1.5256324938187997,
+        "median_ms": 1.333111198619008,
+        "min_ms": 1.2122001498937607,
+        "samples_ms": [
+          2.03158613294363,
+          1.2122001498937607,
+          1.333111198619008
+        ],
+        "stdev_ms": 0.4423196628386582
+      }
+    },
+    "chunked_pingpong_stream_overlap": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.400991916656494,
+        "mean_ms": 1.691049297650655,
+        "median_ms": 1.3482580184936523,
+        "min_ms": 1.3238979578018188,
+        "samples_ms": [
+          1.3482580184936523,
+          1.3238979578018188,
+          2.400991916656494
+        ],
+        "stdev_ms": 0.6149489774362421
+      },
+      "label": "chunked_pingpong_stream_overlap",
+      "peak_memory_allocated_bytes": 474815488,
+      "peak_memory_allocated_gib": 0.44220638275146484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.4193290155380964,
+        "mean_ms": 1.7095530250420172,
+        "median_ms": 1.366670010611415,
+        "min_ms": 1.3426600489765406,
+        "samples_ms": [
+          1.366670010611415,
+          1.3426600489765406,
+          2.4193290155380964
+        ],
+        "stdev_ms": 0.6148012581948289
+      }
+    },
+    "chunked_sequential_emit_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.1411609947681427,
+        "mean_ms": 0.14012166361014047,
+        "median_ms": 0.14044199883937836,
+        "min_ms": 0.1387619972229004,
+        "samples_ms": [
+          0.1387619972229004,
+          0.1411609947681427,
+          0.14044199883937836
+        ],
+        "stdev_ms": 0.001231161362225853
+      },
+      "label": "chunked_sequential_emit_detached_scatter",
+      "peak_memory_allocated_bytes": 474749952,
+      "peak_memory_allocated_gib": 0.44214534759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.15983101911842823,
+        "mean_ms": 0.15864109930892786,
+        "median_ms": 0.15808106400072575,
+        "min_ms": 0.15801121480762959,
+        "samples_ms": [
+          0.15808106400072575,
+          0.15983101911842823,
+          0.15801121480762959
+        ],
+        "stdev_ms": 0.0010310924266161135
+      }
+    },
+    "chunked_sequential_emit_reduce": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.1538819968700409,
+        "mean_ms": 0.14652200043201447,
+        "median_ms": 0.1445620059967041,
+        "min_ms": 0.1411219984292984,
+        "samples_ms": [
+          0.1538819968700409,
+          0.1445620059967041,
+          0.1411219984292984
+        ],
+        "stdev_ms": 0.006601937116617622
+      },
+      "label": "chunked_sequential_emit_reduce",
+      "peak_memory_allocated_bytes": 474749952,
+      "peak_memory_allocated_gib": 0.44214534759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.17165206372737885,
+        "mean_ms": 0.16448134556412697,
+        "median_ms": 0.16257097013294697,
+        "min_ms": 0.1592210028320551,
+        "samples_ms": [
+          0.17165206372737885,
+          0.16257097013294697,
+          0.1592210028320551
+        ],
+        "stdev_ms": 0.0064319491184130165
+      }
+    },
+    "selected_row_emit_only": {
+      "checksum_norm": 626.1732788085938,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.056641001254320145,
+        "mean_ms": 0.05421399946014086,
+        "median_ms": 0.05316099897027016,
+        "min_ms": 0.05283999815583229,
+        "samples_ms": [
+          0.05316099897027016,
+          0.056641001254320145,
+          0.05283999815583229
+        ],
+        "stdev_ms": 0.0021079643408818682
+      },
+      "label": "selected_row_emit_only",
+      "peak_memory_allocated_bytes": 482550272,
+      "peak_memory_allocated_gib": 0.44940996170043945,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.06927992217242718,
+        "mean_ms": 0.0666703563183546,
+        "median_ms": 0.06569107063114643,
+        "min_ms": 0.06504007615149021,
+        "samples_ms": [
+          0.06569107063114643,
+          0.06927992217242718,
+          0.06504007615149021
+        ],
+        "stdev_ms": 0.002283270442411903
+      }
+    },
+    "selected_row_emit_scatter": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.07836099714040756,
+        "mean_ms": 0.07680099954207738,
+        "median_ms": 0.07696100324392319,
+        "min_ms": 0.0750809982419014,
+        "samples_ms": [
+          0.07836099714040756,
+          0.07696100324392319,
+          0.0750809982419014
+        ],
+        "stdev_ms": 0.0016458429700319786
+      },
+      "label": "selected_row_emit_scatter",
+      "peak_memory_allocated_bytes": 482614272,
+      "peak_memory_allocated_gib": 0.44946956634521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.0914200209081173,
+        "mean_ms": 0.08960999548435211,
+        "median_ms": 0.08965004235506058,
+        "min_ms": 0.08775992318987846,
+        "samples_ms": [
+          0.0914200209081173,
+          0.08965004235506058,
+          0.08775992318987846
+        ],
+        "stdev_ms": 0.0018303774585189878
+      }
+    },
+    "selected_row_scatter_only": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.0437610000371933,
+        "mean_ms": 0.04322699954112371,
+        "median_ms": 0.04332000017166138,
+        "min_ms": 0.04259999841451645,
+        "samples_ms": [
+          0.0437610000371933,
+          0.04332000017166138,
+          0.04259999841451645
+        ],
+        "stdev_ms": 0.0005860614557577323
+      },
+      "label": "selected_row_scatter_only",
+      "peak_memory_allocated_bytes": 474226176,
+      "peak_memory_allocated_gib": 0.44165754318237305,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.056649791076779366,
+        "mean_ms": 0.05562362881998221,
+        "median_ms": 0.055680982768535614,
+        "min_ms": 0.05454011261463165,
+        "samples_ms": [
+          0.056649791076779366,
+          0.055680982768535614,
+          0.05454011261463165
+        ],
+        "stdev_ms": 0.00105600800658588
+      }
+    },
+    "single_full_emit_detached_scatter": {
+      "checksum_norm": 595.8117065429688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.07600100338459015,
+        "mean_ms": 0.07434766739606857,
+        "median_ms": 0.0750809982419014,
+        "min_ms": 0.07196100056171417,
+        "samples_ms": [
+          0.07600100338459015,
+          0.0750809982419014,
+          0.07196100056171417
+        ],
+        "stdev_ms": 0.0021174834826507808
+      },
+      "label": "single_full_emit_detached_scatter",
+      "peak_memory_allocated_bytes": 474749952,
+      "peak_memory_allocated_gib": 0.44214534759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.09569083340466022,
+        "mean_ms": 0.09102785649398963,
+        "median_ms": 0.08934084326028824,
+        "min_ms": 0.08805189281702042,
+        "samples_ms": [
+          0.08934084326028824,
+          0.08805189281702042,
+          0.09569083340466022
+        ],
+        "stdev_ms": 0.0040893597987197725
+      }
+    },
+    "single_full_emit_reduce": {
+      "checksum_norm": 595.811767578125,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.33440399169921875,
+        "mean_ms": 0.17677566409111023,
+        "median_ms": 0.09908200055360794,
+        "min_ms": 0.096841000020504,
+        "samples_ms": [
+          0.09908200055360794,
+          0.33440399169921875,
+          0.096841000020504
+        ],
+        "stdev_ms": 0.13651473462320554
+      },
+      "label": "single_full_emit_reduce",
+      "peak_memory_allocated_bytes": 474749952,
+      "peak_memory_allocated_gib": 0.44214534759521484,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.4311830271035433,
+        "mean_ms": 0.2208813869704803,
+        "median_ms": 0.1211799681186676,
+        "min_ms": 0.11028116568922997,
+        "samples_ms": [
+          0.1211799681186676,
+          0.4311830271035433,
+          0.11028116568922997
+        ],
+        "stdev_ms": 0.18220807022629715
+      }
+    }
+  },
+  "workspace": {
+    "grad_logits_gib": 0.0009765625,
+    "probs_gib": 0.0009765625,
+    "safe_groups_gib": 3.0517578125e-05,
+    "valid_gib": 3.814697265625e-06
+  }
+}

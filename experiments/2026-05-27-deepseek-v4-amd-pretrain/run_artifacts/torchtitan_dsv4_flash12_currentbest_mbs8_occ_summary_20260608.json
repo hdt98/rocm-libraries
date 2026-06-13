@@ -1,0 +1,3178 @@
+{
+  "bucket_rows": {
+    "moe.backward.all": {
+      "calls": 79392,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 43815548.09817671,
+        "GRBM_GUI_ACTIVE": 43815548.09817671,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.367722316995008,
+        "SQ_BUSY_CU_CYCLES": 311608641.85919714,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 331815882.2761761,
+        "SQ_WAVES": 251040.42522902408
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2197564.946543732,
+        "GRBM_GUI_ACTIVE": 2197564.946543732,
+        "MeanOccupancyPerActiveCU": 2.2311182024637173,
+        "SQ_BUSY_CU_CYCLES": 47184884.10294488,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109663896.09351069,
+        "SQ_WAVES": 67147.7273528819
+      },
+      "duration_ms_mean_per_call": 0.13395149444528415,
+      "duration_ms_rankmax": 1439.955142,
+      "duration_ms_rankmean": 1329.334630875,
+      "duration_ms_rankmin": 1241.761137,
+      "duration_ms_sum_across_sources": 10634.677047,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.0.moe",
+        "dsv4.backward.moe.dsv4.layers.1.moe",
+        "dsv4.backward.moe.dsv4.layers.10.moe",
+        "dsv4.backward.moe.dsv4.layers.11.moe",
+        "dsv4.backward.moe.dsv4.layers.2.moe",
+        "dsv4.backward.moe.dsv4.layers.3.moe",
+        "dsv4.backward.moe.dsv4.layers.4.moe",
+        "dsv4.backward.moe.dsv4.layers.5.moe",
+        "dsv4.backward.moe.dsv4.layers.6.moe",
+        "dsv4.backward.moe.dsv4.layers.7.moe",
+        "dsv4.backward.moe.dsv4.layers.8.moe",
+        "dsv4.backward.moe.dsv4.layers.9.moe"
+      ],
+      "grid_size_mean": 4297454.550584442,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "85",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer0": {
+      "calls": 6636,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 44095989.98734867,
+        "GRBM_GUI_ACTIVE": 44095989.98734867,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3962028035876797,
+        "SQ_BUSY_CU_CYCLES": 315091942.74005485,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 305549234.81485647,
+        "SQ_WAVES": 257625.73059624832
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2254236.63517179,
+        "GRBM_GUI_ACTIVE": 2254236.63517179,
+        "MeanOccupancyPerActiveCU": 2.2625115557564763,
+        "SQ_BUSY_CU_CYCLES": 48310839.40340567,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109358991.66244726,
+        "SQ_WAVES": 69893.00723327306
+      },
+      "duration_ms_mean_per_call": 0.13715355635925258,
+      "duration_ms_rankmax": 122.735431,
+      "duration_ms_rankmean": 113.76887500000001,
+      "duration_ms_rankmin": 106.961337,
+      "duration_ms_sum_across_sources": 910.151,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.0.moe"
+      ],
+      "grid_size_mean": 4473152.462929476,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "90",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer1": {
+      "calls": 6704,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 29447556.283535678,
+        "GRBM_GUI_ACTIVE": 29447556.283535678,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.481321140049243,
+        "SQ_BUSY_CU_CYCLES": 291304379.6863903,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 297332340.8748618,
+        "SQ_WAVES": 308616.05122856307
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2186380.64573389,
+        "GRBM_GUI_ACTIVE": 2186380.64573389,
+        "MeanOccupancyPerActiveCU": 2.119064717482098,
+        "SQ_BUSY_CU_CYCLES": 49204293.80355012,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108332798.77804296,
+        "SQ_WAVES": 72299.17989260143
+      },
+      "duration_ms_mean_per_call": 0.1336974622613365,
+      "duration_ms_rankmax": 121.27916,
+      "duration_ms_rankmean": 112.038473375,
+      "duration_ms_rankmin": 104.006417,
+      "duration_ms_sum_across_sources": 896.307787,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.1.moe"
+      ],
+      "grid_size_mean": 4627147.513126492,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "90",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer10": {
+      "calls": 6497,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 45669098.913939476,
+        "GRBM_GUI_ACTIVE": 45669098.913939476,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3018318886699873,
+        "SQ_BUSY_CU_CYCLES": 314256376.2360597,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 325370912.55791235,
+        "SQ_WAVES": 214570.10794773506
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2121534.131137448,
+        "GRBM_GUI_ACTIVE": 2121534.131137448,
+        "MeanOccupancyPerActiveCU": 2.3253904168077577,
+        "SQ_BUSY_CU_CYCLES": 45275395.533015236,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 111619831.21317531,
+        "SQ_WAVES": 62620.597198707095
+      },
+      "duration_ms_mean_per_call": 0.13034672017854393,
+      "duration_ms_rankmax": 119.892835,
+      "duration_ms_rankmean": 105.85783012499999,
+      "duration_ms_rankmin": 94.15147,
+      "duration_ms_sum_across_sources": 846.862641,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.10.moe"
+      ],
+      "grid_size_mean": 4007718.220717254,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "91",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer11": {
+      "calls": 6405,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 57419358.23565781,
+        "GRBM_GUI_ACTIVE": 57419358.23565781,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.252445622366165,
+        "SQ_BUSY_CU_CYCLES": 294972314.86726797,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 362177589.0761858,
+        "SQ_WAVES": 199718.4858191838
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2154985.2221701797,
+        "GRBM_GUI_ACTIVE": 2154985.2221701797,
+        "MeanOccupancyPerActiveCU": 2.3804270437158452,
+        "SQ_BUSY_CU_CYCLES": 44652760.2088993,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 113169487.77767369,
+        "SQ_WAVES": 61070.04246682279
+      },
+      "duration_ms_mean_per_call": 0.13174214660421546,
+      "duration_ms_rankmax": 119.910484,
+      "duration_ms_rankmean": 105.476056125,
+      "duration_ms_rankmin": 94.737807,
+      "duration_ms_sum_across_sources": 843.808449,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.11.moe"
+      ],
+      "grid_size_mean": 3908482.717876659,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "85",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer2": {
+      "calls": 6828,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 33520990.55391989,
+        "GRBM_GUI_ACTIVE": 33520990.55391989,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3787717504755714,
+        "SQ_BUSY_CU_CYCLES": 270364988.80837554,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 288882763.2916445,
+        "SQ_WAVES": 255951.70482212963
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2123886.6009080256,
+        "GRBM_GUI_ACTIVE": 2123886.6009080256,
+        "MeanOccupancyPerActiveCU": 2.048080554188638,
+        "SQ_BUSY_CU_CYCLES": 46663556.99135911,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 106291693.10369068,
+        "SQ_WAVES": 64890.83274751025
+      },
+      "duration_ms_mean_per_call": 0.12889150527240775,
+      "duration_ms_rankmax": 122.050157,
+      "duration_ms_rankmean": 110.00889975,
+      "duration_ms_rankmin": 100.387288,
+      "duration_ms_sum_across_sources": 880.071198,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.2.moe"
+      ],
+      "grid_size_mean": 4153013.295840656,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "91",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer3": {
+      "calls": 6599,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 44031339.315714575,
+        "GRBM_GUI_ACTIVE": 44031339.315714575,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.387235794495308,
+        "SQ_BUSY_CU_CYCLES": 350102845.8146883,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 304687384.41271144,
+        "SQ_WAVES": 263066.663254242
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2221727.7446582816,
+        "GRBM_GUI_ACTIVE": 2221727.7446582816,
+        "MeanOccupancyPerActiveCU": 2.1991965938778617,
+        "SQ_BUSY_CU_CYCLES": 48592244.45537203,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109961680.90437946,
+        "SQ_WAVES": 68551.08683133808
+      },
+      "duration_ms_mean_per_call": 0.13536229216547963,
+      "duration_ms_rankmax": 124.029057,
+      "duration_ms_rankmean": 111.65697075,
+      "duration_ms_rankmin": 100.201838,
+      "duration_ms_sum_across_sources": 893.255766,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.3.moe"
+      ],
+      "grid_size_mean": 4387269.557205637,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "85",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer4": {
+      "calls": 6649,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 56858163.530020006,
+        "GRBM_GUI_ACTIVE": 56858163.530020006,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.355226198414943,
+        "SQ_BUSY_CU_CYCLES": 343293631.32455343,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 293785520.8769238,
+        "SQ_WAVES": 256418.24059737084
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2359224.028425327,
+        "GRBM_GUI_ACTIVE": 2359224.028425327,
+        "MeanOccupancyPerActiveCU": 2.222446172958342,
+        "SQ_BUSY_CU_CYCLES": 49144555.98435855,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109151594.68912618,
+        "SQ_WAVES": 70668.02977891412
+      },
+      "duration_ms_mean_per_call": 0.14269323086178373,
+      "duration_ms_rankmax": 129.635821,
+      "duration_ms_rankmean": 118.5959115,
+      "duration_ms_rankmin": 111.21284,
+      "duration_ms_sum_across_sources": 948.767292,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.4.moe"
+      ],
+      "grid_size_mean": 4522753.905850504,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "85",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer5": {
+      "calls": 6585,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 54577927.34441349,
+        "GRBM_GUI_ACTIVE": 54577927.34441349,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.35655385848347,
+        "SQ_BUSY_CU_CYCLES": 352212283.0297116,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 301360979.05426496,
+        "SQ_WAVES": 260823.66090340164
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2322121.500987092,
+        "GRBM_GUI_ACTIVE": 2322121.500987092,
+        "MeanOccupancyPerActiveCU": 2.2426344604403896,
+        "SQ_BUSY_CU_CYCLES": 48572833.392406985,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110195028.24479878,
+        "SQ_WAVES": 70124.25664388762
+      },
+      "duration_ms_mean_per_call": 0.14117329840546697,
+      "duration_ms_rankmax": 130.95703,
+      "duration_ms_rankmean": 116.20327125,
+      "duration_ms_rankmin": 105.804238,
+      "duration_ms_sum_across_sources": 929.62617,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.5.moe"
+      ],
+      "grid_size_mean": 4487952.425208808,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "85",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer6": {
+      "calls": 6700,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 35759875.71184108,
+        "GRBM_GUI_ACTIVE": 35759875.71184108,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3694608317482,
+        "SQ_BUSY_CU_CYCLES": 273370347.1457678,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348630356.9774318,
+        "SQ_WAVES": 250480.58883538854
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2134847.674925373,
+        "GRBM_GUI_ACTIVE": 2134847.674925373,
+        "MeanOccupancyPerActiveCU": 2.1661913802985047,
+        "SQ_BUSY_CU_CYCLES": 46035929.148955226,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108299433.95343284,
+        "SQ_WAVES": 65208.42119402985
+      },
+      "duration_ms_mean_per_call": 0.12990056835820896,
+      "duration_ms_rankmax": 119.758631,
+      "duration_ms_rankmean": 108.791726,
+      "duration_ms_rankmin": 99.141971,
+      "duration_ms_sum_across_sources": 870.333808,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.6.moe"
+      ],
+      "grid_size_mean": 4173338.9564179103,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "91",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer7": {
+      "calls": 6661,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 40406548.62394117,
+        "GRBM_GUI_ACTIVE": 40406548.62394117,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.321811860267196,
+        "SQ_BUSY_CU_CYCLES": 268388311.6406963,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348524066.3128961,
+        "SQ_WAVES": 222677.9073020342
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2156009.3383876295,
+        "GRBM_GUI_ACTIVE": 2156009.3383876295,
+        "MeanOccupancyPerActiveCU": 2.205941378621821,
+        "SQ_BUSY_CU_CYCLES": 45571531.04759045,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108903732.84491818,
+        "SQ_WAVES": 63689.10944302657
+      },
+      "duration_ms_mean_per_call": 0.13103003482960518,
+      "duration_ms_rankmax": 118.911567,
+      "duration_ms_rankmean": 109.09888275,
+      "duration_ms_rankmin": 94.042327,
+      "duration_ms_sum_across_sources": 872.791062,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.7.moe"
+      ],
+      "grid_size_mean": 4076103.0043537007,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "91",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer8": {
+      "calls": 6534,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 52356396.579881504,
+        "GRBM_GUI_ACTIVE": 52356396.579881504,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3549063876953795,
+        "SQ_BUSY_CU_CYCLES": 363234173.61757356,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348450926.70807856,
+        "SQ_WAVES": 253943.9673427006
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2239284.08570554,
+        "GRBM_GUI_ACTIVE": 2239284.08570554,
+        "MeanOccupancyPerActiveCU": 2.323318566421795,
+        "SQ_BUSY_CU_CYCLES": 47284690.97673707,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110986041.59412305,
+        "SQ_WAVES": 68300.5644322008
+      },
+      "duration_ms_mean_per_call": 0.13701643617998163,
+      "duration_ms_rankmax": 122.204249,
+      "duration_ms_rankmean": 111.90817425,
+      "duration_ms_rankmin": 102.333939,
+      "duration_ms_sum_across_sources": 895.265394,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.8.moe"
+      ],
+      "grid_size_mean": 4371236.123660851,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "91",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.backward.layer9": {
+      "calls": 6594,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 30129706.23164197,
+        "GRBM_GUI_ACTIVE": 30129706.23164197,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.450849408190484,
+        "SQ_BUSY_CU_CYCLES": 294748715.581869,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 469824820.7525753,
+        "SQ_WAVES": 262808.4548679778
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2097256.4285714286,
+        "GRBM_GUI_ACTIVE": 2097256.4285714286,
+        "MeanOccupancyPerActiveCU": 2.2942973718532036,
+        "SQ_BUSY_CU_CYCLES": 46807205.8644222,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110015965.99090081,
+        "SQ_WAVES": 68243.91477100394
+      },
+      "duration_ms_mean_per_call": 0.12851629966636335,
+      "duration_ms_rankmax": 115.067037,
+      "duration_ms_rankmean": 105.92956,
+      "duration_ms_rankmin": 98.258144,
+      "duration_ms_sum_across_sources": 847.43648,
+      "example_names": [
+        "dsv4.backward.moe.dsv4.layers.9.moe"
+      ],
+      "grid_size_mean": 4367610.545344252,
+      "lds_block_size_max": 134656,
+      "rankmax_source": "90",
+      "scratch_size_max": 696,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.all": {
+      "calls": 29497,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4914458.135984343,
+        "GRBM_GUI_ACTIVE": 4914458.135984343,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9463505776908554,
+        "SQ_BUSY_CU_CYCLES": 145504770.38108996,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 598358441.2614517,
+        "SQ_WAVES": 40801.15053400711
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1117189.9642336508,
+        "GRBM_GUI_ACTIVE": 1117189.9642336508,
+        "MeanOccupancyPerActiveCU": 1.7085932307014298,
+        "SQ_BUSY_CU_CYCLES": 28115985.591280468,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 101182876.31474388,
+        "SQ_WAVES": 17053.236329118216
+      },
+      "duration_ms_mean_per_call": 0.06917779536902058,
+      "duration_ms_rankmax": 273.665879,
+      "duration_ms_rankmean": 255.06717875,
+      "duration_ms_rankmin": 236.957758,
+      "duration_ms_sum_across_sources": 2040.53743,
+      "example_names": [
+        "dsv4.forward.layer0.moe",
+        "dsv4.forward.layer1.moe",
+        "dsv4.forward.layer10.moe",
+        "dsv4.forward.layer11.moe",
+        "dsv4.forward.layer2.moe",
+        "dsv4.forward.layer3.moe",
+        "dsv4.forward.layer4.moe",
+        "dsv4.forward.layer5.moe",
+        "dsv4.forward.layer6.moe",
+        "dsv4.forward.layer7.moe",
+        "dsv4.forward.layer8.moe",
+        "dsv4.forward.layer9.moe"
+      ],
+      "grid_size_mean": 1091407.1250635658,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer0": {
+      "calls": 2441,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4681851.586122366,
+        "GRBM_GUI_ACTIVE": 4681851.586122366,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9289515255821281,
+        "SQ_BUSY_CU_CYCLES": 138554018.43835512,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 579240990.5312691,
+        "SQ_WAVES": 43571.94801294614
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1173327.065546907,
+        "GRBM_GUI_ACTIVE": 1173327.065546907,
+        "MeanOccupancyPerActiveCU": 1.6942829873002867,
+        "SQ_BUSY_CU_CYCLES": 29821379.67103646,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 111867196.72265466,
+        "SQ_WAVES": 17944.26300696436
+      },
+      "duration_ms_mean_per_call": 0.0733789815649324,
+      "duration_ms_rankmax": 26.247304,
+      "duration_ms_rankmean": 22.38976175,
+      "duration_ms_rankmin": 18.565521,
+      "duration_ms_sum_across_sources": 179.118094,
+      "example_names": [
+        "dsv4.forward.layer0.moe"
+      ],
+      "grid_size_mean": 1148432.832445719,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "89",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer1": {
+      "calls": 2636,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4451871.983534146,
+        "GRBM_GUI_ACTIVE": 4451871.983534146,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.8634938833580608,
+        "SQ_BUSY_CU_CYCLES": 131160698.22990589,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 529587791.85168254,
+        "SQ_WAVES": 45628.35245093773
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1213472.358497724,
+        "GRBM_GUI_ACTIVE": 1213472.358497724,
+        "MeanOccupancyPerActiveCU": 1.6226531999241258,
+        "SQ_BUSY_CU_CYCLES": 30998425.854704097,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 114709418.53717755,
+        "SQ_WAVES": 17595.84673748103
+      },
+      "duration_ms_mean_per_call": 0.07528616388467375,
+      "duration_ms_rankmax": 29.157058,
+      "duration_ms_rankmean": 24.806791,
+      "duration_ms_rankmin": 21.765414,
+      "duration_ms_sum_across_sources": 198.454328,
+      "example_names": [
+        "dsv4.forward.layer1.moe"
+      ],
+      "grid_size_mean": 1126134.191198786,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer10": {
+      "calls": 2329,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4317012.412032889,
+        "GRBM_GUI_ACTIVE": 4317012.412032889,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.0397222452615464,
+        "SQ_BUSY_CU_CYCLES": 127165110.11962207,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 491268665.050875,
+        "SQ_WAVES": 35606.01706290165
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1019608.3456419064,
+        "GRBM_GUI_ACTIVE": 1019608.3456419064,
+        "MeanOccupancyPerActiveCU": 1.7866745040790024,
+        "SQ_BUSY_CU_CYCLES": 25142344.09961357,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 85950263.50880206,
+        "SQ_WAVES": 16280.886217260628
+      },
+      "duration_ms_mean_per_call": 0.06198090382138257,
+      "duration_ms_rankmax": 24.900506,
+      "duration_ms_rankmean": 18.044190625,
+      "duration_ms_rankmin": 13.640842,
+      "duration_ms_sum_across_sources": 144.353525,
+      "example_names": [
+        "dsv4.forward.layer10.moe"
+      ],
+      "grid_size_mean": 1041976.7179046802,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer11": {
+      "calls": 2285,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4818324.89265737,
+        "GRBM_GUI_ACTIVE": 4818324.89265737,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.096006017767671,
+        "SQ_BUSY_CU_CYCLES": 142651986.3648301,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 555836962.3577948,
+        "SQ_WAVES": 36064.25284073262
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 965364.6336980306,
+        "GRBM_GUI_ACTIVE": 965364.6336980306,
+        "MeanOccupancyPerActiveCU": 1.819600976805252,
+        "SQ_BUSY_CU_CYCLES": 23555017.82713348,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 78773522.70984682,
+        "SQ_WAVES": 15863.106345733042
+      },
+      "duration_ms_mean_per_call": 0.05846786652078775,
+      "duration_ms_rankmax": 21.123335,
+      "duration_ms_rankmean": 16.699884375,
+      "duration_ms_rankmin": 10.104692,
+      "duration_ms_sum_across_sources": 133.599075,
+      "example_names": [
+        "dsv4.forward.layer11.moe"
+      ],
+      "grid_size_mean": 1015238.8061269147,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "90",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer2": {
+      "calls": 2653,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4222796.255918772,
+        "GRBM_GUI_ACTIVE": 4222796.255918772,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.927591148978589,
+        "SQ_BUSY_CU_CYCLES": 123970097.41389403,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 484334035.0506936,
+        "SQ_WAVES": 38608.201674259304
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1074792.6449302677,
+        "GRBM_GUI_ACTIVE": 1074792.6449302677,
+        "MeanOccupancyPerActiveCU": 1.656719364116094,
+        "SQ_BUSY_CU_CYCLES": 26717902.066716924,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 94489949.31021485,
+        "SQ_WAVES": 15909.931398416886
+      },
+      "duration_ms_mean_per_call": 0.06533476328684508,
+      "duration_ms_rankmax": 24.081436,
+      "duration_ms_rankmean": 21.666640875,
+      "duration_ms_rankmin": 18.086662,
+      "duration_ms_sum_across_sources": 173.333127,
+      "example_names": [
+        "dsv4.forward.layer2.moe"
+      ],
+      "grid_size_mean": 1018235.6094986807,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer3": {
+      "calls": 2517,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4687350.816505488,
+        "GRBM_GUI_ACTIVE": 4687350.816505488,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9264302713046804,
+        "SQ_BUSY_CU_CYCLES": 138178908.41116124,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 552950771.6429201,
+        "SQ_WAVES": 41130.429955444066
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1137932.8835915772,
+        "GRBM_GUI_ACTIVE": 1137932.8835915772,
+        "MeanOccupancyPerActiveCU": 1.689132555423124,
+        "SQ_BUSY_CU_CYCLES": 28762555.881207787,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 103137240.94398093,
+        "SQ_WAVES": 17033.083829956297
+      },
+      "duration_ms_mean_per_call": 0.07051093643226063,
+      "duration_ms_rankmax": 24.804072,
+      "duration_ms_rankmean": 22.184503375,
+      "duration_ms_rankmin": 16.697011,
+      "duration_ms_sum_across_sources": 177.476027,
+      "example_names": [
+        "dsv4.forward.layer3.moe"
+      ],
+      "grid_size_mean": 1090117.365117203,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "86",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer4": {
+      "calls": 2490,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4796221.094526305,
+        "GRBM_GUI_ACTIVE": 4796221.094526305,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.8929412483057322,
+        "SQ_BUSY_CU_CYCLES": 141576546.56638116,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 584643277.5567741,
+        "SQ_WAVES": 43330.889022993935
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1205477.1124497992,
+        "GRBM_GUI_ACTIVE": 1205477.1124497992,
+        "MeanOccupancyPerActiveCU": 1.6809828489959842,
+        "SQ_BUSY_CU_CYCLES": 30706583.67188755,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 112998779.99036145,
+        "SQ_WAVES": 17917.65863453815
+      },
+      "duration_ms_mean_per_call": 0.07493309919678716,
+      "duration_ms_rankmax": 26.478147,
+      "duration_ms_rankmean": 23.322927125,
+      "duration_ms_rankmin": 19.714376,
+      "duration_ms_sum_across_sources": 186.583417,
+      "example_names": [
+        "dsv4.forward.layer4.moe"
+      ],
+      "grid_size_mean": 1146730.1526104417,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "87",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer5": {
+      "calls": 2462,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4788083.589879802,
+        "GRBM_GUI_ACTIVE": 4788083.589879802,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9143090636847162,
+        "SQ_BUSY_CU_CYCLES": 141524336.39633575,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 587770405.7455132,
+        "SQ_WAVES": 42861.06071481593
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1165003.002843217,
+        "GRBM_GUI_ACTIVE": 1165003.002843217,
+        "MeanOccupancyPerActiveCU": 1.6913347745735174,
+        "SQ_BUSY_CU_CYCLES": 29643167.725426484,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109864935.04467912,
+        "SQ_WAVES": 17768.017059301383
+      },
+      "duration_ms_mean_per_call": 0.07339302274573517,
+      "duration_ms_rankmax": 27.017156,
+      "duration_ms_rankmean": 22.58670275,
+      "duration_ms_rankmin": 17.678667,
+      "duration_ms_sum_across_sources": 180.693622,
+      "example_names": [
+        "dsv4.forward.layer5.moe"
+      ],
+      "grid_size_mean": 1137153.0917952885,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "90",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer6": {
+      "calls": 2507,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 5081608.459165717,
+        "GRBM_GUI_ACTIVE": 5081608.459165717,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9478906965170588,
+        "SQ_BUSY_CU_CYCLES": 149739567.014906,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 623297408.6016673,
+        "SQ_WAVES": 38662.05844090009
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1087273.4531312326,
+        "GRBM_GUI_ACTIVE": 1087273.4531312326,
+        "MeanOccupancyPerActiveCU": 1.6960946202632627,
+        "SQ_BUSY_CU_CYCLES": 27098062.23214998,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 95813230.07897887,
+        "SQ_WAVES": 16450.178699641005
+      },
+      "duration_ms_mean_per_call": 0.0667171990426805,
+      "duration_ms_rankmax": 23.451066,
+      "duration_ms_rankmean": 20.90750225,
+      "duration_ms_rankmin": 15.219285,
+      "duration_ms_sum_across_sources": 167.260018,
+      "example_names": [
+        "dsv4.forward.layer6.moe"
+      ],
+      "grid_size_mean": 1052811.4367770243,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "86",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer7": {
+      "calls": 2454,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 4821138.473802764,
+        "GRBM_GUI_ACTIVE": 4821138.473802764,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9854161517009943,
+        "SQ_BUSY_CU_CYCLES": 142479210.03999904,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 573116899.2766783,
+        "SQ_WAVES": 36406.93053587481
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1055748.4987775062,
+        "GRBM_GUI_ACTIVE": 1055748.4987775062,
+        "MeanOccupancyPerActiveCU": 1.7260313679706605,
+        "SQ_BUSY_CU_CYCLES": 26272048.10961695,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 91161557.43765281,
+        "SQ_WAVES": 16243.712306438469
+      },
+      "duration_ms_mean_per_call": 0.0646779478402608,
+      "duration_ms_rankmax": 22.37585,
+      "duration_ms_rankmean": 19.8399605,
+      "duration_ms_rankmin": 16.475812,
+      "duration_ms_sum_across_sources": 158.719684,
+      "example_names": [
+        "dsv4.forward.layer7.moe"
+      ],
+      "grid_size_mean": 1039597.587612062,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer8": {
+      "calls": 2348,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 5418249.931756349,
+        "GRBM_GUI_ACTIVE": 5418249.931756349,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.9581870584443022,
+        "SQ_BUSY_CU_CYCLES": 161331007.96589845,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 675741611.3260484,
+        "SQ_WAVES": 42601.78796464241
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1141614.577512777,
+        "GRBM_GUI_ACTIVE": 1141614.577512777,
+        "MeanOccupancyPerActiveCU": 1.738140696763199,
+        "SQ_BUSY_CU_CYCLES": 29013169.05068143,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 105858133.47870529,
+        "SQ_WAVES": 17826.680579216354
+      },
+      "duration_ms_mean_per_call": 0.07180557666098808,
+      "duration_ms_rankmax": 24.792885,
+      "duration_ms_rankmean": 21.07493675,
+      "duration_ms_rankmin": 14.81247,
+      "duration_ms_sum_across_sources": 168.599494,
+      "example_names": [
+        "dsv4.forward.layer8.moe"
+      ],
+      "grid_size_mean": 1140907.5570698467,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "moe.forward.layer9": {
+      "calls": 2375,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 6884658.739460623,
+        "GRBM_GUI_ACTIVE": 6884658.739460623,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 1.947370009728231,
+        "SQ_BUSY_CU_CYCLES": 207639864.57469955,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 930799338.8355339,
+        "SQ_WAVES": 41715.588934404484
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1148560.8829473683,
+        "GRBM_GUI_ACTIVE": 1148560.8829473683,
+        "MeanOccupancyPerActiveCU": 1.7266869882105262,
+        "SQ_BUSY_CU_CYCLES": 29138301.00463158,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 107103980.92126316,
+        "SQ_WAVES": 17797.25052631579
+      },
+      "duration_ms_mean_per_call": 0.07256716589473684,
+      "duration_ms_rankmax": 24.23664,
+      "duration_ms_rankmean": 21.543377375000002,
+      "duration_ms_rankmin": 15.649647,
+      "duration_ms_sum_across_sources": 172.347019,
+      "example_names": [
+        "dsv4.forward.layer9.moe"
+      ],
+      "grid_size_mean": 1139024.0336842106,
+      "lds_block_size_max": 156672,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.all": {
+      "calls": 2880,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1586581165.5670671,
+        "GRBM_GUI_ACTIVE": 1586581165.5670671,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3606083138905287,
+        "SQ_BUSY_CU_CYCLES": 48272828972.26897,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 14623741193.217634,
+        "SQ_WAVES": 356946.34964107675
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 78737493.646875,
+        "GRBM_GUI_ACTIVE": 78737493.646875,
+        "MeanOccupancyPerActiveCU": 5.956952856250018,
+        "SQ_BUSY_CU_CYCLES": 2381916607.4659724,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 678545180.4444444,
+        "SQ_WAVES": 836060.6666666666
+      },
+      "duration_ms_mean_per_call": 4.528002867013888,
+      "duration_ms_rankmax": 1632.717736,
+      "duration_ms_rankmean": 1630.081032125,
+      "duration_ms_rankmin": 1628.74878,
+      "duration_ms_sum_across_sources": 13040.648257,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53507882.666666664,
+      "lds_block_size_max": 512,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.grad_attn_sink": {
+      "calls": 2240,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 11680456.01997789,
+        "GRBM_GUI_ACTIVE": 11680456.01997789,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 6.91848369112678,
+        "SQ_BUSY_CU_CYCLES": 353354816.6748631,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 1455454.4202297542
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 6162403.522321428,
+        "GRBM_GUI_ACTIVE": 6162403.522321428,
+        "MeanOccupancyPerActiveCU": 6.15047563928572,
+        "SQ_BUSY_CU_CYCLES": 183404729.59107143,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 751332.8571428572
+      },
+      "duration_ms_mean_per_call": 0.39231948660714283,
+      "duration_ms_rankmax": 110.35117,
+      "duration_ms_rankmean": 109.84945625,
+      "duration_ms_rankmin": 109.282348,
+      "duration_ms_sum_across_sources": 878.79565,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink"
+      ],
+      "grid_size_mean": 48085302.85714286,
+      "lds_block_size_max": 512,
+      "rankmax_source": "90",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 28,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c128": {
+      "calls": 1440,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 507829868.9524704,
+        "GRBM_GUI_ACTIVE": 507829868.9524704,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.7295711064482022,
+        "SQ_BUSY_CU_CYCLES": 15071125444.764349,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4778771454.587625,
+        "SQ_WAVES": 453876.3830643588
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38681863.21597222,
+        "GRBM_GUI_ACTIVE": 38681863.21597222,
+        "MeanOccupancyPerActiveCU": 5.963507777083339,
+        "SQ_BUSY_CU_CYCLES": 1147138989.0909722,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.2331182006944448,
+      "duration_ms_rankmax": 404.980411,
+      "duration_ms_rankmean": 401.961276125,
+      "duration_ms_rankmin": 399.339978,
+      "duration_ms_sum_across_sources": 3215.690209,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c128.grad_attn_sink": {
+      "calls": 1120,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 11919451.469531424,
+        "GRBM_GUI_ACTIVE": 11919451.469531424,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 6.927512491894529,
+        "SQ_BUSY_CU_CYCLES": 360537351.46636933,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 1457369.0107141223
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 6256357.235714286,
+        "GRBM_GUI_ACTIVE": 6256357.235714286,
+        "MeanOccupancyPerActiveCU": 6.160382579464281,
+        "SQ_BUSY_CU_CYCLES": 186171637.62857142,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 751332.8571428572
+      },
+      "duration_ms_mean_per_call": 0.39064378749999995,
+      "duration_ms_rankmax": 55.052268,
+      "duration_ms_rankmean": 54.690130249999996,
+      "duration_ms_rankmin": 54.265555,
+      "duration_ms_sum_across_sources": 437.521042,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink"
+      ],
+      "grid_size_mean": 48085302.85714286,
+      "lds_block_size_max": 512,
+      "rankmax_source": "88",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 28,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c128.query_recompute": {
+      "calls": 320,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 585928512.1787518,
+        "GRBM_GUI_ACTIVE": 585928512.1787518,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.0684566894313456,
+        "SQ_BUSY_CU_CYCLES": 17387828080.249504,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5531358118.901085,
+        "SQ_WAVES": 295840.95984254364
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 152171134.146875,
+        "GRBM_GUI_ACTIVE": 152171134.146875,
+        "MeanOccupancyPerActiveCU": 5.274445968750003,
+        "SQ_BUSY_CU_CYCLES": 4510524719.209375,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1409286144.0,
+        "SQ_WAVES": 1130624.0
+      },
+      "duration_ms_mean_per_call": 8.681778646875,
+      "duration_ms_rankmax": 350.123962,
+      "duration_ms_rankmean": 347.271145875,
+      "duration_ms_rankmin": 344.926402,
+      "duration_ms_sum_across_sources": 2778.169167,
+      "example_names": [
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 72359936.0,
+      "lds_block_size_max": 0,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 64,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c4": {
+      "calls": 1440,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1939654427.1038651,
+        "GRBM_GUI_ACTIVE": 1939654427.1038651,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.2398474888858346,
+        "SQ_BUSY_CU_CYCLES": 59139683816.219215,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17845981190.757195,
+        "SQ_WAVES": 325221.33281001344
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 118793124.07777777,
+        "GRBM_GUI_ACTIVE": 118793124.07777777,
+        "MeanOccupancyPerActiveCU": 5.950397935416663,
+        "SQ_BUSY_CU_CYCLES": 3616694225.8409724,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.822887533333334,
+      "duration_ms_rankmax": 1229.689462,
+      "duration_ms_rankmean": 1228.119756,
+      "duration_ms_rankmin": 1227.273319,
+      "duration_ms_sum_across_sources": 9824.958048,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "91",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c4.grad_attn_sink": {
+      "calls": 1120,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 11443493.511312714,
+        "GRBM_GUI_ACTIVE": 11443493.511312714,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 6.9095316910608116,
+        "SQ_BUSY_CU_CYCLES": 346233377.89454395,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 1453556.115617303
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 6068449.808928572,
+        "GRBM_GUI_ACTIVE": 6068449.808928572,
+        "MeanOccupancyPerActiveCU": 6.140568699107145,
+        "SQ_BUSY_CU_CYCLES": 180637821.55357143,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+        "SQ_WAVES": 751332.8571428572
+      },
+      "duration_ms_mean_per_call": 0.3939951857142857,
+      "duration_ms_rankmax": 55.466236,
+      "duration_ms_rankmean": 55.159326,
+      "duration_ms_rankmin": 54.982816,
+      "duration_ms_sum_across_sources": 441.274608,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink"
+      ],
+      "grid_size_mean": 48085302.85714286,
+      "lds_block_size_max": 512,
+      "rankmax_source": "90",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 28,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.c4.query_recompute": {
+      "calls": 320,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 2030329962.9212124,
+        "GRBM_GUI_ACTIVE": 2030329962.9212124,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.020252158440778,
+        "SQ_BUSY_CU_CYCLES": 61904489018.89118,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 18685201567.774384,
+        "SQ_WAVES": 272160.5606559123
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 513329484.01875,
+        "GRBM_GUI_ACTIVE": 513329484.01875,
+        "MeanOccupancyPerActiveCU": 5.284800262499994,
+        "SQ_BUSY_CU_CYCLES": 15642891640.846874,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4697620480.0,
+        "SQ_WAVES": 1134592.0
+      },
+      "duration_ms_mean_per_call": 29.32401075,
+      "duration_ms_rankmax": 1174.486361,
+      "duration_ms_rankmean": 1172.96043,
+      "duration_ms_rankmin": 1172.038896,
+      "duration_ms_sum_across_sources": 9383.68344,
+      "example_names": [
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 72613888.0,
+      "lds_block_size_max": 0,
+      "rankmax_source": "91",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 48,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer10": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1947237023.9935687,
+        "GRBM_GUI_ACTIVE": 1947237023.9935687,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.238585591809712,
+        "SQ_BUSY_CU_CYCLES": 59282670282.38377,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17850494794.5194,
+        "SQ_WAVES": 324869.79193739354
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 119194544.30902778,
+        "GRBM_GUI_ACTIVE": 119194544.30902778,
+        "MeanOccupancyPerActiveCU": 5.949462704861113,
+        "SQ_BUSY_CU_CYCLES": 3623780467.5868053,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.845645607638889,
+      "duration_ms_rankmax": 247.037439,
+      "duration_ms_rankmean": 246.443241875,
+      "duration_ms_rankmin": 245.726181,
+      "duration_ms_sum_across_sources": 1971.545935,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "84",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer11": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 510461353.0926135,
+        "GRBM_GUI_ACTIVE": 510461353.0926135,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.7315291379192694,
+        "SQ_BUSY_CU_CYCLES": 15014710514.287676,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4790173965.520922,
+        "SQ_WAVES": 451265.2042898202
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38900877.635416664,
+        "GRBM_GUI_ACTIVE": 38900877.635416664,
+        "MeanOccupancyPerActiveCU": 5.99735643402778,
+        "SQ_BUSY_CU_CYCLES": 1145058579.25,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.233696628472222,
+      "duration_ms_rankmax": 81.383463,
+      "duration_ms_rankmean": 80.413078625,
+      "duration_ms_rankmin": 79.752069,
+      "duration_ms_sum_across_sources": 643.304629,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "86",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer2": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1934309552.005599,
+        "GRBM_GUI_ACTIVE": 1934309552.005599,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.2402529519115664,
+        "SQ_BUSY_CU_CYCLES": 59067141249.72433,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17846040568.860622,
+        "SQ_WAVES": 325215.4415640306
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 118471965.66319445,
+        "GRBM_GUI_ACTIVE": 118471965.66319445,
+        "MeanOccupancyPerActiveCU": 5.95525821875,
+        "SQ_BUSY_CU_CYCLES": 3612251802.798611,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.804150017361111,
+      "duration_ms_rankmax": 245.294537,
+      "duration_ms_rankmean": 244.949400625,
+      "duration_ms_rankmin": 244.609612,
+      "duration_ms_sum_across_sources": 1959.595205,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "87",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer3": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 506290940.85053754,
+        "GRBM_GUI_ACTIVE": 506290940.85053754,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.727241037854799,
+        "SQ_BUSY_CU_CYCLES": 15074839580.937468,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4775653722.979665,
+        "SQ_WAVES": 454579.07363194006
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38566769.510416664,
+        "GRBM_GUI_ACTIVE": 38566769.510416664,
+        "MeanOccupancyPerActiveCU": 5.950806597222222,
+        "SQ_BUSY_CU_CYCLES": 1146940775.9305556,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.22954059375,
+      "duration_ms_rankmax": 81.093854,
+      "duration_ms_rankmean": 80.26346137499999,
+      "duration_ms_rankmin": 79.662644,
+      "duration_ms_sum_across_sources": 642.107691,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer4": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1935848880.6257527,
+        "GRBM_GUI_ACTIVE": 1935848880.6257527,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.240312060430396,
+        "SQ_BUSY_CU_CYCLES": 59045947806.033,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17842571080.22946,
+        "SQ_WAVES": 325581.28356513113
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 118623784.56597222,
+        "GRBM_GUI_ACTIVE": 118623784.56597222,
+        "MeanOccupancyPerActiveCU": 5.948598670138889,
+        "SQ_BUSY_CU_CYCLES": 3612805149.138889,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.811811479166667,
+      "duration_ms_rankmax": 245.78869,
+      "duration_ms_rankmean": 245.22521325,
+      "duration_ms_rankmin": 244.586083,
+      "duration_ms_sum_across_sources": 1961.801706,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "91",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer5": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 507443157.6838927,
+        "GRBM_GUI_ACTIVE": 507443157.6838927,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.7268107631812524,
+        "SQ_BUSY_CU_CYCLES": 15119846595.019588,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4779461623.011593,
+        "SQ_WAVES": 453703.88818632456
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38632584.809027776,
+        "GRBM_GUI_ACTIVE": 38632584.809027776,
+        "MeanOccupancyPerActiveCU": 5.961962951388892,
+        "SQ_BUSY_CU_CYCLES": 1149790144.2083333,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.2306362604166665,
+      "duration_ms_rankmax": 80.96974,
+      "duration_ms_rankmean": 80.302905375,
+      "duration_ms_rankmin": 79.831277,
+      "duration_ms_sum_across_sources": 642.423243,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "88",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer6": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1940538687.3495617,
+        "GRBM_GUI_ACTIVE": 1940538687.3495617,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.240349731477997,
+        "SQ_BUSY_CU_CYCLES": 59138682283.47274,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17843416204.124104,
+        "SQ_WAVES": 325427.45654067554
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 118859030.6388889,
+        "GRBM_GUI_ACTIVE": 118859030.6388889,
+        "MeanOccupancyPerActiveCU": 5.948985184027775,
+        "SQ_BUSY_CU_CYCLES": 3617026979.548611,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.82822103125,
+      "duration_ms_rankmax": 246.742415,
+      "duration_ms_rankmean": 245.815957125,
+      "duration_ms_rankmin": 244.969678,
+      "duration_ms_sum_across_sources": 1966.527657,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "91",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer7": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 508391258.3151501,
+        "GRBM_GUI_ACTIVE": 508391258.3151501,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.7298122459858503,
+        "SQ_BUSY_CU_CYCLES": 15066818140.772629,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4776261837.935617,
+        "SQ_WAVES": 454334.6721994194
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38677103.010416664,
+        "GRBM_GUI_ACTIVE": 38677103.010416664,
+        "MeanOccupancyPerActiveCU": 5.9494575659722235,
+        "SQ_BUSY_CU_CYCLES": 1145498738.9965277,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.237939809027778,
+      "duration_ms_rankmax": 81.378568,
+      "duration_ms_rankmean": 80.565833125,
+      "duration_ms_rankmin": 80.028602,
+      "duration_ms_sum_across_sources": 644.526665,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer8": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1940290991.2409925,
+        "GRBM_GUI_ACTIVE": 1940290991.2409925,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.2397428194121116,
+        "SQ_BUSY_CU_CYCLES": 59163143993.31063,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 17847364533.84443,
+        "SQ_WAVES": 325014.3222960917
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 118816295.21180555,
+        "GRBM_GUI_ACTIVE": 118816295.21180555,
+        "MeanOccupancyPerActiveCU": 5.9496848993055576,
+        "SQ_BUSY_CU_CYCLES": 3617606730.1319447,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1043915662.2222222,
+        "SQ_WAVES": 836501.5555555555
+      },
+      "duration_ms_mean_per_call": 6.82460953125,
+      "duration_ms_rankmax": 246.015075,
+      "duration_ms_rankmean": 245.685943125,
+      "duration_ms_rankmin": 244.983589,
+      "duration_ms_sum_across_sources": 1965.487545,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53536099.55555555,
+      "lds_block_size_max": 512,
+      "rankmax_source": "91",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.partial_nested.layer9": {
+      "calls": 288,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 506558221.38087267,
+        "GRBM_GUI_ACTIVE": 506558221.38087267,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.732453667321386,
+        "SQ_BUSY_CU_CYCLES": 15079493934.250881,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4772306270.217442,
+        "SQ_WAVES": 455499.2186271282
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 38631981.114583336,
+        "GRBM_GUI_ACTIVE": 38631981.114583336,
+        "MeanOccupancyPerActiveCU": 5.957955336805553,
+        "SQ_BUSY_CU_CYCLES": 1148406707.0694444,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 313174698.6666667,
+        "SQ_WAVES": 835619.7777777778
+      },
+      "duration_ms_mean_per_call": 2.2337777118055553,
+      "duration_ms_rankmax": 81.472523,
+      "duration_ms_rankmean": 80.415997625,
+      "duration_ms_rankmin": 79.672232,
+      "duration_ms_sum_across_sources": 643.327981,
+      "example_names": [
+        "sharedkv_bwd.grad_attn_sink",
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 53479665.777777776,
+      "lds_block_size_max": 512,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 80,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.backward.sharedkv.query_recompute": {
+      "calls": 640,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 1700380924.3254714,
+        "GRBM_GUI_ACTIVE": 1700380924.3254714,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.031263666805107,
+        "SQ_BUSY_CU_CYCLES": 51735412083.49536,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 15680428900.477682,
+        "SQ_WAVES": 277569.9466276421
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 332750309.0828125,
+        "GRBM_GUI_ACTIVE": 332750309.0828125,
+        "MeanOccupancyPerActiveCU": 5.279623115624997,
+        "SQ_BUSY_CU_CYCLES": 10076708180.028126,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 3053453312.0,
+        "SQ_WAVES": 1132608.0
+      },
+      "duration_ms_mean_per_call": 19.0028946984375,
+      "duration_ms_rankmax": 1522.459989,
+      "duration_ms_rankmean": 1520.231575875,
+      "duration_ms_rankmin": 1518.39761,
+      "duration_ms_sum_across_sources": 12161.852607,
+      "example_names": [
+        "sharedkv_bwd.query_recompute"
+      ],
+      "grid_size_mean": 72486912.0,
+      "lds_block_size_max": 0,
+      "rankmax_source": "85",
+      "scratch_size_max": 96,
+      "sgpr_count_max": 64,
+      "source_count": 8,
+      "vgpr_count_max": 128,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.forward.all": {
+      "calls": 22400,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 113867764.54059598,
+        "GRBM_GUI_ACTIVE": 113867764.54059598,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 3.1538813905963834,
+        "SQ_BUSY_CU_CYCLES": 3586135014.214454,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 4431569695.69319,
+        "SQ_WAVES": 465685.7939063936
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 2939640.0862946426,
+        "GRBM_GUI_ACTIVE": 2939640.0862946426,
+        "MeanOccupancyPerActiveCU": 2.986891626651788,
+        "SQ_BUSY_CU_CYCLES": 86867152.54339285,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 94614323.2,
+        "SQ_WAVES": 81496.0142857143
+      },
+      "duration_ms_mean_per_call": 0.17946637870535714,
+      "duration_ms_rankmax": 513.302701,
+      "duration_ms_rankmean": 502.505860375,
+      "duration_ms_rankmin": 495.653491,
+      "duration_ms_sum_across_sources": 4020.046883,
+      "example_names": [
+        "dsv4.forward.layer10.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer11.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer2.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer3.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer4.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer5.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer6.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer7.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer8.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer9.attention.sparse_mla_shared_kv.cr128"
+      ],
+      "grid_size_mean": 5215744.914285715,
+      "lds_block_size_max": 135168,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.forward.c128": {
+      "calls": 10720,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 52561300.68223483,
+        "GRBM_GUI_ACTIVE": 52561300.68223483,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 2.3016496658219814,
+        "SQ_BUSY_CU_CYCLES": 1647429350.7491198,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1919517964.9192183,
+        "SQ_WAVES": 206662.37756897006
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 1514385.787686567,
+        "GRBM_GUI_ACTIVE": 1514385.787686567,
+        "MeanOccupancyPerActiveCU": 2.2083916293843324,
+        "SQ_BUSY_CU_CYCLES": 41745643.9323694,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+        "SQ_WAVES": 14832.298507462687
+      },
+      "duration_ms_mean_per_call": 0.08884521436567164,
+      "duration_ms_rankmax": 123.147936,
+      "duration_ms_rankmean": 119.05258725,
+      "duration_ms_rankmin": 115.93584,
+      "duration_ms_sum_across_sources": 952.420698,
+      "example_names": [
+        "dsv4.forward.layer11.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer3.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer5.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer7.attention.sparse_mla_shared_kv.cr128",
+        "dsv4.forward.layer9.attention.sparse_mla_shared_kv.cr128"
+      ],
+      "grid_size_mean": 949267.104477612,
+      "lds_block_size_max": 135168,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    },
+    "sparse_attention.forward.c4": {
+      "calls": 11680,
+      "counter_duration_weighted_means": {
+        "GRBM_COUNT": 132901878.07939787,
+        "GRBM_GUI_ACTIVE": 132901878.07939787,
+        "GRBM_GUI_ACTIVE_RATIO": 1.0,
+        "MeanOccupancyPerActiveCU": 3.418477884829041,
+        "SQ_BUSY_CU_CYCLES": 4188054312.674944,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5211498513.139978,
+        "SQ_WAVES": 546106.0433464125
+      },
+      "counter_unweighted_means_per_dispatch": {
+        "GRBM_COUNT": 4247750.195976027,
+        "GRBM_GUI_ACTIVE": 4247750.195976027,
+        "MeanOccupancyPerActiveCU": 3.7014053227739896,
+        "SQ_BUSY_CU_CYCLES": 128280044.00830479,
+        "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+        "SQ_WAVES": 142680.5205479452
+      },
+      "duration_ms_mean_per_call": 0.2626392281678082,
+      "duration_ms_rankmax": 390.154765,
+      "duration_ms_rankmean": 383.453273125,
+      "duration_ms_rankmin": 379.717651,
+      "duration_ms_sum_across_sources": 3067.626185,
+      "example_names": [
+        "dsv4.forward.layer10.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer2.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer4.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer6.attention.sparse_mla_shared_kv.cr4",
+        "dsv4.forward.layer8.attention.sparse_mla_shared_kv.cr4"
+      ],
+      "grid_size_mean": 9131553.315068493,
+      "lds_block_size_max": 135168,
+      "rankmax_source": "85",
+      "scratch_size_max": 0,
+      "sgpr_count_max": 112,
+      "source_count": 8,
+      "vgpr_count_max": 256,
+      "workgroup_size_max": 512
+    }
+  },
+  "counter_files": [
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/84_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/85_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/86_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/87_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/88_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/89_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/90_counter_collection.csv",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1/91_counter_collection.csv"
+  ],
+  "last_train_step_only": true,
+  "last_train_step_ranges": {
+    "84": [
+      1603772808277714,
+      1603783851532019
+    ],
+    "85": [
+      1603772807164567,
+      1603783851525108
+    ],
+    "86": [
+      1603772807375890,
+      1603783851499478
+    ],
+    "87": [
+      1603772807752886,
+      1603783851547879
+    ],
+    "88": [
+      1603772807765636,
+      1603783851507998
+    ],
+    "89": [
+      1603772807462441,
+      1603783851521368
+    ],
+    "90": [
+      1603772807143237,
+      1603783851500588
+    ],
+    "91": [
+      1603772807236378,
+      1603783851587319
+    ]
+  },
+  "notes": [
+    "MeanOccupancyPerActiveCU is resident/running waves per active CU, not active-CU coverage.",
+    "Durations are filtered to the final train_step range by default; bucket rows report rank/source max, mean, min, and all-source sums.",
+    "Backward SharedKV C4/C128 split is not emitted by default because sharedkv_bwd.* marker ranges are not reliably nested inside per-layer backward hooks in this trace.",
+    "rocprof counter collection is intrusive; use this for hardware character and bucket ranking, not clean throughput."
+  ],
+  "profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_currentbest_mbs8_occ_20260608/son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1",
+  "top_exact": {
+    "moe_backward": [
+      {
+        "calls": 6585,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 54577927.34441349,
+          "GRBM_GUI_ACTIVE": 54577927.34441349,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.35655385848347,
+          "SQ_BUSY_CU_CYCLES": 352212283.0297116,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 301360979.05426496,
+          "SQ_WAVES": 260823.66090340164
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2322121.500987092,
+          "GRBM_GUI_ACTIVE": 2322121.500987092,
+          "MeanOccupancyPerActiveCU": 2.2426344604403896,
+          "SQ_BUSY_CU_CYCLES": 48572833.392406985,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110195028.24479878,
+          "SQ_WAVES": 70124.25664388762
+        },
+        "duration_ms_mean_per_call": 0.14117329840546697,
+        "duration_ms_rankmax": 130.95703,
+        "duration_ms_rankmean": 116.20327125,
+        "duration_ms_rankmin": 105.804238,
+        "duration_ms_sum_across_sources": 929.62617,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.5.moe"
+        ],
+        "grid_size_mean": 4487952.425208808,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.5.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6649,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 56858163.530020006,
+          "GRBM_GUI_ACTIVE": 56858163.530020006,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.355226198414943,
+          "SQ_BUSY_CU_CYCLES": 343293631.32455343,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 293785520.8769238,
+          "SQ_WAVES": 256418.24059737084
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2359224.028425327,
+          "GRBM_GUI_ACTIVE": 2359224.028425327,
+          "MeanOccupancyPerActiveCU": 2.222446172958342,
+          "SQ_BUSY_CU_CYCLES": 49144555.98435855,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109151594.68912618,
+          "SQ_WAVES": 70668.02977891412
+        },
+        "duration_ms_mean_per_call": 0.14269323086178373,
+        "duration_ms_rankmax": 129.635821,
+        "duration_ms_rankmean": 118.5959115,
+        "duration_ms_rankmin": 111.21284,
+        "duration_ms_sum_across_sources": 948.767292,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.4.moe"
+        ],
+        "grid_size_mean": 4522753.905850504,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.4.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6599,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 44031339.315714575,
+          "GRBM_GUI_ACTIVE": 44031339.315714575,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.387235794495308,
+          "SQ_BUSY_CU_CYCLES": 350102845.8146883,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 304687384.41271144,
+          "SQ_WAVES": 263066.663254242
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2221727.7446582816,
+          "GRBM_GUI_ACTIVE": 2221727.7446582816,
+          "MeanOccupancyPerActiveCU": 2.1991965938778617,
+          "SQ_BUSY_CU_CYCLES": 48592244.45537203,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109961680.90437946,
+          "SQ_WAVES": 68551.08683133808
+        },
+        "duration_ms_mean_per_call": 0.13536229216547963,
+        "duration_ms_rankmax": 124.029057,
+        "duration_ms_rankmean": 111.65697075,
+        "duration_ms_rankmin": 100.201838,
+        "duration_ms_sum_across_sources": 893.255766,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.3.moe"
+        ],
+        "grid_size_mean": 4387269.557205637,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.3.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6636,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 44095989.98734867,
+          "GRBM_GUI_ACTIVE": 44095989.98734867,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3962028035876797,
+          "SQ_BUSY_CU_CYCLES": 315091942.74005485,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 305549234.81485647,
+          "SQ_WAVES": 257625.73059624832
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2254236.63517179,
+          "GRBM_GUI_ACTIVE": 2254236.63517179,
+          "MeanOccupancyPerActiveCU": 2.2625115557564763,
+          "SQ_BUSY_CU_CYCLES": 48310839.40340567,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109358991.66244726,
+          "SQ_WAVES": 69893.00723327306
+        },
+        "duration_ms_mean_per_call": 0.13715355635925258,
+        "duration_ms_rankmax": 122.735431,
+        "duration_ms_rankmean": 113.76887500000001,
+        "duration_ms_rankmin": 106.961337,
+        "duration_ms_sum_across_sources": 910.151,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.0.moe"
+        ],
+        "grid_size_mean": 4473152.462929476,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.0.moe",
+        "rankmax_source": "90",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6534,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52356396.579881504,
+          "GRBM_GUI_ACTIVE": 52356396.579881504,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3549063876953795,
+          "SQ_BUSY_CU_CYCLES": 363234173.61757356,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348450926.70807856,
+          "SQ_WAVES": 253943.9673427006
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2239284.08570554,
+          "GRBM_GUI_ACTIVE": 2239284.08570554,
+          "MeanOccupancyPerActiveCU": 2.323318566421795,
+          "SQ_BUSY_CU_CYCLES": 47284690.97673707,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110986041.59412305,
+          "SQ_WAVES": 68300.5644322008
+        },
+        "duration_ms_mean_per_call": 0.13701643617998163,
+        "duration_ms_rankmax": 122.204249,
+        "duration_ms_rankmean": 111.90817425,
+        "duration_ms_rankmin": 102.333939,
+        "duration_ms_sum_across_sources": 895.265394,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.8.moe"
+        ],
+        "grid_size_mean": 4371236.123660851,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.8.moe",
+        "rankmax_source": "91",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6828,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 33520990.55391989,
+          "GRBM_GUI_ACTIVE": 33520990.55391989,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3787717504755714,
+          "SQ_BUSY_CU_CYCLES": 270364988.80837554,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 288882763.2916445,
+          "SQ_WAVES": 255951.70482212963
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2123886.6009080256,
+          "GRBM_GUI_ACTIVE": 2123886.6009080256,
+          "MeanOccupancyPerActiveCU": 2.048080554188638,
+          "SQ_BUSY_CU_CYCLES": 46663556.99135911,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 106291693.10369068,
+          "SQ_WAVES": 64890.83274751025
+        },
+        "duration_ms_mean_per_call": 0.12889150527240775,
+        "duration_ms_rankmax": 122.050157,
+        "duration_ms_rankmean": 110.00889975,
+        "duration_ms_rankmin": 100.387288,
+        "duration_ms_sum_across_sources": 880.071198,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.2.moe"
+        ],
+        "grid_size_mean": 4153013.295840656,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.2.moe",
+        "rankmax_source": "91",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6704,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 29447556.283535678,
+          "GRBM_GUI_ACTIVE": 29447556.283535678,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.481321140049243,
+          "SQ_BUSY_CU_CYCLES": 291304379.6863903,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 297332340.8748618,
+          "SQ_WAVES": 308616.05122856307
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2186380.64573389,
+          "GRBM_GUI_ACTIVE": 2186380.64573389,
+          "MeanOccupancyPerActiveCU": 2.119064717482098,
+          "SQ_BUSY_CU_CYCLES": 49204293.80355012,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108332798.77804296,
+          "SQ_WAVES": 72299.17989260143
+        },
+        "duration_ms_mean_per_call": 0.1336974622613365,
+        "duration_ms_rankmax": 121.27916,
+        "duration_ms_rankmean": 112.038473375,
+        "duration_ms_rankmin": 104.006417,
+        "duration_ms_sum_across_sources": 896.307787,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.1.moe"
+        ],
+        "grid_size_mean": 4627147.513126492,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.1.moe",
+        "rankmax_source": "90",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6405,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 57419358.23565781,
+          "GRBM_GUI_ACTIVE": 57419358.23565781,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.252445622366165,
+          "SQ_BUSY_CU_CYCLES": 294972314.86726797,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 362177589.0761858,
+          "SQ_WAVES": 199718.4858191838
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2154985.2221701797,
+          "GRBM_GUI_ACTIVE": 2154985.2221701797,
+          "MeanOccupancyPerActiveCU": 2.3804270437158452,
+          "SQ_BUSY_CU_CYCLES": 44652760.2088993,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 113169487.77767369,
+          "SQ_WAVES": 61070.04246682279
+        },
+        "duration_ms_mean_per_call": 0.13174214660421546,
+        "duration_ms_rankmax": 119.910484,
+        "duration_ms_rankmean": 105.476056125,
+        "duration_ms_rankmin": 94.737807,
+        "duration_ms_sum_across_sources": 843.808449,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.11.moe"
+        ],
+        "grid_size_mean": 3908482.717876659,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.11.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6497,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 45669098.913939476,
+          "GRBM_GUI_ACTIVE": 45669098.913939476,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3018318886699873,
+          "SQ_BUSY_CU_CYCLES": 314256376.2360597,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 325370912.55791235,
+          "SQ_WAVES": 214570.10794773506
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2121534.131137448,
+          "GRBM_GUI_ACTIVE": 2121534.131137448,
+          "MeanOccupancyPerActiveCU": 2.3253904168077577,
+          "SQ_BUSY_CU_CYCLES": 45275395.533015236,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 111619831.21317531,
+          "SQ_WAVES": 62620.597198707095
+        },
+        "duration_ms_mean_per_call": 0.13034672017854393,
+        "duration_ms_rankmax": 119.892835,
+        "duration_ms_rankmean": 105.85783012499999,
+        "duration_ms_rankmin": 94.15147,
+        "duration_ms_sum_across_sources": 846.862641,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.10.moe"
+        ],
+        "grid_size_mean": 4007718.220717254,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.10.moe",
+        "rankmax_source": "91",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6700,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 35759875.71184108,
+          "GRBM_GUI_ACTIVE": 35759875.71184108,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3694608317482,
+          "SQ_BUSY_CU_CYCLES": 273370347.1457678,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348630356.9774318,
+          "SQ_WAVES": 250480.58883538854
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2134847.674925373,
+          "GRBM_GUI_ACTIVE": 2134847.674925373,
+          "MeanOccupancyPerActiveCU": 2.1661913802985047,
+          "SQ_BUSY_CU_CYCLES": 46035929.148955226,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108299433.95343284,
+          "SQ_WAVES": 65208.42119402985
+        },
+        "duration_ms_mean_per_call": 0.12990056835820896,
+        "duration_ms_rankmax": 119.758631,
+        "duration_ms_rankmean": 108.791726,
+        "duration_ms_rankmin": 99.141971,
+        "duration_ms_sum_across_sources": 870.333808,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.6.moe"
+        ],
+        "grid_size_mean": 4173338.9564179103,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.6.moe",
+        "rankmax_source": "91",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6661,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 40406548.62394117,
+          "GRBM_GUI_ACTIVE": 40406548.62394117,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.321811860267196,
+          "SQ_BUSY_CU_CYCLES": 268388311.6406963,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 348524066.3128961,
+          "SQ_WAVES": 222677.9073020342
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2156009.3383876295,
+          "GRBM_GUI_ACTIVE": 2156009.3383876295,
+          "MeanOccupancyPerActiveCU": 2.205941378621821,
+          "SQ_BUSY_CU_CYCLES": 45571531.04759045,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 108903732.84491818,
+          "SQ_WAVES": 63689.10944302657
+        },
+        "duration_ms_mean_per_call": 0.13103003482960518,
+        "duration_ms_rankmax": 118.911567,
+        "duration_ms_rankmean": 109.09888275,
+        "duration_ms_rankmin": 94.042327,
+        "duration_ms_sum_across_sources": 872.791062,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.7.moe"
+        ],
+        "grid_size_mean": 4076103.0043537007,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.7.moe",
+        "rankmax_source": "91",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 6594,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 30129706.23164197,
+          "GRBM_GUI_ACTIVE": 30129706.23164197,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.450849408190484,
+          "SQ_BUSY_CU_CYCLES": 294748715.581869,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 469824820.7525753,
+          "SQ_WAVES": 262808.4548679778
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 2097256.4285714286,
+          "GRBM_GUI_ACTIVE": 2097256.4285714286,
+          "MeanOccupancyPerActiveCU": 2.2942973718532036,
+          "SQ_BUSY_CU_CYCLES": 46807205.8644222,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 110015965.99090081,
+          "SQ_WAVES": 68243.91477100394
+        },
+        "duration_ms_mean_per_call": 0.12851629966636335,
+        "duration_ms_rankmax": 115.067037,
+        "duration_ms_rankmean": 105.92956,
+        "duration_ms_rankmin": 98.258144,
+        "duration_ms_sum_across_sources": 847.43648,
+        "example_names": [
+          "dsv4.backward.moe.dsv4.layers.9.moe"
+        ],
+        "grid_size_mean": 4367610.545344252,
+        "lds_block_size_max": 134656,
+        "name": "dsv4.backward.moe.dsv4.layers.9.moe",
+        "rankmax_source": "90",
+        "scratch_size_max": 696,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      }
+    ],
+    "moe_forward": [
+      {
+        "calls": 2636,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4451871.983534146,
+          "GRBM_GUI_ACTIVE": 4451871.983534146,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.8634938833580608,
+          "SQ_BUSY_CU_CYCLES": 131160698.22990589,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 529587791.85168254,
+          "SQ_WAVES": 45628.35245093773
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1213472.358497724,
+          "GRBM_GUI_ACTIVE": 1213472.358497724,
+          "MeanOccupancyPerActiveCU": 1.6226531999241258,
+          "SQ_BUSY_CU_CYCLES": 30998425.854704097,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 114709418.53717755,
+          "SQ_WAVES": 17595.84673748103
+        },
+        "duration_ms_mean_per_call": 0.07528616388467375,
+        "duration_ms_rankmax": 29.157058,
+        "duration_ms_rankmean": 24.806791,
+        "duration_ms_rankmin": 21.765414,
+        "duration_ms_sum_across_sources": 198.454328,
+        "example_names": [
+          "dsv4.forward.layer1.moe"
+        ],
+        "grid_size_mean": 1126134.191198786,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer1.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2462,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4788083.589879802,
+          "GRBM_GUI_ACTIVE": 4788083.589879802,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9143090636847162,
+          "SQ_BUSY_CU_CYCLES": 141524336.39633575,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 587770405.7455132,
+          "SQ_WAVES": 42861.06071481593
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1165003.002843217,
+          "GRBM_GUI_ACTIVE": 1165003.002843217,
+          "MeanOccupancyPerActiveCU": 1.6913347745735174,
+          "SQ_BUSY_CU_CYCLES": 29643167.725426484,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 109864935.04467912,
+          "SQ_WAVES": 17768.017059301383
+        },
+        "duration_ms_mean_per_call": 0.07339302274573517,
+        "duration_ms_rankmax": 27.017156,
+        "duration_ms_rankmean": 22.58670275,
+        "duration_ms_rankmin": 17.678667,
+        "duration_ms_sum_across_sources": 180.693622,
+        "example_names": [
+          "dsv4.forward.layer5.moe"
+        ],
+        "grid_size_mean": 1137153.0917952885,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer5.moe",
+        "rankmax_source": "90",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2490,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4796221.094526305,
+          "GRBM_GUI_ACTIVE": 4796221.094526305,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.8929412483057322,
+          "SQ_BUSY_CU_CYCLES": 141576546.56638116,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 584643277.5567741,
+          "SQ_WAVES": 43330.889022993935
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1205477.1124497992,
+          "GRBM_GUI_ACTIVE": 1205477.1124497992,
+          "MeanOccupancyPerActiveCU": 1.6809828489959842,
+          "SQ_BUSY_CU_CYCLES": 30706583.67188755,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 112998779.99036145,
+          "SQ_WAVES": 17917.65863453815
+        },
+        "duration_ms_mean_per_call": 0.07493309919678716,
+        "duration_ms_rankmax": 26.478147,
+        "duration_ms_rankmean": 23.322927125,
+        "duration_ms_rankmin": 19.714376,
+        "duration_ms_sum_across_sources": 186.583417,
+        "example_names": [
+          "dsv4.forward.layer4.moe"
+        ],
+        "grid_size_mean": 1146730.1526104417,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer4.moe",
+        "rankmax_source": "87",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2441,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4681851.586122366,
+          "GRBM_GUI_ACTIVE": 4681851.586122366,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9289515255821281,
+          "SQ_BUSY_CU_CYCLES": 138554018.43835512,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 579240990.5312691,
+          "SQ_WAVES": 43571.94801294614
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1173327.065546907,
+          "GRBM_GUI_ACTIVE": 1173327.065546907,
+          "MeanOccupancyPerActiveCU": 1.6942829873002867,
+          "SQ_BUSY_CU_CYCLES": 29821379.67103646,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 111867196.72265466,
+          "SQ_WAVES": 17944.26300696436
+        },
+        "duration_ms_mean_per_call": 0.0733789815649324,
+        "duration_ms_rankmax": 26.247304,
+        "duration_ms_rankmean": 22.38976175,
+        "duration_ms_rankmin": 18.565521,
+        "duration_ms_sum_across_sources": 179.118094,
+        "example_names": [
+          "dsv4.forward.layer0.moe"
+        ],
+        "grid_size_mean": 1148432.832445719,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer0.moe",
+        "rankmax_source": "89",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2329,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4317012.412032889,
+          "GRBM_GUI_ACTIVE": 4317012.412032889,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.0397222452615464,
+          "SQ_BUSY_CU_CYCLES": 127165110.11962207,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 491268665.050875,
+          "SQ_WAVES": 35606.01706290165
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1019608.3456419064,
+          "GRBM_GUI_ACTIVE": 1019608.3456419064,
+          "MeanOccupancyPerActiveCU": 1.7866745040790024,
+          "SQ_BUSY_CU_CYCLES": 25142344.09961357,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 85950263.50880206,
+          "SQ_WAVES": 16280.886217260628
+        },
+        "duration_ms_mean_per_call": 0.06198090382138257,
+        "duration_ms_rankmax": 24.900506,
+        "duration_ms_rankmean": 18.044190625,
+        "duration_ms_rankmin": 13.640842,
+        "duration_ms_sum_across_sources": 144.353525,
+        "example_names": [
+          "dsv4.forward.layer10.moe"
+        ],
+        "grid_size_mean": 1041976.7179046802,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer10.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2517,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4687350.816505488,
+          "GRBM_GUI_ACTIVE": 4687350.816505488,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9264302713046804,
+          "SQ_BUSY_CU_CYCLES": 138178908.41116124,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 552950771.6429201,
+          "SQ_WAVES": 41130.429955444066
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1137932.8835915772,
+          "GRBM_GUI_ACTIVE": 1137932.8835915772,
+          "MeanOccupancyPerActiveCU": 1.689132555423124,
+          "SQ_BUSY_CU_CYCLES": 28762555.881207787,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 103137240.94398093,
+          "SQ_WAVES": 17033.083829956297
+        },
+        "duration_ms_mean_per_call": 0.07051093643226063,
+        "duration_ms_rankmax": 24.804072,
+        "duration_ms_rankmean": 22.184503375,
+        "duration_ms_rankmin": 16.697011,
+        "duration_ms_sum_across_sources": 177.476027,
+        "example_names": [
+          "dsv4.forward.layer3.moe"
+        ],
+        "grid_size_mean": 1090117.365117203,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer3.moe",
+        "rankmax_source": "86",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2348,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 5418249.931756349,
+          "GRBM_GUI_ACTIVE": 5418249.931756349,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9581870584443022,
+          "SQ_BUSY_CU_CYCLES": 161331007.96589845,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 675741611.3260484,
+          "SQ_WAVES": 42601.78796464241
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1141614.577512777,
+          "GRBM_GUI_ACTIVE": 1141614.577512777,
+          "MeanOccupancyPerActiveCU": 1.738140696763199,
+          "SQ_BUSY_CU_CYCLES": 29013169.05068143,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 105858133.47870529,
+          "SQ_WAVES": 17826.680579216354
+        },
+        "duration_ms_mean_per_call": 0.07180557666098808,
+        "duration_ms_rankmax": 24.792885,
+        "duration_ms_rankmean": 21.07493675,
+        "duration_ms_rankmin": 14.81247,
+        "duration_ms_sum_across_sources": 168.599494,
+        "example_names": [
+          "dsv4.forward.layer8.moe"
+        ],
+        "grid_size_mean": 1140907.5570698467,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer8.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2375,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 6884658.739460623,
+          "GRBM_GUI_ACTIVE": 6884658.739460623,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.947370009728231,
+          "SQ_BUSY_CU_CYCLES": 207639864.57469955,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 930799338.8355339,
+          "SQ_WAVES": 41715.588934404484
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1148560.8829473683,
+          "GRBM_GUI_ACTIVE": 1148560.8829473683,
+          "MeanOccupancyPerActiveCU": 1.7266869882105262,
+          "SQ_BUSY_CU_CYCLES": 29138301.00463158,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 107103980.92126316,
+          "SQ_WAVES": 17797.25052631579
+        },
+        "duration_ms_mean_per_call": 0.07256716589473684,
+        "duration_ms_rankmax": 24.23664,
+        "duration_ms_rankmean": 21.543377375000002,
+        "duration_ms_rankmin": 15.649647,
+        "duration_ms_sum_across_sources": 172.347019,
+        "example_names": [
+          "dsv4.forward.layer9.moe"
+        ],
+        "grid_size_mean": 1139024.0336842106,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer9.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2653,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4222796.255918772,
+          "GRBM_GUI_ACTIVE": 4222796.255918772,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.927591148978589,
+          "SQ_BUSY_CU_CYCLES": 123970097.41389403,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 484334035.0506936,
+          "SQ_WAVES": 38608.201674259304
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1074792.6449302677,
+          "GRBM_GUI_ACTIVE": 1074792.6449302677,
+          "MeanOccupancyPerActiveCU": 1.656719364116094,
+          "SQ_BUSY_CU_CYCLES": 26717902.066716924,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 94489949.31021485,
+          "SQ_WAVES": 15909.931398416886
+        },
+        "duration_ms_mean_per_call": 0.06533476328684508,
+        "duration_ms_rankmax": 24.081436,
+        "duration_ms_rankmean": 21.666640875,
+        "duration_ms_rankmin": 18.086662,
+        "duration_ms_sum_across_sources": 173.333127,
+        "example_names": [
+          "dsv4.forward.layer2.moe"
+        ],
+        "grid_size_mean": 1018235.6094986807,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer2.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2507,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 5081608.459165717,
+          "GRBM_GUI_ACTIVE": 5081608.459165717,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9478906965170588,
+          "SQ_BUSY_CU_CYCLES": 149739567.014906,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 623297408.6016673,
+          "SQ_WAVES": 38662.05844090009
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1087273.4531312326,
+          "GRBM_GUI_ACTIVE": 1087273.4531312326,
+          "MeanOccupancyPerActiveCU": 1.6960946202632627,
+          "SQ_BUSY_CU_CYCLES": 27098062.23214998,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 95813230.07897887,
+          "SQ_WAVES": 16450.178699641005
+        },
+        "duration_ms_mean_per_call": 0.0667171990426805,
+        "duration_ms_rankmax": 23.451066,
+        "duration_ms_rankmean": 20.90750225,
+        "duration_ms_rankmin": 15.219285,
+        "duration_ms_sum_across_sources": 167.260018,
+        "example_names": [
+          "dsv4.forward.layer6.moe"
+        ],
+        "grid_size_mean": 1052811.4367770243,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer6.moe",
+        "rankmax_source": "86",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2454,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4821138.473802764,
+          "GRBM_GUI_ACTIVE": 4821138.473802764,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 1.9854161517009943,
+          "SQ_BUSY_CU_CYCLES": 142479210.03999904,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 573116899.2766783,
+          "SQ_WAVES": 36406.93053587481
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1055748.4987775062,
+          "GRBM_GUI_ACTIVE": 1055748.4987775062,
+          "MeanOccupancyPerActiveCU": 1.7260313679706605,
+          "SQ_BUSY_CU_CYCLES": 26272048.10961695,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 91161557.43765281,
+          "SQ_WAVES": 16243.712306438469
+        },
+        "duration_ms_mean_per_call": 0.0646779478402608,
+        "duration_ms_rankmax": 22.37585,
+        "duration_ms_rankmean": 19.8399605,
+        "duration_ms_rankmin": 16.475812,
+        "duration_ms_sum_across_sources": 158.719684,
+        "example_names": [
+          "dsv4.forward.layer7.moe"
+        ],
+        "grid_size_mean": 1039597.587612062,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer7.moe",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2285,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 4818324.89265737,
+          "GRBM_GUI_ACTIVE": 4818324.89265737,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.096006017767671,
+          "SQ_BUSY_CU_CYCLES": 142651986.3648301,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 555836962.3577948,
+          "SQ_WAVES": 36064.25284073262
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 965364.6336980306,
+          "GRBM_GUI_ACTIVE": 965364.6336980306,
+          "MeanOccupancyPerActiveCU": 1.819600976805252,
+          "SQ_BUSY_CU_CYCLES": 23555017.82713348,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 78773522.70984682,
+          "SQ_WAVES": 15863.106345733042
+        },
+        "duration_ms_mean_per_call": 0.05846786652078775,
+        "duration_ms_rankmax": 21.123335,
+        "duration_ms_rankmean": 16.699884375,
+        "duration_ms_rankmin": 10.104692,
+        "duration_ms_sum_across_sources": 133.599075,
+        "example_names": [
+          "dsv4.forward.layer11.moe"
+        ],
+        "grid_size_mean": 1015238.8061269147,
+        "lds_block_size_max": 156672,
+        "name": "dsv4.forward.layer11.moe",
+        "rankmax_source": "90",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      }
+    ],
+    "sharedkv_backward": [
+      {
+        "calls": 640,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 1700380924.3254714,
+          "GRBM_GUI_ACTIVE": 1700380924.3254714,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.031263666805107,
+          "SQ_BUSY_CU_CYCLES": 51735412083.49536,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 15680428900.477682,
+          "SQ_WAVES": 277569.9466276421
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 332750309.0828125,
+          "GRBM_GUI_ACTIVE": 332750309.0828125,
+          "MeanOccupancyPerActiveCU": 5.279623115624997,
+          "SQ_BUSY_CU_CYCLES": 10076708180.028126,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 3053453312.0,
+          "SQ_WAVES": 1132608.0
+        },
+        "duration_ms_mean_per_call": 19.0028946984375,
+        "duration_ms_rankmax": 1522.459989,
+        "duration_ms_rankmean": 1520.231575875,
+        "duration_ms_rankmin": 1518.39761,
+        "duration_ms_sum_across_sources": 12161.852607,
+        "example_names": [
+          "sharedkv_bwd.query_recompute"
+        ],
+        "grid_size_mean": 72486912.0,
+        "lds_block_size_max": 0,
+        "name": "sharedkv_bwd.query_recompute",
+        "rankmax_source": "85",
+        "scratch_size_max": 96,
+        "sgpr_count_max": 64,
+        "source_count": 8,
+        "vgpr_count_max": 128,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2240,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 11680456.01997789,
+          "GRBM_GUI_ACTIVE": 11680456.01997789,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 6.91848369112678,
+          "SQ_BUSY_CU_CYCLES": 353354816.6748631,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+          "SQ_WAVES": 1455454.4202297542
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 6162403.522321428,
+          "GRBM_GUI_ACTIVE": 6162403.522321428,
+          "MeanOccupancyPerActiveCU": 6.15047563928572,
+          "SQ_BUSY_CU_CYCLES": 183404729.59107143,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 0.0,
+          "SQ_WAVES": 751332.8571428572
+        },
+        "duration_ms_mean_per_call": 0.39231948660714283,
+        "duration_ms_rankmax": 110.35117,
+        "duration_ms_rankmean": 109.84945625,
+        "duration_ms_rankmin": 109.282348,
+        "duration_ms_sum_across_sources": 878.79565,
+        "example_names": [
+          "sharedkv_bwd.grad_attn_sink"
+        ],
+        "grid_size_mean": 48085302.85714286,
+        "lds_block_size_max": 512,
+        "name": "sharedkv_bwd.grad_attn_sink",
+        "rankmax_source": "90",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 80,
+        "source_count": 8,
+        "vgpr_count_max": 28,
+        "workgroup_size_max": 512
+      }
+    ],
+    "sparse_forward": [
+      {
+        "calls": 2336,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 133344725.64443442,
+          "GRBM_GUI_ACTIVE": 133344725.64443442,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 3.4011890395100473,
+          "SQ_BUSY_CU_CYCLES": 4202313651.110776,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5235274212.902189,
+          "SQ_WAVES": 539260.9285899011
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 4257634.568065069,
+          "GRBM_GUI_ACTIVE": 4257634.568065069,
+          "MeanOccupancyPerActiveCU": 3.7000239648972566,
+          "SQ_BUSY_CU_CYCLES": 128581003.1656678,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+          "SQ_WAVES": 142680.5205479452
+        },
+        "duration_ms_mean_per_call": 0.26297601113013697,
+        "duration_ms_rankmax": 78.198563,
+        "duration_ms_rankmean": 76.78899525,
+        "duration_ms_rankmin": 76.198278,
+        "duration_ms_sum_across_sources": 614.311962,
+        "example_names": [
+          "dsv4.forward.layer10.attention.sparse_mla_shared_kv.cr4"
+        ],
+        "grid_size_mean": 9131553.315068493,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer10.attention.sparse_mla_shared_kv.cr4",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2336,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 132869764.40493096,
+          "GRBM_GUI_ACTIVE": 132869764.40493096,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 3.4161108009114516,
+          "SQ_BUSY_CU_CYCLES": 4186110919.9459977,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5206632069.063685,
+          "SQ_WAVES": 545697.0500053907
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 4253090.576626712,
+          "GRBM_GUI_ACTIVE": 4253090.576626712,
+          "MeanOccupancyPerActiveCU": 3.70194683989726,
+          "SQ_BUSY_CU_CYCLES": 128441962.61900684,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+          "SQ_WAVES": 142680.5205479452
+        },
+        "duration_ms_mean_per_call": 0.2626621438356164,
+        "duration_ms_rankmax": 78.1348,
+        "duration_ms_rankmean": 76.697346,
+        "duration_ms_rankmin": 75.722965,
+        "duration_ms_sum_across_sources": 613.578768,
+        "example_names": [
+          "dsv4.forward.layer8.attention.sparse_mla_shared_kv.cr4"
+        ],
+        "grid_size_mean": 9131553.315068493,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer8.attention.sparse_mla_shared_kv.cr4",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2336,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 132465112.58438143,
+          "GRBM_GUI_ACTIVE": 132465112.58438143,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 3.42825609598166,
+          "SQ_BUSY_CU_CYCLES": 4175465793.8457203,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5197173516.503768,
+          "SQ_WAVES": 550156.3755849275
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 4237823.633133561,
+          "GRBM_GUI_ACTIVE": 4237823.633133561,
+          "MeanOccupancyPerActiveCU": 3.701592402397267,
+          "SQ_BUSY_CU_CYCLES": 128003655.78253424,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+          "SQ_WAVES": 142680.5205479452
+        },
+        "duration_ms_mean_per_call": 0.26260635744863015,
+        "duration_ms_rankmax": 77.979237,
+        "duration_ms_rankmean": 76.681056375,
+        "duration_ms_rankmin": 75.89982,
+        "duration_ms_sum_across_sources": 613.448451,
+        "example_names": [
+          "dsv4.forward.layer2.attention.sparse_mla_shared_kv.cr4"
+        ],
+        "grid_size_mean": 9131553.315068493,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer2.attention.sparse_mla_shared_kv.cr4",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2336,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 133038696.62043552,
+          "GRBM_GUI_ACTIVE": 133038696.62043552,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 3.419283210209063,
+          "SQ_BUSY_CU_CYCLES": 4189825841.66052,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5214747289.269413,
+          "SQ_WAVES": 546914.1944437977
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 4245159.851883561,
+          "GRBM_GUI_ACTIVE": 4245159.851883561,
+          "MeanOccupancyPerActiveCU": 3.702661986301376,
+          "SQ_BUSY_CU_CYCLES": 128136318.86001712,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+          "SQ_WAVES": 142680.5205479452
+        },
+        "duration_ms_mean_per_call": 0.2625920946061644,
+        "duration_ms_rankmax": 77.953927,
+        "duration_ms_rankmean": 76.676891625,
+        "duration_ms_rankmin": 75.689857,
+        "duration_ms_sum_across_sources": 613.415133,
+        "example_names": [
+          "dsv4.forward.layer4.attention.sparse_mla_shared_kv.cr4"
+        ],
+        "grid_size_mean": 9131553.315068493,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer4.attention.sparse_mla_shared_kv.cr4",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2336,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 132790377.22882529,
+          "GRBM_GUI_ACTIVE": 132790377.22882529,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 3.427583719060335,
+          "SQ_BUSY_CU_CYCLES": 4186534365.3397784,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 5203625821.178182,
+          "SQ_WAVES": 548513.6972552881
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 4245042.350171233,
+          "GRBM_GUI_ACTIVE": 4245042.350171233,
+          "MeanOccupancyPerActiveCU": 3.7008014203767123,
+          "SQ_BUSY_CU_CYCLES": 128237279.61429794,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 132954588.93150684,
+          "SQ_WAVES": 142680.5205479452
+        },
+        "duration_ms_mean_per_call": 0.26235953381849314,
+        "duration_ms_rankmax": 77.888238,
+        "duration_ms_rankmean": 76.608983875,
+        "duration_ms_rankmin": 75.894573,
+        "duration_ms_sum_across_sources": 612.871871,
+        "example_names": [
+          "dsv4.forward.layer6.attention.sparse_mla_shared_kv.cr4"
+        ],
+        "grid_size_mean": 9131553.315068493,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer6.attention.sparse_mla_shared_kv.cr4",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2144,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52877042.68791951,
+          "GRBM_GUI_ACTIVE": 52877042.68791951,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3073688630543305,
+          "SQ_BUSY_CU_CYCLES": 1656473937.4086123,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1929056313.8704972,
+          "SQ_WAVES": 208427.41064891784
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1508971.234141791,
+          "GRBM_GUI_ACTIVE": 1508971.234141791,
+          "MeanOccupancyPerActiveCU": 2.2078793871268623,
+          "SQ_BUSY_CU_CYCLES": 41378573.719682835,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+          "SQ_WAVES": 14832.298507462687
+        },
+        "duration_ms_mean_per_call": 0.08895535494402985,
+        "duration_ms_rankmax": 25.026462,
+        "duration_ms_rankmean": 23.840035125,
+        "duration_ms_rankmin": 23.238753,
+        "duration_ms_sum_across_sources": 190.720281,
+        "example_names": [
+          "dsv4.forward.layer11.attention.sparse_mla_shared_kv.cr128"
+        ],
+        "grid_size_mean": 949267.104477612,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer11.attention.sparse_mla_shared_kv.cr128",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2144,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52593237.5097322,
+          "GRBM_GUI_ACTIVE": 52593237.5097322,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.3021973259352255,
+          "SQ_BUSY_CU_CYCLES": 1648707238.8847933,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1920044337.9895723,
+          "SQ_WAVES": 206815.41919168172
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1512163.7737873134,
+          "GRBM_GUI_ACTIVE": 1512163.7737873134,
+          "MeanOccupancyPerActiveCU": 2.208294514458955,
+          "SQ_BUSY_CU_CYCLES": 41719802.59841418,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+          "SQ_WAVES": 14832.298507462687
+        },
+        "duration_ms_mean_per_call": 0.08878256623134329,
+        "duration_ms_rankmax": 24.736252,
+        "duration_ms_rankmean": 23.79372775,
+        "duration_ms_rankmin": 23.131783,
+        "duration_ms_sum_across_sources": 190.349822,
+        "example_names": [
+          "dsv4.forward.layer7.attention.sparse_mla_shared_kv.cr128"
+        ],
+        "grid_size_mean": 949267.104477612,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer7.attention.sparse_mla_shared_kv.cr128",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2144,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52416087.14803012,
+          "GRBM_GUI_ACTIVE": 52416087.14803012,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.299094897357274,
+          "SQ_BUSY_CU_CYCLES": 1642675815.3968828,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1916089703.2928276,
+          "SQ_WAVES": 205963.26275539887
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1517558.0391791044,
+          "GRBM_GUI_ACTIVE": 1517558.0391791044,
+          "MeanOccupancyPerActiveCU": 2.208708934235078,
+          "SQ_BUSY_CU_CYCLES": 41886617.046175376,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+          "SQ_WAVES": 14832.298507462687
+        },
+        "duration_ms_mean_per_call": 0.08905596688432836,
+        "duration_ms_rankmax": 24.478927,
+        "duration_ms_rankmean": 23.866999125,
+        "duration_ms_rankmin": 23.248757,
+        "duration_ms_sum_across_sources": 190.935993,
+        "example_names": [
+          "dsv4.forward.layer5.attention.sparse_mla_shared_kv.cr128"
+        ],
+        "grid_size_mean": 949267.104477612,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer5.attention.sparse_mla_shared_kv.cr128",
+        "rankmax_source": "87",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2144,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52406417.430254534,
+          "GRBM_GUI_ACTIVE": 52406417.430254534,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.2988210428665843,
+          "SQ_BUSY_CU_CYCLES": 1644445249.643713,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1915484665.6224809,
+          "SQ_WAVES": 205867.45650991524
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1516778.739738806,
+          "GRBM_GUI_ACTIVE": 1516778.739738806,
+          "MeanOccupancyPerActiveCU": 2.2086524272388086,
+          "SQ_BUSY_CU_CYCLES": 41906389.25746269,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+          "SQ_WAVES": 14832.298507462687
+        },
+        "duration_ms_mean_per_call": 0.08857928078358208,
+        "duration_ms_rankmax": 24.472161,
+        "duration_ms_rankmean": 23.73924725,
+        "duration_ms_rankmin": 23.044106,
+        "duration_ms_sum_across_sources": 189.913978,
+        "example_names": [
+          "dsv4.forward.layer3.attention.sparse_mla_shared_kv.cr128"
+        ],
+        "grid_size_mean": 949267.104477612,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer3.attention.sparse_mla_shared_kv.cr128",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      },
+      {
+        "calls": 2144,
+        "counter_duration_weighted_means": {
+          "GRBM_COUNT": 52513234.757698074,
+          "GRBM_GUI_ACTIVE": 52513234.757698074,
+          "GRBM_GUI_ACTIVE_RATIO": 1.0,
+          "MeanOccupancyPerActiveCU": 2.300757166819346,
+          "SQ_BUSY_CU_CYCLES": 1644836769.2992353,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 1916899636.69419,
+          "SQ_WAVES": 206235.5745105591
+        },
+        "counter_unweighted_means_per_dispatch": {
+          "GRBM_COUNT": 1516457.1515858208,
+          "GRBM_GUI_ACTIVE": 1516457.1515858208,
+          "MeanOccupancyPerActiveCU": 2.2084228838619464,
+          "SQ_BUSY_CU_CYCLES": 41836837.04011194,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 52840600.8358209,
+          "SQ_WAVES": 14832.298507462687
+        },
+        "duration_ms_mean_per_call": 0.08885290298507463,
+        "duration_ms_rankmax": 24.443568,
+        "duration_ms_rankmean": 23.812578000000002,
+        "duration_ms_rankmin": 22.953866,
+        "duration_ms_sum_across_sources": 190.500624,
+        "example_names": [
+          "dsv4.forward.layer9.attention.sparse_mla_shared_kv.cr128"
+        ],
+        "grid_size_mean": 949267.104477612,
+        "lds_block_size_max": 135168,
+        "name": "dsv4.forward.layer9.attention.sparse_mla_shared_kv.cr128",
+        "rankmax_source": "85",
+        "scratch_size_max": 0,
+        "sgpr_count_max": 112,
+        "source_count": 8,
+        "vgpr_count_max": 256,
+        "workgroup_size_max": 512
+      }
+    ]
+  }
+}

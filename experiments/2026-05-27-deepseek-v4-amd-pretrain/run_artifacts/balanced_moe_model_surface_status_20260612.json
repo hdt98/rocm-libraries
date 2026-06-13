@@ -1,0 +1,42 @@
+{
+  "artifact": "balanced_moe_model_surface_status_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Source-inspection coverage for balanced-MoE retained throughput model surfaces.",
+  "command": "python3 tools/check_balanced_moe_model_surfaces.py --allow-missing kimi_k2_6_reduced_6layer",
+  "read": "DeepSeek and Qwen have real TorchTitan model/config surfaces. Kimi remains a missing training surface; route-shape ABI parity is not a throughput substitute.",
+  "surfaces": {
+    "deepseek_v4_flash_12layer": {
+      "status": "present",
+      "module": "deepseek_v4",
+      "config_function": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+      "flavor": "flash_12layer_ceiling_probe",
+      "topology": "12 layers, 256 experts, top-k 6, DSv4 Flash MLA"
+    },
+    "qwen3_5_397b_a17b_reduced_8layer": {
+      "status": "present",
+      "module": "qwen3",
+      "config_function": "qwen3_5_397b_a17b_reduced_8layer_hothelper_gate",
+      "flavor": "397B-A17B-reduced-8layer",
+      "topology": "8 layers, 512 experts, top-k 10 plus one shared expert"
+    },
+    "kimi_k2_6_reduced_6layer": {
+      "status": "missing",
+      "module": "kimi_k2",
+      "config_function": "kimi_k2_6_reduced_6layer_hothelper_gate",
+      "flavor": "kimi-k2-6-reduced-6layer",
+      "topology": "6 layers, 384 experts, top-k 8 plus one shared expert, MLA, native hidden 7168 with 4096 fallback",
+      "missing_checks": [
+        "module_dir_exists",
+        "module_listed_in_torchtitan_models",
+        "config_registry_exists",
+        "config_function_exists",
+        "flavor_exists"
+      ],
+      "required_next_action": "Add a real reduced Kimi TorchTitan training model/config surface, then run the 20-step no-helper versus top-8 helper ladder."
+    }
+  },
+  "allowed_missing": [
+    "kimi_k2_6_reduced_6layer"
+  ],
+  "unallowed_missing": []
+}

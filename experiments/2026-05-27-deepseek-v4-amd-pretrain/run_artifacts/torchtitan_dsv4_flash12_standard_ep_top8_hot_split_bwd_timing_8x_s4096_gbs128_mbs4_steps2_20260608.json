@@ -1,0 +1,902 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_hot_split_bwd_timing_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "moe_force_load_balance": false
+  },
+  "purpose": "Measure missing standard-EP hot-helper backward spans around the retained top-8 helper-execute layout after expert-Muon was rejected as an e2e promotion path.",
+  "source_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "env_flag": "TORCHTITAN_STANDARD_EP_HOT_SPLIT_BACKWARD_TIMING / CANARY_STANDARD_EP_HOT_SPLIT_BACKWARD_TIMING",
+    "spans": {
+      "scatter_to_remote_y": "Autograd span from final token scatter output back to remote_y, including weighted scatter/inverse-order backward path.",
+      "helper_mlp_vjp_to_sorted_x": "Autograd span from remote_y back to sorted_x through helper grouped W2, SwiGLU, W1, and W3 VJP."
+    }
+  },
+  "run_result": {
+    "result": "completed_two_step_timing_profile_not_throughput_baseline",
+    "step_metrics": {
+      "1": {
+        "tokens_per_gpu_s_min": 1619,
+        "tokens_per_gpu_s_max": 1623,
+        "tflops_per_gpu_min": 81.97,
+        "tflops_per_gpu_max": 82.2,
+        "memory_gib_min": 153.57,
+        "memory_gib_max": 155.71,
+        "loss": 12.17417,
+        "grad_norm": 19.625,
+        "mfu_pct_min": 3.55,
+        "mfu_pct_max": 3.56,
+        "rank_records": 8
+      },
+      "2": {
+        "tokens_per_gpu_s_min": 7547,
+        "tokens_per_gpu_s_max": 7547,
+        "tflops_per_gpu_min": 382.11,
+        "tflops_per_gpu_max": 382.12,
+        "memory_gib_min": 190.84,
+        "memory_gib_max": 194.17,
+        "loss": 9.32562,
+        "grad_norm": 56.5,
+        "mfu_pct_min": 16.54,
+        "mfu_pct_max": 16.54,
+        "rank_records": 8
+      }
+    },
+    "profile_jsonl_files": 8,
+    "profile_records": 8512,
+    "raw_log": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hot_split_bwd_timing_8x_s4096_gbs128_mbs4_steps2_20260608.docker-run.log",
+    "profile_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hot_split_bwd_timing_8x_s4096_gbs128_mbs4_steps2_20260608.profile_timing/torchtitan_dsv4_flash12_standard_ep_top8_hot_split_bwd_timing_8x_s4096_gbs128_mbs4_steps2_20260608",
+    "structured_log_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hot_split_bwd_timing_8x_s4096_gbs128_mbs4_steps2_20260608.structured_logs/structured_logs"
+  },
+  "profile_windows": {
+    "call_id_gt_432_late_window_matches_prior_stage_timing_convention": {
+      "key_stage_rankmax_ms": {
+        "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": {
+          "rankmax_ms": 371.731,
+          "rankmax_rank": 2,
+          "rankmean_ms": 359.956,
+          "rankmin_ms": 348.95,
+          "rank_records_total": 480
+        },
+        "standard_ep.hot_split.backward.scatter_to_remote_y": {
+          "rankmax_ms": 115.743,
+          "rankmax_rank": 2,
+          "rankmean_ms": 112.524,
+          "rankmin_ms": 109.322,
+          "rank_records_total": 480
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "rankmax_ms": 175.259,
+          "rankmax_rank": 7,
+          "rankmean_ms": 171.424,
+          "rankmin_ms": 165.327,
+          "rank_records_total": 440
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "rankmax_ms": 114.718,
+          "rankmax_rank": 3,
+          "rankmean_ms": 105.562,
+          "rankmin_ms": 93.657,
+          "rank_records_total": 440
+        },
+        "standard_ep.hot_split.grouped_w1": {
+          "rankmax_ms": 56.268,
+          "rankmax_rank": 5,
+          "rankmean_ms": 53.973,
+          "rankmin_ms": 49.019,
+          "rank_records_total": 440
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "rankmax_ms": 54.804,
+          "rankmax_rank": 5,
+          "rankmean_ms": 52.476,
+          "rankmin_ms": 49.592,
+          "rank_records_total": 440
+        },
+        "standard_ep.hot_split.grouped_w3": {
+          "rankmax_ms": 50.433,
+          "rankmax_rank": 1,
+          "rankmean_ms": 48.556,
+          "rankmin_ms": 44.245,
+          "rank_records_total": 440
+        },
+        "standard_ep.combine.weighted_scatter_add": {
+          "rankmax_ms": 324.676,
+          "rankmax_rank": 4,
+          "rankmean_ms": 294.297,
+          "rankmin_ms": 265.185,
+          "rank_records_total": 432
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "rankmax_ms": 108.637,
+          "rankmax_rank": 7,
+          "rankmean_ms": 83.082,
+          "rankmin_ms": 31.871,
+          "rank_records_total": 432
+        },
+        "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 44.815,
+          "rankmax_rank": 2,
+          "rankmean_ms": 43.817,
+          "rankmin_ms": 43.168,
+          "rank_records_total": 480
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 44.001,
+          "rankmax_rank": 2,
+          "rankmean_ms": 43.462,
+          "rankmin_ms": 43.196,
+          "rank_records_total": 480
+        },
+        "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 121.854,
+          "rankmax_rank": 4,
+          "rankmean_ms": 107.637,
+          "rankmin_ms": 93.012,
+          "rank_records_total": 480
+        }
+      },
+      "kind_counts": {
+        "standard_ep_hot_weight": 2752,
+        "standard_ep_hot_split": 440,
+        "standard_ep_dispatch": 432,
+        "standard_ep_combine": 432,
+        "chunked_ce_loss": 40,
+        "standard_ep_hot_split_backward": 960
+      },
+      "top_rankmax_stages": [
+        {
+          "stage": "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x",
+          "rankmax_ms": 371.731,
+          "rankmax_rank": 2,
+          "rankmean_ms": 359.956,
+          "rankmin_ms": 348.95,
+          "rank_records_total": 480
+        },
+        {
+          "stage": "standard_ep.combine.weighted_scatter_add",
+          "rankmax_ms": 324.676,
+          "rankmax_rank": 4,
+          "rankmean_ms": 294.297,
+          "rankmin_ms": 265.185,
+          "rank_records_total": 432
+        },
+        {
+          "stage": "standard_ep.hot_split.broadcast_hot_weights",
+          "rankmax_ms": 175.259,
+          "rankmax_rank": 7,
+          "rankmean_ms": 171.424,
+          "rankmin_ms": 165.327,
+          "rank_records_total": 440
+        },
+        {
+          "stage": "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 121.854,
+          "rankmax_rank": 4,
+          "rankmean_ms": 107.637,
+          "rankmin_ms": 93.012,
+          "rank_records_total": 480
+        },
+        {
+          "stage": "standard_ep.hot_split.backward.scatter_to_remote_y",
+          "rankmax_ms": 115.743,
+          "rankmax_rank": 2,
+          "rankmean_ms": 112.524,
+          "rankmin_ms": 109.322,
+          "rank_records_total": 480
+        },
+        {
+          "stage": "standard_ep.hot_split.weighted_scatter_tokens",
+          "rankmax_ms": 114.718,
+          "rankmax_rank": 3,
+          "rankmean_ms": 105.562,
+          "rankmin_ms": 93.657,
+          "rank_records_total": 440
+        },
+        {
+          "stage": "standard_ep.dispatch.count_all_to_all",
+          "rankmax_ms": 108.637,
+          "rankmax_rank": 7,
+          "rankmean_ms": 83.082,
+          "rankmin_ms": 31.871,
+          "rank_records_total": 432
+        },
+        {
+          "stage": "standard_ep.dispatch.permute",
+          "rankmax_ms": 88.204,
+          "rankmax_rank": 1,
+          "rankmean_ms": 84.757,
+          "rankmin_ms": 81.978,
+          "rank_records_total": 432
+        },
+        {
+          "stage": "dsv4.loss.chunk_7.backward",
+          "rankmax_ms": 87.286,
+          "rankmax_rank": 3,
+          "rankmean_ms": 79.236,
+          "rankmin_ms": 62.084,
+          "rank_records_total": 40
+        },
+        {
+          "stage": "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight",
+          "rankmax_ms": 70.123,
+          "rankmax_rank": 7,
+          "rankmean_ms": 65.864,
+          "rankmin_ms": 59.493,
+          "rank_records_total": 432
+        },
+        {
+          "stage": "standard_ep.combine.unpermute",
+          "rankmax_ms": 57.344,
+          "rankmax_rank": 1,
+          "rankmean_ms": 50.686,
+          "rankmin_ms": 44.441,
+          "rank_records_total": 432
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w1",
+          "rankmax_ms": 56.268,
+          "rankmax_rank": 5,
+          "rankmean_ms": 53.973,
+          "rankmin_ms": 49.019,
+          "rank_records_total": 440
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w2",
+          "rankmax_ms": 54.804,
+          "rankmax_rank": 5,
+          "rankmean_ms": 52.476,
+          "rankmin_ms": 49.592,
+          "rank_records_total": 440
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w3",
+          "rankmax_ms": 50.433,
+          "rankmax_rank": 1,
+          "rankmean_ms": 48.556,
+          "rankmin_ms": 44.245,
+          "rank_records_total": 440
+        },
+        {
+          "stage": "dsv4.loss.chunk_0.lm_head_forward",
+          "rankmax_ms": 48.666,
+          "rankmax_rank": 4,
+          "rankmean_ms": 35.0,
+          "rankmin_ms": 24.914,
+          "rank_records_total": 40
+        },
+        {
+          "stage": "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 44.815,
+          "rankmax_rank": 2,
+          "rankmean_ms": 43.817,
+          "rankmin_ms": 43.168,
+          "rank_records_total": 480
+        },
+        {
+          "stage": "dsv4.loss.chunk_1.backward",
+          "rankmax_ms": 44.207,
+          "rankmax_rank": 1,
+          "rankmean_ms": 40.445,
+          "rankmin_ms": 39.006,
+          "rank_records_total": 40
+        },
+        {
+          "stage": "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 44.001,
+          "rankmax_rank": 2,
+          "rankmean_ms": 43.462,
+          "rankmin_ms": 43.196,
+          "rank_records_total": 480
+        },
+        {
+          "stage": "dsv4.loss.chunk_0.backward",
+          "rankmax_ms": 41.189,
+          "rankmax_rank": 1,
+          "rankmean_ms": 39.425,
+          "rankmin_ms": 38.216,
+          "rank_records_total": 40
+        },
+        {
+          "stage": "standard_ep_hot_weight.w3.forward.all_reduce_hot_weight",
+          "rankmax_ms": 40.5,
+          "rankmax_rank": 2,
+          "rankmean_ms": 39.888,
+          "rankmin_ms": 39.509,
+          "rank_records_total": 440
+        }
+      ]
+    },
+    "call_id_gt_576_step2_ish_window": {
+      "key_stage_rankmax_ms": {
+        "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": {
+          "rankmax_ms": 334.019,
+          "rankmax_rank": 2,
+          "rankmean_ms": 322.341,
+          "rankmin_ms": 312.184,
+          "rank_records_total": 384
+        },
+        "standard_ep.hot_split.backward.scatter_to_remote_y": {
+          "rankmax_ms": 105.546,
+          "rankmax_rank": 2,
+          "rankmean_ms": 102.087,
+          "rankmin_ms": 99.617,
+          "rank_records_total": 384
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "rankmax_ms": 135.13,
+          "rankmax_rank": 7,
+          "rankmean_ms": 131.129,
+          "rankmin_ms": 124.97,
+          "rank_records_total": 328
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "rankmax_ms": 103.718,
+          "rankmax_rank": 3,
+          "rankmean_ms": 94.637,
+          "rankmin_ms": 82.356,
+          "rank_records_total": 328
+        },
+        "standard_ep.hot_split.grouped_w1": {
+          "rankmax_ms": 45.4,
+          "rankmax_rank": 0,
+          "rankmean_ms": 43.472,
+          "rankmin_ms": 38.595,
+          "rank_records_total": 328
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "rankmax_ms": 45.83,
+          "rankmax_rank": 5,
+          "rankmean_ms": 43.94,
+          "rankmin_ms": 40.777,
+          "rank_records_total": 328
+        },
+        "standard_ep.hot_split.grouped_w3": {
+          "rankmax_ms": 42.408,
+          "rankmax_rank": 7,
+          "rankmean_ms": 40.49,
+          "rankmin_ms": 36.065,
+          "rank_records_total": 328
+        },
+        "standard_ep.combine.weighted_scatter_add": {
+          "rankmax_ms": 245.263,
+          "rankmax_rank": 4,
+          "rankmean_ms": 221.478,
+          "rankmin_ms": 195.807,
+          "rank_records_total": 320
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "rankmax_ms": 92.482,
+          "rankmax_rank": 2,
+          "rankmean_ms": 69.808,
+          "rankmin_ms": 30.607,
+          "rank_records_total": 320
+        },
+        "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 35.777,
+          "rankmax_rank": 2,
+          "rankmean_ms": 34.958,
+          "rankmin_ms": 34.417,
+          "rank_records_total": 384
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 35.237,
+          "rankmax_rank": 2,
+          "rankmean_ms": 34.798,
+          "rankmin_ms": 34.616,
+          "rank_records_total": 384
+        },
+        "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 105.573,
+          "rankmax_rank": 4,
+          "rankmean_ms": 91.966,
+          "rankmin_ms": 78.736,
+          "rank_records_total": 384
+        }
+      },
+      "kind_counts": {
+        "standard_ep_hot_weight": 2136,
+        "standard_ep_hot_split": 328,
+        "standard_ep_dispatch": 320,
+        "standard_ep_combine": 320,
+        "chunked_ce_loss": 32,
+        "standard_ep_hot_split_backward": 768
+      },
+      "top_rankmax_stages": [
+        {
+          "stage": "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x",
+          "rankmax_ms": 334.019,
+          "rankmax_rank": 2,
+          "rankmean_ms": 322.341,
+          "rankmin_ms": 312.184,
+          "rank_records_total": 384
+        },
+        {
+          "stage": "standard_ep.combine.weighted_scatter_add",
+          "rankmax_ms": 245.263,
+          "rankmax_rank": 4,
+          "rankmean_ms": 221.478,
+          "rankmin_ms": 195.807,
+          "rank_records_total": 320
+        },
+        {
+          "stage": "standard_ep.hot_split.broadcast_hot_weights",
+          "rankmax_ms": 135.13,
+          "rankmax_rank": 7,
+          "rankmean_ms": 131.129,
+          "rankmin_ms": 124.97,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 105.573,
+          "rankmax_rank": 4,
+          "rankmean_ms": 91.966,
+          "rankmin_ms": 78.736,
+          "rank_records_total": 384
+        },
+        {
+          "stage": "standard_ep.hot_split.backward.scatter_to_remote_y",
+          "rankmax_ms": 105.546,
+          "rankmax_rank": 2,
+          "rankmean_ms": 102.087,
+          "rankmin_ms": 99.617,
+          "rank_records_total": 384
+        },
+        {
+          "stage": "standard_ep.hot_split.weighted_scatter_tokens",
+          "rankmax_ms": 103.718,
+          "rankmax_rank": 3,
+          "rankmean_ms": 94.637,
+          "rankmin_ms": 82.356,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "standard_ep.dispatch.count_all_to_all",
+          "rankmax_ms": 92.482,
+          "rankmax_rank": 2,
+          "rankmean_ms": 69.808,
+          "rankmin_ms": 30.607,
+          "rank_records_total": 320
+        },
+        {
+          "stage": "dsv4.loss.chunk_7.backward",
+          "rankmax_ms": 72.395,
+          "rankmax_rank": 3,
+          "rankmean_ms": 64.498,
+          "rankmin_ms": 49.73,
+          "rank_records_total": 32
+        },
+        {
+          "stage": "standard_ep.dispatch.permute",
+          "rankmax_ms": 62.586,
+          "rankmax_rank": 1,
+          "rankmean_ms": 59.139,
+          "rankmin_ms": 56.94,
+          "rank_records_total": 320
+        },
+        {
+          "stage": "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight",
+          "rankmax_ms": 57.269,
+          "rankmax_rank": 7,
+          "rankmean_ms": 52.893,
+          "rankmin_ms": 46.506,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w2",
+          "rankmax_ms": 45.83,
+          "rankmax_rank": 5,
+          "rankmean_ms": 43.94,
+          "rankmin_ms": 40.777,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w1",
+          "rankmax_ms": 45.4,
+          "rankmax_rank": 0,
+          "rankmean_ms": 43.472,
+          "rankmin_ms": 38.595,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "dsv4.loss.chunk_0.lm_head_forward",
+          "rankmax_ms": 43.567,
+          "rankmax_rank": 4,
+          "rankmean_ms": 29.679,
+          "rankmin_ms": 19.766,
+          "rank_records_total": 32
+        },
+        {
+          "stage": "standard_ep.combine.unpermute",
+          "rankmax_ms": 42.465,
+          "rankmax_rank": 1,
+          "rankmean_ms": 36.227,
+          "rankmin_ms": 31.093,
+          "rank_records_total": 320
+        },
+        {
+          "stage": "standard_ep.hot_split.grouped_w3",
+          "rankmax_ms": 42.408,
+          "rankmax_rank": 7,
+          "rankmean_ms": 40.49,
+          "rankmin_ms": 36.065,
+          "rank_records_total": 328
+        },
+        {
+          "stage": "dsv4.loss.chunk_1.backward",
+          "rankmax_ms": 37.619,
+          "rankmax_rank": 1,
+          "rankmean_ms": 34.097,
+          "rankmin_ms": 32.739,
+          "rank_records_total": 32
+        },
+        {
+          "stage": "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 35.777,
+          "rankmax_rank": 2,
+          "rankmean_ms": 34.958,
+          "rankmin_ms": 34.417,
+          "rank_records_total": 384
+        },
+        {
+          "stage": "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight",
+          "rankmax_ms": 35.237,
+          "rankmax_rank": 2,
+          "rankmean_ms": 34.798,
+          "rankmin_ms": 34.616,
+          "rank_records_total": 384
+        },
+        {
+          "stage": "dsv4.loss.chunk_0.backward",
+          "rankmax_ms": 34.914,
+          "rankmax_rank": 1,
+          "rankmean_ms": 33.31,
+          "rankmin_ms": 32.028,
+          "rank_records_total": 32
+        },
+        {
+          "stage": "standard_ep_hot_weight.w3.forward.all_reduce_hot_weight",
+          "rankmax_ms": 30.318,
+          "rankmax_rank": 2,
+          "rankmean_ms": 29.86,
+          "rankmin_ms": 29.53,
+          "rank_records_total": 328
+        }
+      ]
+    },
+    "call_id_gt_720_late_step2_partial_window": {
+      "key_stage_rankmax_ms": {
+        "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": {
+          "rankmax_ms": 249.701,
+          "rankmax_rank": 5,
+          "rankmean_ms": 241.43,
+          "rankmin_ms": 233.806,
+          "rank_records_total": 288
+        },
+        "standard_ep.hot_split.backward.scatter_to_remote_y": {
+          "rankmax_ms": 79.551,
+          "rankmax_rank": 2,
+          "rankmean_ms": 76.776,
+          "rankmin_ms": 74.929,
+          "rank_records_total": 288
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "rankmax_ms": 84.767,
+          "rankmax_rank": 2,
+          "rankmean_ms": 82.77,
+          "rankmin_ms": 79.65,
+          "rank_records_total": 216
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "rankmax_ms": 38.643,
+          "rankmax_rank": 2,
+          "rankmean_ms": 37.001,
+          "rankmin_ms": 35.687,
+          "rank_records_total": 216
+        },
+        "standard_ep.hot_split.grouped_w1": {
+          "rankmax_ms": 28.931,
+          "rankmax_rank": 1,
+          "rankmean_ms": 27.23,
+          "rankmin_ms": 25.513,
+          "rank_records_total": 216
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "rankmax_ms": 26.571,
+          "rankmax_rank": 2,
+          "rankmean_ms": 25.543,
+          "rankmin_ms": 24.735,
+          "rank_records_total": 216
+        },
+        "standard_ep.hot_split.grouped_w3": {
+          "rankmax_ms": 25.306,
+          "rankmax_rank": 2,
+          "rankmean_ms": 24.278,
+          "rankmin_ms": 23.35,
+          "rank_records_total": 216
+        },
+        "standard_ep.combine.weighted_scatter_add": {
+          "rankmax_ms": 142.967,
+          "rankmax_rank": 4,
+          "rankmean_ms": 131.377,
+          "rankmin_ms": 115.185,
+          "rank_records_total": 216
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "rankmax_ms": 41.671,
+          "rankmax_rank": 6,
+          "rankmean_ms": 30.395,
+          "rankmin_ms": 7.678,
+          "rank_records_total": 208
+        },
+        "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 26.859,
+          "rankmax_rank": 2,
+          "rankmean_ms": 26.2,
+          "rankmin_ms": 25.798,
+          "rank_records_total": 288
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 26.443,
+          "rankmax_rank": 2,
+          "rankmean_ms": 26.048,
+          "rankmin_ms": 25.934,
+          "rank_records_total": 288
+        },
+        "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 77.427,
+          "rankmax_rank": 4,
+          "rankmean_ms": 67.285,
+          "rankmin_ms": 57.074,
+          "rank_records_total": 288
+        }
+      }
+    },
+    "call_id_gt_864_last_microbatches_window": {
+      "key_stage_rankmax_ms": {
+        "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": {
+          "rankmax_ms": 167.279,
+          "rankmax_rank": 5,
+          "rankmean_ms": 161.074,
+          "rankmin_ms": 155.692,
+          "rank_records_total": 192
+        },
+        "standard_ep.hot_split.backward.scatter_to_remote_y": {
+          "rankmax_ms": 53.327,
+          "rankmax_rank": 2,
+          "rankmean_ms": 51.269,
+          "rankmin_ms": 49.888,
+          "rank_records_total": 192
+        },
+        "standard_ep.hot_split.broadcast_hot_weights": {
+          "rankmax_ms": 40.912,
+          "rankmax_rank": 2,
+          "rankmean_ms": 39.98,
+          "rankmin_ms": 38.558,
+          "rank_records_total": 104
+        },
+        "standard_ep.hot_split.weighted_scatter_tokens": {
+          "rankmax_ms": 18.617,
+          "rankmax_rank": 2,
+          "rankmean_ms": 17.761,
+          "rankmin_ms": 17.142,
+          "rank_records_total": 104
+        },
+        "standard_ep.hot_split.grouped_w1": {
+          "rankmax_ms": 13.853,
+          "rankmax_rank": 1,
+          "rankmean_ms": 13.074,
+          "rankmin_ms": 12.061,
+          "rank_records_total": 104
+        },
+        "standard_ep.hot_split.grouped_w2": {
+          "rankmax_ms": 12.898,
+          "rankmax_rank": 5,
+          "rankmean_ms": 12.343,
+          "rankmin_ms": 11.641,
+          "rank_records_total": 104
+        },
+        "standard_ep.hot_split.grouped_w3": {
+          "rankmax_ms": 12.039,
+          "rankmax_rank": 7,
+          "rankmean_ms": 11.669,
+          "rankmin_ms": 11.085,
+          "rank_records_total": 104
+        },
+        "standard_ep.combine.weighted_scatter_add": {
+          "rankmax_ms": 70.727,
+          "rankmax_rank": 0,
+          "rankmean_ms": 64.043,
+          "rankmin_ms": 55.012,
+          "rank_records_total": 104
+        },
+        "standard_ep.dispatch.count_all_to_all": {
+          "rankmax_ms": 19.046,
+          "rankmax_rank": 6,
+          "rankmean_ms": 14.151,
+          "rankmin_ms": 4.784,
+          "rank_records_total": 104
+        },
+        "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 17.887,
+          "rankmax_rank": 2,
+          "rankmean_ms": 17.451,
+          "rankmin_ms": 17.16,
+          "rank_records_total": 192
+        },
+        "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 17.617,
+          "rankmax_rank": 2,
+          "rankmean_ms": 17.366,
+          "rankmin_ms": 17.266,
+          "rank_records_total": 192
+        },
+        "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": {
+          "rankmax_ms": 51.903,
+          "rankmax_rank": 4,
+          "rankmean_ms": 44.381,
+          "rankmin_ms": 36.502,
+          "rank_records_total": 192
+        }
+      }
+    }
+  },
+  "remote_row_read": {
+    "call_id_gt_576_remote_rows_by_rank": [
+      {
+        "rank": 0,
+        "records": 137,
+        "min": 20315,
+        "max": 59298,
+        "mean": 40608.3
+      },
+      {
+        "rank": 1,
+        "records": 137,
+        "min": 21704,
+        "max": 51808,
+        "mean": 39628.7
+      },
+      {
+        "rank": 2,
+        "records": 137,
+        "min": 23408,
+        "max": 67542,
+        "mean": 43051.5
+      },
+      {
+        "rank": 3,
+        "records": 137,
+        "min": 21193,
+        "max": 66770,
+        "mean": 40264.8
+      },
+      {
+        "rank": 4,
+        "records": 137,
+        "min": 24963,
+        "max": 67590,
+        "mean": 39866.1
+      },
+      {
+        "rank": 5,
+        "records": 137,
+        "min": 19379,
+        "max": 56171,
+        "mean": 41802.2
+      },
+      {
+        "rank": 6,
+        "records": 137,
+        "min": 16512,
+        "max": 66495,
+        "mean": 40609.3
+      },
+      {
+        "rank": 7,
+        "records": 137,
+        "min": 14394,
+        "max": 67225,
+        "mean": 41011.0
+      }
+    ],
+    "call_id_gt_576_remote_hot_rows_by_rank": [
+      {
+        "rank": 0,
+        "records": 40,
+        "min": 20315,
+        "max": 59298,
+        "mean": 41271.9
+      },
+      {
+        "rank": 1,
+        "records": 40,
+        "min": 21704,
+        "max": 51808,
+        "mean": 40269.2
+      },
+      {
+        "rank": 2,
+        "records": 40,
+        "min": 23408,
+        "max": 67542,
+        "mean": 43851.7
+      },
+      {
+        "rank": 3,
+        "records": 40,
+        "min": 21193,
+        "max": 66770,
+        "mean": 41049.7
+      },
+      {
+        "rank": 4,
+        "records": 40,
+        "min": 24963,
+        "max": 67590,
+        "mean": 40725.7
+      },
+      {
+        "rank": 5,
+        "records": 40,
+        "min": 19379,
+        "max": 56171,
+        "mean": 42433.6
+      },
+      {
+        "rank": 6,
+        "records": 40,
+        "min": 16741,
+        "max": 66495,
+        "mean": 41906.7
+      },
+      {
+        "rank": 7,
+        "records": 40,
+        "min": 14394,
+        "max": 67225,
+        "mean": 42396.1
+      }
+    ]
+  },
+  "comparison_to_retained_baseline": {
+    "retained_baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "retained_steps_2_to_6_tokens_per_gpu_s": 8029.0,
+    "retained_steps_2_to_6_tflops_per_gpu": 406.522,
+    "this_profile_step2_tokens_per_gpu_s": 7547,
+    "this_profile_step2_tflops_per_gpu": 382.12,
+    "read": "The timing hooks synchronize, so this run is attribution evidence only. It should not replace the retained non-profiled throughput baseline."
+  },
+  "read": {
+    "main": "The missing standard-EP hot-helper backward spans are material. In the step2-ish call_id>576 window, helper MLP VJP is 334.019 ms rank-max and scatter_to_remote_y is 105.546 ms rank-max. These are larger than the forward helper grouped W1/W2/W3 buckets at 45.400/45.830/42.408 ms rank-max.",
+    "optimization_target": "The next MoE/EP optimization should target batched/fused helper grouped training VJP plus weighted scatter/combine, preserving the standard-EP hot/cold/helper layout. More hot-weight transport tuning alone is unlikely to close the gap.",
+    "non_targets": "Hot dW reduce and hot-weight broadcast remain visible, but they are not the only wall: w3 backward reduce is 105.573 ms rank-max in the step2-ish window, comparable to scatter_to_remote_y and below helper MLP VJP."
+  },
+  "validation": {
+    "training_run": "completed 2 steps",
+    "local_source_py_compile": "passed earlier for moe.py",
+    "launcher_bash_n": "passed earlier for torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  }
+}

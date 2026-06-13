@@ -1,0 +1,45 @@
+{
+  "attn_backend": "sdpa",
+  "batch": 1,
+  "compressed_layers_all_indexer_grads_present": true,
+  "compressed_layers_all_sparse_used": true,
+  "compressed_layers_any_indexer_grad_nonzero": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_results": [
+    {
+      "compress_ratio": 4,
+      "estimated_selected_state_elements": 139460608,
+      "implementation_status": "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+      "indexer_all_grads_present": true,
+      "indexer_any_grad_nonzero": true,
+      "indexer_grad_norms": {
+        "weights_proj.weight": 1.2500614502641838e-05,
+        "wk.weight": 1.784885535016656e-05,
+        "wq.weight": 8.225784768001176e-06
+      },
+      "input_grad_norm": 0.00016774165851529688,
+      "last_indexer_loss": 0.0,
+      "last_sparse_compressed_groups": 1024,
+      "last_sparse_selected_keys": 640,
+      "layer_id": 2,
+      "loss": 0.008468781597912312,
+      "output_shape": [
+        1,
+        4096,
+        4096
+      ],
+      "pytorch_sparse_mla_max_seq_len": 4096,
+      "sparse_skip_reason": null,
+      "sparse_used": true
+    }
+  ],
+  "model_dim": 4096,
+  "seed": 1234,
+  "selected_layers": [
+    2
+  ],
+  "seq_len": 4096,
+  "status": "passed"
+}

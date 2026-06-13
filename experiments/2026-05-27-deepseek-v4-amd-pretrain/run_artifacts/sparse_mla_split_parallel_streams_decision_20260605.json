@@ -1,0 +1,59 @@
+{
+  "schema": "dsv4_sparse_mla_split_parallel_streams_decision",
+  "created_at": "2026-06-05",
+  "node": "do-sonle-kernel",
+  "gpu": "MI350",
+  "container": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "source_script": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py",
+  "question": "Can the split selected-slot dQ/no-dKV launch and union/group-aware dKV-only launch overlap on two streams, and do we need an end sync?",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "token_block": 4,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "block_d": 128
+  },
+  "artifacts": {
+    "timing": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_parallel_t4k512_u256_s4096_layer2_20260605.json",
+    "correctness": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_parallel_t4k512_u256_s4096_layer2_correctness_20260605.json"
+  },
+  "timing_ms": {
+    "retained_sparse_attention_backward_gate": 11.1347,
+    "matched_single_token_full_boundary": 11.076744079589844,
+    "matched_single_token_no_dkv": 1.990291953086853,
+    "union_dkv_only_full": 7.482830047607422,
+    "union_dkv_only_sink": 5.68813419342041,
+    "union_dkv_global_accum_delta": 1.7946958541870117,
+    "serialized_split_selected_dq_plus_union_dkv": 10.740462303161621,
+    "parallel_stream_split_selected_dq_plus_union_dkv": 16.26499366760254
+  },
+  "correctness": {
+    "checked": true,
+    "passed": true,
+    "dq_max_abs_diff": 0.0016285479068756104,
+    "dkv_max_abs_diff": 0.06620311737060547,
+    "dkv_atol": 1.0
+  },
+  "decision": {
+    "serialized_split": "promising_latency_probe",
+    "parallel_stream_split": "rejected_for_plain_pytorch_triton_stream_overlap",
+    "promoted_kernel_boundary": false
+  },
+  "read": [
+    "The two-stream A/B is real and correctness-equivalent, but it regresses latency because both launches replay the same QK/P/scaled-dP source-boundary work and compete for the same CUs, MFMA issue, L2/HBM, allocator zero-fill kernels, and dKV write path.",
+    "The serialized split is now a narrow latency win over the retained 11.13 ms gate, but it still recomputes QK/P/scaled-dP twice and is a two-launch diagnostic path, not the final fused/cooperative sparse-attention backward owner.",
+    "The benchmark waits on both side streams before recording the end event so the measured value represents completed device work. In a production autograd path this should be represented as event dependencies or stream recording for the downstream consumers, not a host-wide synchronization."
+  ],
+  "next": [
+    "If using split as a temporary integration candidate, measure materialized TorchTitan sparse-attention boundary and then e2e TFLOPs; do not assume the 10.74 ms standalone number survives bridge overhead.",
+    "For the real kernel, keep the selected-slot query-major dQ path and move group-aware dKV reduction into the same producer/cooperative boundary so QK/P/scaled-dP is computed once.",
+    "CU-masked separation would require a HIP/CK-level owner or explicit hipExtStreamCreateWithCUMask-style stream construction; PyTorch/Triton stream launches do not expose a clean CU/LDS partition knob."
+  ]
+}

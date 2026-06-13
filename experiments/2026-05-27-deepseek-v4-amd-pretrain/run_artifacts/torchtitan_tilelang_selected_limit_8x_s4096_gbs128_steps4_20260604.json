@@ -1,0 +1,117 @@
+{
+  "artifact": "torchtitan_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604",
+  "created_at": "2026-06-04",
+  "status": "completed_negative_for_promotion",
+  "run_id": "torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604",
+  "purpose": "End-to-end 8xMI350 check for the selected-limit TileLang compressed-dKV bridge before investing further integration work.",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "steps_requested": 4,
+    "steps_completed": 4
+  },
+  "active_path": {
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "shared_kv_backward_mode": "explicit_tilelang_dkv",
+    "tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "activation_checkpoint_mode": "full",
+    "profile_sharedkv_backward": false
+  },
+  "step_metrics_rank0_log": [
+    {
+      "step": 1,
+      "loss": 12.33671,
+      "grad_norm": 13.125,
+      "tokens_per_gpu_s": 1550,
+      "tflops_per_gpu": 29.32,
+      "mfu_percent": 1.27,
+      "memory_gib_range_across_ranks": [
+        48.52,
+        49.09
+      ],
+      "read": "Warmup and TileLang compile polluted."
+    },
+    {
+      "step": 2,
+      "loss": 8.95651,
+      "grad_norm": 23.375,
+      "tokens_per_gpu_s": 3059,
+      "tflops_per_gpu": 57.89,
+      "mfu_percent": 2.51,
+      "memory_gib_range_across_ranks": [
+        61.70,
+        73.34
+      ]
+    },
+    {
+      "step": 3,
+      "loss": 19.55966,
+      "grad_norm": 40.0,
+      "tokens_per_gpu_s": 2576,
+      "tflops_per_gpu": 48.73,
+      "mfu_percent": 2.11,
+      "memory_gib_range_across_ranks": [
+        64.52,
+        104.38
+      ]
+    },
+    {
+      "step": 4,
+      "loss": 14.36533,
+      "grad_norm": 58.0,
+      "tokens_per_gpu_s": 2513,
+      "tflops_per_gpu": 47.56,
+      "mfu_percent": 2.06,
+      "memory_gib_range_across_ranks": [
+        81.43,
+        105.34
+      ]
+    }
+  ],
+  "comparison": {
+    "retained_full_ac_anchor_artifact": "run_artifacts/torchtitan_current_8x_performance_scoreboard_20260603.json",
+    "retained_full_ac_anchor_tflops_per_gpu": 58.71,
+    "selected_limit_step2_tflops_per_gpu": 57.89,
+    "selected_limit_step4_tflops_per_gpu": 47.56,
+    "target_tflops_per_gpu": 277.0,
+    "read": "The selected-limit TileLang bridge does not improve the retained 8x anchor and decays after step 2."
+  },
+  "observations": [
+    "The run completed all 4 requested steps with clean process-group teardown.",
+    "TileLang compiled mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim during startup on all ranks.",
+    "TileLang emitted data-race warnings for group_acc(local_slot, d_i); the run still completed, but this is not a production-ready signal.",
+    "This backend is still a late compressed-dKV replacement. TorchTitan still pays upstream sparse-backward boundary costs before the TileLang bridge."
+  ],
+  "decision": {
+    "promote": false,
+    "retain_as_baseline": false,
+    "next_action": "Stop optimizing the late selected-limit dKV bridge as an e2e TFLOPs lever. If TileLang remains the path, port or fuse the whole sparse-MLA backward boundary so the kernel consumes q, dO, shared/compressed KV, LI indices, output, lse, and sink directly, avoiding HSK/probs/grad_logits/selected-state materialization."
+  },
+  "artifacts": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604",
+    "remote_docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604/docker-run.log",
+    "remote_rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604/structured_logs/training.global_rank_0.20260604-100026-HTAH3V.jsonl"
+  },
+  "commands_run": [
+    "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_STEPS=4 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu 'tail -n 120 /scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604/docker-run.log'"
+  ],
+  "dependency_pin_changes": []
+}

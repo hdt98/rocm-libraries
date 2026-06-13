@@ -1,0 +1,227 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mhc_nodecheck_20260610",
+  "created_utc": "2026-06-10T14:20:00Z",
+  "purpose": "Check whether the corrected mHC failure is a node/runtime problem or an mHC memory-fit problem by rerunning the retained 8xMI350 MBS8 baseline on the same node with hyper-connections disabled.",
+  "node": "do-sonle5-mi350-gpu",
+  "hardware": {
+    "gpus": 8,
+    "gpu_type": "AMD Instinct MI350X VF",
+    "per_gpu_vram_gib_reported": 287.69
+  },
+  "common_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_balanced_moe_mode": "execute",
+    "moe_balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "nomhc_control": {
+    "run_id": "torchtitan_dsv4_flash12_nomHC_nodecheck_mbs8_6step_8x_s4096_gbs128_20260610",
+    "use_hyper_connections": false,
+    "status": "completed",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_nomHC_nodecheck_mbs8_6step_8x_s4096_gbs128_20260610/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_nomHC_nodecheck_mbs8_6step_8x_s4096_gbs128_20260610",
+    "steps": [
+      {"step": 1, "loss": 12.32883, "memory_gib": 210.50, "tok_per_gpu_s": 1595.0, "tflops_per_gpu": 80.75},
+      {"step": 2, "loss": 8.26339, "memory_gib": 245.99, "tok_per_gpu_s": 7903.0, "tflops_per_gpu": 400.13},
+      {"step": 3, "loss": 20.26685, "memory_gib": 241.78, "tok_per_gpu_s": 8278.0, "tflops_per_gpu": 419.12},
+      {"step": 4, "loss": 15.42294, "memory_gib": 241.85, "tok_per_gpu_s": 8313.0, "tflops_per_gpu": 420.92},
+      {"step": 5, "loss": 9.31118, "memory_gib": 240.94, "tok_per_gpu_s": 8377.0, "tflops_per_gpu": 424.15},
+      {"step": 6, "loss": 7.88240, "memory_gib": 245.12, "tok_per_gpu_s": 8269.0, "tflops_per_gpu": 418.65}
+    ],
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 8228.0,
+      "tflops_per_gpu": 416.594
+    },
+    "steps_4_to_6_mean": {
+      "tok_per_gpu_s": 8319.6667,
+      "tflops_per_gpu": 421.24
+    },
+    "peak_logged_memory_gib": 245.99
+  },
+  "mhc_retained_shape_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_mbs8_fit3_8x_s4096_gbs128_20260610b",
+    "use_hyper_connections": true,
+    "status": "failed_before_first_completed_step",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_mbs8_fit3_8x_s4096_gbs128_20260610b/docker-run.log",
+    "failure": {
+      "phase": "backward",
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "free_memory_marker": "Available Free mem : 0 MB",
+      "completed_metric_steps": 0
+    },
+    "parameter_count_delta_vs_nomhc": {
+      "nomhc_total_parameters": 81244314368,
+      "mhc_total_parameters": 81253817741,
+      "extra_dense_parameters": 9503373
+    }
+  },
+  "mhc_full_activation_checkpoint_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_fullac_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "use_hyper_connections": true,
+    "activation_checkpoint_mode": "full",
+    "activation_checkpoint_scope": "transformer_block",
+    "status": "completed",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_fullac_mbs8_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_fullac_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "steps": [
+      {"step": 1, "loss": 12.19830, "memory_gib": 105.44, "tok_per_gpu_s": 1458.0, "tflops_per_gpu": 73.88},
+      {"step": 2, "loss": 10.93262, "memory_gib": 139.97, "tok_per_gpu_s": 5490.0, "tflops_per_gpu": 278.29},
+      {"step": 3, "loss": 18.13386, "memory_gib": 140.34, "tok_per_gpu_s": 5544.0, "tflops_per_gpu": 280.99},
+      {"step": 4, "loss": 16.38447, "memory_gib": 140.67, "tok_per_gpu_s": 5537.0, "tflops_per_gpu": 280.68},
+      {"step": 5, "loss": 13.41598, "memory_gib": 141.80, "tok_per_gpu_s": 5561.0, "tflops_per_gpu": 281.87},
+      {"step": 6, "loss": 9.44574, "memory_gib": 141.04, "tok_per_gpu_s": 5595.0, "tflops_per_gpu": 283.61}
+    ],
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 5545.4,
+      "tflops_per_gpu": 281.088
+    },
+    "steps_4_to_6_mean": {
+      "tok_per_gpu_s": 5564.3333,
+      "tflops_per_gpu": 282.0533
+    },
+    "peak_logged_memory_gib": 142.51,
+    "read": "Full activation checkpointing restores enough memory headroom for mHC at the retained MBS8/GBS128/S4096 shape, but it is much slower than the no-mHC attention-only checkpointed control because it recomputes entire transformer blocks."
+  },
+  "mhc_attention_and_hyper_connections_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "use_hyper_connections": true,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_and_hyper_connections",
+    "status": "failed_after_one_completed_step",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs8_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "source_patch": {
+      "activation_checkpoint_scope_added": "attention_and_hyper_connections",
+      "behavior": "Wrap the attention submodule with the existing attention-only selective checkpoint policy and checkpoint only the four mHC pre/post helper calls inside DeepSeekV4TransformerBlock.",
+      "fast_path_effect": "No effect unless TORCHTITAN_ACTIVATION_CHECKPOINT_SCOPE or CANARY_ACTIVATION_CHECKPOINT_SCOPE selects hyper_connections_only or attention_and_hyper_connections."
+    },
+    "completed_steps": [
+      {
+        "step": 1,
+        "loss": 12.26306,
+        "grad_norm": 19.125,
+        "memory_gib_rankmax": 252.63,
+        "tok_per_gpu_s_range": [1474.0, 1477.0],
+        "tflops_per_gpu_range": [74.71, 74.88]
+      }
+    ],
+    "failure": {
+      "phase": "next_backward_after_step1",
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "free_memory_marker": "Available Free mem : 0 MB",
+      "root_rank": 2,
+      "completed_metric_steps": 1
+    },
+    "post_failure_node_state": {
+      "training_processes": "none found by pgrep torchrun|torchtitan/train.py",
+      "rocm_smi_showpids": "only gpuagent was reported as a KFD process",
+      "stale_vram_observed": true,
+      "read": "The OOR abort left high VRAM accounting on some cards without a live TorchTitan PID, so follow-up performance runs should wait for a clean node or explicit cleanup."
+    },
+    "read": "This narrower mHC policy avoids the selective/transformer_block weighted-scatter checkpoint device mismatch and reaches one finite metric step, but it still does not provide stable MBS8 headroom. It is better evidence than the attention-only immediate OOR, but not a corrected throughput baseline."
+  },
+  "mhc_attention_and_hyper_connections_mbs4_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs4_steps6_8x_s4096_gbs128_20260610",
+    "use_hyper_connections": true,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_and_hyper_connections",
+    "status": "completed",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs4_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs4_steps6_8x_s4096_gbs128_20260610",
+    "shape_delta_vs_common_shape": {
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "global_batch_size": 128
+    },
+    "steps": [
+      {"step": 1, "loss": 12.29066, "grad_norm": 20.5, "memory_gib_rankmax": 150.30, "tok_per_gpu_s": 1477.0, "tflops_per_gpu": 74.87},
+      {"step": 2, "loss": 7.63693, "grad_norm": 32.5, "memory_gib_rankmax": 187.39, "tok_per_gpu_s": 5894.0, "tflops_per_gpu": 298.77},
+      {"step": 3, "loss": 18.95582, "grad_norm": 43.25, "memory_gib_rankmax": 187.39, "tok_per_gpu_s": 6033.0, "tflops_per_gpu": 305.80},
+      {"step": 4, "loss": 11.13910, "grad_norm": 14.9375, "memory_gib_rankmax": 187.39, "tok_per_gpu_s": 6063.0, "tflops_per_gpu": 307.30},
+      {"step": 5, "loss": 8.93405, "grad_norm": 26.625, "memory_gib_rankmax": 187.39, "tok_per_gpu_s": 6056.0, "tflops_per_gpu": 306.98},
+      {"step": 6, "loss": 7.38885, "grad_norm": 18.25, "memory_gib_rankmax": 187.39, "tok_per_gpu_s": 6062.0, "tflops_per_gpu": 307.27}
+    ],
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 6021.6,
+      "node_tok_s": 48172.8,
+      "tflops_per_gpu": 305.224
+    },
+    "steps_4_to_6_mean": {
+      "tok_per_gpu_s": 6060.3333,
+      "node_tok_s": 48482.6664,
+      "tflops_per_gpu": 307.1833
+    },
+    "peak_logged_memory_gib": 187.39,
+    "comparison": {
+      "vs_mhc_full_ac_mbs8_steps_2_to_6_tok_per_gpu_s_delta_pct": 8.59,
+      "vs_nomhc_attention_only_mbs8_steps_2_to_6_tok_per_gpu_s_ratio": 0.7318,
+      "vs_12200_tok_per_gpu_target_ratio": 0.4936
+    },
+    "post_run_node_state": {
+      "training_processes": "none found by pgrep torchrun|torchtitan/train.py",
+      "stale_vram_observed_immediately_after_run": true,
+      "read": "The run completed cleanly, but immediate rocm-smi still reported high VRAM accounting on several cards with no live TorchTitan process. Wait for cleanup before launching another performance run."
+    },
+    "read": "This is the best corrected mHC fit point in this artifact: MBS4/GA4 with attention+mHC selective checkpointing is stable and faster than MBS8 full activation checkpointing, but still trails the no-mHC retained baseline and the 12.2k tok/GPU/s target."
+  },
+  "mhc_selective_transformer_block_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_selective_block_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "use_hyper_connections": true,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "transformer_block",
+    "status": "failed_before_first_completed_step",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_selective_block_mbs8_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "failure": {
+      "phase": "backward_checkpoint_recompute",
+      "primary_marker": "Expected all tensors to be on the same device",
+      "detail": "weighted_scatter_add recompute reached deterministic_weighted_scatter_add with remote_y on cuda and scatter_scores or checkpoint metadata on cpu.",
+      "completed_metric_steps": 0
+    },
+    "read": "The existing selective/transformer_block checkpoint scope is not a fit datapoint yet. It avoids the immediate attention-only OOR path but exposes a checkpoint/hot-split tensor-device contract bug in the standard-EP helper weighted scatter path."
+  },
+  "mhc_selective_transformer_block_scorecopy_diagnostic": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_selective_block_scorecopy_mbs8_steps6_8x_s4096_gbs128_20260610",
+    "status": "failed_before_first_completed_step_not_retained",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_selective_block_scorecopy_mbs8_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+    "failure": {
+      "phase": "backward_checkpoint_recompute",
+      "primary_marker": "Autograd not support dtype: Byte",
+      "completed_metric_steps": 0
+    },
+    "read": "A temporary forced device-copy diagnostic was rejected and not retained in source. The failure confirms this is not a simple missing .to(device) boundary; selective/transformer_block needs a real checkpoint-safe hot-split metadata/scatter contract."
+  },
+  "interpretation": {
+    "node_health": "Healthy for the retained no-mHC control before the mHC OOR: the same node and shape completed six steps near the retained throughput band. After the mHC OOR, rocm-smi showed stale/high VRAM accounting without a live TorchTitan PID, so subsequent measurements need a clean node state.",
+    "mhc_read": "mHC is enabled and builds. The retained MBS8 attention-only checkpointing shape does not fit, full activation checkpointing completes six steps at about 5.55k tok/GPU/s, the new MBS8 attention_and_hyper_connections scope reaches one finite metric step then OORs in the next backward, and the existing selective/transformer_block scope is blocked by a checkpoint/hot-split weighted-scatter contract bug before any metric step. Lowering to MBS4/GA4 with attention_and_hyper_connections completes six steps at about 6.02k tok/GPU/s and 305.224 TFLOPs/GPU.",
+    "next_action": "Do not treat the original mHC failure as a bad-node result. Treat MBS4/GA4 attention_and_hyper_connections as the current corrected mHC fit baseline, with MBS8 full-AC as the memory-safe but slower reference. The next optimization should either reduce mHC activation lifetime enough to recover MBS8 without full-block recompute or profile the MBS4 corrected baseline to pick the MoE/sparse-attention target."
+  },
+  "validation_commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/distributed/activation_checkpoint.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+    "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/distributed/activation_checkpoint.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+    "8xMI350 run torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs8_steps6_8x_s4096_gbs128_20260610 with CANARY_USE_HYPER_CONNECTIONS=true and CANARY_ACTIVATION_CHECKPOINT_SCOPE=attention_and_hyper_connections",
+    "8xMI350 run torchtitan_dsv4_flash12_mhc_attention_hc_ac_mbs4_steps6_8x_s4096_gbs128_20260610 with CANARY_USE_HYPER_CONNECTIONS=true, CANARY_MBS=4, CANARY_GBS=128, and CANARY_ACTIVATION_CHECKPOINT_SCOPE=attention_and_hyper_connections",
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/dsv4_profile_timing.py",
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/ops/scatter_add.py",
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/dsv4_profile_timing.py experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/ops/scatter_add.py experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,126 @@
+{
+  "artifact": "primus_turbo_ck_grouped_gemm_moe_vjp_decision_20260602",
+  "date": "2026-06-02",
+  "scope": "EP8 owner-rank MoE training VJP backend selection for DeepSeek-V4 Flash on MI350",
+  "runtime_tuple": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "device_capability": [9, 5],
+    "torch": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "shape_context": {
+    "one_gpu_single_layer_trace_surface": {
+      "tokens": 4096,
+      "total_experts": 256,
+      "topk": 6,
+      "assignments": 24576,
+      "mean_rows_per_expert": 96,
+      "measured_moe_routed_expert_vjp_ms": 25.453129,
+      "source_artifact": "single_layer_backward_gemm_bucket_split_20260602.json"
+    },
+    "ep8_owner_rank_probe_surface": {
+      "tokens_per_rank": 4096,
+      "world_size": 8,
+      "total_experts": 256,
+      "local_experts": 32,
+      "topk": 6,
+      "assignments_to_owner_rank": 24695,
+      "mean_rows_per_local_expert": 771.71875,
+      "min_rows_per_local_expert": 708,
+      "max_rows_per_local_expert": 816,
+      "padding_multiplier_local_max": 1.0573800364446244,
+      "read": "EP8 changes the GEMM shape distribution by aggregating routed tokens from all ranks into fewer owner-local experts, avoiding much of the one-GPU 96-row/expert tiny-GEMM pathology."
+    }
+  },
+  "candidate_results": {
+    "ep4_owner_rank_comparison": {
+      "artifact": "owned_expert_vjp_ep4_primus_turbo_triton_transcfalse_compare_20260602.json",
+      "checks_passed": ["dx", "dw1", "dw2", "dw3", "dtopk"],
+      "shape": {
+        "world_size": 4,
+        "local_experts": 64,
+        "assignments_to_owner_rank": 24508,
+        "mean_rows_per_local_expert": 382.9375,
+        "padding_multiplier_local_max": 1.1490125673249552
+      },
+      "full_vjp_ms_median": {
+        "padded_torch": 8.337696075439453,
+        "padded_triton_swiglu": 7.056920051574707,
+        "primus_turbo_triton": 8.73501968383789
+      },
+      "read": "At the EP4 owner-rank shape, Primus-Turbo Triton grouped-GEMM is correct but does not improve latency; the retained Triton-SwiGLU padded branch is fastest."
+    },
+    "ep8_owner_rank_comparison": {
+      "artifact": "owned_expert_vjp_ep8_primus_turbo_triton_transcfalse_compare_20260602.json",
+      "checks_passed": ["dx", "dw1", "dw2", "dw3", "dtopk"],
+      "shape": {
+        "world_size": 8,
+        "local_experts": 32,
+        "assignments_to_owner_rank": 24695,
+        "mean_rows_per_local_expert": 771.71875,
+        "padding_multiplier_local_max": 1.0573800364446244
+      },
+      "full_vjp_ms_median": {
+        "padded_torch": 7.695927143096924,
+        "padded_triton_swiglu": 6.415792942047119,
+        "primus_turbo_triton": 7.711647033691406
+      },
+      "wgrad_ms_median": {
+        "padded_torch": 2.0603439807891846,
+        "padded_triton_swiglu": 2.4598278999328613,
+        "primus_turbo_triton": 1.8640609979629517
+      },
+      "read": "At the EP8 owner-rank shape, Primus-Turbo Triton improves the grouped wgrad slice, but the full local VJP still ties padded torch and loses to the retained Triton-SwiGLU branch because xgrad/recompute/SwiGLU overhead offsets the wgrad gain."
+    },
+    "retained_padded_torch_owner_rank_vjp": {
+      "full_vjp_ms_median": 7.498781204223633,
+      "wgrad_ms_median": 2.1614699363708496,
+      "artifact": "owned_expert_vjp_ep8_triton_swiglu_detail_20260602.json",
+      "note": "This artifact also contains the Triton-SwiGLU candidate below; values here are the padded torch baseline in that same run."
+    },
+    "retained_padded_triton_swiglu_owner_rank_vjp": {
+      "full_vjp_ms_median": 6.340761184692383,
+      "artifact": "owned_expert_vjp_ep8_triton_swiglu_detail_20260602.json",
+      "checks_passed": ["dx", "dw1", "dw2", "dw3", "dtopk"],
+      "read": "Best current owner-rank local VJP probe. This is math/local-owner timing, not full routed TorchTitan backward wall time."
+    },
+    "primus_turbo_triton_grouped_gemm": {
+      "full_vjp_ms_median": 7.788857936859131,
+      "wgrad_ms_median": 2.0052649974823,
+      "artifact": "owned_expert_vjp_ep8_primus_turbo_triton_20260602.json",
+      "checks_passed": ["dx", "dw1", "dw2", "dw3", "dtopk"],
+      "read": "Correct and close to padded torch, but slower than the retained Triton-SwiGLU padded branch."
+    },
+    "primus_turbo_hipblaslt_grouped_gemm": {
+      "full_vjp_ms_median": 10.617856979370117,
+      "wgrad_ms_median": 2.5089120864868164,
+      "artifact": "owned_expert_vjp_ep8_primus_turbo_hipblaslt_20260602.json",
+      "checks_passed": ["dx", "dw1", "dw2", "dw3", "dtopk"],
+      "read": "Correct but slower than padded torch at the EP8 owner-rank target shape."
+    },
+    "primus_turbo_ck_grouped_gemm": {
+      "status": "not_usable_in_current_image",
+      "artifact_smoke_bf16_rows40": "primus_turbo_ck_grouped_gemm_isolation_smoke_20260602.json",
+      "artifact_bf16_rows256": "primus_turbo_ck_grouped_gemm_isolation_rows256_20260602.json",
+      "artifact_fp16_rows256": "primus_turbo_ck_grouped_gemm_isolation_fp16_rows256_20260602.json",
+      "observed_failures": [
+        "import_only and set_ck_only pass",
+        "bf16 rows40 normal grouped GEMM NN/NT, variable-K wgrad, old trans_c path, and autograd all segfault with returncode -11",
+        "bf16 rows256 normal grouped GEMM NT and variable-K wgrad segfault with returncode -11",
+        "fp16 rows256 normal grouped GEMM NT and variable-K wgrad segfault with returncode -11"
+      ],
+      "source_inspection": {
+        "factory_file": "/tmp/primus-turbo-20260602-56897a/csrc/kernels/grouped_gemm/ck/ck_grouped_gemm_kernel_instance_factory.cu",
+        "wrapper_file": "/tmp/primus-turbo-20260602-56897a/csrc/kernels/grouped_gemm/ck_grouped_gemm.cu",
+        "read": "The wrapper obtains a CK runner from get_ck_grouped_gemm_instance(...) and calls runner->run(...). The runtime is MI350/gfx950, so this is on the intended GFX950 branch, but every actual BF16/FP16 grouped-GEMM invocation segfaults in the installed image before producing a tensor."
+      }
+    }
+  },
+  "decision": {
+    "selected_current_backend": "retained_padded_triton_swiglu_owner_rank_vjp",
+    "do_not_select_now": ["primus_turbo_ck_grouped_gemm", "primus_turbo_hipblaslt_grouped_gemm"],
+    "ck_next_action_if_required": "Patch/rebuild Primus-Turbo CK grouped-GEMM for MI350/gfx950 and add a null/error guard around missing CK runner instances before attempting DSv4 VJP integration.",
+    "moe_next_action": "Treat EP8 as reducing the one-GPU tiny/ragged GEMM pathology; continue with fused/production owner-rank MoE backward work around the 6.42 ms EP8 local VJP baseline and full TorchTitan routed-backward integration costs."
+  }
+}

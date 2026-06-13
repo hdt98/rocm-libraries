@@ -1,0 +1,358 @@
+{
+  "artifact": "mori_manual_launch_geometry_probe_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Focused manual MORI combine launch-geometry probe after the AUTO branch regressed/hung. Target shape is EP8/FSDP8 MBS1 S4096 GBS8 with registered backward combine input and MORI routed padded VJP.",
+  "status": "complete",
+  "common_knobs": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "module": "deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "sequence_length": 4096,
+    "mbs": 1,
+    "gbs": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "activation_checkpointing": "full",
+    "checkpoint_enabled": false,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot",
+    "mori_backward": "routed padded VJP",
+    "local_vjp_swiglu_backend": "triton runtime n_elements",
+    "mori_op_cache_mode": "backward",
+    "assume_identical_dispatch_order": 1,
+    "backward_combine_input_mode": "registered",
+    "mori_ep_launch_config_mode": "MANUAL",
+    "mori_shmem_heap_size": "32G",
+    "steps": 2
+  },
+  "baseline_context": {
+    "manual_registered_default": {
+      "launch": [
+        64,
+        32,
+        8
+      ],
+      "step2_exclude_call5_combine_dx_median_ms": 28.145153999328613,
+      "source_artifact": "mori_backward_combine_registered_ab_20260603.json"
+    },
+    "auto_registered_negative": {
+      "launch": [
+        128,
+        0,
+        4
+      ],
+      "status": "hung_before_step_output",
+      "source_artifact": "mori_auto_launch_config_ab_20260603.json"
+    }
+  },
+  "runs": {
+    "manual_b64_r0_w8": {
+      "shape": "EP8/FSDP8 MBS1 S4096 GBS8",
+      "run_id": "torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r0_w8_s4096_gbs8_mbs1_20260603",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.40855,
+        "step2_loss": 8.21377,
+        "step2_grad_norm": 45.75,
+        "step2_tokens_per_gpu_s": 2836,
+        "read": "Event timing perturbs throughput; use stage timings for the geometry decision."
+      },
+      "requested_launch_config": {
+        "block_num": 64,
+        "rdma_block_num": 0,
+        "warp_num_per_block": 8
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          64,
+          0,
+          8
+        ],
+        "combine_dtopk_launch": [
+          64,
+          0,
+          8
+        ]
+      },
+      "timing": {
+        "records": 64,
+        "ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "call_ids": [
+          1,
+          8
+        ],
+        "step2_exclude_call5": {
+          "backward.combine_dx.call": {
+            "n": 24,
+            "median_ms": 29.567286491394043,
+            "p90_ms": 117.93384552001953,
+            "min_ms": 0.4661250114440918,
+            "max_ms": 130.21759033203125,
+            "ratio_vs_default_b64_r32_w8": 1.0505285027788214,
+            "delta_vs_default_ms": 1.4221324920654297
+          },
+          "backward.combine_dtopk.call": {
+            "n": 24,
+            "median_ms": 0.047900499776005745,
+            "p90_ms": 0.05060100182890892,
+            "min_ms": 0.04487999901175499,
+            "max_ms": 0.050919998437166214
+          },
+          "backward.dispatch_x.call": {
+            "n": 24,
+            "median_ms": 3.2183979749679565,
+            "p90_ms": 5.840588092803955,
+            "min_ms": 0.5677260160446167,
+            "max_ms": 9.077705383300781
+          },
+          "backward.dispatch_grad_output.call": {
+            "n": 24,
+            "median_ms": 0.6218670010566711,
+            "p90_ms": 0.6490870118141174,
+            "min_ms": 0.5669670104980469,
+            "max_ms": 0.6630079746246338
+          },
+          "backward.local_vjp.padded": {
+            "n": 24,
+            "median_ms": 29.450122833251953,
+            "p90_ms": 70.70114135742188,
+            "min_ms": 13.304834365844727,
+            "max_ms": 142.9010467529297
+          }
+        }
+      },
+      "raw_timing": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r0_w8_s4096_gbs8_mbs1_20260603/mori_timing",
+        "local_copy": "/tmp/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r0_w8_s4096_gbs8_mbs1_20260603_copy/mori_timing"
+      }
+    },
+    "manual_b128_r32_w8": {
+      "shape": "EP8/FSDP8 MBS1 S4096 GBS8",
+      "run_id": "torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b128_r32_w8_s4096_gbs8_mbs1_20260603",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.40339,
+        "step2_loss": 7.84199,
+        "step2_grad_norm": 41.0,
+        "step2_tokens_per_gpu_s": 2758,
+        "read": "Event timing perturbs throughput; use stage timings for the geometry decision."
+      },
+      "requested_launch_config": {
+        "block_num": 128,
+        "rdma_block_num": 32,
+        "warp_num_per_block": 8
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          128,
+          32,
+          8
+        ],
+        "combine_dtopk_launch": [
+          128,
+          32,
+          8
+        ]
+      },
+      "timing": {
+        "records": 64,
+        "ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "call_ids": [
+          1,
+          8
+        ],
+        "step2_exclude_call5": {
+          "backward.combine_dx.call": {
+            "n": 24,
+            "median_ms": 34.86025619506836,
+            "p90_ms": 49.6779670715332,
+            "min_ms": 0.4286450147628784,
+            "max_ms": 57.55978012084961,
+            "ratio_vs_default_b64_r32_w8": 1.2385882200502414,
+            "delta_vs_default_ms": 6.715102195739746
+          },
+          "backward.combine_dtopk.call": {
+            "n": 24,
+            "median_ms": 0.03106100019067526,
+            "p90_ms": 0.03243999928236008,
+            "min_ms": 0.030040999874472618,
+            "max_ms": 0.03264100104570389
+          },
+          "backward.dispatch_x.call": {
+            "n": 24,
+            "median_ms": 2.4992289543151855,
+            "p90_ms": 6.016549110412598,
+            "min_ms": 0.4865649938583374,
+            "max_ms": 8.117253303527832
+          },
+          "backward.dispatch_grad_output.call": {
+            "n": 24,
+            "median_ms": 0.557266503572464,
+            "p90_ms": 0.6152870059013367,
+            "min_ms": 0.4818049967288971,
+            "max_ms": 0.6373680233955383
+          },
+          "backward.local_vjp.padded": {
+            "n": 24,
+            "median_ms": 31.950885772705078,
+            "p90_ms": 64.18865966796875,
+            "min_ms": 15.50482177734375,
+            "max_ms": 72.95343780517578
+          }
+        }
+      },
+      "raw_timing": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b128_r32_w8_s4096_gbs8_mbs1_20260603/mori_timing",
+        "local_copy": "/tmp/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b128_r32_w8_s4096_gbs8_mbs1_20260603_copy/mori_timing"
+      }
+    },
+    "manual_b64_r32_w4": {
+      "shape": "EP8/FSDP8 MBS1 S4096 GBS8",
+      "run_id": "torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r32_w4_s4096_gbs8_mbs1_20260603",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.28865,
+        "step2_loss": 7.94303,
+        "step2_grad_norm": 42.5,
+        "step2_tokens_per_gpu_s": 2771,
+        "read": "Event timing perturbs throughput; use stage timings for the geometry decision."
+      },
+      "requested_launch_config": {
+        "block_num": 64,
+        "rdma_block_num": 32,
+        "warp_num_per_block": 4
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          64,
+          32,
+          4
+        ],
+        "combine_dtopk_launch": [
+          64,
+          32,
+          4
+        ]
+      },
+      "timing": {
+        "records": 64,
+        "ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "call_ids": [
+          1,
+          8
+        ],
+        "step2_exclude_call5": {
+          "backward.combine_dx.call": {
+            "n": 24,
+            "median_ms": 24.612098693847656,
+            "p90_ms": 106.7092514038086,
+            "min_ms": 0.5409250259399414,
+            "max_ms": 117.76261901855469,
+            "ratio_vs_default_b64_r32_w8": 0.8744702087767849,
+            "delta_vs_default_ms": -3.533055305480957
+          },
+          "backward.combine_dtopk.call": {
+            "n": 24,
+            "median_ms": 0.07596100121736526
+          },
+          "backward.dispatch_x.call": {
+            "n": 24,
+            "median_ms": 3.750102996826172
+          },
+          "backward.dispatch_grad_output.call": {
+            "n": 24,
+            "median_ms": 0.9828124940395355
+          },
+          "backward.local_vjp.padded": {
+            "n": 24,
+            "median_ms": 29.256752967834473
+          }
+        }
+      },
+      "raw_timing": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r32_w4_s4096_gbs8_mbs1_20260603/mori_timing",
+        "local_copy": "/tmp/torchtitan_dsv4_mori_eventtiming_ep8_registered_manual_b64_r32_w4_s4096_gbs8_mbs1_20260603_copy/mori_timing"
+      }
+    },
+    "manual_b64_r32_w4_no_timing_gbs128": {
+      "shape": "EP8/FSDP8 MBS1 S4096 GBS128",
+      "run_id": "torchtitan_dsv4_mori_registered_b64_r32_w4_neltsruntime_8x_s4096_gbs128_20260603",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.27966,
+        "step1_tokens_per_gpu_s": 1899,
+        "step2_loss": 9.62122,
+        "step2_grad_norm": 50.25,
+        "step2_tokens_per_gpu_s": 2801,
+        "step2_tflops_per_gpu": 53.0,
+        "step2_mfu": "2.29%",
+        "read": "No timing instrumentation. This is the promotion check for the low-warp tuple; it regresses versus the retained [64, 32, 8] no-timing GBS128 run at 3026 tok/GPU/s."
+      },
+      "requested_launch_config": {
+        "block_num": 64,
+        "rdma_block_num": 32,
+        "warp_num_per_block": 4
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          64,
+          32,
+          4
+        ],
+        "combine_dtopk_launch": [
+          64,
+          32,
+          4
+        ]
+      },
+      "comparison": {
+        "retained_b64_r32_w8_no_timing_gbs128_tokens_per_gpu_s": 3026,
+        "tokens_per_gpu_s_delta_vs_retained": -225,
+        "tokens_per_gpu_s_ratio_vs_retained": 0.9256444150693985
+      },
+      "raw_log": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_registered_b64_r32_w4_neltsruntime_8x_s4096_gbs128_20260603/docker-run.log"
+      }
+    }
+  },
+  "read": [
+    "Setting rdma_block_num=0 alone does not explain or solve the EP8 registered combine wall. It passed cleanly but regressed combine_dx.call from 28.15 ms to 29.57 ms at the retained step2 steady filter.",
+    "Increasing block_num from 64 to 128 while keeping rdma_block_num=32 and warp_num_per_block=8 is also a negative result: it passes, but step2 steady combine_dx.call regresses to 34.86 ms, about 24% slower than the retained default.",
+    "Lowering warp_num_per_block from 8 to 4 while keeping [block, rdma]=[64, 32] improves the event-timed step2 steady combine_dx.call median to 24.61 ms, about 12.5% faster than the retained default, but the no-timing GBS128 promotion check regresses to 2801 tok/GPU/s versus the retained 3026 tok/GPU/s.",
+    "The AUTO EP8 failure was not simply caused by rdma_block_num=0; the AUTO tuple also changed block_num and warp_num_per_block.",
+    "Keep [64, 32, 8] as the current retained manual registered tuple.",
+    "The manual geometry branch has now rejected no-RDMA, larger-block, and low-warp promotion variants. The next combine branch should move toward split/overlapped backward combine rather than spending many runs on blind tuple sweeps."
+  ]
+}

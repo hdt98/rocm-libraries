@@ -1,0 +1,55 @@
+{
+  "scope": "tilelang_sparse_dkv_prepacked_scalar_reduced",
+  "status": "closed_rejected_as_speed_candidate",
+  "read": "A concrete TileLang prepacked compact-row dKV producer now works: one CTA owns compact active compressed-group rows, consumes prepacked (token, selected) pair lists, reduces into a compact row, and writes the row without final global atomics. This proves TileLang can consume the prepacked route contract and avoid dynamic output-slot layout issues. It is rejected as the latency path because group-owned scalar contribution production gives up query-major q/dO reuse and scales badly at topk512.",
+  "best_s128": {
+    "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s128_k128_tb32_sw128_rb8_d32_20260604.json",
+    "shape": "S128,H64,D512,topk128,token_block32,selected_window128,row_block8",
+    "median_ms": 5.5854902267456055,
+    "write_reduction_x": 5.609038000684697,
+    "correctness": {
+      "max_abs_diff": 0.00006707967258989811,
+      "mean_abs_diff": 0.000008086705747700762
+    }
+  },
+  "row_block_s128_sweep": [
+    {
+      "row_block": 1,
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s128_k128_tb32_sw128_d32_20260604.json",
+      "median_ms": 16.954397201538086
+    },
+    {
+      "row_block": 4,
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s128_k128_tb32_sw128_rb4_d32_20260604.json",
+      "median_ms": 8.489397048950195
+    },
+    {
+      "row_block": 8,
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s128_k128_tb32_sw128_rb8_d32_20260604.json",
+      "median_ms": 5.5854902267456055
+    },
+    {
+      "row_block": 16,
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s128_k128_tb32_sw128_rb16_d32_20260604.json",
+      "median_ms": 9.797650337219238
+    }
+  ],
+  "target_shape_proxy": {
+    "s512": {
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s512_k512_tb32_sw512_rb8_d32_20260604.json",
+      "shape": "S512,H64,D512,topk512,token_block32,selected_window512,row_block8",
+      "median_ms": 67.50546264648438,
+      "write_reduction_x": 21.50484003281378
+    },
+    "s4096": {
+      "artifact": "tilelang_sparse_dkv_prepacked_scalar_reduced_s4096_k512_tb32_sw512_rb8_d32_timing_20260604.json",
+      "shape": "S4096,H64,D512,topk512,token_block32,selected_window512,row_block8",
+      "median_ms": 562.1204223632812,
+      "write_reduction_x": 21.500210168031906,
+      "raw_selected_write_mib_fp32": 4096.0,
+      "compact_output_mib_fp32": 190.509765625
+    }
+  },
+  "decision": "Do not pursue group-owned scalar TileLang dKV as the sparse-attention backward speed path. Keep this harness as a correctness/lowering reference for prepacked route consumption.",
+  "next_action": "Implement query-major segmented TileLang/HIP producer: keep the fast selected-key contribution loop, use prepacked LI route metadata for lane/warp/block segmented accumulation inside the producer, and emit reduced compact rows or reduced atomics before the final small reducer."
+}

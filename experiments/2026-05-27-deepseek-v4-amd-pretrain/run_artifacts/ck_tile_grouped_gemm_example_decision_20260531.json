@@ -1,0 +1,60 @@
+{
+  "artifact": "ck_tile_grouped_gemm_example_decision_20260531",
+  "date": "2026-05-31",
+  "updated_target_context": {
+    "s2048_full_layer_target_ms": 16.0,
+    "s4096_full_layer_target_ms": 32.0,
+    "normalized_layer_tokens_per_s": 128100
+  },
+  "decision": {
+    "status": "demote_stock_ck_tile_example_for_bwd_w2_dgrad",
+    "reason": "The stock CK-Tile grouped GEMM example requires tile-aligned M/N/K and pads each S2048 expert group to M=128. It is correct for tile-aligned BF16 shapes and reaches high TFLOPs on padded work, but the 4.0x row-padding tax leaves it slower than the retained max-count padded torch.bmm(out=) baseline for the isolated W2 dgrad slot.",
+    "promote_only_if_future_ck_path": {
+      "supports_small_expert_m": true,
+      "uses_row_major_b_or_integrates_weight_layout_change": true,
+      "beats_torch_padded_bmm_out_ms": 3.6242690086364746,
+      "initial_latency_gate_ms": 3.0
+    }
+  },
+  "shape": {
+    "tokens": 2048,
+    "assignments": 12288,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "dtype": "bf16",
+    "b_layout": "R"
+  },
+  "baseline": {
+    "name": "retained_global_max_padded_torch_bmm_out",
+    "median_ms": 3.6242690086364746
+  },
+  "candidate": {
+    "name": "stock_ck_tile_grouped_gemm_example",
+    "summary_path": "run_artifacts/ck_tile_grouped_gemm_example_s2048_20260531.json",
+    "returncode": 0,
+    "route_padding": {
+      "pad_m": 128,
+      "min_per_expert": 15,
+      "max_per_expert": 47,
+      "padded_rows": 49152,
+      "padding_multiplier_vs_compact": 4.0
+    },
+    "best": {
+      "kernel": "gemm_grouped_bf16_128x128x64_8x8x1_0x0x0_Persistent_NoMultiD_SingleSmemBuffer",
+      "ms": 5.48353,
+      "tflops_on_padded_work": 394.757,
+      "gb_per_s": 3267.61,
+      "speedup_vs_torch_padded_bmm_out": 0.6609372080824715
+    },
+    "tile_aligned_smoke": {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "b_layout_r_correct": true,
+      "note": "The same binary failed validation for M=32 or N=64 because the stock configs have kPadM=false and kPadN=false."
+    }
+  },
+  "read": "This closes the stock CK-Tile example as a direct replacement for S2048 W2 dgrad. The useful CK follow-up is not another example run; it is a custom CK/CK-Tile binding/config with smaller M tiles or explicit M padding support below 128."
+}

@@ -1,0 +1,113 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_steps6_8x_s4096_gbs128_20260610",
+  "date": "2026-06-10",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "status": "completed_training_steps6_launcher_postamble_exit2",
+  "shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "optimizer": "AdamW",
+    "activation_checkpoint": "attention-only selective AC",
+    "moe_layout": "standard-EP hot-helper execute top-8",
+    "compact_collective_backend": "mori_native",
+    "sparse_mla": "enabled at S4096 with Triton SharedKV backend"
+  },
+  "env": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "source_change_summary": {
+    "torchtitan_role_split_default": "Native compact role split defaults to true, so dispatch and combine handles do not alias role-specific signal/staging state.",
+    "forward_handle_reuse": "Forward dispatch/combine MORI handles are reused for inverse autograd collectives and retained by one logical reference per inverse autograd consumer.",
+    "keep_released_handles": "Released handles remain cached by default to avoid MORI C++ handle destructor hipDeviceSynchronize in the normal perf path.",
+    "launcher_heap_default": "When CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND=mori_native, the launcher now defaults MORI_SHMEM_HEAP_SIZE to 32G unless the caller overrides it.",
+    "perf_scope": "Handle lifetime and heap sizing only; no new row materialization, route-mask wrapper, token collective, per-row Python work, or per-token refcounting."
+  },
+  "step_metrics": [
+    {"step": 1, "tok_per_gpu_s": 1068, "tflops_per_gpu": 54.07, "loss": 12.30120, "grad_norm": 20.75, "rank_max_memory_gib": 195.72},
+    {"step": 2, "tok_per_gpu_s": 6955, "tflops_per_gpu": 352.12, "loss": 7.40061, "grad_norm": 38.25, "rank_max_memory_gib": 235.19},
+    {"step": 3, "tok_per_gpu_s": 7486, "tflops_per_gpu": 379.01, "loss": 14.52956, "grad_norm": 58.50, "rank_max_memory_gib": 235.20},
+    {"step": 4, "tok_per_gpu_s": 8010, "tflops_per_gpu": 405.57, "loss": 19.94143, "grad_norm": 17.50, "rank_max_memory_gib": 235.59},
+    {"step": 5, "tok_per_gpu_s": 8204, "tflops_per_gpu": 415.37, "loss": 13.11408, "grad_norm": 18.75, "rank_max_memory_gib": 235.59},
+    {"step": 6, "tok_per_gpu_s": 8286, "tflops_per_gpu": 419.55, "loss": 10.90418, "grad_norm": 17.50, "rank_max_memory_gib": 235.59}
+  ],
+  "windows": {
+    "steps_2_to_6": {
+      "tok_per_gpu_s": 7788.2,
+      "node_tok_s": 62305.6,
+      "tflops_per_gpu": 394.324,
+      "delta_vs_retained_20step_tok_per_gpu_pct": -8.5776,
+      "delta_vs_retained_20step_tflops_pct": -8.5739
+    },
+    "steps_4_to_6": {
+      "tok_per_gpu_s": 8166.667,
+      "node_tok_s": 65333.333,
+      "tflops_per_gpu": 413.497,
+      "delta_vs_retained_20step_tok_per_gpu_pct": -4.1328,
+      "delta_vs_retained_20step_tflops_pct": -4.1311
+    }
+  },
+  "memory": {
+    "peak_logged_memory_gib": 235.59,
+    "delta_vs_retained_20step_gib": -16.38
+  },
+  "baseline": {
+    "artifact": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "steps_2_to_20_tok_per_gpu_s": 8518.84,
+    "steps_2_to_20_tflops_per_gpu": 431.31,
+    "peak_logged_memory_gib": 251.97
+  },
+  "heap_ab": {
+    "heap16": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap16_smoke3_8x_s4096_gbs128_20260610",
+      "status": "failed_before_training_mori_heap_exhaustion",
+      "read": "16G is too small; native compact handle construction requested another aligned 8 GiB allocation from a 16 GiB heap."
+    },
+    "heap32": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_steps6_8x_s4096_gbs128_20260610",
+      "status": "completed_six_training_steps",
+      "read": "Right-sized heap for the role-split/reused-forward-handle path in this six-step gate."
+    },
+    "heap48": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_kernelmodule_smoke3_8x_s4096_gbs128_20260610",
+      "status": "failed_after_finite_step1_fsdp_reduce_oom",
+      "read": "48G over-reserves MORI heap and leaves too little headroom for the later FSDP reduce allocation."
+    }
+  },
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_steps6_8x_s4096_gbs128_20260610/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_steps6_8x_s4096_gbs128_20260610",
+  "launcher_note": "The remote training log contains Training completed for all ranks. The local launcher command returned exit code 2 after completion with '.: filename argument required', so this is recorded as a launcher postamble issue rather than a training failure.",
+  "decision": {
+    "stability": "Native compact role split plus forward-handle reuse plus keep-released handles plus 32G heap clears the previous step-1/native-compact residency wall for a six-step sparse S4096 gate.",
+    "throughput": "Not promoted over the retained 20-step standard-EP baseline; the six-step window is still lower throughput, though lower memory.",
+    "perf_safety": "The fix is kept because it is a handle-lifetime/heap-sizing fix and does not introduce row-path latency mechanisms.",
+    "next_action": "Run a 20-step non-profiled native role-split/heap32 gate and profile only if the full-window throughput still trails."
+  },
+  "validation": [
+    "remote log confirmed clean sparse env and Training completed on all ranks",
+    "local python3 -m py_compile token_dispatcher.py passed after the source edit",
+    "local bash -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh passed after the launcher edit",
+    "local git diff --check passed after docs/artifact updates"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "artifact": "torchtitan_qwen397b_primus_turbo_mbs_scaling_audit_20260612",
+  "created_local": "2026-06-12",
+  "question": "Why does Qwen3.5-397B-A17B Primus-Turbo TurboEPBackend no-helper raw top-k EP drop from MBS2 to MBS8?",
+  "surface": {
+    "model": "Qwen3.5-397B-A17B reduced 8-layer",
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "hot_helper": false,
+    "backend": "Primus-Turbo in-tree TurboEPBackend raw token-major top-k EP"
+  },
+  "read": "The MBS2 -> MBS8 drop is real enough to demote the Qwen TurboEP MBS8 row from clean scaling evidence. The configs line up, but MBS8 runs near the allocator cliff: it logs 45 CUDA memory allocation retry warnings and reaches 277.96 GiB peak, while MBS1/MBS2/MBS4 log zero retry warnings. MBS8 has high bursts but several slow steps, so the retained average is contaminated by memory/headroom and adapter-pressure effects. The old MBS4 read in this audit was superseded by torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612.json, where a clean rerun reaches 15745.63 tok/GPU/s over steps 2-20.",
+  "remote_logs": {
+    "mbs1": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs1_retry_steps20_20260612/logs/train.log",
+    "mbs2": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs2_steps20_20260612/logs/train.log",
+    "mbs4": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs4_retry_steps20_20260612/logs/train.log",
+    "mbs8": "/scratch/sonle5/dsv4_pretrain_canary_20260527/runs/qwen397b_a17b_primus_deepep_nohelper_mbs8_steps20_20260612/logs/train.log"
+  },
+  "parsed_log_summary": [
+    {
+      "micro_batch_size": 1,
+      "gradient_accumulation_steps": 16,
+      "steps_2_to_20_mean_tok_per_gpu_s": 9355.29,
+      "steps_13_to_20_mean_tok_per_gpu_s": 9373.75,
+      "max_logged_memory_gib": 126.75,
+      "cuda_memory_allocation_retry_warnings": 0,
+      "hsa_oor_mentions": 0
+    },
+    {
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 8,
+      "steps_2_to_20_mean_tok_per_gpu_s": 12473.89,
+      "steps_13_to_20_mean_tok_per_gpu_s": 12513.94,
+      "max_logged_memory_gib": 138.19,
+      "cuda_memory_allocation_retry_warnings": 0,
+      "hsa_oor_mentions": 0
+    },
+    {
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "steps_2_to_20_mean_tok_per_gpu_s": 11799.55,
+      "steps_13_to_20_mean_tok_per_gpu_s": 11746.88,
+      "max_logged_memory_gib": 218.39,
+      "cuda_memory_allocation_retry_warnings": 0,
+      "hsa_oor_mentions": 0
+    },
+    {
+      "micro_batch_size": 8,
+      "gradient_accumulation_steps": 2,
+      "steps_2_to_20_mean_tok_per_gpu_s": 11650.92,
+      "steps_13_to_20_mean_tok_per_gpu_s": 12149.63,
+      "max_logged_memory_gib": 277.96,
+      "cuda_memory_allocation_retry_warnings": 45,
+      "hsa_oor_mentions": 0,
+      "slow_step_tok_per_gpu_s_examples": {
+        "step_5": 8936,
+        "step_7": 7167,
+        "step_11": 9136,
+        "step_16": 10030
+      },
+      "burst_step_tok_per_gpu_s_examples": {
+        "step_2": 13868,
+        "step_3": 13460
+      }
+    }
+  ],
+  "decision": {
+    "mbs4_superseded_by": "run_artifacts/torchtitan_qwen397b_primus_turbo_mbs2_mbs4_rerun_profile_20260612.json",
+    "use_qwen_turboep_mbs8_as_clean_scaling_baseline": false,
+    "keep_qwen_turboep_mbs8_as_diagnostic": true,
+    "next_gate": "Run or rerun a Qwen MBS8 TurboEP profile with dispatch/permute/combine, expert compute, weighted combine, allocator retries, and memory snapshots, or rerun MBS8 with a lower-memory/headroom variant before claiming TurboEP high-MBS scaling."
+  }
+}

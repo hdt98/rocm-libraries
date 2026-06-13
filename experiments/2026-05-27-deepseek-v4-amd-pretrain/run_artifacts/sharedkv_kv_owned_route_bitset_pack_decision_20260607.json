@@ -1,0 +1,97 @@
+{
+  "artifact": "sharedkv_kv_owned_route_bitset_pack_decision_20260607",
+  "status": "metadata_gate_passed_kernel_schedule_next",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sharedkv_route_bitset_pack.py",
+  "shape": {
+    "batch": 4,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "candidate": "KV-owned compressed-group SharedKV backward with route bitset membership"
+  },
+  "reference_context": {
+    "current_c4_query_major_b1_boundary_ms": {
+      "full": 11.01801586151123,
+      "no_dkv": 1.932217001914978,
+      "global_dkv_accumulation_delta": 8.179350852966309
+    },
+    "current_c128_query_major_b1_boundary_ms": {
+      "full": 1.0685689449310303,
+      "no_dkv": 0.5413650274276733,
+      "global_dkv_accumulation_delta": 0.26688194274902344
+    },
+    "hipkittens_dense_latent_reference": {
+      "event_ms_median": 17.285459518432617,
+      "shape": "B4/S4096/H64/HKV1/D128 dense non-causal local latent fork"
+    }
+  },
+  "c4": {
+    "compress_ratio": 4,
+    "topk": 512,
+    "groups": 1024,
+    "words_per_token": 32,
+    "metadata_bytes": {
+      "top_indices_int32": 33554432,
+      "route_bitset_int32": 2097152
+    },
+    "pair_model": {
+      "selected_pairs_per_batch": 1572352,
+      "visible_group_pairs_per_batch": 2096128,
+      "visible_over_selected_x": 1.3331162487788994,
+      "noncausal_group_pairs_per_batch": 4194304,
+      "noncausal_over_selected_x": 2.6675350048844026,
+      "query_major_scalar_dkv_atomic_elements_per_batch": 805044224,
+      "kv_owned_final_dkv_store_elements_per_batch": 524288,
+      "query_major_atomic_to_owned_store_reduction_x": 1535.5
+    },
+    "route_bitset_pack_ms": {
+      "block256_zero_plus_pack_median": 0.3746040016412735,
+      "block512_zero_plus_pack_median": 0.3488435000181198,
+      "block1024_zero_plus_pack_median": 0.3511189967393875,
+      "best_observed_zero_plus_pack_median": 0.3488435000181198,
+      "spot_check_selected_bits_set": true
+    },
+    "rough_hk_compute_shape_model_ms": {
+      "selected_pair_lower_bound": 6.47993727796711,
+      "visible_group_pair_model": 8.638509676326066
+    }
+  },
+  "c128": {
+    "compress_ratio": 128,
+    "topk": 32,
+    "groups": 32,
+    "words_per_token": 1,
+    "metadata_bytes": {
+      "top_indices_int32": 2097152,
+      "route_bitset_int32": 65536
+    },
+    "pair_model": {
+      "selected_pairs_per_batch": 63520,
+      "visible_group_pairs_per_batch": 63520,
+      "visible_over_selected_x": 1.0,
+      "noncausal_group_pairs_per_batch": 131072,
+      "noncausal_over_selected_x": 2.063476070528967,
+      "query_major_scalar_dkv_atomic_elements_per_batch": 32522240,
+      "kv_owned_final_dkv_store_elements_per_batch": 16384,
+      "query_major_atomic_to_owned_store_reduction_x": 1985.0
+    },
+    "route_bitset_pack_ms": {
+      "block256_zero_plus_pack_median": 0.03888050094246864,
+      "block512_zero_plus_pack_median": 0.0421999990940094,
+      "block1024_zero_plus_pack_median": 0.03893999941647053,
+      "best_observed_zero_plus_pack_median": 0.03888050094246864,
+      "spot_check_selected_bits_set": true
+    },
+    "rough_hk_compute_shape_model_ms": {
+      "selected_pair_lower_bound": 0.26177701678534504,
+      "visible_group_pair_model": 0.26177701678534504
+    }
+  },
+  "decision": {
+    "read": "The forward-known route bitset is cheap enough to carry into backward: about 0.35 ms for C4 and 0.04 ms for C128 at B4/S4096. C4 visible-group replay is only 1.33x selected-pair work under causal compression, while replacing query-major scalar dKV atomics with owned final dKV stores reduces the write count by about 1535x. This makes a KV-owned compressed-group HipKittens-style owner worth the next kernel attempt.",
+    "next_kernel_gate": "Implement a masked KV-owned producer for compressed groups: scan visible compressed groups, use bitset membership to zero unselected P/dP contributions, accumulate dCmpKV as owned rows, and leave dQ on the existing fast query-major path until the dKV owner proves latency.",
+    "not_an_e2e_claim": true
+  }
+}

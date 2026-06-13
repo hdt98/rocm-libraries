@@ -1,0 +1,68 @@
+{
+  "artifact": "sparse_mla_query_major_selected_dq_union_dkv_split_decision",
+  "date": "2026-06-05",
+  "scope": "S4096 layer-2 sparse-MLA backward full-boundary gate with selected-slot query-major dQ kept intact and union/group-aware dKV applied only to dKV",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "token_block_for_union_dkv": 4,
+    "selected_block": 512,
+    "block_h": 64,
+    "block_n_for_selected_dq": 64,
+    "block_d": 128
+  },
+  "contract": {
+    "dQ": "selected-slot query-major QK -> P -> scaled_dP -> dQ path remains outside the compressed-group union operand axis",
+    "dKV": "union/group-aware dKV-only path uses forward-known token x union-group selected-slot sidecar, then atomically accumulates reduced dKV",
+    "measurement": "two-launch measured boundary: selected-slot query-major dQ/no-dKV followed by union dKV-only",
+    "not_final_fusion": "This does not yet share QK/P/scaled_dP intermediates between dQ and dKV; it measures whether the dKV epilogue gain survives when paired with the intact dQ owner."
+  },
+  "timing_ms": {
+    "retained_triton_full_sparse_attention_backward_gate": 11.1347,
+    "block_u_64": {
+      "artifact": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_split_t4k512_u64_s4096_layer2_20260605.json",
+      "measured_split_selected_dq_plus_union_dkv": 14.236534118652344,
+      "union_dkv_only_full": 9.309393882751465,
+      "union_full_dq_dkv": 50.42958068847656
+    },
+    "block_u_128": {
+      "artifact": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_split_t4k512_u128_s4096_layer2_20260605.json",
+      "measured_split_selected_dq_plus_union_dkv": 13.117392539978027,
+      "union_dkv_only_full": 9.18346118927002,
+      "union_full_dq_dkv": 29.695951461791992
+    },
+    "block_u_256": {
+      "artifact": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_split_t4k512_u256_s4096_layer2_20260605.json",
+      "measured_split_selected_dq_plus_union_dkv": 12.210972785949707,
+      "union_dkv_only_full": 8.2536039352417,
+      "union_dkv_only_sink": 7.028952121734619,
+      "union_dkv_global_accum_delta": 1.22465181350708,
+      "union_full_dq_dkv": 20.139297485351562
+    }
+  },
+  "correctness": {
+    "artifact": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_split_t4k512_u256_s4096_layer2_correctness_20260605.json",
+    "passed": true,
+    "dq_max_abs_diff": 0.0016285479068756104,
+    "dkv_max_abs_diff": 0.06616878509521484,
+    "dkv_atol": 1.0
+  },
+  "read": {
+    "best_result": "The sharper selected-dQ plus union-dKV split boundary is correct but still slower than the retained Triton full sparse-attention backward: 12.21 ms versus 11.13 ms.",
+    "why_the_sum_was_misleading": "The derived sum of matched single-token no-dKV plus union dKV-only predicted about 10.24 ms, but the measured two-launch boundary is 12.21 ms. The extra overhead means the dKV slice win does not materialize unless dQ and dKV share the source-boundary producer/intermediates inside one fused owner.",
+    "union_full_rejected": "Letting union rows serve dQ remains rejected: even the best nearby block_u=256 full union dQ+dKV is 20.14 ms, and smaller block_u settings were worse.",
+    "next_kernel_contract": "Keep selected-slot query-major QK/P/scaled_dP/dQ. Add a dKV epilogue that consumes the same P/scaled_dP while still hot, performs group-aware local reduction before global atomics, and avoids a second source-boundary recompute/launch."
+  },
+  "decision": {
+    "status": "correct_but_not_promoted",
+    "promote_to_e2e": false,
+    "reason": "No full sparse-attention latency uplift was materialized; best correct measured full-boundary split is 12.21 ms, slower than the retained 11.13 ms gate."
+  }
+}

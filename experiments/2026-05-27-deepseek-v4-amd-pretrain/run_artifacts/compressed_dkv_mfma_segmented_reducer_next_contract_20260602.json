@@ -1,0 +1,139 @@
+{
+  "artifact": "compressed_dkv_mfma_segmented_reducer_next_contract_20260602",
+  "created_date": "2026-06-02",
+  "status": "next_executable_contract_after_scalar_lds_rejection",
+  "scope": "Actual LightningIndexer layer-2 compressed dKV backward on 1xMI350 at S4096, CR=4, topk=512, H=64, D=512.",
+  "why_this_artifact_exists": "The dense-group HIP probe reduced modeled writes but regressed to 121.8 ms at S4096. This records why that is not a full-layer regression and pins the next implementation rung so future work does not loop back into scalar local accumulation.",
+  "source_artifacts": {
+    "full_layer_gap": "run_artifacts/single_layer_current_gap_after_li_tile_20260601.json",
+    "mechanism_inspection": "run_artifacts/sparse_mla_sharedkv_compressed_route_mechanism_inspection_20260602.json",
+    "query_major_actual_li_profile": "run_artifacts/actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+    "active_groups_pack": "run_artifacts/actual_li_active_groups_pack_triton_summary_20260602.json",
+    "dblocked_contract": "run_artifacts/actual_li_dblocked_dkv_kernel_contract_20260602.json",
+    "tile_budget": "run_artifacts/actual_li_tile_budget_lds_hash_candidate_summary_20260602.json",
+    "dotk_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "partial_store": "run_artifacts/actual_li_active_list_dotk_partial_store_triton_dkv_summary_20260602.json",
+    "dense_group_hip_decision": "run_artifacts/compressed_dkv_dense_group_tile_decision_20260602.json",
+    "ascend_gap_closure": "run_artifacts/ascend_gap_closure_sparse_attention_moe_backward_20260602.json"
+  },
+  "not_a_production_regression_read": {
+    "full_single_layer_proxy_ms": 68.2089,
+    "full_single_layer_target_ms": 24.9,
+    "current_gap_x": 2.7393132530120483,
+    "bad_probe_ms": 121.80220031738281,
+    "bad_probe_scope": "One isolated scalar dense local compressed-group x D16 HIP reducer. It consumes diagnostic materialized probs and grad_logits and times only the compressed dKV accumulation/write path.",
+    "read": "The 121.8 ms number is not the current full-layer fwd+bwd latency and should not be used to update the full-layer gap. It rejects one local-accumulation schedule: scalar LDS/local atomic work can reduce global write count while destroying MFMA/GEMM tile efficiency."
+  },
+  "localized_wall": {
+    "query_major_full_atomic_ms": 11.080920219421387,
+    "query_major_no_dkv_ms": 1.9742660522460938,
+    "query_major_dkv_reduce_sink_ms": 2.795030117034912,
+    "estimated_dkv_dot_math_ms": 0.8207640647888184,
+    "estimated_global_dkv_accumulation_ms": 8.285890102386475,
+    "dotk_sparse_atomic_best_ms": 8.80629825592041,
+    "dotk_sparse_atomic_rocprof_kernel_ms": 8.614211,
+    "partial_store_emit_only_ms": 8.794984817504883,
+    "partial_store_full_reduce_ms": 9.507111549377441,
+    "dense_group_hip_s4096_ms": 121.80220031738281,
+    "dense_group_hip_s4096_write_reduction_x": 11.906525920428903,
+    "read": "Dot math is small, direct sparse atomics land on the 8-9 ms global accumulation wall, and partial-store proves the wall is not just final cross-tile atomic contention. The failed dense-group HIP branch shows that local write coalescing must be MFMA-shaped; scalar per-selected/group/D loops are the wrong body."
+  },
+  "positive_floors_to_preserve": {
+    "materialized_bmm_mixed_ms": 7.065645217895508,
+    "materialized_flat_gemm_mixed_ms": 7.052491188049316,
+    "materialized_flat_gemm_bf16_ms": 4.727312088012695,
+    "active_group_flags_plus_pack_ms": 0.8476099967956543,
+    "active_group_dense_slot_overhead_x": 1.3438008791924454,
+    "active_group_unique_groups_total": 66029,
+    "read": "MFMA-friendly KxS by SxD accumulation is capable of beating the atomic path, and route metadata is sub-ms. The production kernel must keep those two positives while avoiding the multi-GiB score/prob or dense-route slabs used by the floors."
+  },
+  "operator_formula": {
+    "compressed_dkv": "For each compressed group g and D16 block, dKV[g, d] += sum_{token t, head h, selected slot k where group(t,k)=g} grad_logits[t,h,k] * scale * q[t,h,d] + probs[t,h,k] * dO[t,h,d].",
+    "desired_tile_compute": "Inside one query tile, form selected-key contributions with MFMA-shaped dot-K or equivalent Kx(rows) by rowsxD16 contractions, segment them by compressed group, reduce locally, then write one reduced D16 row per touched group instead of per-token/per-selected global atomics."
+  },
+  "implementation_contract": {
+    "backend_surface": "gfx950 HIP/CK-Tile/rocPRIM PyTorch extension for the accumulator body; Triton remains acceptable for route flags/packing and small probes.",
+    "do_not_edit": "Do not edit third_party checkouts. Keep the implementation under the experiment tools or TorchTitan WIP changesets.",
+    "input_contract_first_stage": "Diagnostic stage may consume materialized probs, grad_logits, safe_groups, valid_u8, and active-group lists to isolate dKV accumulation. Production stage must fuse score/probability recompute, LI derivative, and compressor gradients without saving selected K/V/prob slabs.",
+    "layout_contract": "Preserve query-major selected-key reuse. Do not switch the whole backward to group-major row recompute, do not materialize dense [H,S,G] route weights, and do not materialize [B,H,S,K] scores/probs at S4096.",
+    "global_write_contract": "Write compressed dKV once per touched compressed-group and D16 tile, or fuse downstream LI/compressor gradients so this intermediate write is avoided entirely."
+  },
+  "first_executable_rung": {
+    "name": "32x256_D16_materialized_probs_smoke",
+    "token_block": 32,
+    "selected_block": 256,
+    "head_block": 64,
+    "d_block": 16,
+    "micro_token_block": 1,
+    "micro_selected_block": 64,
+    "route_atomic_reduction_x": 12.338365924856399,
+    "p99_combined_scratch_kib": 115.3870703125,
+    "scratch_budget_kib": 128.0,
+    "dblock_tile_microsteps": 128,
+    "why_first": "This halves selected span relative to the primary target while preserving nontrivial write reduction and the same scratch envelope. It is the compile/parity/perf smoke, not the final target."
+  },
+  "primary_target_rung": {
+    "name": "32x512_D16_actual_li_layer2",
+    "token_block": 32,
+    "selected_block": 512,
+    "head_block": 64,
+    "d_block": 16,
+    "micro_token_block": 1,
+    "micro_selected_block": 64,
+    "route_atomic_reduction_x": 23.813051840857806,
+    "raw_query_major_atomic_elements": 805044224,
+    "coalesced_active_list_atomic_elements": 33806848,
+    "p99_combined_scratch_kib": 115.25890625,
+    "scratch_budget_kib": 128.0,
+    "dblock_tile_microsteps": 256,
+    "layer_microsteps": 1048576,
+    "why_primary": "It keeps the full coalesced-write target while staying under the 128 KiB p99 scratch budget. It is the smallest retained rung that can plausibly move the 8-9 ms dKV wall toward the 4.7-7.1 ms MFMA floors."
+  },
+  "acceptable_compaction_branches": {
+    "dynamic_unique_group": {
+      "metadata_cost_ms": 0.8476099967956543,
+      "dense_slot_overhead_x": 1.3438008791924454,
+      "requirement": "Do compaction inside the fused kernel or with a sub-ms metadata kernel. External torch.unique/scatter/BMM loops are rejected."
+    },
+    "fixed_panel": {
+      "preferred_seq_chunk": 32,
+      "preferred_group_panels": [
+        {
+          "group_panel": 64,
+          "dense_slot_overhead_x": 1.4171279713448388,
+          "nonempty_panels": 1088
+        },
+        {
+          "group_panel": 128,
+          "dense_slot_overhead_x": 1.5004884402474763,
+          "nonempty_panels": 576
+        }
+      ],
+      "requirement": "Only retry fixed panels as a fused in-kernel compaction/accumulation body. PyTorch panel scatter+BMM loops and dense-panel scalar loops are already rejected."
+    }
+  },
+  "promotion_gates": {
+    "correctness": [
+      "S128 parity against reference dKV, then S512 parity. Use the existing BF16 tolerance envelope already accepted for actual-LI dKV probes; add FP32/tighter smoke if the kernel exposes a clean oracle path.",
+      "Exact route metadata parity for active flags, counts, and packed group lists when using the dynamic-unique branch.",
+      "No saved selected K/V, no saved selected probability slab, and no dense [H,S,G] route tensor at S4096."
+    ],
+    "performance": [
+      "The S512 isolated accumulator must beat the rejected scalar branches: active-list scalar 3.13 ms, fixed-panel scalar 3.08 ms, dense-group HIP 4.14 ms, and dot_k_sparse local 8.06 ms.",
+      "The first S4096 32x256/D16 timing must beat the direct sparse-atomic wall around 8.6-8.8 ms, otherwise write coalescing is not paying for itself.",
+      "The S4096 32x512/D16 target should move toward the 7.05 ms mixed flat-GEMM floor while avoiding its 3.4-5.6 GiB materialization footprint; a stretch target is the 4.73 ms BF16 flat-GEMM floor."
+    ],
+    "reject_immediately_if": [
+      "The kernel reaches high modeled write reduction but S512 is slower than the scalar local accumulators.",
+      "The body loops scalar over selected groups/heads/D in a way that cannot map the main contraction to MFMA.",
+      "Target-shape memory climbs because scores/probs, dense route weights, or selected K/V are materialized.",
+      "S4096 timing is dominated by one HIP kernel like the 120.07 ms dense-group trace."
+    ]
+  },
+  "next_actions": [
+    "Add a new HIP/CK-Tile entrypoint beside the existing scalar accumulator, not by mutating the scalar body into the production path.",
+    "Smoke 32x256/D16 on S128 and S512 with materialized probs/grad_logits to isolate the accumulator.",
+    "If S512 passes the promotion gate, run S4096 timing-only and rocprof kernel trace on one MI350 under /scratch/sonle5/dsv4_pretrain_canary_20260527.",
+    "Only after the accumulator is close, fuse target_probs, KL derivative, LI dQ/dK/dW, and compressor gradients into the query-major recompute path."
+  ]
+}

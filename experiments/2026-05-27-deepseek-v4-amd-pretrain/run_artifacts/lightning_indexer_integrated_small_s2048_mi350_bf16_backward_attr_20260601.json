@@ -1,0 +1,1840 @@
+{
+  "artifacts": {
+    "torch_key_averages": null,
+    "torch_trace": null,
+    "trace_dir": "/work/traces/lightning_indexer_integrated_small_s2048_mi350_bf16_backward_attr_20260601"
+  },
+  "attention_impl": "sparse-gather-lightning-indexer",
+  "backward_attribution": {
+    "attention_subblocks": true,
+    "block_ms": {
+      "attention.csa.dgrad": 0.6086069624871016,
+      "attention.csa.wgrad": 0.5463180132210255,
+      "attention.dgrad": 2.52545194234699,
+      "attention.hca.dgrad": 0.6154190050438046,
+      "attention.hca.wgrad": 0.5603189347311854,
+      "attention.kv_path.dgrad": 0.42587798088788986,
+      "attention.kv_path.wgrad": 0.39528904017060995,
+      "attention.out_proj.dgrad": 0.30120008159428835,
+      "attention.out_proj.wgrad": 0.274927937425673,
+      "attention.output_rope_inv.dgrad": 0.3535799914970994,
+      "attention.q_path.dgrad": 0.6580889457836747,
+      "attention.q_path.wgrad": 0.5856490461155772,
+      "attention.sparse_mla.dgrad_qkv": 0.524798990227282,
+      "attention.sparse_mla.sink_wgrad": 0.25759998243302107,
+      "attention.wgrad": 2.382902894169092,
+      "layer.attn_norm.dgrad": 0.5446979776024818,
+      "layer.attn_norm.wgrad": 0.24236890021711588,
+      "layer.moe_norm.dgrad": 0.29054901096969843,
+      "layer.moe_norm.wgrad": 0.24575996212661266,
+      "loss.dout": 0.4836979787796736,
+      "moe.routed.dgrad": 152.23588701337576,
+      "moe.routed.wgrad": 2.168722916394472,
+      "moe.shared.dgrad": 0.27082895394414663,
+      "moe.shared.wgrad": 0.29588898178189993
+    },
+    "iters": 1,
+    "mode": "segmented_autograd_grad",
+    "moe_subblocks": false,
+    "note": "These timings split backward with separate autograd.grad calls for attribution; phase_ms.backward remains the normal loss.backward path. When freeze_params is true, parameter-gradient attribution is intentionally skipped.",
+    "profile_wgrad": true,
+    "stats": {
+      "attention_input_grad_norm": 1.3049627341388259e-05,
+      "attention_subblock_csa_grad_norm": 5.388295448938152e-06,
+      "attention_subblock_hca_grad_norm": 8.17178897705162e-06,
+      "attention_subblock_input_grad_max_abs_diff": 1.0943040251731873e-08,
+      "attention_subblock_input_grad_norm": 1.3067691725154873e-05,
+      "attention_subblock_input_grad_rel_l2_diff": 0.040088772773742676,
+      "attention_subblock_kv_all_grad_norm": 1.0558303074503783e-05,
+      "attention_subblock_kv_grad_norm": 3.95801635022508e-06,
+      "attention_subblock_output_projection_input_grad_norm": 3.60640260623768e-05,
+      "attention_subblock_q_grad_norm": 7.899820047896355e-06,
+      "attention_subblock_sparse_out_grad_norm": 3.606404789024964e-05,
+      "input_grad_norm": 0.0027614301070570946,
+      "loss": 0.9994491934776306,
+      "moe_input_grad_norm": 1.2240296200616285e-05,
+      "output_grad_norm": 0.0027613751590251923,
+      "routed_moe_input_grad_norm": 7.0713272180000786e-06,
+      "shared_moe_input_grad_norm": 1.0000982911151368e-05
+    },
+    "warmup": 0
+  },
+  "backward_shape_contract": {
+    "attention_impl": "sparse-gather-lightning-indexer",
+    "attention_subblocks": [
+      {
+        "forward_inputs": [
+          {
+            "name": "out_unrope",
+            "role": "post sparse-MLA output",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          },
+          {
+            "name": "o_low_rank",
+            "role": "grouped low-rank projection",
+            "shape": [
+              1,
+              2048,
+              4,
+              32
+            ]
+          },
+          {
+            "name": "wo_a",
+            "role": "first output projection weight",
+            "shape": [
+              4,
+              32,
+              64
+            ]
+          },
+          {
+            "name": "wo_b",
+            "role": "second output projection weight",
+            "shape": [
+              256,
+              128
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "attn_out",
+            "role": "attention branch output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_attn_out",
+            "role": "from residual",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "attention_out_projection_backward",
+        "produced_gradients": [
+          {
+            "name": "d_out_unrope",
+            "role": "gradient to inverse RoPE",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          },
+          {
+            "name": "d_wo_a",
+            "role": "wo_a gradient",
+            "shape": [
+              4,
+              32,
+              64
+            ]
+          },
+          {
+            "name": "d_wo_b",
+            "role": "wo_b gradient",
+            "shape": [
+              256,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "q",
+            "role": "query states",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          },
+          {
+            "name": "kv_all",
+            "role": "vanilla plus CSA/HCA keys and values",
+            "shape": [
+              1,
+              2688,
+              32
+            ]
+          },
+          {
+            "name": "kv_selected",
+            "role": "gathered sparse-key view, materialized by sparse-gather attention paths",
+            "shape": [
+              1,
+              2048,
+              656,
+              32
+            ]
+          },
+          {
+            "name": "scores",
+            "role": "attention logits plus sink",
+            "shape": [
+              1,
+              8,
+              2048,
+              657
+            ]
+          },
+          {
+            "name": "probs",
+            "role": "softmax probabilities excluding sink",
+            "shape": [
+              1,
+              8,
+              2048,
+              656
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "sparse_out",
+            "role": "attention value mix",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_sparse_out",
+            "role": "from output projection",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          }
+        ],
+        "name": "sparse_mla_backward",
+        "produced_gradients": [
+          {
+            "name": "d_q",
+            "role": "query gradient",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          },
+          {
+            "name": "d_kv_all",
+            "role": "combined kv gradient",
+            "shape": [
+              1,
+              2688,
+              32
+            ]
+          },
+          {
+            "name": "d_attn_sink",
+            "role": "sink parameter gradient",
+            "shape": [
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "attn_in",
+            "role": "attention input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "q_rank",
+            "role": "low-rank query activations",
+            "shape": [
+              1,
+              2048,
+              64
+            ]
+          },
+          {
+            "name": "q",
+            "role": "RoPE-applied query",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "q",
+            "role": "query states consumed by MLA",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_q",
+            "role": "from sparse MLA",
+            "shape": [
+              1,
+              2048,
+              8,
+              32
+            ]
+          }
+        ],
+        "name": "q_path_backward",
+        "produced_gradients": [
+          {
+            "name": "d_attn_in_q",
+            "role": "query-path input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_wq_a",
+            "role": "first query projection gradient",
+            "shape": [
+              64,
+              256
+            ]
+          },
+          {
+            "name": "d_wq_b",
+            "role": "second query projection gradient",
+            "shape": [
+              256,
+              64
+            ]
+          },
+          {
+            "name": "d_q_norm_weight",
+            "role": "query RMSNorm scale gradient",
+            "shape": [
+              64
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "attn_in",
+            "role": "attention input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "kv",
+            "role": "vanilla latent kv",
+            "shape": [
+              1,
+              2048,
+              32
+            ]
+          },
+          {
+            "name": "csa",
+            "role": "compressed short attention kv",
+            "shape": [
+              1,
+              512,
+              32
+            ]
+          },
+          {
+            "name": "hca",
+            "role": "compressed historical attention kv",
+            "shape": [
+              1,
+              128,
+              32
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "kv_all",
+            "role": "concatenated kv consumed by MLA",
+            "shape": [
+              1,
+              2688,
+              32
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_kv_all",
+            "role": "from sparse MLA",
+            "shape": [
+              1,
+              2688,
+              32
+            ]
+          }
+        ],
+        "name": "kv_and_compressed_paths_backward",
+        "produced_gradients": [
+          {
+            "name": "d_attn_in_kv",
+            "role": "vanilla kv-path input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_attn_in_csa",
+            "role": "CSA compressor input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_attn_in_hca",
+            "role": "HCA compressor input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_wkv",
+            "role": "vanilla kv projection gradient",
+            "shape": [
+              32,
+              256
+            ]
+          },
+          {
+            "name": "d_csa_weights",
+            "role": "CSA compressor gradients",
+            "shape": [
+              "CSA ratio/kv/M dependent"
+            ]
+          },
+          {
+            "name": "d_hca_weights",
+            "role": "HCA compressor gradients",
+            "shape": [
+              "HCA ratio/kv/M dependent"
+            ]
+          }
+        ]
+      }
+    ],
+    "kv_all_materialized": true,
+    "mode": "single_gpu_no_sequence_parallel_segmented_autograd_path",
+    "moe_subblocks": [
+      {
+        "forward_inputs": [
+          {
+            "name": "flat_moe_in",
+            "role": "flattened MoE input",
+            "shape": [
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "x_group",
+            "role": "tokens grouped by expert",
+            "shape": [
+              16,
+              256,
+              256
+            ]
+          },
+          {
+            "name": "w1",
+            "role": "gate projection weights",
+            "shape": [
+              16,
+              128,
+              256
+            ]
+          },
+          {
+            "name": "w3",
+            "role": "up projection weights",
+            "shape": [
+              16,
+              128,
+              256
+            ]
+          },
+          {
+            "name": "w2",
+            "role": "down projection weights",
+            "shape": [
+              16,
+              256,
+              128
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "routed_gate",
+            "role": "SwiGLU gate branch",
+            "shape": [
+              4096,
+              128
+            ]
+          },
+          {
+            "name": "routed_up",
+            "role": "SwiGLU up branch",
+            "shape": [
+              4096,
+              128
+            ]
+          },
+          {
+            "name": "routed_hidden",
+            "role": "SwiGLU product",
+            "shape": [
+              4096,
+              128
+            ]
+          },
+          {
+            "name": "routed_y_unscaled",
+            "role": "expert outputs before router scale",
+            "shape": [
+              4096,
+              256
+            ]
+          },
+          {
+            "name": "moe_routed",
+            "role": "reduced routed output",
+            "shape": [
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_moe_out",
+            "role": "from MoE residual, flattened",
+            "shape": [
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "routed_expert_batches_backward",
+        "produced_gradients": [
+          {
+            "name": "d_flat_moe_in_routed",
+            "role": "routed input gradient after gather/reduce",
+            "shape": [
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_w1",
+            "role": "routed gate wgrad",
+            "shape": [
+              16,
+              128,
+              256
+            ]
+          },
+          {
+            "name": "d_w3",
+            "role": "routed up wgrad",
+            "shape": [
+              16,
+              128,
+              256
+            ]
+          },
+          {
+            "name": "d_w2",
+            "role": "routed down wgrad",
+            "shape": [
+              16,
+              256,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "flat_moe_in",
+            "role": "flattened MoE input",
+            "shape": [
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "shared_w1",
+            "role": "shared gate projection",
+            "shape": [
+              128,
+              256
+            ]
+          },
+          {
+            "name": "shared_w3",
+            "role": "shared up projection",
+            "shape": [
+              128,
+              256
+            ]
+          },
+          {
+            "name": "shared_w2",
+            "role": "shared down projection",
+            "shape": [
+              256,
+              128
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "shared_gate",
+            "role": "shared gate branch",
+            "shape": [
+              2048,
+              128
+            ]
+          },
+          {
+            "name": "shared_up",
+            "role": "shared up branch",
+            "shape": [
+              2048,
+              128
+            ]
+          },
+          {
+            "name": "shared_hidden",
+            "role": "shared SwiGLU product",
+            "shape": [
+              2048,
+              128
+            ]
+          },
+          {
+            "name": "moe_shared",
+            "role": "shared expert output",
+            "shape": [
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_moe_out",
+            "role": "from MoE residual, flattened",
+            "shape": [
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "shared_expert_backward",
+        "produced_gradients": [
+          {
+            "name": "d_flat_moe_in_shared",
+            "role": "shared input gradient",
+            "shape": [
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_shared_w1",
+            "role": "shared gate wgrad",
+            "shape": [
+              128,
+              256
+            ]
+          },
+          {
+            "name": "d_shared_w3",
+            "role": "shared up wgrad",
+            "shape": [
+              128,
+              256
+            ]
+          },
+          {
+            "name": "d_shared_w2",
+            "role": "shared down wgrad",
+            "shape": [
+              256,
+              128
+            ]
+          }
+        ]
+      }
+    ],
+    "note": "The harness stores tensors as [B, S, M]. If a Megatron path exposes [S, B, M], the first backward edge is the inverse view/communication that restores the local attention layout before these steps.",
+    "symbols": {
+      "A": 4096,
+      "ATTN_KEYS": 656,
+      "ATTN_MATERIALIZED_KEYS": 656,
+      "ATTN_WINDOW_KEYS": 16,
+      "A_PER_E_BALANCED": 256,
+      "B": 1,
+      "CSA": 512,
+      "D": 32,
+      "E": 16,
+      "G": 4,
+      "GD": 64,
+      "H": 8,
+      "HCA": 128,
+      "I": 128,
+      "K": 2,
+      "KV_ALL": 2688,
+      "M": 256,
+      "Q": 64,
+      "R": 32,
+      "S": 2048,
+      "SH": 128,
+      "T": 2048
+    },
+    "top_level_backward": [
+      {
+        "forward_inputs": [
+          {
+            "name": "layer_output",
+            "role": "loss input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "loss",
+            "role": "scalar loss",
+            "shape": []
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_loss",
+            "role": "seed gradient",
+            "shape": []
+          }
+        ],
+        "name": "loss_to_layer_output",
+        "produced_gradients": [
+          {
+            "name": "d_layer_output",
+            "role": "dL/d layer output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "hidden_after_attention",
+            "role": "residual input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "moe_out",
+            "role": "MoE branch output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "layer_output",
+            "role": "residual sum",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_layer_output",
+            "role": "from loss",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "moe_residual_add",
+        "produced_gradients": [
+          {
+            "name": "d_hidden_after_attention_residual",
+            "role": "identity residual gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_moe_out",
+            "role": "gradient entering MoE backward",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "moe_in",
+            "role": "normalized MoE input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "top_scores",
+            "role": "router weights",
+            "shape": [
+              2048,
+              2
+            ]
+          },
+          {
+            "name": "top_indices",
+            "role": "router expert ids",
+            "shape": [
+              2048,
+              2
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "moe_routed",
+            "role": "routed expert contribution",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "moe_shared",
+            "role": "shared expert contribution",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "moe_out",
+            "role": "combined MoE output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_moe_out",
+            "role": "from MoE residual",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "moe_backward",
+        "produced_gradients": [
+          {
+            "name": "d_moe_in",
+            "role": "routed plus shared input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_moe_weights",
+            "role": "router, routed, and shared wgrads",
+            "shape": [
+              "E/I/M dependent"
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "hidden_after_attention",
+            "role": "RMSNorm input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "moe_in",
+            "role": "RMSNorm output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_moe_in",
+            "role": "from MoE backward",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "moe_rmsnorm_backward",
+        "produced_gradients": [
+          {
+            "name": "d_hidden_after_attention_norm",
+            "role": "gradient through MoE RMSNorm",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_ffn_norm_weight",
+            "role": "RMSNorm scale gradient",
+            "shape": [
+              256
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "hidden",
+            "role": "layer input residual",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "attn_out",
+            "role": "attention branch output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "hidden_after_attention",
+            "role": "residual sum",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_hidden_after_attention",
+            "role": "d_hidden_after_attention_residual + d_hidden_after_attention_norm",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "attention_residual_add",
+        "produced_gradients": [
+          {
+            "name": "d_hidden_residual",
+            "role": "identity residual gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_attn_out",
+            "role": "gradient entering attention backward",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "attn_in",
+            "role": "normalized attention input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "attn_out",
+            "role": "attention output projection result",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_attn_out",
+            "role": "from attention residual",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "attention_backward",
+        "produced_gradients": [
+          {
+            "name": "d_attn_in",
+            "role": "attention input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_attention_weights",
+            "role": "attention wgrads",
+            "shape": [
+              "attention weight dependent"
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "hidden",
+            "role": "layer input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "attn_in",
+            "role": "attention RMSNorm output",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [
+          {
+            "name": "d_attn_in",
+            "role": "from attention backward",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "name": "attention_rmsnorm_backward",
+        "produced_gradients": [
+          {
+            "name": "d_hidden_norm",
+            "role": "gradient through attention RMSNorm",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_attention_norm_weight",
+            "role": "RMSNorm scale gradient",
+            "shape": [
+              256
+            ]
+          }
+        ]
+      },
+      {
+        "forward_inputs": [
+          {
+            "name": "d_hidden_residual",
+            "role": "from attention residual identity",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          },
+          {
+            "name": "d_hidden_norm",
+            "role": "from attention RMSNorm",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "forward_outputs": [
+          {
+            "name": "d_hidden",
+            "role": "layer input gradient",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ],
+        "incoming_gradients": [],
+        "name": "input_gradient_accumulation",
+        "produced_gradients": [
+          {
+            "name": "d_hidden",
+            "role": "final dL/d layer input",
+            "shape": [
+              1,
+              2048,
+              256
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "batch": 1,
+  "boundary_impl": "separate",
+  "config": {
+    "attention_impl": "sparse-gather-lightning-indexer",
+    "boundary_impl": "separate",
+    "csa_ratio": 4,
+    "dsa_indexer_head_dim": 32,
+    "dsa_indexer_n_heads": 8,
+    "dsa_indexer_topk": 32,
+    "hca_ratio": 16,
+    "hidden_size": 256,
+    "init_std": 0.012,
+    "kv_dim": 32,
+    "moe_intermediate": 128,
+    "num_experts": 16,
+    "num_heads": 8,
+    "o_groups": 4,
+    "o_lora_rank": 32,
+    "q_lora_rank": 64,
+    "rms_eps": 1e-06,
+    "rmsnorm_save_policy": "memory-light",
+    "rope_dim": 8,
+    "routed_top_k": 2,
+    "shared_experts": 1,
+    "window_size": 16
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "estimated_tflops": 0.0007523885244643085,
+  "fixed_router": false,
+  "flop_mode": "train",
+  "flops_by_block": {
+    "attention_fwd": 1711276032.0,
+    "attention_train": 5133828096.0,
+    "routed_moe_fwd": 805306368.0,
+    "routed_moe_train": 2415919104.0,
+    "router_fwd": 16777216.0,
+    "router_train": 50331648.0,
+    "shared_moe_fwd": 402653184.0,
+    "shared_moe_train": 1207959552.0
+  },
+  "forward_block_ms": {
+    "attn.compress_csa": 62.42712493985891,
+    "attn.compress_hca": 0.7647780003026128,
+    "attn.kv_proj": 0.7963369134813547,
+    "attn.lightning_indexer": 1460.1299490313977,
+    "attn.out_proj": 0.74771698564291,
+    "attn.q_proj": 87.10516896098852,
+    "attn.q_rank": 3185.1457699667662,
+    "attn.sparse_mla": 924.7473150026053,
+    "layer.attn_norm": 333.40666198637336,
+    "layer.attn_residual": 0.07343094330281019,
+    "layer.moe_norm": 0.25639007799327374,
+    "layer.moe_residual": 0.05512009374797344,
+    "moe.routed_experts": 905.8678640285507,
+    "moe.router": 19.594679004512727,
+    "moe.shared_expert": 0.3761890111491084
+  },
+  "forward_only": false,
+  "fp4": null,
+  "freeze_params": false,
+  "grad_norms": null,
+  "impl": "reference",
+  "iters": 1,
+  "loss_last": 0.9994491934776306,
+  "loss_mean": 0.9994491934776306,
+  "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+  "output_shape": [
+    1,
+    2048,
+    256
+  ],
+  "performance_by_block": {
+    "backward": {
+      "attention.csa.dgrad": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.11026634287218208,
+        "ms": 0.6086069624871016,
+        "tokens_per_s": 3365061.7331598536
+      },
+      "attention.csa.wgrad": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.12283846107203053,
+        "ms": 0.5463180132210255,
+        "tokens_per_s": 3748732.332520463
+      },
+      "attention.dgrad": {
+        "estimated_flops": 1845493760.0,
+        "estimated_tflops": 0.730757821621788,
+        "ms": 2.52545194234699,
+        "tokens_per_s": 810943.9604290085
+      },
+      "attention.hca.dgrad": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.10904581017159728,
+        "ms": 0.6154190050438046,
+        "tokens_per_s": 3327814.03111564
+      },
+      "attention.hca.wgrad": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.11976904552082585,
+        "ms": 0.5603189347311854,
+        "tokens_per_s": 3655061.2036384842
+      },
+      "attention.kv_path.dgrad": {
+        "estimated_flops": 33554432.0,
+        "estimated_tflops": 0.07878883977529007,
+        "ms": 0.42587798088788986,
+        "tokens_per_s": 4808889.146441044
+      },
+      "attention.kv_path.wgrad": {
+        "estimated_flops": 33554432.0,
+        "estimated_tflops": 0.08488581415138055,
+        "ms": 0.39528904017060995,
+        "tokens_per_s": 5181018.930137973
+      },
+      "attention.out_proj.dgrad": {
+        "estimated_flops": 167772160.0,
+        "estimated_tflops": 0.5570123325065575,
+        "ms": 0.30120008159428835,
+        "tokens_per_s": 6799466.949542939
+      },
+      "attention.out_proj.wgrad": {
+        "estimated_flops": 167772160.0,
+        "estimated_tflops": 0.6102404927304172,
+        "ms": 0.274927937425673,
+        "tokens_per_s": 7449224.7647756
+      },
+      "attention.output_rope_inv.dgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.3535799914970994,
+        "tokens_per_s": 5792182.955060682
+      },
+      "attention.q_path.dgrad": {
+        "estimated_flops": 134217728.0,
+        "estimated_tflops": 0.2039507407925975,
+        "ms": 0.6580889457836747,
+        "tokens_per_s": 3112041.3328948594
+      },
+      "attention.q_path.wgrad": {
+        "estimated_flops": 134217728.0,
+        "estimated_tflops": 0.22917774542658825,
+        "ms": 0.5856490461155772,
+        "tokens_per_s": 3496974.8752836343
+      },
+      "attention.sparse_mla.dgrad_qkv": {
+        "estimated_flops": 2751463424.0,
+        "estimated_tflops": 5.242890087895148,
+        "ms": 0.524798990227282,
+        "tokens_per_s": 3902446.5331250806
+      },
+      "attention.sparse_mla.sink_wgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.25759998243302107,
+        "tokens_per_s": 7950311.101176039
+      },
+      "attention.wgrad": {
+        "estimated_flops": 1845493760.0,
+        "estimated_tflops": 0.7744729189409607,
+        "ms": 2.382902894169092,
+        "tokens_per_s": 859455.9203446385
+      },
+      "layer.attn_norm.dgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.5446979776024818,
+        "tokens_per_s": 3759881.777080181
+      },
+      "layer.attn_norm.wgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.24236890021711588,
+        "tokens_per_s": 8449929.005600084
+      },
+      "layer.moe_norm.dgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.29054901096969843,
+        "tokens_per_s": 7048724.733788846
+      },
+      "layer.moe_norm.wgrad": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.24575996212661266,
+        "tokens_per_s": 8333334.617560261
+      },
+      "loss.dout": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.4836979787796736,
+        "tokens_per_s": 4234047.04970428
+      },
+      "moe.routed.dgrad": {
+        "estimated_flops": 805306368.0,
+        "estimated_tflops": 0.005289858940613944,
+        "ms": 152.23588701337576,
+        "tokens_per_s": 13452.806957534649
+      },
+      "moe.routed.wgrad": {
+        "estimated_flops": 805306368.0,
+        "estimated_tflops": 0.37132745816087537,
+        "ms": 2.168722916394472,
+        "tokens_per_s": 944334.5595318486
+      },
+      "moe.shared.dgrad": {
+        "estimated_flops": 402653184.0,
+        "estimated_tflops": 1.4867434893354854,
+        "ms": 0.27082895394414663,
+        "tokens_per_s": 7561968.431271796
+      },
+      "moe.shared.wgrad": {
+        "estimated_flops": 402653184.0,
+        "estimated_tflops": 1.360825204017891,
+        "ms": 0.29588898178189993,
+        "tokens_per_s": 6921514.913014175
+      }
+    },
+    "flops_by_profile_block": {
+      "backward": {
+        "attention.csa.dgrad": 67108864.0,
+        "attention.csa.wgrad": 67108864.0,
+        "attention.dgrad": 1845493760.0,
+        "attention.hca.dgrad": 67108864.0,
+        "attention.hca.wgrad": 67108864.0,
+        "attention.kv_path.dgrad": 33554432.0,
+        "attention.kv_path.wgrad": 33554432.0,
+        "attention.out_proj.dgrad": 167772160.0,
+        "attention.out_proj.wgrad": 167772160.0,
+        "attention.output_rope_inv.dgrad": 0.0,
+        "attention.q_path.dgrad": 134217728.0,
+        "attention.q_path.wgrad": 134217728.0,
+        "attention.sparse_mla.dgrad_qkv": 2751463424.0,
+        "attention.sparse_mla.sink_wgrad": 0.0,
+        "attention.wgrad": 1845493760.0,
+        "layer.attn_norm.dgrad": 0.0,
+        "layer.attn_norm.wgrad": 0.0,
+        "layer.moe_norm.dgrad": 0.0,
+        "layer.moe_norm.wgrad": 0.0,
+        "loss.dout": 0.0,
+        "moe.routed.dgrad": 805306368.0,
+        "moe.routed.input_gather_reduce.dgrad": 0.0,
+        "moe.routed.output_scale_reduce.dgrad": 0.0,
+        "moe.routed.swiglu.dgrad": 0.0,
+        "moe.routed.w1.wgrad": 268435456.0,
+        "moe.routed.w1_w3.dgrad": 536870912.0,
+        "moe.routed.w2.dgrad": 268435456.0,
+        "moe.routed.w2.wgrad": 268435456.0,
+        "moe.routed.w3.wgrad": 268435456.0,
+        "moe.routed.wgrad": 805306368.0,
+        "moe.shared.dgrad": 402653184.0,
+        "moe.shared.swiglu.dgrad": 0.0,
+        "moe.shared.w1.wgrad": 134217728.0,
+        "moe.shared.w1_w3.dgrad": 268435456.0,
+        "moe.shared.w2.dgrad": 134217728.0,
+        "moe.shared.w2.wgrad": 134217728.0,
+        "moe.shared.w3.wgrad": 134217728.0,
+        "moe.shared.wgrad": 402653184.0
+      },
+      "forward": {
+        "attn.compress_csa": 67108864.0,
+        "attn.compress_hca": 67108864.0,
+        "attn.kv_proj": 33554432.0,
+        "attn.out_proj": 167772160.0,
+        "attn.q_proj": 134217728.0,
+        "attn.sparse_mla": 1375731712.0,
+        "moe.routed_experts": 805306368.0,
+        "moe.router": 16777216.0,
+        "moe.router_fixed": 0.0,
+        "moe.shared_expert": 402653184.0
+      },
+      "phase": {
+        "backward": 6140461056.0,
+        "forward": 3070230528.0,
+        "loss": 0.0
+      }
+    },
+    "forward": {
+      "attn.compress_csa": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.0010749952695186808,
+        "ms": 62.42712493985891,
+        "tokens_per_s": 32806.25212154177
+      },
+      "attn.compress_hca": {
+        "estimated_flops": 67108864.0,
+        "estimated_tflops": 0.08774946974605165,
+        "ms": 0.7647780003026128,
+        "tokens_per_s": 2677901.298402455
+      },
+      "attn.kv_proj": {
+        "estimated_flops": 33554432.0,
+        "estimated_tflops": 0.042135974650866964,
+        "ms": 0.7963369134813547,
+        "tokens_per_s": 2571775.7965617045
+      },
+      "attn.lightning_indexer": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 1460.1299490313977,
+        "tokens_per_s": 1402.6148846262458
+      },
+      "attn.out_proj": {
+        "estimated_flops": 167772160.0,
+        "estimated_tflops": 0.22437922799860477,
+        "ms": 0.74771698564291,
+        "tokens_per_s": 2739004.2480298434
+      },
+      "attn.q_proj": {
+        "estimated_flops": 134217728.0,
+        "estimated_tflops": 0.0015408698427542412,
+        "ms": 87.10516896098852,
+        "tokens_per_s": 23511.80790335451
+      },
+      "attn.q_rank": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 3185.1457699667662,
+        "tokens_per_s": 642.9847008293655
+      },
+      "attn.sparse_mla": {
+        "estimated_flops": 1375731712.0,
+        "estimated_tflops": 0.0014876839215219827,
+        "ms": 924.7473150026053,
+        "tokens_per_s": 2214.6590390416327
+      },
+      "layer.attn_norm": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 333.40666198637336,
+        "tokens_per_s": 6142.648703533416
+      },
+      "layer.attn_residual": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.07343094330281019,
+        "tokens_per_s": 27890149.68192058
+      },
+      "layer.moe_norm": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.25639007799327374,
+        "tokens_per_s": 7987828.608772171
+      },
+      "layer.moe_residual": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.05512009374797344,
+        "tokens_per_s": 37155234.339116074
+      },
+      "moe.routed_experts": {
+        "estimated_flops": 805306368.0,
+        "estimated_tflops": 0.0008889887807904606,
+        "ms": 905.8678640285507,
+        "tokens_per_s": 2260.815380835115
+      },
+      "moe.router": {
+        "estimated_flops": 16777216.0,
+        "estimated_tflops": 0.0008562128522817926,
+        "ms": 19.594679004512727,
+        "tokens_per_s": 104518.17044455477
+      },
+      "moe.shared_expert": {
+        "estimated_flops": 402653184.0,
+        "estimated_tflops": 1.0703480752137178,
+        "ms": 0.3761890111491084,
+        "tokens_per_s": 5444071.834379668
+      }
+    },
+    "mode": "static_flops_divided_by_measured_block_ms",
+    "note": "Block rates use approximate static FLOP attribution. Router FLOPs are zero when --fixed-router bypasses the router GEMM. When --freeze-params is active, phase backward FLOPs exclude wgrad.",
+    "phase": {
+      "backward": {
+        "estimated_flops": 6140461056.0,
+        "estimated_tflops": 0.0013387015986243886,
+        "ms": 4586.878108093515,
+        "tokens_per_s": 446.4910450500784
+      },
+      "forward": {
+        "estimated_flops": 3070230528.0,
+        "estimated_tflops": 0.00043122589667765116,
+        "ms": 7119.773074053228,
+        "tokens_per_s": 287.64961729799774
+      },
+      "loss": {
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.11748005636036396,
+        "tokens_per_s": 17432746.148145065
+      }
+    }
+  },
+  "phase_ms": {
+    "backward": 4586.878108093515,
+    "forward": 7119.773074053228,
+    "loss": 0.11748005636036396
+  },
+  "phase_total_ms": 11706.768662203103,
+  "preset": "small",
+  "profiling_control": {
+    "ready_file": null,
+    "roctx_block_ranges": false,
+    "roctx_profile_attribution": false,
+    "roctx_profile_region": false,
+    "sleep_after_iters_s": 0.0,
+    "trigger_file": null,
+    "trigger_timeout_s": 600.0
+  },
+  "rmsnorm_save_policy": "memory-light",
+  "seqlen": 2048,
+  "shared_expert_impl": "fused-w13",
+  "subsystem_summary": {
+    "backward": {
+      "attention_dgrad": {
+        "blocks": [
+          "attention.dgrad"
+        ],
+        "estimated_flops": 1845493760.0,
+        "estimated_tflops": 0.730757821621788,
+        "ms": 2.52545194234699,
+        "tokens_per_s": 810943.9604290085
+      },
+      "attention_wgrad": {
+        "blocks": [
+          "attention.wgrad"
+        ],
+        "estimated_flops": 1845493760.0,
+        "estimated_tflops": 0.7744729189409607,
+        "ms": 2.382902894169092,
+        "tokens_per_s": 859455.9203446385
+      },
+      "boundary_dgrad": {
+        "blocks": [
+          "loss.dout",
+          "layer.moe_norm.dgrad",
+          "layer.attn_norm.dgrad"
+        ],
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 1.3189449673518538,
+        "tokens_per_s": 1552756.2185645436
+      },
+      "boundary_wgrad": {
+        "blocks": [
+          "layer.moe_norm.wgrad",
+          "layer.attn_norm.wgrad"
+        ],
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 0.48812886234372854,
+        "tokens_per_s": 4195613.408653242
+      },
+      "moe_dgrad": {
+        "blocks": [
+          "moe.routed.dgrad",
+          "moe.shared.dgrad"
+        ],
+        "estimated_flops": 1207959552.0,
+        "estimated_tflops": 0.007920697421999757,
+        "ms": 152.5067159673199,
+        "tokens_per_s": 13428.916798909093
+      },
+      "moe_wgrad": {
+        "blocks": [
+          "moe.routed.wgrad",
+          "moe.shared.wgrad"
+        ],
+        "estimated_flops": 1207959552.0,
+        "estimated_tflops": 0.49012161017878697,
+        "ms": 2.464611898176372,
+        "tokens_per_s": 830962.4738545514
+      }
+    },
+    "backward_segmented_over_phase_ms": {
+      "attention_dgrad": 0.0005505818735167276,
+      "attention_wgrad": 0.0005195042985695383,
+      "boundary_dgrad": 0.00028754742033030797,
+      "boundary_wgrad": 0.00010641853802097521,
+      "moe_dgrad": 0.03324847802216999,
+      "moe_wgrad": 0.0005373179404588016
+    },
+    "forward": {
+      "attention": {
+        "blocks": [
+          "attn.compress_csa",
+          "attn.compress_hca",
+          "attn.kv_proj",
+          "attn.lightning_indexer",
+          "attn.out_proj",
+          "attn.q_proj",
+          "attn.q_rank",
+          "attn.sparse_mla"
+        ],
+        "estimated_flops": 1845493760.0,
+        "estimated_tflops": 0.0003225336548472291,
+        "ms": 5721.864159801044,
+        "tokens_per_s": 357.92530944516716
+      },
+      "boundary": {
+        "blocks": [
+          "layer.attn_norm",
+          "layer.attn_residual",
+          "layer.attn_residual_moe_norm",
+          "layer.moe_norm",
+          "layer.moe_residual"
+        ],
+        "estimated_flops": 0.0,
+        "estimated_tflops": 0.0,
+        "ms": 333.7916031014174,
+        "tokens_per_s": 6135.564768469466
+      },
+      "moe": {
+        "blocks": [
+          "moe.routed_experts",
+          "moe.router",
+          "moe.shared_expert"
+        ],
+        "estimated_flops": 1224736768.0,
+        "estimated_tflops": 0.0013228402805052595,
+        "ms": 925.8387320442125,
+        "tokens_per_s": 2212.048307244722
+      }
+    },
+    "forward_share_of_phase_ms": {
+      "attention": 0.8036582206044431,
+      "boundary": 0.04688233734834369,
+      "moe": 0.13003767429305724
+    },
+    "mode": "aggregate_attention_moe_boundary_from_profile_blocks",
+    "note": "Forward aggregates use trace block timings. Backward aggregates use major segmented autograd attribution blocks when available; segmented backward ratios can exceed 1.0 because they compare separate autograd.grad calls against the normal loss.backward phase. When --freeze-params is active, wgrad groups are omitted."
+  },
+  "tokens": 2048,
+  "tokens_per_s": 174.94152819575626,
+  "traffic_estimate": {
+    "accum_dtype_bytes": 4,
+    "activation_dtype_bytes": 2,
+    "attention_impl": "sparse-gather-lightning-indexer",
+    "attention_score_keys_per_query": 656,
+    "bucket_totals_bytes": {
+      "attention_activations": 176308224,
+      "boundary_activations": 9908032,
+      "gradient_edges": 20094976,
+      "moe_activations": 11182080,
+      "parameter_gradients": 3581240
+    },
+    "compressed_tokens": {
+      "csa": 512,
+      "hca": 128
+    },
+    "custom_rmsnorm_saved_tensors_bytes": {
+      "input_or_accum": 2531328,
+      "policy": "memory-light",
+      "rstd": 35328,
+      "weight_or_accum": 1344
+    },
+    "details_bytes": {
+      "attention_activations": {
+        "csa_kv": 32768,
+        "hca_kv": 8192,
+        "kv": 131072,
+        "kv_all": 172032,
+        "o_low_rank": 524288,
+        "out_unrope": 1048576,
+        "probs": 42991616,
+        "q": 1048576,
+        "q_rank": 262144,
+        "scores": 43057152,
+        "sparse_gather_selected_kv": 85983232,
+        "sparse_out": 1048576
+      },
+      "boundary_activations": {
+        "attention_norm_out": 1048576,
+        "attention_out": 1048576,
+        "custom_rmsnorm_saved_tensors": 2568000,
+        "hidden_after_attention_residual": 1048576,
+        "hidden_input": 1048576,
+        "layer_output": 1048576,
+        "moe_norm_out": 1048576,
+        "moe_out": 1048576
+      },
+      "gradient_edges": {
+        "attention_output_edges": 2621440,
+        "attention_q_kv_edges": 1220608,
+        "boundary_hidden_edges": 6291456,
+        "moe_routed_edges": 7340032,
+        "moe_shared_edges": 2621440
+      },
+      "moe_activations": {
+        "routed_gate": 1048576,
+        "routed_hidden": 1048576,
+        "routed_up": 1048576,
+        "routed_x_group": 2097152,
+        "routed_y_reduced": 1048576,
+        "routed_y_unscaled": 2097152,
+        "router_scores": 131072,
+        "shared_gate": 524288,
+        "shared_hidden": 524288,
+        "shared_out": 1048576,
+        "shared_up": 524288,
+        "top_indices": 32768,
+        "top_scores": 8192
+      },
+      "parameter_gradients": {
+        "attention_parameter_grads": 229688,
+        "boundary_norm_parameter_grads": 1024,
+        "moe_parameter_grads": 3350528
+      }
+    },
+    "index_dtype_bytes": 8,
+    "kv_all_materialized": true,
+    "kv_all_tokens": 2688,
+    "mode": "static_shape_estimate_not_profiler_memory",
+    "packed_fp4_weight_storage_bytes": null,
+    "rmsnorm_save_policy": "memory-light",
+    "sparse_gather_materialized_keys_per_query": 656,
+    "sparse_keys_per_query": 656,
+    "tokens": 2048,
+    "total_estimated_bytes": 221074552
+  }
+}

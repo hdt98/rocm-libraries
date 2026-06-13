@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-05",
+  "question": "While waiting for the blocked AMD 4xMI350 GBS128/GA comparison run, can existing profiling traces identify root-cause performance gaps versus the Ascend recipe?",
+  "short_answer": "Yes, as a ranked gap analysis rather than the final same-shape answer. Existing traces say sparse attention is not the main source of the current memory-equivalent e2e gap. The bigger gaps are MoE/MORI owner-rank VJP plus dX-return skew, a large AMD forward/backward wrapper residual, and a visible loss/lm-head path. Sparse attention remains an important kernel target, but the isolated AMD operator is already competitive with or faster than the sampled Ascend operator boundary; the materialized AMD integration still has bridge/scatter variants that can erase that advantage.",
+  "blocked_followup": {
+    "planned_run": "AMD 4xMI350 S4096 target-shape GBS128/GA comparison and profile",
+    "blocker": "MI350 node currently occupied by an external SGLang Qwen3-32B TP8 workload",
+    "policy": "Do not stop external workload without explicit user approval"
+  },
+  "throughput_gap": {
+    "ascend_existing_best_memory_equivalent": {
+      "artifact": "run_artifacts/ascend910_vs_mi350_tflops_comparison_20260605.json",
+      "hardware": "8 dual-die Ascend 910C, 16 logical dies, treated by user as roughly memory-equivalent to 4xMI350",
+      "shape": "S4096 MBS1 GBS128 GA8 DeepSeek-V4 4-layer",
+      "late_mean_node_tokens_s": 47370.67,
+      "late_mean_step_time_s": 11.07,
+      "normalized_tflops_per_mi350_equivalent": 224.13
+    },
+    "amd_current_4x_best_existing": {
+      "artifact": "run_artifacts/torchtitan_query_recompute_stability_4x_s4096_gbs64_20260604.json",
+      "hardware": "4xMI350",
+      "shape": "S4096 MBS1 GBS64 GA16 FSDP4/EP4 no activation checkpointing",
+      "late_mean_node_tokens_s": 16361.32,
+      "late_mean_step_time_s": 16.02,
+      "late_mean_tflops_per_gpu": 77.4
+    },
+    "gap": {
+      "ascend_over_amd_node_tokens_s_ratio": 2.897,
+      "amd_ratio_to_active_277_tflops_target": 0.2794,
+      "same_shape_warning": "The pending AMD GBS128/GA comparison is still needed. Existing traces compare the best available AMD GBS64 4x run against Ascend GBS128."
+    }
+  },
+  "sparse_attention_findings": {
+    "isolated_amd_kernel": {
+      "artifact": "run_artifacts/sparse_attention_kernel_actual_li_query_recompute_profile_decision_20260605.json",
+      "shape": "S4096 layer2 H64 D512 topk512 compressed_groups1024",
+      "full_sparse_attention_backward_ms": 11.1347,
+      "no_dkv_ms": 1.9623,
+      "dkv_reduce_sink_ms": 2.8535,
+      "global_dkv_accumulation_wall_ms": 8.2812
+    },
+    "sampled_ascend_operator_boundary": {
+      "artifact": "run_artifacts/ascend910_sasg_slig_latency_profile_20260605.json",
+      "sparse_attn_sharedkv_grad_c4_topk512_avg_ms": 25.481,
+      "sparse_lightning_indexer_grad_kl_loss_avg_ms": 9.809,
+      "serial_sasg_plus_slig_avg_ms": 35.29,
+      "perfect_overlap_lower_bound_ms": 25.481
+    },
+    "materialized_amd_paths": {
+      "explicit_pytorch_profile_artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_control_profile4x_ep4_s4096_gbs64_20260604.json",
+      "explicit_pytorch_stage_sum_rank_total_ms_median": 4171.8754,
+      "explicit_pytorch_per_call_largest_stages_ms": {
+        "scatter": 13.8039,
+        "dkv_math": 7.3752,
+        "grad_logits_terms": 2.307,
+        "gather_selected_kv_fp32": 1.999,
+        "grad_q": 1.4517,
+        "scores_qk": 1.3553
+      },
+      "query_recompute_profile_artifact": "run_artifacts/torchtitan_query_recompute_profile4x_ep4_s4096_gbs64_20260604.json",
+      "query_recompute_stage_median_ms": 55.1125,
+      "query_recompute_rank_total_ms_median": 8163.0773,
+      "read": "The isolated AMD query-major kernel is strong, but the integrated query_recompute timing hook is much slower and was demoted in the 4x profile A/B. The explicit materialized path is closer to the Ascend SparseAttnSharedkvGrad boundary but still pays selected-state/scatter stages."
+    }
+  },
+  "moe_mori_findings": {
+    "amd_8x_late_profile": {
+      "artifact": "run_artifacts/torchtitan_noac_alloc_expand_lowintrusion_profile_8x_s4096_gbs128_20260604b.json",
+      "late_rank_median_per_call_ms": {
+        "local_vjp_total": 92.614,
+        "combine_dx": 44.981,
+        "local_vjp_recompute_forward": 29.857,
+        "local_vjp_wgrad": 23.409,
+        "local_vjp_xgrad_reduce": 21.508,
+        "local_vjp_w2_dgrad_swiglu": 12.499,
+        "dispatch_grad_inputs": 3.142
+      },
+      "late_rank_median_total_ms": {
+        "local_vjp_total": 14056.127,
+        "combine_dx": 9734.362
+      },
+      "rank_total_range_ms": {
+        "local_vjp_total": [6607.288, 22233.317],
+        "combine_dx": [1470.43, 17270.008]
+      },
+      "read": "High-recv ranks run long local VJP tails while low-recv ranks wait in combine_dx. This is owner-rank VJP imbalance plus dX-return wait, not raw MORI combine microkernel cost."
+    },
+    "sampled_ascend_moe_ops_from_msprof": {
+      "profile_dir": "/data2/sonle/dsv4_ascend910_fit_20260601/profiles/bf16_compile_customopp_novirtual_fullac_forcebalance_msprof_delay600_20260602T033625",
+      "sampled_devices": [2, 5, 6, 10, 14, 15],
+      "grouped_matmul_variants_avg_ms": [3.614, 1.838, 3.566, 1.843, 1.72],
+      "moe_token_permute_avg_ms_examples": [0.407, 0.278, 0.145, 0.116],
+      "moe_token_unpermute_avg_ms": 0.372,
+      "alltoallv_aicpu_avg_ms": 0.487,
+      "read": "Ascend uses compact GroupedMatmul plus token permute/unpermute operators. Because Ascend uses 16 logical dies and AMD 4x uses EP4 in the current trace, this is not a strict shape match, but the mechanism gap is clear: AMD owner VJP is still padded/recompute-heavy and skewed."
+    }
+  },
+  "loss_lm_head_findings": {
+    "amd_profile": {
+      "query_recompute_profile_artifact": "run_artifacts/torchtitan_query_recompute_lowintrusion_profile4x_ep4_s4096_gbs64_20260604.json",
+      "loss_chunked_ce_rank_total_ms_median": 15768.0844,
+      "loss_lm_head_forward_rank_total_ms_median": 1374.7716,
+      "loss_cross_entropy_forward_rank_total_ms_median": 273.8826,
+      "loss_chunk_backward_rank_total_ms_median": 14133.7402,
+      "explicit_control_loss_chunked_ce_rank_total_ms_median": 7575.6629
+    },
+    "ascend_sampled_ops": {
+      "lm_head_or_vocab_matmul_avg_ms_examples": {
+        "4096x129280_by_129280x4096": 57.101,
+        "4096x4096_by_129280x4096": 41.263,
+        "4096x4096_by_4096x129280": 74.646
+      },
+      "logsoftmax_forward_avg_ms": 5.422,
+      "logsoftmax_backward_avg_ms": 5.747
+    },
+    "read": "Loss/lm-head is visible on both stacks. On AMD it is a secondary optimization target and can distort profiled totals depending on chunk count, but the 8x additive profile says loss is flat across step-2 versus late-step slowdown, so it does not explain the burst decay."
+  },
+  "wrapper_residual_findings": {
+    "artifact": "run_artifacts/torchtitan_noac_alloc_expand_lowintrusion_profile_8x_s4096_gbs128_20260604b.json",
+    "late_steps4_to6_rank_max_ms": {
+      "rank_step_wall": 18757.644,
+      "model_forward": 2251.791,
+      "loss": 465.693,
+      "backward": 11157.331,
+      "microbatch_forward_backward_residual": 4600.717
+    },
+    "step2_to_late_delta_ms": {
+      "rank_step_wall": 4888.607,
+      "backward": 4802.898,
+      "model_forward": 96.434,
+      "loss": -3.186,
+      "residual": -4.253
+    },
+    "read": "The late-step slowdown is backward-dominated, but the persistent ~4.6s residual is a separate root-cause bucket. It likely contains FSDP/autograd scheduling, waits, or uninstrumented framework/communication boundaries and needs a same-shape torch-profiler/additive trace."
+  },
+  "ranked_root_cause_read": [
+    "1. MoE/MORI owner-rank VJP plus dX-return skew is the highest-return trace-backed target. AMD per-call local VJP is tens of ms with large rank skew; Ascend uses compact grouped-matmul/token-permute operators.",
+    "2. The persistent AMD forward/backward wrapper residual is large enough to erase isolated kernel wins and must be decomposed with a same-shape profiler run.",
+    "3. Sparse attention is still worth optimizing, but the currently isolated AMD SparseAttnSharedkvGrad-style kernel is not the main observed gap versus Ascend. The risk is materialization: active integrated paths still pay explicit scatter or slow query_recompute wrappers.",
+    "4. Loss/lm-head is visible and may need sharded/fused vocab-loss work, but current traces do not put it ahead of MoE/skew and wrapper residual.",
+    "5. The final AMD GBS128/GA comparison is still required because current AMD profile is GBS64/GA16 while the Ascend local run is GBS128/GA8."
+  ],
+  "commands_run_for_this_comparison": [
+    "jq over local AMD and Ascend run_artifacts",
+    "ssh ascend-910-dev Python CSV parser over existing op_statistic/op_summary msprof files; no fresh Ascend workload launched",
+    "git status --short and experiment README/recipe read before persisting artifact"
+  ],
+  "files_changed": [
+    "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/amd_ascend_profile_gap_comparison_20260605.json"
+  ],
+  "dependency_pin_changes": []
+}

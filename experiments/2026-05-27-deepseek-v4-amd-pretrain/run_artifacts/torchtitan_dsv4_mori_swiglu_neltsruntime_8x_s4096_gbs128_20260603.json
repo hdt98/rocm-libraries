@@ -1,0 +1,63 @@
+{
+  "artifact": "torchtitan_dsv4_mori_swiglu_neltsruntime_8x_s4096_gbs128_20260603",
+  "run_id": "torchtitan_dsv4_mori_swiglu_neltsruntime_8x_s4096_gbs128_20260603",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_swiglu_neltsruntime_8x_s4096_gbs128_20260603",
+  "code_change": "Triton SwiGLU n_elements changed from tl.constexpr to runtime scalar in mori_aiter_moe.py to avoid dynamic routed-row specialization/recompile behavior.",
+  "shape": {
+    "gpus": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 128,
+    "sequence_length": 4096,
+    "steps": 2,
+    "activation_checkpointing": "full"
+  },
+  "knobs": {
+    "experimental_mori_aiter_moe": 1,
+    "mori_aiter_backward_mode": "routed",
+    "local_vjp_mode": "padded",
+    "local_vjp_swiglu_backend": "triton",
+    "mori_op_cache_mode": "backward",
+    "assume_identical_dispatch_order": 1,
+    "mori_shmem_heap_size": "32G",
+    "moe_comm_backend": "mori",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot",
+    "checkpoint_enabled": false
+  },
+  "result": {
+    "passed": true,
+    "loss_step1": 12.31628,
+    "loss_step2": 8.89764,
+    "grad_norm_step1": 9.3125,
+    "grad_norm_step2": 49.25,
+    "tokens_per_gpu_s_step1_range": [
+      1918,
+      1920
+    ],
+    "tokens_per_gpu_s_step2": 2936,
+    "tokens_per_node_s_step2": 23488,
+    "implied_step_time_s_step2": 22.32,
+    "tflops_per_gpu_step2": 55.55,
+    "mfu_step2_pct_mi350": 2.41,
+    "peak_memory_gib_range_step2": [
+      71.66,
+      174.68
+    ],
+    "process_groups_destroyed_cleanly": true
+  },
+  "comparison": {
+    "previous_safe_default_8x_step2_tokens_per_gpu_s": 2645,
+    "previous_sharedkv_safeauto_8x_step2_tokens_per_gpu_s": 2648,
+    "normalized_8x_target_tokens_per_gpu_s": [
+      2200,
+      2400
+    ]
+  },
+  "read": "Normal no-timing 8x target slice passed after the runtime-n_elements Triton SwiGLU patch. Step 2 is above the normalized 8x target band and improves over the earlier 8x guarded MORI routed padded runs. This is still guarded/shared-KV prototype systems evidence, not final fused sparse-MLA/LI performance."
+}

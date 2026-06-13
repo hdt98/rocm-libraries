@@ -1,0 +1,1007 @@
+{
+  "date": "2026-05-31",
+  "operator_path": [
+    {
+      "input": {
+        "top_indices": [
+          "tokens",
+          6
+        ],
+        "top_scores": [
+          "tokens",
+          6
+        ]
+      },
+      "output": {
+        "compact_to_tile": [
+          "tokens * topk"
+        ],
+        "group_offsets": [
+          385
+        ],
+        "group_sizes": [
+          384
+        ],
+        "score_sorted": [
+          "tokens * topk"
+        ],
+        "tile_descriptors": [
+          "sum(ceil(group_sizes / tile_m))",
+          4
+        ],
+        "tile_offsets": [
+          385
+        ],
+        "token_ids_sorted": [
+          "tokens * topk"
+        ]
+      },
+      "step": "route_to_compact_and_tile_metadata"
+    },
+    {
+      "input": {
+        "token_ids_sorted": [
+          "tokens * topk"
+        ],
+        "x": [
+          "tokens",
+          7168
+        ]
+      },
+      "output": {
+        "x_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "step": "pack_x_to_tile_rows"
+    },
+    {
+      "input": {
+        "w1": [
+          384,
+          3072,
+          7168
+        ],
+        "w2": [
+          384,
+          7168,
+          3072
+        ],
+        "w3": [
+          384,
+          3072,
+          7168
+        ],
+        "x_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "output": {
+        "gate_tile": [
+          "tile_rows",
+          3072
+        ],
+        "hidden_tile": [
+          "tile_rows",
+          3072
+        ],
+        "up_tile": [
+          "tile_rows",
+          3072
+        ],
+        "y_unscaled_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "step": "forward_grouped_gemms"
+    },
+    {
+      "input": {
+        "score_sorted": [
+          "tokens * topk"
+        ],
+        "tile_to_compact": [
+          "tile_rows"
+        ],
+        "token_ids_sorted": [
+          "tokens * topk"
+        ],
+        "y_unscaled_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "output": {
+        "y": [
+          "tokens",
+          7168
+        ]
+      },
+      "step": "forward_reduce_to_tokens"
+    },
+    {
+      "input": {
+        "dy": [
+          "tokens",
+          7168
+        ],
+        "score_sorted": [
+          "tokens * topk"
+        ],
+        "token_ids_sorted": [
+          "tokens * topk"
+        ],
+        "y_unscaled_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "output": {
+        "dtop_scores_sorted": [
+          "tokens * topk"
+        ],
+        "dy_unscaled_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "step": "backward_pack_dy_and_dscore"
+    },
+    {
+      "input": {
+        "dy_unscaled_tile": [
+          "tile_rows",
+          7168
+        ],
+        "gate_tile": [
+          "tile_rows",
+          3072
+        ],
+        "hidden_tile": [
+          "tile_rows",
+          3072
+        ],
+        "up_tile": [
+          "tile_rows",
+          3072
+        ],
+        "w1": [
+          384,
+          3072,
+          7168
+        ],
+        "w2": [
+          384,
+          7168,
+          3072
+        ],
+        "w3": [
+          384,
+          3072,
+          7168
+        ],
+        "x_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "output": {
+        "dw1": [
+          384,
+          3072,
+          7168
+        ],
+        "dw2": [
+          384,
+          7168,
+          3072
+        ],
+        "dw3": [
+          384,
+          3072,
+          7168
+        ],
+        "dx_tile": [
+          "tile_rows",
+          7168
+        ]
+      },
+      "step": "backward_grouped_gemms"
+    },
+    {
+      "input": {
+        "dx_tile": [
+          "tile_rows",
+          7168
+        ],
+        "sorted_assignment_order": [
+          "tokens * topk"
+        ],
+        "tile_to_compact": [
+          "tile_rows"
+        ],
+        "token_ids_sorted": [
+          "tokens * topk"
+        ]
+      },
+      "output": {
+        "dtop_scores": [
+          "tokens",
+          6
+        ],
+        "dx": [
+          "tokens",
+          7168
+        ]
+      },
+      "step": "backward_reduce_dx_and_restore_score_order"
+    }
+  ],
+  "probe": "compact_moe_tile_schedule",
+  "read": "This is the concrete row schedule for a compact tile_m grouped MoE training kernel. The retained PyTorch bridge pads every expert to one global max_count; this schedule pads only each expert's valid rows to tile_m and carries tile_to_compact metadata for valid-row reductions.",
+  "routes": [
+    {
+      "assignments": 12288,
+      "compact_flop_ratio_vs_current_max": 0.6808510638297872,
+      "compact_rows": 12288,
+      "compact_train_gemm_flops": 4870492913664.0,
+      "current_max_padded_rows": 18048,
+      "current_max_padded_train_gemm_flops": 7153536466944.0,
+      "experts": 384,
+      "max_per_expert": 47,
+      "mean_per_expert": 32.0,
+      "metadata_samples": {
+        "compact_to_tile": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "flat_padded_index": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "group_offsets": [
+          0,
+          36,
+          62,
+          93,
+          129,
+          161,
+          200,
+          230,
+          252,
+          285,
+          317,
+          346,
+          378,
+          419,
+          452,
+          487
+        ],
+        "group_sizes": [
+          36,
+          26,
+          31,
+          36,
+          32,
+          39,
+          30,
+          22,
+          33,
+          32,
+          29,
+          32,
+          41,
+          33,
+          35,
+          34
+        ],
+        "score_sorted": [
+          0.16565755009651184,
+          0.16711269319057465,
+          0.16763648390769958,
+          0.1695130467414856,
+          0.16503310203552246,
+          0.16580331325531006,
+          0.16975614428520203,
+          0.16512586176395416,
+          0.173323854804039,
+          0.16575168073177338,
+          0.17166294157505035,
+          0.16788779199123383,
+          0.16522057354450226,
+          0.16451045870780945,
+          0.1700373888015747,
+          0.16652970016002655
+        ],
+        "sorted_assignment_order": [
+          8721,
+          3860,
+          6764,
+          613,
+          2279,
+          10288,
+          2190,
+          9194,
+          4356,
+          2115,
+          2095,
+          4597,
+          10089,
+          10905,
+          4861,
+          9896
+        ],
+        "tile_descriptors": [
+          [
+            0,
+            0,
+            0,
+            8
+          ],
+          [
+            0,
+            8,
+            8,
+            8
+          ],
+          [
+            0,
+            16,
+            16,
+            8
+          ],
+          [
+            0,
+            24,
+            24,
+            8
+          ],
+          [
+            0,
+            32,
+            32,
+            4
+          ],
+          [
+            1,
+            36,
+            40,
+            8
+          ],
+          [
+            1,
+            44,
+            48,
+            8
+          ],
+          [
+            1,
+            52,
+            56,
+            8
+          ],
+          [
+            1,
+            60,
+            64,
+            2
+          ],
+          [
+            2,
+            62,
+            72,
+            8
+          ],
+          [
+            2,
+            70,
+            80,
+            8
+          ],
+          [
+            2,
+            78,
+            88,
+            8
+          ],
+          [
+            2,
+            86,
+            96,
+            7
+          ],
+          [
+            3,
+            93,
+            104,
+            8
+          ],
+          [
+            3,
+            101,
+            112,
+            8
+          ],
+          [
+            3,
+            109,
+            120,
+            8
+          ]
+        ],
+        "tile_offsets": [
+          0,
+          40,
+          72,
+          104,
+          144,
+          176,
+          216,
+          248,
+          272,
+          312,
+          344,
+          376,
+          408,
+          456,
+          496,
+          536
+        ],
+        "tile_to_compact": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "token_ids_sorted": [
+          1453,
+          643,
+          1127,
+          102,
+          379,
+          1714,
+          365,
+          1532,
+          726,
+          352,
+          349,
+          766,
+          1681,
+          1817,
+          810,
+          1649
+        ]
+      },
+      "metadata_shapes": {
+        "compact_to_tile": [
+          12288
+        ],
+        "flat_padded_index": [
+          12288
+        ],
+        "group_offsets": [
+          385
+        ],
+        "group_sizes": [
+          384
+        ],
+        "score_sorted": [
+          12288
+        ],
+        "sorted_assignment_order": [
+          12288
+        ],
+        "tile_descriptors_expert_compact_begin_tile_begin_valid_rows": [
+          1700,
+          4
+        ],
+        "tile_offsets": [
+          385
+        ],
+        "tile_to_compact": [
+          13600
+        ],
+        "token_ids_sorted": [
+          12288
+        ]
+      },
+      "min_per_expert": 15,
+      "nonzero_percentiles": {
+        "p50": 32,
+        "p90": 39,
+        "p95": 41,
+        "p99": 45
+      },
+      "padding_multiplier_current_max": 1.46875,
+      "padding_multiplier_tile": 1.1067708333333333,
+      "per_expert_count_histogram": {
+        "15": 2,
+        "18": 1,
+        "19": 2,
+        "21": 4,
+        "22": 4,
+        "23": 13,
+        "24": 11,
+        "25": 12,
+        "26": 15,
+        "27": 13,
+        "28": 23,
+        "29": 24,
+        "30": 25,
+        "31": 29,
+        "32": 27,
+        "33": 31,
+        "34": 23,
+        "35": 25,
+        "36": 21,
+        "37": 18,
+        "38": 13,
+        "39": 14,
+        "40": 10,
+        "41": 7,
+        "42": 5,
+        "43": 2,
+        "44": 5,
+        "45": 3,
+        "46": 1,
+        "47": 1
+      },
+      "rounded_count_histogram": {
+        "16": 2,
+        "24": 35,
+        "32": 168,
+        "40": 155,
+        "48": 24
+      },
+      "tile_count": 1700,
+      "tile_flop_ratio_vs_current_max": 0.7535460992907801,
+      "tile_m": 8,
+      "tile_row_utilization": 0.9035294117647059,
+      "tile_rows": 13600,
+      "tile_rows_extra_vs_compact": 1312,
+      "tile_rows_saved_vs_current_max": 4448,
+      "tile_train_gemm_flops": 5390519500800.0,
+      "tokens": 2048,
+      "topk": 6
+    },
+    {
+      "assignments": 24576,
+      "compact_flop_ratio_vs_current_max": 0.7272727272727273,
+      "compact_rows": 24576,
+      "compact_train_gemm_flops": 9740985827328.0,
+      "current_max_padded_rows": 33792,
+      "current_max_padded_train_gemm_flops": 13393855512576.0,
+      "experts": 384,
+      "max_per_expert": 88,
+      "mean_per_expert": 64.0,
+      "metadata_samples": {
+        "compact_to_tile": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "flat_padded_index": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "group_offsets": [
+          0,
+          66,
+          118,
+          189,
+          259,
+          323,
+          393,
+          448,
+          501,
+          567,
+          634,
+          697,
+          761,
+          830,
+          892,
+          961
+        ],
+        "group_sizes": [
+          66,
+          52,
+          71,
+          70,
+          64,
+          70,
+          55,
+          53,
+          66,
+          67,
+          63,
+          64,
+          69,
+          62,
+          69,
+          65
+        ],
+        "score_sorted": [
+          0.16937695443630219,
+          0.1619008332490921,
+          0.164430171251297,
+          0.1652538776397705,
+          0.1661059856414795,
+          0.16796448826789856,
+          0.17100287973880768,
+          0.16933119297027588,
+          0.1657954603433609,
+          0.1663060337305069,
+          0.17166294157505035,
+          0.1686883568763733,
+          0.16336743533611298,
+          0.16080251336097717,
+          0.16271544992923737,
+          0.1674213409423828
+        ],
+        "sorted_assignment_order": [
+          18948,
+          22931,
+          17888,
+          3621,
+          19485,
+          17474,
+          5238,
+          5305,
+          2853,
+          20680,
+          2095,
+          5965,
+          24370,
+          7313,
+          14969,
+          23803
+        ],
+        "tile_descriptors": [
+          [
+            0,
+            0,
+            0,
+            8
+          ],
+          [
+            0,
+            8,
+            8,
+            8
+          ],
+          [
+            0,
+            16,
+            16,
+            8
+          ],
+          [
+            0,
+            24,
+            24,
+            8
+          ],
+          [
+            0,
+            32,
+            32,
+            8
+          ],
+          [
+            0,
+            40,
+            40,
+            8
+          ],
+          [
+            0,
+            48,
+            48,
+            8
+          ],
+          [
+            0,
+            56,
+            56,
+            8
+          ],
+          [
+            0,
+            64,
+            64,
+            2
+          ],
+          [
+            1,
+            66,
+            72,
+            8
+          ],
+          [
+            1,
+            74,
+            80,
+            8
+          ],
+          [
+            1,
+            82,
+            88,
+            8
+          ],
+          [
+            1,
+            90,
+            96,
+            8
+          ],
+          [
+            1,
+            98,
+            104,
+            8
+          ],
+          [
+            1,
+            106,
+            112,
+            8
+          ],
+          [
+            1,
+            114,
+            120,
+            4
+          ]
+        ],
+        "tile_offsets": [
+          0,
+          72,
+          128,
+          200,
+          272,
+          336,
+          408,
+          464,
+          520,
+          592,
+          664,
+          728,
+          792,
+          864,
+          928,
+          1000
+        ],
+        "tile_to_compact": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "token_ids_sorted": [
+          3158,
+          3821,
+          2981,
+          603,
+          3247,
+          2912,
+          873,
+          884,
+          475,
+          3446,
+          349,
+          994,
+          4061,
+          1218,
+          2494,
+          3967
+        ]
+      },
+      "metadata_shapes": {
+        "compact_to_tile": [
+          24576
+        ],
+        "flat_padded_index": [
+          24576
+        ],
+        "group_offsets": [
+          385
+        ],
+        "group_sizes": [
+          384
+        ],
+        "score_sorted": [
+          24576
+        ],
+        "sorted_assignment_order": [
+          24576
+        ],
+        "tile_descriptors_expert_compact_begin_tile_begin_valid_rows": [
+          3244,
+          4
+        ],
+        "tile_offsets": [
+          385
+        ],
+        "tile_to_compact": [
+          25952
+        ],
+        "token_ids_sorted": [
+          24576
+        ]
+      },
+      "min_per_expert": 45,
+      "nonzero_percentiles": {
+        "p50": 64,
+        "p90": 74,
+        "p95": 78,
+        "p99": 82
+      },
+      "padding_multiplier_current_max": 1.375,
+      "padding_multiplier_tile": 1.0559895833333333,
+      "per_expert_count_histogram": {
+        "45": 1,
+        "46": 1,
+        "47": 5,
+        "48": 2,
+        "49": 6,
+        "50": 7,
+        "51": 3,
+        "52": 5,
+        "53": 7,
+        "54": 11,
+        "55": 8,
+        "56": 11,
+        "57": 13,
+        "58": 18,
+        "59": 15,
+        "60": 20,
+        "61": 15,
+        "62": 16,
+        "63": 20,
+        "64": 16,
+        "65": 24,
+        "66": 13,
+        "67": 20,
+        "68": 14,
+        "69": 13,
+        "70": 21,
+        "71": 15,
+        "72": 7,
+        "73": 11,
+        "74": 10,
+        "75": 4,
+        "76": 10,
+        "77": 1,
+        "78": 5,
+        "79": 4,
+        "80": 5,
+        "81": 1,
+        "82": 2,
+        "83": 2,
+        "84": 1,
+        "88": 1
+      },
+      "rounded_count_histogram": {
+        "48": 9,
+        "56": 58,
+        "64": 133,
+        "72": 127,
+        "80": 50,
+        "88": 7
+      },
+      "tile_count": 3244,
+      "tile_flop_ratio_vs_current_max": 0.7679924242424242,
+      "tile_m": 8,
+      "tile_row_utilization": 0.9469790382244143,
+      "tile_rows": 25952,
+      "tile_rows_extra_vs_compact": 1376,
+      "tile_rows_saved_vs_current_max": 7840,
+      "tile_train_gemm_flops": 10286379565056.0,
+      "tokens": 4096,
+      "topk": 6
+    }
+  ],
+  "seed": 20260531,
+  "shape_base": {
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tile_m": 8,
+    "topk": 6
+  },
+  "small_contract_check": {
+    "assignments": 51,
+    "experts": 7,
+    "hidden": 5,
+    "max_abs_reduce_diff": 0.0,
+    "reduce_ok": true,
+    "roundtrip_ok": true,
+    "tile_m": 4,
+    "tile_rows": 64,
+    "tokens": 17,
+    "topk": 3
+  }
+}

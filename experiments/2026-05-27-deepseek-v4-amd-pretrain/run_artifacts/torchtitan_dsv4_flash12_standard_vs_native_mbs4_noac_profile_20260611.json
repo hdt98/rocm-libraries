@@ -1,0 +1,188 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_vs_native_mbs4_noac_profile_20260611",
+  "date": "2026-06-11",
+  "host": "do-sonle5-mi350-gpu",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint": "none",
+    "mhc": false
+  },
+  "runs": {
+    "standard_ep_ownercompact": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "result": "completed_two_step_profile",
+      "step2_tokens_per_gpu_s": 6253,
+      "step2_tflops_per_gpu": 316.61,
+      "step2_peak_logged_memory_gib": 179.98,
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/docker-run.log",
+      "profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+      "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/additive_timing.jsonl",
+      "local_step2_profile_summary": "run_artifacts/torchtitan_dsv4_flash12_standard_vs_native_mbs4_noac_profile_step2_summary_20260611.json"
+    },
+    "native_mori_source_scatter": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "result": "completed_two_step_profile",
+      "step2_tokens_per_gpu_s": 5476,
+      "step2_tflops_per_gpu": 277.25,
+      "step2_peak_logged_memory_gib": 179.76,
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_source_scatter_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/docker-run.log",
+      "profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_source_scatter_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+      "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_source_scatter_profile2_mbs4_noac_steps2_8x_s4096_gbs128_20260611/additive_timing.jsonl",
+      "local_step2_profile_summary": "run_artifacts/torchtitan_dsv4_flash12_standard_vs_native_mbs4_noac_profile_step2_summary_20260611.json"
+    },
+    "native_mori_with_full_mori_profiler": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_profile_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "result": "failed_before_first_metric",
+      "failure": "HSA_STATUS_ERROR_MEMORY_APERTURE_VIOLATION during _standard_ep_mori_native_compact_profile_end torch.cuda.synchronize after native dispatch",
+      "read": "Full-run MORI profiler hook is unsafe on this surface; use timing hooks for full-run A/B and isolate MORI profiler by stage."
+    }
+  },
+  "delta_native_minus_standard": {
+    "tokens_per_gpu_s": -777,
+    "tflops_per_gpu": -39.36,
+    "throughput_pct": -12.43,
+    "peak_memory_gib": -0.22
+  },
+  "additive_rankmax_ms": {
+    "train_step": {
+      "standard": 9036.181,
+      "native": 10425.48,
+      "delta": 1389.3
+    },
+    "forward_backward_call": {
+      "standard": 8924.588,
+      "native": 10316.046,
+      "delta": 1391.458
+    },
+    "model_forward": {
+      "standard": 2389.126,
+      "native": 3109.686,
+      "delta": 720.56
+    },
+    "backward": {
+      "standard": 6145.218,
+      "native": 6818.766,
+      "delta": 673.548
+    },
+    "loss": {
+      "standard": 399.317,
+      "native": 393.747,
+      "delta": -5.571
+    },
+    "optimizer": {
+      "standard": 47.032,
+      "native": 46.349,
+      "delta": -0.683
+    }
+  },
+  "profile_kind_rankmax_ms": {
+    "module_backward": {
+      "standard": 11698.45,
+      "native": 13056.145,
+      "delta": 1357.695
+    },
+    "standard_ep_dispatch": {
+      "standard": 324.821,
+      "native": 780.575,
+      "delta": 455.754
+    },
+    "standard_ep_combine": {
+      "standard": 385.589,
+      "native": 591.566,
+      "delta": 205.976
+    },
+    "standard_ep_hot_split": {
+      "standard": 404.053,
+      "native": 427.111,
+      "delta": 23.059
+    },
+    "standard_ep_hot_weight": {
+      "standard": 137.852,
+      "native": 123.57,
+      "delta": -14.282
+    },
+    "chunked_ce_loss": {
+      "standard": 394.994,
+      "native": 389.822,
+      "delta": -5.173
+    }
+  },
+  "selected_stage_rankmax_ms": {
+    "dispatch": {
+      "standard": {
+        "local_reorder": 24.537,
+        "count_all_to_all": 92.839,
+        "all_to_all": 16.432,
+        "permute": 100.117,
+        "hot_metadata": 24.598,
+        "hot_local_reorder": 39.117
+      },
+      "native": {
+        "local_reorder": 24.911,
+        "count_all_to_all": 102.627,
+        "mori_native_compact_init": 21.985,
+        "mori_native_compact_launch": 521.425,
+        "permute": 16.505,
+        "hot_metadata": 25.213,
+        "hot_local_reorder": 39.901
+      }
+    },
+    "combine": {
+      "standard": {
+        "all_to_all": 8.384,
+        "all_to_all_wait": 224.181,
+        "unpermute": 57.473,
+        "weighted_scatter_add": 140.395
+      },
+      "native": {
+        "mori_native_compact_init": 179.196,
+        "mori_native_compact_launch": 382.871,
+        "native_source_positions": 0.261,
+        "weighted_scatter_add": 97.245
+      }
+    },
+    "hot_split": {
+      "standard": {
+        "broadcast_hot_weights": 191.332,
+        "grouped_w13": 80.404,
+        "grouped_w2": 43.717,
+        "weighted_scatter_tokens": 83.787
+      },
+      "native": {
+        "broadcast_hot_weights": 201.634,
+        "grouped_w13": 81.328,
+        "grouped_w2": 45.597,
+        "weighted_scatter_tokens": 99.096
+      }
+    }
+  },
+  "module_backward_layer_sum_ms": {
+    "attention": {
+      "standard": 3790.971,
+      "native": 3822.054,
+      "delta": 31.083
+    },
+    "moe": {
+      "standard": 2050.859,
+      "native": 2698.888,
+      "delta": 648.029
+    }
+  },
+  "read": [
+    "The current node and no-mHC baseline are healthy; this A/B isolates native-MORI compact source-scatter behavior at matched no-AC MBS4.",
+    "The regression is EP/MoE native compact, not sparse attention, loss, optimizer, or node health.",
+    "Native MORI buys smaller dispatch permute and combine weighted scatter, but it pays larger native compact launch/body cost on dispatch and combine.",
+    "Step-2 parser output shows dispatch init is not the steady wall: dispatch native launch is 521.425 ms summed rank-max, combine native launch is 382.871 ms, and native capacity is mostly stable at 16384 peer rows.",
+    "The full-run MORI profiler hook faulted on this surface; use low-intrusion timing hooks for full-run A/B and stage-isolated MORI profiler runs.",
+    "Next source target: collapse native compact staging/pull into final expert-major or compact-return ABI directly consumable by AITER/helper grouped MLP, rather than adding route-mask or selected-order adapters."
+  ]
+}

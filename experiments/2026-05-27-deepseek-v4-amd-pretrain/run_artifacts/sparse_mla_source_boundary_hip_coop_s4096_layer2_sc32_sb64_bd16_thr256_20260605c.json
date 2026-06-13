@@ -1,0 +1,205 @@
+{
+  "artifact": "sparse_mla_source_boundary_hip_coop_probe",
+  "status": "timed",
+  "scope": "source-boundary compressed dKV producer: q,dO,output,lse,kv,LI route to dKV without materialized probs/grad_logits",
+  "arch": "gfx950",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip": "7.2.26015-fc0010cf6a",
+  "device": "AMD Instinct MI350X VF",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "build_seconds": 24.73249635612592,
+  "extension_dir": "/work/torch_extensions/source_boundary_hip_coop_20260605c",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 32,
+    "selected_block": 64,
+    "block_d": 16,
+    "threads": 256,
+    "k_tile": 16,
+    "h_tile": 16,
+    "schedule_read": "D16 row-leader source-boundary rung. It consumes score/prob/dP inside one CTA, but still replays QK and dO.V per D16 tile. The next real cooperative kernel must share or persist the score tile across D-block consumers."
+  },
+  "contract": {
+    "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]",
+    "source_boundary": true,
+    "materialized_probs_grad_logits": false,
+    "hip_source_includes_torch_extension": false,
+    "hip_source_headers": [
+      "hip/hip_runtime.h",
+      "cstdint",
+      "cmath"
+    ],
+    "cpp_source_includes": [
+      "torch/extension.h"
+    ]
+  },
+  "route_stats": {
+    "token_block": 32,
+    "selected_block": 64,
+    "d_block": 16,
+    "d_blocks_per_full_dim": 32,
+    "tiles": 1024,
+    "nonempty_tiles": 800,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_unique_groups": 458649,
+    "baseline_atomic_add_elements": 805044224,
+    "coalesced_atomic_add_elements": 234828288,
+    "route_atomic_reduction_x": 3.428225069715621,
+    "valid_pairs_per_tile": {
+      "mean": 1535.5,
+      "p50": 2048.0,
+      "p90": 2048.0,
+      "p99": 2048.0,
+      "max": 2048
+    },
+    "unique_groups_per_tile": {
+      "mean": 447.8994140625,
+      "p50": 506.5,
+      "p90": 830.0,
+      "p99": 887.5400390625,
+      "max": 908
+    },
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block."
+  },
+  "boundary_route_fanin": {
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "actual_compressed": {
+      "rows": 1024,
+      "nonzero_rows": 1024,
+      "zero_rows": 0,
+      "total_selections": 1572352,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "p50_all_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p50_nonzero_rows": 1420.5,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_nonzero_rows": 3413.16,
+      "gini": 0.38915823461643767,
+      "top1_share": 0.002225328679583198,
+      "top8_share": 0.017700871051774668,
+      "top16_share": 0.035047495726147834,
+      "top64_share": 0.13582136824324326
+    },
+    "prefix_compressed_same_topk": {
+      "rows": 1024,
+      "nonzero_rows": 512,
+      "zero_rows": 512,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 2049,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "p50_all_rows": 1024.5,
+      "p90_all_rows": 3683.8,
+      "p99_all_rows": 4052.08,
+      "p50_nonzero_rows": 3071.0,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_nonzero_rows": 4072.56,
+      "gini": 0.5555734339384565,
+      "top1_share": 0.0026031066834907197,
+      "top8_share": 0.020753622598502115,
+      "top16_share": 0.04134443178117877,
+      "top64_share": 0.16147020514490393
+    },
+    "valid_selected_per_query": {
+      "rows": 4096,
+      "nonzero_rows": 4093,
+      "zero_rows": 3,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 1,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "p50_all_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "gini": 0.22245742365577173,
+      "top1_share": 0.00032562683165092806,
+      "top8_share": 0.0026050146532074245,
+      "top16_share": 0.005210029306414849,
+      "top64_share": 0.020840117225659396
+    },
+    "atomic_estimates": {
+      "block_h_16": {
+        "head_blocks": 4,
+        "actual_atomic_add_elements": 3220176896,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "head_blocks": 1,
+        "actual_atomic_add_elements": 805044224,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology."
+  },
+  "correctness": {
+    "passed": null,
+    "dkv_atol": 0.75,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "reference_norm": null,
+    "candidate_norm": null
+  },
+  "timing_ms": {
+    "source_boundary_row_leader_dkv": {
+      "label": "source_boundary_row_leader_dkv",
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          8217.872225912288
+        ],
+        "mean_ms": 8217.872225912288,
+        "median_ms": 8217.872225912288,
+        "min_ms": 8217.872225912288,
+        "max_ms": 8217.872225912288,
+        "stdev_ms": 0.0
+      },
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          8217.6962890625
+        ],
+        "mean_ms": 8217.6962890625,
+        "median_ms": 8217.6962890625,
+        "min_ms": 8217.6962890625,
+        "max_ms": 8217.6962890625,
+        "stdev_ms": 0.0
+      },
+      "peak_memory_allocated_bytes": 1681921536,
+      "peak_memory_allocated_gib": 1.5664114952087402,
+      "checksum_norm": 960.2539672851562
+    }
+  },
+  "gate": {
+    "candidate_event_median_ms": 8217.6962890625,
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "passes_triton_full_boundary_gate": false,
+    "read": "This is not a promoted full sparse-attention backward because it only returns dKV. Passing would justify adding dQ and a shared score-tile cooperative schedule; failing still proves the source-boundary HIP build path and rejects D16 replay."
+  }
+}

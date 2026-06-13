@@ -1,0 +1,50 @@
+{
+  "artifact": "compressed_dkv_rocwmma_contrib_tile_smoke",
+  "scope": "single_16x16_bf16_rocwmma_contribution_tile",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "k_tile": 16,
+    "d_tile": 16,
+    "h_dim": 64,
+    "formula": "dKV[K,D] = dL_scaled[K,H] @ Q[H,D] + P[K,H] @ dO[H,D]"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 18.6845253740903,
+  "extension_dir": "/workspace/cache/torch_extensions_rocwmma_contrib_undefhalf_w64",
+  "parity": {
+    "allclose": true,
+    "atol": 0.25,
+    "rtol": 0.05,
+    "max_abs_diff": 2.9802322387695312e-08,
+    "mean_abs_diff": 7.275957614183426e-09,
+    "reference_max_abs": 0.5440868735313416
+  },
+  "timing_ms": {
+    "warmup_iters": 10,
+    "timed_iters": 50,
+    "median_ms": 0.007439999841153622,
+    "min_ms": 0.006320000160485506,
+    "max_ms": 0.012480000033974648,
+    "mean_ms": 0.007734500011429191
+  },
+  "tensor_stats": {
+    "reference": {
+      "norm": 3.010233163833618,
+      "max_abs": 0.5440868735313416,
+      "mean_abs": 0.14968638122081757
+    },
+    "candidate": {
+      "norm": 3.010233163833618,
+      "max_abs": 0.5440868735313416,
+      "mean_abs": 0.14968638122081757
+    }
+  },
+  "read": "This is the first positive/negative gate for the next compressed-dKV schedule: compute the contribution tile once with BF16 rocWMMA and FP32 accumulation. It does not yet solve route grouping, segmented many-to-one accumulation, or full sparse-MLA backward integration."
+}

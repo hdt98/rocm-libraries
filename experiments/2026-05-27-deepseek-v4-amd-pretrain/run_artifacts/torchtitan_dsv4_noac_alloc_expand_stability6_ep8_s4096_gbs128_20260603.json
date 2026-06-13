@@ -1,0 +1,167 @@
+{
+  "artifact": "torchtitan_dsv4_noac_alloc_expand_stability6_ep8_s4096_gbs128_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Allocator-expanded six-step no-activation-checkpoint stability gate for the retained 8xMI350 target-shape canary.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_noac_alloc_expand_stability6_ep8_s4096_gbs128_20260603",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_stability6_ep8_s4096_gbs128_20260603",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_noac_alloc_expand_stability6_ep8_s4096_gbs128_20260603/docker-run.log",
+  "command_shape": {
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "target_host": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "gpus_per_node": 8,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "sequence_length": 4096,
+    "gradient_accumulation_steps": 16,
+    "steps": 6
+  },
+  "settings": {
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none",
+    "enable_profiling": false,
+    "enable_structured_logging": false,
+    "additive_timing_path": "default",
+    "chunked_ce_num_chunks": 2,
+    "pytorch_cuda_alloc_conf": "expandable_segments:True",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_shmem_heap_size": "32G"
+  },
+  "result": {
+    "status": "passed_not_promoted",
+    "process_groups_destroyed": true,
+    "loss_movement": "12.22448 -> 8.92756 -> 13.49064 -> 12.08055 -> 8.87291 -> 9.54996",
+    "step1": {
+      "loss": 12.22448,
+      "grad_norm": 11.25,
+      "tok_per_gpu_s_range": [
+        2358,
+        2361
+      ],
+      "tflops_per_gpu_range": [
+        44.62,
+        44.68
+      ],
+      "mfu_percent": 1.93,
+      "peak_logged_memory_gib": 46.52
+    },
+    "step2": {
+      "loss": 8.92756,
+      "grad_norm": 20.375,
+      "tok_per_gpu_s": 4857,
+      "node_tok_s": 38856,
+      "implied_step_time_s": 13.49,
+      "tflops_per_gpu": 91.9,
+      "mfu_percent": 3.98,
+      "peak_logged_memory_gib": 68.37
+    },
+    "step3": {
+      "loss": 13.49064,
+      "grad_norm": 23.375,
+      "tok_per_gpu_s": 3734,
+      "node_tok_s": 29872,
+      "implied_step_time_s": 17.55,
+      "tflops_per_gpu": 70.65,
+      "mfu_percent": 3.06,
+      "peak_logged_memory_gib": 100.79
+    },
+    "step4": {
+      "loss": 12.08055,
+      "grad_norm": 60.5,
+      "tok_per_gpu_s_range": [
+        2763,
+        2764
+      ],
+      "node_tok_s_from_2763": 22104,
+      "implied_step_time_s_from_2763": 23.72,
+      "tflops_per_gpu": 52.29,
+      "mfu_percent": 2.26,
+      "peak_logged_memory_gib": 107.18
+    },
+    "step5": {
+      "loss": 8.87291,
+      "grad_norm": 37.5,
+      "tok_per_gpu_s": 3330,
+      "node_tok_s": 26640,
+      "implied_step_time_s": 19.68,
+      "tflops_per_gpu": 63.0,
+      "mfu_percent": 2.73,
+      "peak_logged_memory_gib": 107.18
+    },
+    "step6": {
+      "loss": 9.54996,
+      "grad_norm": 60.0,
+      "tok_per_gpu_s": 3206,
+      "node_tok_s": 25648,
+      "implied_step_time_s": 20.44,
+      "tflops_per_gpu": 60.67,
+      "mfu_percent": 2.63,
+      "peak_logged_memory_gib": 107.18,
+      "cuda_memory_allocation_retry_warning_count": 0
+    },
+    "mean_steps2_to6": {
+      "tok_per_gpu_s": 3578.0,
+      "tflops_per_gpu": 67.702
+    },
+    "mean_steps3_to6": {
+      "tok_per_gpu_s": 3258.25,
+      "tflops_per_gpu": 61.6525
+    },
+    "mean_steps4_to6": {
+      "tok_per_gpu_s": 3099.67,
+      "tflops_per_gpu": 58.6533
+    },
+    "step2_to_step6": {
+      "tflops_drop_percent": 33.98,
+      "tok_per_gpu_s_drop_percent": 33.99,
+      "peak_memory_growth_gib": 38.81
+    }
+  },
+  "comparison_to_retained_full_ac_anchor": {
+    "anchor_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "anchor_step2_tok_per_gpu_s": 3103,
+    "anchor_step2_tflops_per_gpu": 58.71,
+    "anchor_step2_implied_step_time_s": 21.12,
+    "step2_tflops_uplift_percent": 56.53,
+    "step3_tflops_uplift_percent": 20.34,
+    "step4_tflops_uplift_percent": -10.94,
+    "step5_tflops_uplift_percent": 7.31,
+    "step6_tflops_uplift_percent": 3.34,
+    "mean_steps2_to6_tflops_uplift_percent": 15.32,
+    "mean_steps3_to6_tflops_uplift_percent": 5.01,
+    "mean_steps4_to6_tflops_uplift_percent": -0.1
+  },
+  "comparison_to_allocator_expand_stability4": {
+    "artifact": "run_artifacts/torchtitan_dsv4_noac_alloc_expand_stability4_ep8_s4096_gbs128_20260603.json",
+    "matching_knobs": true,
+    "previous_step4_tflops_per_gpu": 66.53,
+    "this_run_step4_tflops_per_gpu": 52.29,
+    "this_run_step6_tflops_per_gpu": 60.67,
+    "read": "The allocator-expanded no-AC branch still fits cleanly and removes allocation retries, but the late-step throughput band is not reproducibly above the retained full-AC anchor."
+  },
+  "comparison_to_target": {
+    "target_tflops_per_gpu": 277.0,
+    "step2_target_fraction_percent": 33.18,
+    "step6_target_fraction_percent": 21.9,
+    "mean_steps2_to6_target_fraction_percent": 24.44,
+    "mean_steps3_to6_target_fraction_percent": 22.26,
+    "mean_steps4_to6_target_fraction_percent": 21.17,
+    "remaining_speedup_to_target_from_mean_steps4_to6": 4.72
+  },
+  "read": [
+    "The six-step gate confirms the no-AC plus expandable allocator step-2 burst, reaching 91.90 TFLOPs/GPU, but the late steps do not hold that level.",
+    "Steps 4-6 average 58.65 TFLOPs/GPU, essentially the retained full-AC anchor's 58.71 TFLOPs/GPU, while step 6 is only a 3.34% uplift over that anchor.",
+    "No activation checkpointing remains valuable as an attribution lever and may still help after memory/free/unwind behavior is fixed, but this exact branch should not replace the retained full-AC baseline."
+  ]
+}

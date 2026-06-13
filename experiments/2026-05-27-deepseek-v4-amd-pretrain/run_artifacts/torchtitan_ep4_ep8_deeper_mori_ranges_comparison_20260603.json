@@ -1,0 +1,991 @@
+{
+  "artifact": "torchtitan_ep4_ep8_deeper_mori_ranges_comparison_20260603",
+  "created_from": [
+    "torchtitan_ep4_deeper_mori_ranges_baseline_20260603.json",
+    "torchtitan_ep8_deeper_mori_ranges_baseline_20260603.json"
+  ],
+  "interpretation": [
+    "MORI routed VJP is still the main MoE backward wall at both EP4 and EP8.",
+    "Local padded VJP math is the largest single child bucket (~4.06s mean per profiled step), so grouped GEMM/SwiGLU remains a real target.",
+    "The new split also exposes large host metadata synchronization: dispatch_x total_recv.item is ~1.6-1.7s mean; topk dummy total_recv.item is ~1.0-1.1s mean.",
+    "dispatch_x.get_dispatch_src_token_pos is smaller on EP8 (~135ms mean) than EP4 (~375ms mean), but still not zero.",
+    "combine_dx Python call is short on CPU, but the gpu_user_annotation under combine_dx.call is ~1.0-1.1s mean, so combine device work/wait is another bucket.",
+    "Dense linear owner tags are sub-second all-rank totals in this profile and are not the main backward wall compared with MORI routed VJP."
+  ],
+  "runs": {
+    "ep4": {
+      "run_id": "torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_deeper_mori_ranges_baseline_20260603",
+      "shape": {
+        "gpus_per_node": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "micro_batch_size": 1,
+        "global_batch_size": 64,
+        "sequence_length": 4096,
+        "layers": 4
+      },
+      "routed_vjp_mean_ms": 8694.486,
+      "routed_vjp_max_ms": 8715.26,
+      "major_components_mean_ms": {
+        "local_vjp_padded": 4055.769,
+        "dispatch_x_cpu_parent": 2079.772,
+        "dispatch_x_total_recv_item_cpu": 1685.805,
+        "dispatch_x_get_src_pos_cpu": 375.346,
+        "combine_dx_cpu_parent": 1302.544,
+        "combine_dx_call_gpu_annotation": 1102.882,
+        "dispatch_topk_dummy_cpu_parent": 1128.424,
+        "dispatch_topk_total_recv_item_cpu": 1111.941,
+        "dispatch_grad_output_cpu_parent": 52.794,
+        "combine_dtopk_cpu_parent": 33.802
+      },
+      "major_components_pct_of_routed_vjp_mean": {
+        "local_vjp_padded": 46.65,
+        "dispatch_x_cpu_parent": 23.92,
+        "dispatch_x_total_recv_item_cpu": 19.39,
+        "dispatch_x_get_src_pos_cpu": 4.32,
+        "combine_dx_cpu_parent": 14.98,
+        "dispatch_topk_dummy_cpu_parent": 12.98,
+        "dispatch_topk_total_recv_item_cpu": 12.79,
+        "dispatch_grad_output_cpu_parent": 0.61,
+        "combine_dtopk_cpu_parent": 0.39
+      },
+      "local_vjp_children_mean_ms": {
+        "w13_forward_gemm": 22.304,
+        "w2_forward_gemm": 36.649,
+        "w2_dgrad_gemm": 14.126,
+        "w2_wgrad_gemm": 26.719,
+        "w13_wgrad_gemm": 13.881,
+        "w13_xgrad_gemm_reduce": 22.206,
+        "gather_scale_scatter": 24.921,
+        "sort_counts": 47.333,
+        "route_pack": 22.65,
+        "scatter_outputs": 20.034,
+        "swiglu_forward": 1833.182,
+        "swiglu_backward": 1942.921,
+        "dtopk_weight": 17.251
+      },
+      "top_dense_linear_backward_cpu_all_ranks": [
+        {
+          "name": "dsv4.linear.feed_forward.w2.bwd",
+          "sum_ms_all_ranks": 91.513,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 22.892,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 22.876,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 22.958,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 22.787,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_b.bwd",
+          "sum_ms_all_ranks": 76.739,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 19.005,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 19.317,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 19.095,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 19.321,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.moe.router_gate.bwd",
+          "sum_ms_all_ranks": 65.031,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 15.616,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 16.742,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 15.911,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 16.762,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wkv_a.bwd",
+          "sum_ms_all_ranks": 63.079,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 15.623,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 15.825,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 15.654,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 15.977,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w3.bwd",
+          "sum_ms_all_ranks": 57.147,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 14.281,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 14.356,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 14.218,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 14.293,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_a.bwd",
+          "sum_ms_all_ranks": 56.42,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 13.989,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 14.296,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 13.958,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 14.177,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w2.bwd.dinput",
+          "sum_ms_all_ranks": 54.846,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 13.58,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 13.878,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 13.907,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 13.481,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w1.bwd",
+          "sum_ms_all_ranks": 51.252,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 12.764,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 12.842,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 12.632,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 13.013,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_b.bwd.dinput",
+          "sum_ms_all_ranks": 45.656,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 11.364,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 11.471,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 11.393,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 11.427,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wkv_b.bwd",
+          "sum_ms_all_ranks": 35.055,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 8.578,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 9.025,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 8.49,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.962,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.moe.router_gate.bwd.dinput",
+          "sum_ms_all_ranks": 34.163,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 8.268,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 8.796,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 8.36,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.739,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wo.bwd",
+          "sum_ms_all_ranks": 31.022,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 7.428,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 8.177,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 7.307,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.11,
+              "count": 64
+            }
+          ]
+        }
+      ],
+      "trace_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep4_deeper_mori_ranges_s4096_20260603_baseline/iteration_2"
+    },
+    "ep8": {
+      "run_id": "torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603",
+      "shape": {
+        "gpus_per_node": 8,
+        "fsdp": 8,
+        "ep": 8,
+        "micro_batch_size": 1,
+        "global_batch_size": 128,
+        "sequence_length": 4096,
+        "layers": 4
+      },
+      "routed_vjp_mean_ms": 7935.903,
+      "routed_vjp_max_ms": 7965.225,
+      "major_components_mean_ms": {
+        "local_vjp_padded": 4066.578,
+        "dispatch_x_cpu_parent": 1758.32,
+        "dispatch_x_total_recv_item_cpu": 1606.203,
+        "dispatch_x_get_src_pos_cpu": 135.445,
+        "combine_dx_cpu_parent": 945.671,
+        "combine_dx_call_gpu_annotation": 989.838,
+        "dispatch_topk_dummy_cpu_parent": 1025.912,
+        "dispatch_topk_total_recv_item_cpu": 1008.286,
+        "dispatch_grad_output_cpu_parent": 51.906,
+        "combine_dtopk_cpu_parent": 40.708
+      },
+      "major_components_pct_of_routed_vjp_mean": {
+        "local_vjp_padded": 51.24,
+        "dispatch_x_cpu_parent": 22.16,
+        "dispatch_x_total_recv_item_cpu": 20.24,
+        "dispatch_x_get_src_pos_cpu": 1.71,
+        "combine_dx_cpu_parent": 11.92,
+        "dispatch_topk_dummy_cpu_parent": 12.93,
+        "dispatch_topk_total_recv_item_cpu": 12.71,
+        "dispatch_grad_output_cpu_parent": 0.65,
+        "combine_dtopk_cpu_parent": 0.51
+      },
+      "local_vjp_children_mean_ms": {
+        "w13_forward_gemm": 22.147,
+        "w2_forward_gemm": 39.021,
+        "w2_dgrad_gemm": 14.395,
+        "w2_wgrad_gemm": 26.911,
+        "w13_wgrad_gemm": 14.104,
+        "w13_xgrad_gemm_reduce": 26.603,
+        "gather_scale_scatter": 26.149,
+        "sort_counts": 50.951,
+        "route_pack": 28.861,
+        "scatter_outputs": 21.093,
+        "swiglu_forward": 1846.765,
+        "swiglu_backward": 1918.928,
+        "dtopk_weight": 18.78
+      },
+      "top_dense_linear_backward_cpu_all_ranks": [
+        {
+          "name": "dsv4.linear.feed_forward.w2.bwd",
+          "sum_ms_all_ranks": 158.202,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 20.014,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 19.312,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 20.364,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 19.405,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 20.019,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 19.143,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 19.767,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 20.178,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_b.bwd",
+          "sum_ms_all_ranks": 154.381,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 19.128,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 19.264,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 19.217,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 19.318,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 19.41,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 19.16,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 19.67,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 19.213,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.moe.router_gate.bwd",
+          "sum_ms_all_ranks": 135.793,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 16.785,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 16.883,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 16.693,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 16.971,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 17.85,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 16.616,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 17.068,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 16.926,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wkv_a.bwd",
+          "sum_ms_all_ranks": 127.155,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 15.949,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 15.593,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 15.864,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 16.01,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 15.918,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 15.912,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 16.141,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 15.768,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w3.bwd",
+          "sum_ms_all_ranks": 114.407,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 14.313,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 14.368,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 14.262,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 14.422,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 14.3,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 14.107,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 14.38,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 14.255,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_a.bwd",
+          "sum_ms_all_ranks": 114.087,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 14.221,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 14.374,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 14.123,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 14.321,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 14.361,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 14.018,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 14.495,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 14.174,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w1.bwd",
+          "sum_ms_all_ranks": 104.193,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 12.993,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 13.1,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 12.993,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 13.201,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 13.114,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 12.721,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 13.142,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 12.93,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wq_b.bwd.dinput",
+          "sum_ms_all_ranks": 91.869,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 11.387,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 11.507,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 11.424,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 11.463,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 11.482,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 11.415,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 11.725,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 11.466,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.feed_forward.w2.bwd.dinput",
+          "sum_ms_all_ranks": 89.224,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 11.274,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 10.647,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 11.768,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 10.881,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 11.403,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 10.675,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 11.126,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 11.45,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wkv_b.bwd",
+          "sum_ms_all_ranks": 71.708,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 8.987,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 9.143,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 8.841,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.951,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 8.879,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 8.928,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 9.117,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 8.862,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.moe.router_gate.bwd.dinput",
+          "sum_ms_all_ranks": 71.45,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 8.884,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 8.882,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 8.695,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.931,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 9.36,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 8.61,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 8.946,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 9.143,
+              "count": 64
+            }
+          ]
+        },
+        {
+          "name": "dsv4.linear.attention.wo.bwd",
+          "sum_ms_all_ranks": 63.997,
+          "per_rank": [
+            {
+              "rank": 0,
+              "ms": 8.004,
+              "count": 64
+            },
+            {
+              "rank": 1,
+              "ms": 8.05,
+              "count": 64
+            },
+            {
+              "rank": 2,
+              "ms": 7.765,
+              "count": 64
+            },
+            {
+              "rank": 3,
+              "ms": 8.197,
+              "count": 64
+            },
+            {
+              "rank": 4,
+              "ms": 8.077,
+              "count": 64
+            },
+            {
+              "rank": 5,
+              "ms": 7.919,
+              "count": 64
+            },
+            {
+              "rank": 6,
+              "ms": 8.03,
+              "count": 64
+            },
+            {
+              "rank": 7,
+              "ms": 7.955,
+              "count": 64
+            }
+          ]
+        }
+      ],
+      "trace_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_deeper_mori_ranges_baseline_20260603/profiling/traces_ep8_deeper_mori_ranges_s4096_20260603_baseline/iteration_2"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_D": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_H": "2",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": null,
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SCHEDULE": "sglang_head_block",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SPLIT_SOURCES": null
+  },
+  "max_output_abs_diff": null,
+  "output_atol": 0.01,
+  "output_checksum": -0.0003314990026410669,
+  "requires_grad": false,
+  "scope": "synthetic_sparse_mla_triton_forward",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "head_dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "selected_count": 160,
+    "seq_len": 128,
+    "value_dim": 512
+  },
+  "skip_correctness": true,
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 1.744338035583496,
+      "mean_ms": 1.637649416923523,
+      "median_ms": 1.624197542667389,
+      "min_ms": 1.616776943206787,
+      "samples_ms": [
+        1.648097038269043,
+        1.744338035583496,
+        1.6266570091247559,
+        1.623218059539795,
+        1.6231770515441895,
+        1.6199769973754883,
+        1.6214580535888672,
+        1.625177025794983,
+        1.616776943206787,
+        1.6276179552078247
+      ],
+      "stdev_ms": 0.038436796882336546
+    },
+    "iters": 10,
+    "peak_memory_allocated_bytes": 46321664,
+    "peak_memory_allocated_gib": 0.043140411376953125,
+    "wall": {
+      "enabled": true,
+      "max_ms": 1.7639839788898826,
+      "mean_ms": 1.6549827181734145,
+      "median_ms": 1.6400145832449198,
+      "min_ms": 1.6310650389641523,
+      "samples_ms": [
+        1.6792149981483817,
+        1.7639839788898826,
+        1.642035087570548,
+        1.6379940789192915,
+        1.6379550797864795,
+        1.6346150077879429,
+        1.6359840519726276,
+        1.6436049481853843,
+        1.6310650389641523,
+        1.6433749115094543
+      ],
+      "stdev_ms": 0.04058833555687427
+    },
+    "warmup_iters": 3
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "artifact": "tilelang_chunked_reduced_producer_decision_20260604",
+  "created_at": "2026-06-04",
+  "status": "rejected",
+  "scope": "TileLang query-major selected-K-chunk compact sparse-dKV producer",
+  "question": "Can a chunk-local active-group accumulator shrink the producer LDS/control wall while preserving the D64 MFMA contribution body?",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "valid_topk": 512,
+    "topk_workspace": 640,
+    "token_block": 256,
+    "group_panel_size": 512,
+    "panel_capacity": 320,
+    "selected_window": 320,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "route_pattern": "panel_capacity_random",
+    "fold_backend": "torch"
+  },
+  "implementation": {
+    "file": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "math_mode": "mfma_chunked_reduced",
+    "read": "One CTA owns one token tile, one selected K64 chunk inside a route panel, and one D64 block. It uses the same TileLang BF16 MFMA contribution body as mfma_reduced, accumulates into a chunk-local active compressed-group table, writes compact chunk rows, then folds those rows with torch.index_add_ for this gate."
+  },
+  "correctness": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_chunked_reduced_fold_torch_s128_valid512_tb256_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "s128_max_abs_diff": 1.257285475730896e-08,
+    "s128_mean_abs_diff": 1.4570759043763815e-09,
+    "read": "The small correctness gate passes against the PyTorch final-dKV reference."
+  },
+  "latency": {
+    "candidate_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_chunked_reduced_fold_torch_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "candidate_full_final_dkv_median_ms": 11.552196502685547,
+    "candidate_fold_only_median_ms": 0.13588199764490128,
+    "retained_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "retained_full_final_dkv_median_ms": 7.990410327911377,
+    "retained_fold_only_median_ms": 0.01397999981418252,
+    "regression_vs_retained_ms": 3.56178617477417,
+    "regression_vs_retained_x": 1.445757554416498
+  },
+  "route_read": {
+    "panel_local_active_rows": 16384,
+    "panel_local_partials_mib": 32.0,
+    "panel_local_write_reduction_x": 128.0,
+    "chunk_local_active_rows": 78589,
+    "chunk_local_partials_mib": 153.494140625,
+    "chunk_local_write_reduction_x": 26.68505770527682,
+    "chunk_local_active_count_mean": 491.18125,
+    "chunk_local_active_count_min": 373,
+    "chunk_local_active_count_max": 512,
+    "read": "The assumed LDS shrink does not materialize at token_block=256. Even one K64 chunk sees almost every group in the 512-group panel across 256 tokens, so the chunk-local table still reaches max_active_groups=512 while multiplying route chunks and compact partial rows."
+  },
+  "decision": {
+    "retain": "mfma_reduced tb256/gps512/cap320/k64d64/threads512 with TileLang panel-dense final fold",
+    "reject": "mfma_chunked_reduced selected-K-chunk ownership",
+    "why": "It loses Q/dO reuse and increases compact partial traffic without reducing the live active-group table at the target token tile.",
+    "next_work": "A useful rewrite must avoid both failure modes: keep panel-level Q/dO reuse and avoid a full 512xD FP32 shared accumulator. Candidate directions are wave/register-local pre-aggregation before touching group_acc, a lower-level HIP/rocWMMA producer with explicit segmented epilogue control, or fusing downstream compressor/LI dKV consumption so the producer does not need to materialize dense compact rows."
+  },
+  "commands": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "rsync -a tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "docker run ... benchmark_tilelang_sparse_dkv_compact_partial.py --seq-len 128 --topk 640 --valid-topk 512 --route-pattern panel_capacity_random --group-panel-size 512 --token-block 256 --selected-window 320 --block-k 64 --block-d 64 --threads 512 --math-mode mfma_chunked_reduced --fold-final-dkv --fold-backend torch --check-correctness",
+    "docker run ... benchmark_tilelang_sparse_dkv_compact_partial.py --seq-len 4096 --topk 640 --valid-topk 512 --route-pattern panel_capacity_random --group-panel-size 512 --token-block 256 --selected-window 320 --block-k 64 --block-d 64 --threads 512 --math-mode mfma_chunked_reduced --fold-final-dkv --fold-backend torch"
+  ],
+  "dependency_pin_changes": []
+}

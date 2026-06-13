@@ -1,0 +1,83 @@
+{
+  "artifact": "hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq_gate_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "target": "HipKittens route-keyed 64-row SharedKV D512 row-term producer plus dQ scratch gate",
+  "status": "rejected_validity",
+  "source_files": [
+    "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_routekeyed_64row_d512_rowterms_dq.cpp",
+    "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq.py"
+  ],
+  "build": {
+    "command": "make hk_sharedkv_routekeyed_64row_d512_rowterms_dq GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H_KV=1 ATTN_N=4096",
+    "resource_report": {
+      "TotalSGPRs": 83,
+      "VGPRs": 94,
+      "AGPRs": 128,
+      "ScratchSize_bytes_per_lane": 0,
+      "DynamicStack": false,
+      "Occupancy_waves_per_SIMD": 2,
+      "SGPRsSpill": 0,
+      "VGPRsSpill": 0
+    }
+  },
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "kv_heads": 1,
+    "dim": 512,
+    "kv_tiles": 64,
+    "tile_rows": 64,
+    "dot_slice_qo": 16,
+    "dq_cols": 32,
+    "dq_subchunks": 16,
+    "input_scale": 0.01,
+    "lse_value": 1.0,
+    "softmax_dot_scale": 0.02
+  },
+  "active1_validity": {
+    "command": "python tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq.py --batch 4 --seq 4096 --kv-heads 1 --dim 512 --active-tiles 1 --warmup 3 --iters 10",
+    "latency_ms": {
+      "median": 0.04284050129354,
+      "mean": 0.04653639979660511,
+      "min": 0.041039999574422836,
+      "max": 0.058079998940229416
+    },
+    "dq_scratch": {
+      "finite": false,
+      "nonfinite": 64,
+      "abs_max": 2.661052139999099e35,
+      "mean_abs": 7.515757025315263e30,
+      "nonzero": 32768
+    },
+    "read": "invalid; direct K32 loads reduce the D512 dQ corruption versus subtile loads, but DQ still contains NaN/Inf and absurd finite magnitudes"
+  },
+  "active64_timing": {
+    "command": "python tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq.py --batch 4 --seq 4096 --kv-heads 1 --dim 512 --active-tiles 64 --warmup 5 --iters 30",
+    "latency_ms": {
+      "median": 0.04614049941301346,
+      "mean": 0.04702836697300275,
+      "min": 0.04487999901175499,
+      "max": 0.05364000052213669
+    },
+    "dq_scratch": {
+      "finite": true,
+      "nonfinite": 0,
+      "abs_max": 2.3365335863406724e34,
+      "mean_abs": 1.874689247386815e31,
+      "nonzero": 2097144
+    },
+    "read": "timing is fast but invalid because DQ magnitude is physically impossible for the synthetic scale"
+  },
+  "comparison": {
+    "previous_d512_score_gate_artifact": "run_artifacts/hipkittens_sharedkv_routekeyed_64row_d512_rowterms_score_gate_20260607.json",
+    "previous_d512_score_gate_active64_median_ms": 0.0475605,
+    "previous_d512_score_gate_read": "finite dK/dV scratch; producer-only gate passed",
+    "current_dq_gate_read": "dQ consumer integration is the failing piece, not the corrected D512 row-term producer"
+  },
+  "decision": {
+    "promote": false,
+    "reason": "The gate is latency-fast but invalid. The D512 row-term producer remains viable, but the dQ scratch consumer cannot use the normal RT D32 shortcut safely. Next work should port the dQ consumer to the ART-style register/load/MMA contract used by the HipKittens dense backward path before adding dOriKV/dCmpKV/dSinks."
+  }
+}

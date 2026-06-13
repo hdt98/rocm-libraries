@@ -1,0 +1,175 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_8x_s4096_gbs128_20260609",
+  "date": "2026-06-09",
+  "node": "do-vunguyen-mi350-gpu",
+  "hardware": {
+    "accelerators": "8x MI350",
+    "notes": "Raw logs and run outputs are kept outside the repo under /scratch/sonle5/dsv4_pretrain_canary_20260527."
+  },
+  "shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "seq_len": 4096,
+    "micro_batch_size": 8,
+    "gradient_accumulation": 2,
+    "global_batch_size": 128,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "optimizer": "AdamW",
+    "activation_checkpoint": "attention-only selective AC",
+    "sparse_mla": "enabled at S4096",
+    "standard_ep_hot_helper": "top-8 MindSpeed-like helper layout",
+    "mori_native_compact": "cold/normal compact dispatch/combine with source-position final combine"
+  },
+  "source_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_SINK_DOT_CHUNK=32",
+    "description": "Chunk the sparse SharedKV sink-gradient dot over the last dimension to avoid materializing the full grad_output.float() * output.float() product slab.",
+    "reason": "The pre-patch 20-step native source-position gate failed after step 4 in _grad_attn_sink_from_output_lse while trying to allocate a 4 GiB temporary product."
+  },
+  "baseline": {
+    "artifact": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "steps_2_20": {
+      "tok_per_gpu_s": 8518.84,
+      "node_tok_s": 68150.74,
+      "tflops_per_gpu": 431.31
+    },
+    "steps_13_20": {
+      "tok_per_gpu_s": 8630.66,
+      "tflops_per_gpu": 436.97
+    },
+    "peak_memory_gib": 251.97
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_mbs8_steps20_20260609",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_mbs8_steps20_20260609/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_mbs8_steps20_20260609",
+      "completed_steps": 20,
+      "status": "completed",
+      "peak_memory_gib": 228.04,
+      "windows": {
+        "steps_2_20": {
+          "tok_per_gpu_s": 8450.368421052632,
+          "node_tok_s": 67602.94736842105,
+          "tflops_per_gpu": 427.8578947368422,
+          "delta_vs_baseline_tok_per_gpu_pct": -0.8037664628912866,
+          "delta_vs_baseline_tflops_pct": -0.8003768201891526
+        },
+        "steps_13_20": {
+          "tok_per_gpu_s": 9055.5,
+          "node_tok_s": 72444.0,
+          "tflops_per_gpu": 458.4975,
+          "delta_vs_baseline_tok_per_gpu_pct": 4.9224508901984265,
+          "delta_vs_baseline_tflops_pct": 4.9265395793761435
+        },
+        "steps_16_20": {
+          "tok_per_gpu_s": 9054.4,
+          "node_tok_s": 72435.2,
+          "tflops_per_gpu": 458.442
+        }
+      },
+      "step_metrics": [
+        {"step": 1, "tok_per_gpu_s": 1844, "tflops_per_gpu": 93.35, "loss": 12.30783, "grad_norm": 15.625, "rank_max_memory_gib": 164.21},
+        {"step": 2, "tok_per_gpu_s": 8151, "tflops_per_gpu": 412.69, "loss": 7.50866, "grad_norm": 110.0, "rank_max_memory_gib": 208.97},
+        {"step": 3, "tok_per_gpu_s": 8124, "tflops_per_gpu": 411.32, "loss": 6.38748, "grad_norm": 37.75, "rank_max_memory_gib": 217.31},
+        {"step": 4, "tok_per_gpu_s": 8637, "tflops_per_gpu": 437.32, "loss": 19.36760, "grad_norm": 209.0, "rank_max_memory_gib": 219.25},
+        {"step": 5, "tok_per_gpu_s": 8665, "tflops_per_gpu": 438.72, "loss": 22.66968, "grad_norm": 434.0, "rank_max_memory_gib": 219.25},
+        {"step": 6, "tok_per_gpu_s": 8280, "tflops_per_gpu": 419.24, "loss": 6.88062, "grad_norm": 23.125, "rank_max_memory_gib": 225.83},
+        {"step": 7, "tok_per_gpu_s": 7141, "tflops_per_gpu": 361.56, "loss": 6.74568, "grad_norm": 27.75, "rank_max_memory_gib": 226.87},
+        {"step": 8, "tok_per_gpu_s": 8771, "tflops_per_gpu": 444.09, "loss": 6.74657, "grad_norm": 25.0, "rank_max_memory_gib": 226.87},
+        {"step": 9, "tok_per_gpu_s": 7537, "tflops_per_gpu": 381.63, "loss": 6.96821, "grad_norm": 19.625, "rank_max_memory_gib": 227.28},
+        {"step": 10, "tok_per_gpu_s": 7198, "tflops_per_gpu": 364.46, "loss": 6.13386, "grad_norm": 14.8125, "rank_max_memory_gib": 227.45},
+        {"step": 11, "tok_per_gpu_s": 8433, "tflops_per_gpu": 426.95, "loss": 5.03174, "grad_norm": 14.125, "rank_max_memory_gib": 227.45},
+        {"step": 12, "tok_per_gpu_s": 7176, "tflops_per_gpu": 363.34, "loss": 4.70874, "grad_norm": 31.0, "rank_max_memory_gib": 228.04},
+        {"step": 13, "tok_per_gpu_s": 9056, "tflops_per_gpu": 458.50, "loss": 3.92152, "grad_norm": 20.25, "rank_max_memory_gib": 228.04},
+        {"step": 14, "tok_per_gpu_s": 9074, "tflops_per_gpu": 459.44, "loss": 3.50166, "grad_norm": 9.75, "rank_max_memory_gib": 228.04},
+        {"step": 15, "tok_per_gpu_s": 9042, "tflops_per_gpu": 457.83, "loss": 3.46020, "grad_norm": 10.5625, "rank_max_memory_gib": 228.04},
+        {"step": 16, "tok_per_gpu_s": 9048, "tflops_per_gpu": 458.13, "loss": 3.32105, "grad_norm": 7.5938, "rank_max_memory_gib": 228.04},
+        {"step": 17, "tok_per_gpu_s": 9053, "tflops_per_gpu": 458.39, "loss": 3.24174, "grad_norm": 4.8125, "rank_max_memory_gib": 228.04},
+        {"step": 18, "tok_per_gpu_s": 9065, "tflops_per_gpu": 458.96, "loss": 3.20671, "grad_norm": 3.8125, "rank_max_memory_gib": 228.04},
+        {"step": 19, "tok_per_gpu_s": 9053, "tflops_per_gpu": 458.35, "loss": 3.16585, "grad_norm": 3.0625, "rank_max_memory_gib": 228.04},
+        {"step": 20, "tok_per_gpu_s": 9053, "tflops_per_gpu": 458.38, "loss": 3.17475, "grad_norm": 2.5938, "rank_max_memory_gib": 228.04}
+      ]
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_repeat2_mbs8_steps20_20260609",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_repeat2_mbs8_steps20_20260609/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_sourcepos_chunkedsink_repeat2_mbs8_steps20_20260609",
+      "completed_steps": 20,
+      "status": "completed",
+      "peak_memory_gib": 228.72,
+      "windows": {
+        "steps_2_20": {
+          "tok_per_gpu_s": 8429.421052631578,
+          "node_tok_s": 67435.36842105263,
+          "tflops_per_gpu": 426.7978947368421,
+          "delta_vs_baseline_tok_per_gpu_pct": -1.0496610732027123,
+          "delta_vs_baseline_tflops_pct": -1.0461397285381424
+        },
+        "steps_13_20": {
+          "tok_per_gpu_s": 8896.125,
+          "node_tok_s": 71169.0,
+          "tflops_per_gpu": 450.4287499999999,
+          "delta_vs_baseline_tok_per_gpu_pct": 3.0758366104098656,
+          "delta_vs_baseline_tflops_pct": 3.080016934801
+        },
+        "steps_16_20": {
+          "tok_per_gpu_s": 8972.8,
+          "node_tok_s": 71782.4,
+          "tflops_per_gpu": 454.3059999999999
+        }
+      },
+      "step_metrics": [
+        {"step": 1, "tok_per_gpu_s": 1816, "tflops_per_gpu": 91.94, "loss": 12.25222, "grad_norm": 16.75, "rank_max_memory_gib": 164.88},
+        {"step": 2, "tok_per_gpu_s": 7718, "tflops_per_gpu": 390.78, "loss": 8.72884, "grad_norm": 77.5, "rank_max_memory_gib": 212.43},
+        {"step": 3, "tok_per_gpu_s": 8561, "tflops_per_gpu": 433.43, "loss": 15.48809, "grad_norm": 274.0, "rank_max_memory_gib": 213.91},
+        {"step": 4, "tok_per_gpu_s": 8650, "tflops_per_gpu": 437.98, "loss": 16.79438, "grad_norm": 57.5, "rank_max_memory_gib": 221.47},
+        {"step": 5, "tok_per_gpu_s": 8502, "tflops_per_gpu": 430.49, "loss": 7.55420, "grad_norm": 30.625, "rank_max_memory_gib": 225.87},
+        {"step": 6, "tok_per_gpu_s": 6723, "tflops_per_gpu": 340.41, "loss": 7.62658, "grad_norm": 51.5, "rank_max_memory_gib": 227.28},
+        {"step": 7, "tok_per_gpu_s": 8216, "tflops_per_gpu": 416.01, "loss": 8.30657, "grad_norm": 28.25, "rank_max_memory_gib": 227.28},
+        {"step": 8, "tok_per_gpu_s": 7712, "tflops_per_gpu": 390.48, "loss": 7.54776, "grad_norm": 24.75, "rank_max_memory_gib": 227.45},
+        {"step": 9, "tok_per_gpu_s": 8373, "tflops_per_gpu": 423.93, "loss": 6.92523, "grad_norm": 21.25, "rank_max_memory_gib": 227.45},
+        {"step": 10, "tok_per_gpu_s": 8154, "tflops_per_gpu": 412.83, "loss": 5.57901, "grad_norm": 15.875, "rank_max_memory_gib": 227.45},
+        {"step": 11, "tok_per_gpu_s": 8001, "tflops_per_gpu": 405.08, "loss": 4.26847, "grad_norm": 12.75, "rank_max_memory_gib": 227.57},
+        {"step": 12, "tok_per_gpu_s": 8380, "tflops_per_gpu": 424.31, "loss": 4.10773, "grad_norm": 27.125, "rank_max_memory_gib": 228.00},
+        {"step": 13, "tok_per_gpu_s": 8216, "tflops_per_gpu": 416.01, "loss": 4.05247, "grad_norm": 22.5, "rank_max_memory_gib": 228.72},
+        {"step": 14, "tok_per_gpu_s": 9048, "tflops_per_gpu": 458.12, "loss": 3.53218, "grad_norm": 14.5, "rank_max_memory_gib": 228.72},
+        {"step": 15, "tok_per_gpu_s": 9041, "tflops_per_gpu": 457.77, "loss": 3.33909, "grad_norm": 6.7188, "rank_max_memory_gib": 228.72},
+        {"step": 16, "tok_per_gpu_s": 8979, "tflops_per_gpu": 454.62, "loss": 3.25997, "grad_norm": 7.125, "rank_max_memory_gib": 228.72},
+        {"step": 17, "tok_per_gpu_s": 8995, "tflops_per_gpu": 455.41, "loss": 3.19482, "grad_norm": 4.5938, "rank_max_memory_gib": 228.72},
+        {"step": 18, "tok_per_gpu_s": 8968, "tflops_per_gpu": 454.06, "loss": 3.16948, "grad_norm": 4.9375, "rank_max_memory_gib": 228.72},
+        {"step": 19, "tok_per_gpu_s": 8967, "tflops_per_gpu": 454.03, "loss": 3.11366, "grad_norm": 3.5781, "rank_max_memory_gib": 228.72},
+        {"step": 20, "tok_per_gpu_s": 8955, "tflops_per_gpu": 453.41, "loss": 3.12091, "grad_norm": 2.0, "rank_max_memory_gib": 228.72}
+      ]
+    }
+  ],
+  "combined_read": {
+    "completed_20_step_repeats": 2,
+    "mean_steps_2_20": {
+      "tok_per_gpu_s": 8439.894736842105,
+      "tflops_per_gpu": 427.32789473684215,
+      "delta_vs_baseline_tok_per_gpu_pct": -0.9268837739961432
+    },
+    "mean_steps_13_20": {
+      "tok_per_gpu_s": 8975.8125,
+      "tflops_per_gpu": 454.463125,
+      "delta_vs_baseline_tok_per_gpu_pct": 4.000613250104216
+    },
+    "peak_memory_gib_max": 228.72,
+    "memory_delta_vs_baseline_gib": -23.25
+  },
+  "decision": {
+    "stability": "promoted from unstable to stable native source-position candidate; both 20-step repeats completed",
+    "throughput": "not promoted over the retained full-window steps 2-20 standard-EP baseline because the mean is about 0.9% lower",
+    "late_window": "promising; steps 13-20 average is about 4.0% higher than retained baseline with about 23 GiB lower peak memory",
+    "next_action": "Run a short MORI-profiler/isolation pass on the stable native candidate to explain steps 6-12 dips before considering a retained-baseline replacement."
+  },
+  "validation": [
+    "local python3 -m py_compile on sparse_mla_shared_kv_triton_forward_backend.py",
+    "in-container python3 -m py_compile on do-vunguyen-mi350-gpu",
+    "two non-profiled 20-step 8xMI350 training runs completed cleanly"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "artifact": "dgrad_backend_floor_decision_20260531",
+  "date": "2026-05-31",
+  "scope": "S2048 full-layer forward plus input-gradient-only backward lower bound with parameter gradients frozen",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "device": "MI350/CDNA4 via torch cuda ROCm interface"
+  },
+  "target": {
+    "single_layer_fwd_bwd_target_ms": 16.0,
+    "target_tokens_per_s": 128100,
+    "note": "These runs freeze parameters, so they are a lower-bound fwd+dgrad probe, not a valid full-training measurement."
+  },
+  "common_command": {
+    "runner": "python3 -m dsv4_layer_microbench.run_microbench",
+    "preset": "full",
+    "impl": "fp4-packed-sim",
+    "batch": 1,
+    "seqlen": 2048,
+    "dtype": "bf16",
+    "device": "cuda",
+    "warmup": 5,
+    "iters": 12,
+    "freeze_params": true,
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "rmsnorm_save_policy": "saved-accum"
+  },
+  "measurements": {
+    "retained_compact_reduce_learned_router": {
+      "artifact": "dgrad_only_s2048_20260531.json",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 33.38545240694657,
+      "min_ms": 33.27130898833275,
+      "tokens_per_s": 61344.084094959544,
+      "estimated_tflops": 194.41909149415793,
+      "target_ratio": 2.0865907754341606,
+      "speedup_vs_retained": 1.0,
+      "decision": "keep_as_current_dynamic_router_lower_bound"
+    },
+    "retained_compact_reduce_fixed_balanced_router": {
+      "artifact": "dgrad_only_fixed_router_s2048_20260531.json",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 30.840944673400372,
+      "min_ms": 30.724789947271347,
+      "tokens_per_s": 66405.2292070792,
+      "estimated_tflops": 210.45948477960027,
+      "target_ratio": 1.9275590420875233,
+      "speedup_vs_retained": 1.082504208625645,
+      "router_override": {
+        "mode": "fixed_balanced",
+        "assignments": 12288,
+        "experts": 384,
+        "max_per_expert": 32,
+        "mean_per_expert": 32.0,
+        "padding_multiplier_32": 1.0
+      },
+      "decision": "keep_as_padding_ideal_floor_only"
+    },
+    "compact_save_bwd": {
+      "artifact": "dgrad_only_compact_save_s2048_20260531.json",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-save-bwd-dense-wgrad",
+      "avg_ms": 44.230999609377854,
+      "min_ms": 43.82964305114001,
+      "tokens_per_s": 46302.36752699985,
+      "estimated_tflops": 146.74706390094397,
+      "target_ratio": 2.764437475586116,
+      "speedup_vs_retained": 0.7547976012703134,
+      "decision": "demote"
+    },
+    "aiter_bwd": {
+      "artifact": "dgrad_only_aiter_bwd_s2048_20260531.json",
+      "moe_impl": "grouped-expert-batches-dynamic-aiter-bwd-dense-wgrad",
+      "avg_ms": 45.64662307772475,
+      "min_ms": 44.34438899625093,
+      "tokens_per_s": 44866.407675169525,
+      "estimated_tflops": 142.19604624481966,
+      "target_ratio": 2.8529139423577967,
+      "speedup_vs_retained": 0.7313893154834152,
+      "decision": "demote"
+    },
+    "aiter_fwd_bwd": {
+      "artifact": "dgrad_only_aiter_fwd_bwd_s2048_20260531.json",
+      "moe_impl": "grouped-expert-batches-dynamic-aiter-fwd-bwd-dense-wgrad",
+      "avg_ms": 56.09492524915064,
+      "min_ms": 55.1661680219695,
+      "tokens_per_s": 36509.54147641029,
+      "estimated_tflops": 115.71045504117647,
+      "target_ratio": 3.505932828071915,
+      "speedup_vs_retained": 0.5951599410938171,
+      "decision": "demote"
+    }
+  },
+  "decision": {
+    "promote": [
+      "retained compact-reduce dynamic router path as the current baseline",
+      "fixed balanced router only as a non-training lower-bound diagnostic"
+    ],
+    "demote": [
+      "compact-save backward for the full frozen-param layer",
+      "AITER backward-only dynamic MoE path for the full frozen-param layer",
+      "AITER forward+backward dynamic MoE path for the full frozen-param layer"
+    ],
+    "reason": "Even the non-training fixed-router, parameter-frozen lower bound is 30.84 ms at S2048, 1.93x over the 16 ms target. AITER and compact-save make the full fwd+dgrad path slower than the retained compact-reduce baseline, so backend swaps alone do not close the gap.",
+    "next": "Prioritize a compact-native routed-MoE dgrad kernel family that tightly schedules W2 dgrad, SwiGLU backward, W1/W3 xgrad, and input reduce for the observed small per-expert M distribution. Revisit attention dgrad only after the MoE dgrad floor drops materially."
+  }
+}

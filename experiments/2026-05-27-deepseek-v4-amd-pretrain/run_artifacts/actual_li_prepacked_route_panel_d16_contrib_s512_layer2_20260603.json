@@ -1,0 +1,1425 @@
+{
+  "artifact": "actual_li_prepacked_route_consumption",
+  "scope": "timing_sorted_route_list_consumption_before_group_owned_dkv_accumulator",
+  "status": "measured",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "device": "cuda",
+  "dtype": "bf16",
+  "seed": 1234,
+  "layer_id": 2,
+  "shape": {
+    "batch": 1,
+    "seq_len": 512,
+    "heads": 64,
+    "dim": 512,
+    "topk": 128,
+    "compressed_groups": 128,
+    "compress_ratio": 4,
+    "valid_pairs": 32640
+  },
+  "kernel_config": {
+    "route_block_pairs": 256,
+    "route_block_segments": 128,
+    "scalar_block_pairs": 16,
+    "scalar_block_h": 64,
+    "scalar_d_offset": 0,
+    "include_scalar_input_sink": false,
+    "include_panel_d16_contrib_sink": true,
+    "panel_block_k": 16,
+    "panel_block_d": 16,
+    "panel_block_h": 64
+  },
+  "rows": [
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "group_panels": 1,
+      "token_tiles": 16,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 1088,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 557056,
+      "write_reduction_x": 30.0,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 2.2734375,
+      "traffic_vs_raw_x": 28.04123711340206,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.0427200011909008,
+            0.03152000159025192,
+            0.02419999986886978,
+            0.023761000484228134,
+            0.022640999406576157
+          ],
+          "mean_ms": 0.02896840050816536,
+          "median_ms": 0.02419999986886978,
+          "min_ms": 0.022640999406576157,
+          "max_ms": 0.0427200011909008,
+          "stdev_ms": 0.008448488826205006
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.16475096344947815,
+            0.051320064812898636,
+            0.04200008697807789,
+            0.04064897075295448,
+            0.040220096707344055
+          ],
+          "mean_ms": 0.06778803654015064,
+          "median_ms": 0.04200008697807789,
+          "min_ms": 0.040220096707344055,
+          "max_ms": 0.16475096344947815,
+          "stdev_ms": 0.054393340191323455
+        },
+        "median_ms": 0.02419999986886978,
+        "min_ms": 0.022640999406576157,
+        "max_ms": 0.0427200011909008,
+        "mean_ms": 0.02896840050816536,
+        "peak_memory_allocated_bytes": 624301568,
+        "peak_memory_allocated_gib": 0.5814261436462402,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.03139999881386757,
+            0.027160000056028366,
+            0.02247999981045723,
+            0.022801000624895096,
+            0.02208000048995018
+          ],
+          "mean_ms": 0.02518419995903969,
+          "median_ms": 0.022801000624895096,
+          "min_ms": 0.02208000048995018,
+          "max_ms": 0.03139999881386757,
+          "stdev_ms": 0.004036345292486022
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.07106899283826351,
+            0.0460802111774683,
+            0.039950013160705566,
+            0.03918004222214222,
+            0.03916001878678799
+          ],
+          "mean_ms": 0.04708785563707352,
+          "median_ms": 0.039950013160705566,
+          "min_ms": 0.03916001878678799,
+          "max_ms": 0.07106899283826351,
+          "stdev_ms": 0.01371534901275599
+        },
+        "median_ms": 0.022801000624895096,
+        "min_ms": 0.02208000048995018,
+        "max_ms": 0.03139999881386757,
+        "mean_ms": 0.02518419995903969,
+        "peak_memory_allocated_bytes": 624301568,
+        "peak_memory_allocated_gib": 0.5814261436462402,
+        "checksum": 32.660972595214844
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 16,
+        "max_token_segments_per_panel": 32
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.89513099193573,
+            0.8810120224952698,
+            0.8628910183906555,
+            0.8489710092544556,
+            0.846651017665863
+          ],
+          "mean_ms": 0.8669312119483947,
+          "median_ms": 0.8628910183906555,
+          "min_ms": 0.846651017665863,
+          "max_ms": 0.89513099193573,
+          "stdev_ms": 0.020878668192198642
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.0122980456799269,
+            0.900947954505682,
+            0.8796269539743662,
+            0.8677961304783821,
+            0.8695260621607304
+          ],
+          "mean_ms": 0.9060390293598175,
+          "median_ms": 0.8796269539743662,
+          "min_ms": 0.8677961304783821,
+          "max_ms": 1.0122980456799269,
+          "stdev_ms": 0.060848605997162644
+        },
+        "median_ms": 0.8628910183906555,
+        "min_ms": 0.846651017665863,
+        "max_ms": 0.89513099193573,
+        "mean_ms": 0.8669312119483947,
+        "peak_memory_allocated_bytes": 624303616,
+        "peak_memory_allocated_gib": 0.581428050994873,
+        "checksum": -2870.804443359375
+      }
+    },
+    {
+      "token_block": 32,
+      "group_panel": 512,
+      "group_panels": 1,
+      "token_tiles": 16,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 1088,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 557056,
+      "write_reduction_x": 30.0,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 2.2734375,
+      "traffic_vs_raw_x": 28.04123711340206,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.026480000466108322,
+            0.024521000683307648,
+            0.022360999137163162,
+            0.021080000326037407,
+            0.021159999072551727
+          ],
+          "mean_ms": 0.023120399937033652,
+          "median_ms": 0.022360999137163162,
+          "min_ms": 0.021080000326037407,
+          "max_ms": 0.026480000466108322,
+          "stdev_ms": 0.0023362196954846265
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05165114998817444,
+            0.04234001971781254,
+            0.03929995000362396,
+            0.03796000964939594,
+            0.037841033190488815
+          ],
+          "mean_ms": 0.04181843250989914,
+          "median_ms": 0.03929995000362396,
+          "min_ms": 0.037841033190488815,
+          "max_ms": 0.05165114998817444,
+          "stdev_ms": 0.005788010726362576
+        },
+        "median_ms": 0.022360999137163162,
+        "min_ms": 0.021080000326037407,
+        "max_ms": 0.026480000466108322,
+        "mean_ms": 0.023120399937033652,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.021560000255703926,
+            0.023760000243782997,
+            0.020880000665783882,
+            0.02043999917805195,
+            0.020679999142885208
+          ],
+          "mean_ms": 0.02146399989724159,
+          "median_ms": 0.020880000665783882,
+          "min_ms": 0.02043999917805195,
+          "max_ms": 0.023760000243782997,
+          "stdev_ms": 0.0013495483891119494
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.04129018634557724,
+            0.04140078090131283,
+            0.037910183891654015,
+            0.03775092773139477,
+            0.037899939343333244
+          ],
+          "mean_ms": 0.03925040364265442,
+          "median_ms": 0.037910183891654015,
+          "min_ms": 0.03775092773139477,
+          "max_ms": 0.04140078090131283,
+          "stdev_ms": 0.001913975355304958
+        },
+        "median_ms": 0.020880000665783882,
+        "min_ms": 0.02043999917805195,
+        "max_ms": 0.023760000243782997,
+        "mean_ms": 0.02146399989724159,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.660972595214844
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 16,
+        "max_token_segments_per_panel": 32
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            1.3771779537200928,
+            1.3628979921340942,
+            1.3514970541000366,
+            1.3447779417037964,
+            1.3238569498062134
+          ],
+          "mean_ms": 1.3520415782928468,
+          "median_ms": 1.3514970541000366,
+          "min_ms": 1.3238569498062134,
+          "max_ms": 1.3771779537200928,
+          "stdev_ms": 0.019982050052082867
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.4938721433281898,
+            1.3844820205122232,
+            1.3702220749109983,
+            1.363441115245223,
+            1.3424709904938936
+          ],
+          "mean_ms": 1.3908976688981056,
+          "median_ms": 1.3702220749109983,
+          "min_ms": 1.3424709904938936,
+          "max_ms": 1.4938721433281898,
+          "stdev_ms": 0.05952182086185209
+        },
+        "median_ms": 1.3514970541000366,
+        "min_ms": 1.3238569498062134,
+        "max_ms": 1.3771779537200928,
+        "mean_ms": 1.3520415782928468,
+        "peak_memory_allocated_bytes": 624303616,
+        "peak_memory_allocated_gib": 0.581428050994873,
+        "checksum": -2870.804443359375
+      }
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "group_panels": 1,
+      "token_tiles": 8,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 576,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 294912,
+      "write_reduction_x": 56.666666666666664,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 1.2109375,
+      "traffic_vs_raw_x": 52.645161290322584,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.026920000091195107,
+            0.02483999915421009,
+            0.023679999634623528,
+            0.020919999107718468,
+            0.022440999746322632
+          ],
+          "mean_ms": 0.023760199546813965,
+          "median_ms": 0.023679999634623528,
+          "min_ms": 0.020919999107718468,
+          "max_ms": 0.026920000091195107,
+          "stdev_ms": 0.0022893102316076655
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05400087684392929,
+            0.04302011802792549,
+            0.03958004526793957,
+            0.03733090125024319,
+            0.03927084617316723
+          ],
+          "mean_ms": 0.04264055751264095,
+          "median_ms": 0.03958004526793957,
+          "min_ms": 0.03733090125024319,
+          "max_ms": 0.05400087684392929,
+          "stdev_ms": 0.00667298772720607
+        },
+        "median_ms": 0.023679999634623528,
+        "min_ms": 0.020919999107718468,
+        "max_ms": 0.026920000091195107,
+        "mean_ms": 0.023760199546813965,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.022360000759363174,
+            0.022561000660061836,
+            0.021000999957323074,
+            0.020080000162124634,
+            0.01988000050187111
+          ],
+          "mean_ms": 0.021176400408148766,
+          "median_ms": 0.021000999957323074,
+          "min_ms": 0.01988000050187111,
+          "max_ms": 0.022561000660061836,
+          "stdev_ms": 0.001248152553138133
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.041400082409381866,
+            0.040790997445583344,
+            0.03761006519198418,
+            0.03677094355225563,
+            0.036629848182201385
+          ],
+          "mean_ms": 0.03864038735628128,
+          "median_ms": 0.03761006519198418,
+          "min_ms": 0.036629848182201385,
+          "max_ms": 0.041400082409381866,
+          "stdev_ms": 0.0022825255864654236
+        },
+        "median_ms": 0.021000999957323074,
+        "min_ms": 0.01988000050187111,
+        "max_ms": 0.022561000660061836,
+        "mean_ms": 0.021176400408148766,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.650482177734375
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 8,
+        "max_token_segments_per_panel": 64
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            1.3750979900360107,
+            1.3451780080795288,
+            1.3294169902801514,
+            1.32185697555542,
+            1.3288569450378418
+          ],
+          "mean_ms": 1.3400813817977906,
+          "median_ms": 1.3294169902801514,
+          "min_ms": 1.32185697555542,
+          "max_ms": 1.3750979900360107,
+          "stdev_ms": 0.02135406671966277
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.490871887654066,
+            1.3659510295838118,
+            1.3485909439623356,
+            1.3411019463092089,
+            1.3478109613060951
+          ],
+          "mean_ms": 1.3788653537631035,
+          "median_ms": 1.3485909439623356,
+          "min_ms": 1.3411019463092089,
+          "max_ms": 1.490871887654066,
+          "stdev_ms": 0.06328355537867397
+        },
+        "median_ms": 1.3294169902801514,
+        "min_ms": 1.32185697555542,
+        "max_ms": 1.3750979900360107,
+        "mean_ms": 1.3400813817977906,
+        "peak_memory_allocated_bytes": 624302592,
+        "peak_memory_allocated_gib": 0.5814270973205566,
+        "checksum": -2870.8017578125
+      }
+    },
+    {
+      "token_block": 64,
+      "group_panel": 512,
+      "group_panels": 1,
+      "token_tiles": 8,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 576,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 294912,
+      "write_reduction_x": 56.666666666666664,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 1.2109375,
+      "traffic_vs_raw_x": 52.645161290322584,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.02711999975144863,
+            0.024159999564290047,
+            0.02184000052511692,
+            0.021400000900030136,
+            0.02128100022673607
+          ],
+          "mean_ms": 0.023160200193524362,
+          "median_ms": 0.02184000052511692,
+          "min_ms": 0.02128100022673607,
+          "max_ms": 0.02711999975144863,
+          "stdev_ms": 0.002502610264962291
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05328003317117691,
+            0.0424699392169714,
+            0.03960984759032726,
+            0.038529979065060616,
+            0.03816001117229462
+          ],
+          "mean_ms": 0.04240996204316616,
+          "median_ms": 0.03960984759032726,
+          "min_ms": 0.03816001117229462,
+          "max_ms": 0.05328003317117691,
+          "stdev_ms": 0.006307119684404253
+        },
+        "median_ms": 0.02184000052511692,
+        "min_ms": 0.02128100022673607,
+        "max_ms": 0.02711999975144863,
+        "mean_ms": 0.023160200193524362,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.02247999981045723,
+            0.019999999552965164,
+            0.021239999681711197,
+            0.024761000648140907,
+            0.020600000396370888
+          ],
+          "mean_ms": 0.021816200017929076,
+          "median_ms": 0.021239999681711197,
+          "min_ms": 0.019999999552965164,
+          "max_ms": 0.024761000648140907,
+          "stdev_ms": 0.0018856174978059193
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.04215002991259098,
+            0.04021008498966694,
+            0.0395399983972311,
+            0.03945990465581417,
+            0.03733998164534569
+          ],
+          "mean_ms": 0.039739999920129776,
+          "median_ms": 0.0395399983972311,
+          "min_ms": 0.03733998164534569,
+          "max_ms": 0.04215002991259098,
+          "stdev_ms": 0.0017253815681404882
+        },
+        "median_ms": 0.021239999681711197,
+        "min_ms": 0.019999999552965164,
+        "max_ms": 0.024761000648140907,
+        "mean_ms": 0.021816200017929076,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.650482177734375
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 8,
+        "max_token_segments_per_panel": 64
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            2.201749086380005,
+            2.1815099716186523,
+            2.153228998184204,
+            2.1763100624084473,
+            2.168910026550293
+          ],
+          "mean_ms": 2.1763416290283204,
+          "median_ms": 2.1763100624084473,
+          "min_ms": 2.153228998184204,
+          "max_ms": 2.201749086380005,
+          "stdev_ms": 0.017760025834637844
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            2.321809995919466,
+            2.2029378451406956,
+            2.1795888897031546,
+            2.1995578426867723,
+            2.18743784353137
+          ],
+          "mean_ms": 2.2182664833962917,
+          "median_ms": 2.1995578426867723,
+          "min_ms": 2.1795888897031546,
+          "max_ms": 2.321809995919466,
+          "stdev_ms": 0.058635741368678024
+        },
+        "median_ms": 2.1763100624084473,
+        "min_ms": 2.153228998184204,
+        "max_ms": 2.201749086380005,
+        "mean_ms": 2.1763416290283204,
+        "peak_memory_allocated_bytes": 624302592,
+        "peak_memory_allocated_gib": 0.5814270973205566,
+        "checksum": -2870.8017578125
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "group_panels": 1,
+      "token_tiles": 16,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 1088,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 557056,
+      "write_reduction_x": 30.0,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 2.2734375,
+      "traffic_vs_raw_x": 28.04123711340206,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.0427200011909008,
+            0.03152000159025192,
+            0.02419999986886978,
+            0.023761000484228134,
+            0.022640999406576157
+          ],
+          "mean_ms": 0.02896840050816536,
+          "median_ms": 0.02419999986886978,
+          "min_ms": 0.022640999406576157,
+          "max_ms": 0.0427200011909008,
+          "stdev_ms": 0.008448488826205006
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.16475096344947815,
+            0.051320064812898636,
+            0.04200008697807789,
+            0.04064897075295448,
+            0.040220096707344055
+          ],
+          "mean_ms": 0.06778803654015064,
+          "median_ms": 0.04200008697807789,
+          "min_ms": 0.040220096707344055,
+          "max_ms": 0.16475096344947815,
+          "stdev_ms": 0.054393340191323455
+        },
+        "median_ms": 0.02419999986886978,
+        "min_ms": 0.022640999406576157,
+        "max_ms": 0.0427200011909008,
+        "mean_ms": 0.02896840050816536,
+        "peak_memory_allocated_bytes": 624301568,
+        "peak_memory_allocated_gib": 0.5814261436462402,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.03139999881386757,
+            0.027160000056028366,
+            0.02247999981045723,
+            0.022801000624895096,
+            0.02208000048995018
+          ],
+          "mean_ms": 0.02518419995903969,
+          "median_ms": 0.022801000624895096,
+          "min_ms": 0.02208000048995018,
+          "max_ms": 0.03139999881386757,
+          "stdev_ms": 0.004036345292486022
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.07106899283826351,
+            0.0460802111774683,
+            0.039950013160705566,
+            0.03918004222214222,
+            0.03916001878678799
+          ],
+          "mean_ms": 0.04708785563707352,
+          "median_ms": 0.039950013160705566,
+          "min_ms": 0.03916001878678799,
+          "max_ms": 0.07106899283826351,
+          "stdev_ms": 0.01371534901275599
+        },
+        "median_ms": 0.022801000624895096,
+        "min_ms": 0.02208000048995018,
+        "max_ms": 0.03139999881386757,
+        "mean_ms": 0.02518419995903969,
+        "peak_memory_allocated_bytes": 624301568,
+        "peak_memory_allocated_gib": 0.5814261436462402,
+        "checksum": 32.660972595214844
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 16,
+        "max_token_segments_per_panel": 32
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.89513099193573,
+            0.8810120224952698,
+            0.8628910183906555,
+            0.8489710092544556,
+            0.846651017665863
+          ],
+          "mean_ms": 0.8669312119483947,
+          "median_ms": 0.8628910183906555,
+          "min_ms": 0.846651017665863,
+          "max_ms": 0.89513099193573,
+          "stdev_ms": 0.020878668192198642
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.0122980456799269,
+            0.900947954505682,
+            0.8796269539743662,
+            0.8677961304783821,
+            0.8695260621607304
+          ],
+          "mean_ms": 0.9060390293598175,
+          "median_ms": 0.8796269539743662,
+          "min_ms": 0.8677961304783821,
+          "max_ms": 1.0122980456799269,
+          "stdev_ms": 0.060848605997162644
+        },
+        "median_ms": 0.8628910183906555,
+        "min_ms": 0.846651017665863,
+        "max_ms": 0.89513099193573,
+        "mean_ms": 0.8669312119483947,
+        "peak_memory_allocated_bytes": 624303616,
+        "peak_memory_allocated_gib": 0.581428050994873,
+        "checksum": -2870.804443359375
+      }
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "group_panels": 1,
+      "token_tiles": 8,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 576,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 294912,
+      "write_reduction_x": 56.666666666666664,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 1.2109375,
+      "traffic_vs_raw_x": 52.645161290322584,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.026920000091195107,
+            0.02483999915421009,
+            0.023679999634623528,
+            0.020919999107718468,
+            0.022440999746322632
+          ],
+          "mean_ms": 0.023760199546813965,
+          "median_ms": 0.023679999634623528,
+          "min_ms": 0.020919999107718468,
+          "max_ms": 0.026920000091195107,
+          "stdev_ms": 0.0022893102316076655
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05400087684392929,
+            0.04302011802792549,
+            0.03958004526793957,
+            0.03733090125024319,
+            0.03927084617316723
+          ],
+          "mean_ms": 0.04264055751264095,
+          "median_ms": 0.03958004526793957,
+          "min_ms": 0.03733090125024319,
+          "max_ms": 0.05400087684392929,
+          "stdev_ms": 0.00667298772720607
+        },
+        "median_ms": 0.023679999634623528,
+        "min_ms": 0.020919999107718468,
+        "max_ms": 0.026920000091195107,
+        "mean_ms": 0.023760199546813965,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.022360000759363174,
+            0.022561000660061836,
+            0.021000999957323074,
+            0.020080000162124634,
+            0.01988000050187111
+          ],
+          "mean_ms": 0.021176400408148766,
+          "median_ms": 0.021000999957323074,
+          "min_ms": 0.01988000050187111,
+          "max_ms": 0.022561000660061836,
+          "stdev_ms": 0.001248152553138133
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.041400082409381866,
+            0.040790997445583344,
+            0.03761006519198418,
+            0.03677094355225563,
+            0.036629848182201385
+          ],
+          "mean_ms": 0.03864038735628128,
+          "median_ms": 0.03761006519198418,
+          "min_ms": 0.036629848182201385,
+          "max_ms": 0.041400082409381866,
+          "stdev_ms": 0.0022825255864654236
+        },
+        "median_ms": 0.021000999957323074,
+        "min_ms": 0.01988000050187111,
+        "max_ms": 0.022561000660061836,
+        "mean_ms": 0.021176400408148766,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.650482177734375
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 8,
+        "max_token_segments_per_panel": 64
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            1.3750979900360107,
+            1.3451780080795288,
+            1.3294169902801514,
+            1.32185697555542,
+            1.3288569450378418
+          ],
+          "mean_ms": 1.3400813817977906,
+          "median_ms": 1.3294169902801514,
+          "min_ms": 1.32185697555542,
+          "max_ms": 1.3750979900360107,
+          "stdev_ms": 0.02135406671966277
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.490871887654066,
+            1.3659510295838118,
+            1.3485909439623356,
+            1.3411019463092089,
+            1.3478109613060951
+          ],
+          "mean_ms": 1.3788653537631035,
+          "median_ms": 1.3485909439623356,
+          "min_ms": 1.3411019463092089,
+          "max_ms": 1.490871887654066,
+          "stdev_ms": 0.06328355537867397
+        },
+        "median_ms": 1.3294169902801514,
+        "min_ms": 1.32185697555542,
+        "max_ms": 1.3750979900360107,
+        "mean_ms": 1.3400813817977906,
+        "peak_memory_allocated_bytes": 624302592,
+        "peak_memory_allocated_gib": 0.5814270973205566,
+        "checksum": -2870.8017578125
+      }
+    },
+    {
+      "token_block": 32,
+      "group_panel": 512,
+      "group_panels": 1,
+      "token_tiles": 16,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 1088,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 557056,
+      "write_reduction_x": 30.0,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 2.2734375,
+      "traffic_vs_raw_x": 28.04123711340206,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.026480000466108322,
+            0.024521000683307648,
+            0.022360999137163162,
+            0.021080000326037407,
+            0.021159999072551727
+          ],
+          "mean_ms": 0.023120399937033652,
+          "median_ms": 0.022360999137163162,
+          "min_ms": 0.021080000326037407,
+          "max_ms": 0.026480000466108322,
+          "stdev_ms": 0.0023362196954846265
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05165114998817444,
+            0.04234001971781254,
+            0.03929995000362396,
+            0.03796000964939594,
+            0.037841033190488815
+          ],
+          "mean_ms": 0.04181843250989914,
+          "median_ms": 0.03929995000362396,
+          "min_ms": 0.037841033190488815,
+          "max_ms": 0.05165114998817444,
+          "stdev_ms": 0.005788010726362576
+        },
+        "median_ms": 0.022360999137163162,
+        "min_ms": 0.021080000326037407,
+        "max_ms": 0.026480000466108322,
+        "mean_ms": 0.023120399937033652,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.021560000255703926,
+            0.023760000243782997,
+            0.020880000665783882,
+            0.02043999917805195,
+            0.020679999142885208
+          ],
+          "mean_ms": 0.02146399989724159,
+          "median_ms": 0.020880000665783882,
+          "min_ms": 0.02043999917805195,
+          "max_ms": 0.023760000243782997,
+          "stdev_ms": 0.0013495483891119494
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.04129018634557724,
+            0.04140078090131283,
+            0.037910183891654015,
+            0.03775092773139477,
+            0.037899939343333244
+          ],
+          "mean_ms": 0.03925040364265442,
+          "median_ms": 0.037910183891654015,
+          "min_ms": 0.03775092773139477,
+          "max_ms": 0.04140078090131283,
+          "stdev_ms": 0.001913975355304958
+        },
+        "median_ms": 0.020880000665783882,
+        "min_ms": 0.02043999917805195,
+        "max_ms": 0.023760000243782997,
+        "mean_ms": 0.02146399989724159,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.660972595214844
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 16,
+        "max_token_segments_per_panel": 32
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            1.3771779537200928,
+            1.3628979921340942,
+            1.3514970541000366,
+            1.3447779417037964,
+            1.3238569498062134
+          ],
+          "mean_ms": 1.3520415782928468,
+          "median_ms": 1.3514970541000366,
+          "min_ms": 1.3238569498062134,
+          "max_ms": 1.3771779537200928,
+          "stdev_ms": 0.019982050052082867
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            1.4938721433281898,
+            1.3844820205122232,
+            1.3702220749109983,
+            1.363441115245223,
+            1.3424709904938936
+          ],
+          "mean_ms": 1.3908976688981056,
+          "median_ms": 1.3702220749109983,
+          "min_ms": 1.3424709904938936,
+          "max_ms": 1.4938721433281898,
+          "stdev_ms": 0.05952182086185209
+        },
+        "median_ms": 1.3514970541000366,
+        "min_ms": 1.3238569498062134,
+        "max_ms": 1.3771779537200928,
+        "mean_ms": 1.3520415782928468,
+        "peak_memory_allocated_bytes": 624303616,
+        "peak_memory_allocated_gib": 0.581428050994873,
+        "checksum": -2870.804443359375
+      }
+    },
+    {
+      "token_block": 64,
+      "group_panel": 512,
+      "group_panels": 1,
+      "token_tiles": 8,
+      "pair_count": 32640,
+      "token_panel_segments": 509,
+      "output_group_rows": 576,
+      "k16_work_units": 2280,
+      "k16_padded_pairs": 36480,
+      "k16_fill_x": 0.8947368421052632,
+      "avg_pairs_per_k16_work_unit": 14.31578947368421,
+      "pairs_per_token_panel": {
+        "count": 509,
+        "mean": 64.12574005126953,
+        "p50": 64.0,
+        "p90": 115.0,
+        "p99": 126.0,
+        "max": 128.0
+      },
+      "raw_write_elements": 16711680,
+      "active_write_elements": 294912,
+      "write_reduction_x": 56.666666666666664,
+      "raw_stream_mib": 63.75,
+      "active_stream_mib": 1.2109375,
+      "traffic_vs_raw_x": 52.645161290322584,
+      "naive_panel_rescan_amplification_x": 1,
+      "torch_pack_workspace_mib": 0.7509613037109375,
+      "production_int32_route_workspace_mib": 0.25096893310546875,
+      "read": "Pairs are sorted by (seq_tile, group_panel, token), so a group-owned kernel can consume only active panel routes instead of rescanning all top-k slots once per group panel. The output-group count sizes the reduced dKV row stream; this probe does not time dKV math.",
+      "route_pair_metadata_timing": {
+        "label": "route_pair_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.02711999975144863,
+            0.024159999564290047,
+            0.02184000052511692,
+            0.021400000900030136,
+            0.02128100022673607
+          ],
+          "mean_ms": 0.023160200193524362,
+          "median_ms": 0.02184000052511692,
+          "min_ms": 0.02128100022673607,
+          "max_ms": 0.02711999975144863,
+          "stdev_ms": 0.002502610264962291
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.05328003317117691,
+            0.0424699392169714,
+            0.03960984759032726,
+            0.038529979065060616,
+            0.03816001117229462
+          ],
+          "mean_ms": 0.04240996204316616,
+          "median_ms": 0.03960984759032726,
+          "min_ms": 0.03816001117229462,
+          "max_ms": 0.05328003317117691,
+          "stdev_ms": 0.006307119684404253
+        },
+        "median_ms": 0.02184000052511692,
+        "min_ms": 0.02128100022673607,
+        "max_ms": 0.02711999975144863,
+        "mean_ms": 0.023160200193524362,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 25.00942611694336
+      },
+      "route_segment_metadata_timing": {
+        "label": "route_segment_metadata_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            0.02247999981045723,
+            0.019999999552965164,
+            0.021239999681711197,
+            0.024761000648140907,
+            0.020600000396370888
+          ],
+          "mean_ms": 0.021816200017929076,
+          "median_ms": 0.021239999681711197,
+          "min_ms": 0.019999999552965164,
+          "max_ms": 0.024761000648140907,
+          "stdev_ms": 0.0018856174978059193
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            0.04215002991259098,
+            0.04021008498966694,
+            0.0395399983972311,
+            0.03945990465581417,
+            0.03733998164534569
+          ],
+          "mean_ms": 0.039739999920129776,
+          "median_ms": 0.0395399983972311,
+          "min_ms": 0.03733998164534569,
+          "max_ms": 0.04215002991259098,
+          "stdev_ms": 0.0017253815681404882
+        },
+        "median_ms": 0.021239999681711197,
+        "min_ms": 0.019999999552965164,
+        "max_ms": 0.024761000648140907,
+        "mean_ms": 0.021816200017929076,
+        "peak_memory_allocated_bytes": 624302080,
+        "peak_memory_allocated_gib": 0.5814266204833984,
+        "checksum": 32.650482177734375
+      },
+      "route_scalar_input_timing": null,
+      "panel_segments": {
+        "panel_count": 8,
+        "max_token_segments_per_panel": 64
+      },
+      "route_panel_d16_contrib_timing": {
+        "label": "route_panel_d16_contrib_sink",
+        "warmup_iters": 2,
+        "timed_iters": 5,
+        "event": {
+          "enabled": true,
+          "samples_ms": [
+            2.201749086380005,
+            2.1815099716186523,
+            2.153228998184204,
+            2.1763100624084473,
+            2.168910026550293
+          ],
+          "mean_ms": 2.1763416290283204,
+          "median_ms": 2.1763100624084473,
+          "min_ms": 2.153228998184204,
+          "max_ms": 2.201749086380005,
+          "stdev_ms": 0.017760025834637844
+        },
+        "wall": {
+          "enabled": true,
+          "samples_ms": [
+            2.321809995919466,
+            2.2029378451406956,
+            2.1795888897031546,
+            2.1995578426867723,
+            2.18743784353137
+          ],
+          "mean_ms": 2.2182664833962917,
+          "median_ms": 2.1995578426867723,
+          "min_ms": 2.1795888897031546,
+          "max_ms": 2.321809995919466,
+          "stdev_ms": 0.058635741368678024
+        },
+        "median_ms": 2.1763100624084473,
+        "min_ms": 2.153228998184204,
+        "max_ms": 2.201749086380005,
+        "mean_ms": 2.1763416290283204,
+        "peak_memory_allocated_bytes": 624302592,
+        "peak_memory_allocated_gib": 0.5814270973205566,
+        "checksum": -2870.8017578125
+      }
+    }
+  ],
+  "decision": {
+    "read": "If pair/segment metadata consumption is sub-ms at S4096, the prepacked route format is not the wall. If the scalar input sink is also far below the sparse-atomic dKV gate, the next risk is the D16 MFMA accumulator plus tile-local grouped reduction, not sorted route traversal.",
+    "non_goal": "This is not a correctness or production latency candidate: it does not compute full D16 contributions, does not reduce duplicate groups, and does not update dKV."
+  },
+  "boundary_route_fanin": {
+    "topk": 128,
+    "compressed_groups": 128,
+    "compress_ratio": 4,
+    "actual_compressed": {
+      "rows": 128,
+      "nonzero_rows": 128,
+      "zero_rows": 0,
+      "total_selections": 32640,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "p50_all_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p50_nonzero_rows": 255.0,
+      "p90_nonzero_rows": 458.2,
+      "p99_nonzero_rows": 503.92,
+      "gini": 0.33462009803921566,
+      "top1_share": 0.01559436274509804,
+      "top8_share": 0.1213235294117647,
+      "top16_share": 0.23480392156862745,
+      "top64_share": 0.7509803921568627
+    },
+    "prefix_compressed_same_topk": {
+      "rows": 128,
+      "nonzero_rows": 128,
+      "zero_rows": 0,
+      "total_selections": 32640,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "p50_all_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p50_nonzero_rows": 255.0,
+      "p90_nonzero_rows": 458.2,
+      "p99_nonzero_rows": 503.92,
+      "gini": 0.33462009803921566,
+      "top1_share": 0.01559436274509804,
+      "top8_share": 0.1213235294117647,
+      "top16_share": 0.23480392156862745,
+      "top64_share": 0.7509803921568627
+    },
+    "valid_selected_per_query": {
+      "rows": 512,
+      "nonzero_rows": 509,
+      "zero_rows": 3,
+      "total_selections": 32640,
+      "min": 0,
+      "min_nonzero": 1,
+      "max": 128,
+      "mean_all_rows": 63.75,
+      "mean_nonzero_rows": 64.12573673870334,
+      "p50_all_rows": 64.0,
+      "p90_all_rows": 115.0,
+      "p99_all_rows": 126.0,
+      "p50_nonzero_rows": 64.0,
+      "p90_nonzero_rows": 115.0,
+      "p99_nonzero_rows": 126.0,
+      "gini": 0.33464307598039217,
+      "top1_share": 0.00392156862745098,
+      "top8_share": 0.031066176470588236,
+      "top16_share": 0.0616421568627451,
+      "top64_share": 0.23480392156862745
+    },
+    "atomic_estimates": {
+      "block_h_16": {
+        "head_blocks": 4,
+        "actual_atomic_add_elements": 66846720,
+        "prefix_atomic_add_elements": 66846720
+      },
+      "block_h_64": {
+        "head_blocks": 1,
+        "actual_atomic_add_elements": 16711680,
+        "prefix_atomic_add_elements": 16711680
+      }
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology."
+  },
+  "materialized_workspace": {
+    "probs_gib": 0.015625,
+    "grad_logits_gib": 0.015625
+  }
+}

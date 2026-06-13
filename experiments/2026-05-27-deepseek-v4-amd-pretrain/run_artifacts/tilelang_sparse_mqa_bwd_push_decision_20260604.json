@@ -1,0 +1,111 @@
+{
+  "artifact": "tilelang_sparse_mqa_bwd_push_decision_20260604",
+  "scope": "TileLang DSv4 sparse-MQA backward continuation gate after straight-reference atomic rejection.",
+  "date": "2026-06-04",
+  "runtime": {
+    "node": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "gpu": "MI350X/gfx950",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "tilelang": "0.1.7.post3+cuda.gita55a8230"
+  },
+  "code": {
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py",
+    "local_diagnostic_variant": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+    "reference": "sources/references/miles-deepseek-v4-pr1045/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "kv_len": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "dtype": "bfloat16",
+    "forward_state": "synthetic"
+  },
+  "baseline": {
+    "straight_reference_best_full_width_artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_thr256_synthetic_20260604.json",
+    "straight_reference_best_full_width_core_ms": 28.085914611816406,
+    "straight_reference_previous_headsplit32_core_ms": 28.111255645751953,
+    "current_triton_sparse_atomic_dkv_wall_ms": 8.006924390792847,
+    "read": "The direct vendored reference still loses to the current Triton sparse-atomic dKV wall because it must split heads and still performs per-selected dKV atomics."
+  },
+  "sweep_results": [
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit16_synthetic_20260604.json",
+      "variant": "reference",
+      "head_split": 16,
+      "block_size": 32,
+      "threads": 128,
+      "core_backward_median_ms": 55.315547943115234,
+      "read": "Smaller head tiles double launch/work count and are worse."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_b16_synthetic_20260604.json",
+      "variant": "reference",
+      "head_split": 32,
+      "block_size": 16,
+      "threads": 128,
+      "core_backward_median_ms": 28.407995223999023,
+      "read": "Lower block size compiles but is slightly slower than block_size=32."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_thr256_synthetic_20260604.json",
+      "variant": "reference",
+      "head_split": 32,
+      "block_size": 32,
+      "threads": 256,
+      "core_backward_median_ms": 28.085914611816406,
+      "read": "Best straight-reference full-width point, but still much slower than the Triton dKV wall."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_nodkv_directdq_s4096_kv1024_topk512_h64_d512_direct_b16_synthetic_20260604.json",
+      "variant": "no_dkv_directdq",
+      "head_split": 0,
+      "block_size": 16,
+      "threads": 128,
+      "core_backward_median_ms": 3.9971530437469482,
+      "read": "Full H64/D512 compiles once dKV contribution/writeback is removed."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_nodkv_directdq_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_synthetic_20260604.json",
+      "variant": "no_dkv_directdq",
+      "head_split": 0,
+      "block_size": 16,
+      "threads": 256,
+      "core_backward_median_ms": 2.1869380474090576,
+      "read": "Best no-dKV diagnostic point: full-shape QK, softmax backward, dQ, and dAttnSink are fast in TileLang."
+    }
+  ],
+  "compile_failures": [
+    {
+      "shape": "S4096,kv1024,H64,D512,topk512,reference,direct,threads=64,block_size=32",
+      "failure": "TileLang lowering/vectorization internal error before runtime.",
+      "read": "Lowering threads does not rescue direct H64/D512 reference."
+    },
+    {
+      "shape": "S4096,kv1024,H64,D512,topk512,reference,head_split=32,block_size=64",
+      "failure": "Requested dynamic shared memory 204800 exceeds device limit 163840.",
+      "read": "Larger selected block is blocked by shared memory."
+    },
+    {
+      "shape": "S4096,kv1024,H64,D512,topk512,no_dkv_directdq,direct,block_size=32,threads=128",
+      "failure": "Requested dynamic shared memory 167936 exceeds device limit 163840.",
+      "read": "Removing dKV writeback nearly fits direct H64/D512; block_size=16 fits."
+    }
+  ],
+  "decision": {
+    "push_tilelang_path": true,
+    "promote_straight_reference_atomic": false,
+    "why": [
+      "The straight reference is still too slow at full H64/D512: best measured split point is 28.09 ms.",
+      "The local no-dKV direct diagnostic proves TileLang can run the full H64/D512 non-dKV backward body at 2.19 ms.",
+      "Therefore the next TileLang target should be a dKV-specific rewrite, not another full-kernel split sweep."
+    ],
+    "next_kernel_contract": "Start from the no_dkv_directdq direct H64/D512 schedule, then add a TileLang dKV producer/reducer that keeps BS=16 or another shared-memory-fitting tile, accumulates multiple selected rows by compressed group inside the tile, and emits reduced dKV writes instead of per-selected T.atomic_addx4.",
+    "first_promotion_gate": "At S4096/H64/D512/topk512, full TileLang backward with reduced dKV writeback must beat the 8.01 ms Triton sparse-atomic dKV wall plus preserve the 2.19 ms non-dKV TileLang floor as much as possible."
+  },
+  "dependency_pin_changes": []
+}

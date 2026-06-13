@@ -1,0 +1,216 @@
+{
+  "artifact": "grouped_bmm_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Direct one-MI350 BF16 grouped-BMM probes for the S4096 routed-MoE bottleneck after the M=12288 one-expert GEMM floor passed target.",
+  "source_artifacts": {
+    "balanced_actual": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_balanced_actual_20260531.json",
+    "padded88_actual": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_padded88_actual_20260531.json",
+    "balanced_materialized_transpose": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_balanced_materialized_transpose_20260531.json",
+    "padded88_materialized_transpose": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_padded88_materialized_transpose_20260531.json",
+    "probe_plan": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_probe_plan_20260531.json",
+    "expert_gemm_m12288_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/expert_gemm_m12288_decision_20260531.json",
+    "s4096_rocprof_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/rocprof_s4096_after_m12288_decision_20260531.json"
+  },
+  "remote_summary_paths": {
+    "balanced_actual": "do-sonle-kernel:/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/grouped_bmm_s4096_20260531/grouped_bmm_s4096_balanced_actual/summary.json",
+    "padded88_actual": "do-sonle-kernel:/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/grouped_bmm_s4096_20260531/grouped_bmm_s4096_padded88_actual/summary.json",
+    "balanced_materialized_transpose": "do-sonle-kernel:/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/grouped_bmm_s4096_mattrans_20260531/grouped_bmm_s4096_balanced_materialized-transpose/summary.json",
+    "padded88_materialized_transpose": "do-sonle-kernel:/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/grouped_bmm_s4096_mattrans_20260531/grouped_bmm_s4096_padded88_materialized-transpose/summary.json"
+  },
+  "run": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "dtype": "bfloat16",
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "layout": "actual_and_materialized_transpose",
+    "blas_backend_request": "current",
+    "blas_backend_effective": "Cublaslt",
+    "iters": 5,
+    "tuning_enabled": false
+  },
+  "targets": {
+    "full_layer_fwd_bwd_s4096_ms": 24.9,
+    "attention_m4096_one_gpu_ms": 3.6,
+    "moe_expert_gemm_m12288_one_gpu_ms_per_expert": 1.3
+  },
+  "balanced_rows_per_expert_64": {
+    "tokens": 4096,
+    "tokens_per_group": 64,
+    "read": "Balanced cyclic S4096/topk6 proxy with no learned-route global-max padding.",
+    "ops": {
+      "fwd_w1": {
+        "median_ms": 2.897226095199585,
+        "min_ms": 2.8499059677124023,
+        "tflops_median": 373.57517950888126
+      },
+      "w2_dgrad": {
+        "median_ms": 3.0861051082611084,
+        "min_ms": 3.0515050888061523,
+        "tflops_median": 350.71124301461293
+      },
+      "w1w3_xgrad_pair": {
+        "median_ms": 6.319410800933838,
+        "min_ms": 6.082250118255615,
+        "tflops_median": 342.5419845888356,
+        "per_gemm_equivalent_ms": 3.159705400466919
+      },
+      "w2_wgrad": {
+        "median_ms": 4.511597156524658,
+        "min_ms": 4.49043607711792,
+        "tflops_median": 239.8999115040081
+      },
+      "w1_wgrad": {
+        "median_ms": 4.379875183105469,
+        "min_ms": 4.36675500869751,
+        "tflops_median": 247.1147494720598
+      },
+      "w3_wgrad": {
+        "median_ms": 4.381836891174316,
+        "min_ms": 4.332955837249756,
+        "tflops_median": 247.00411847186282
+      }
+    },
+    "wgrad_copy_cost": {
+      "copy_all_wgrad_lhs_median_ms": 1.0034079551696777,
+      "copy_w2_wgrad_lhs_median_ms": 0.5513240098953247,
+      "copy_w1_wgrad_lhs_median_ms": 0.22104200720787048,
+      "copy_w3_wgrad_lhs_median_ms": 0.2220419943332672
+    }
+  },
+  "padded_rows_per_expert_88": {
+    "tokens": 5632,
+    "tokens_per_group": 88,
+    "read": "Proxy for learned-router S4096 max padding: 384 experts x 88 rows = 33792 padded assignments.",
+    "ops": {
+      "fwd_w1": {
+        "median_ms": 3.673470973968506,
+        "min_ms": 3.5294699668884277,
+        "tflops_median": 405.12261526222665
+      },
+      "w2_dgrad": {
+        "median_ms": 3.316986083984375,
+        "min_ms": 3.1523849964141846,
+        "tflops_median": 448.6621681199101
+      },
+      "w1w3_xgrad_pair": {
+        "median_ms": 6.454730987548828,
+        "min_ms": 6.176329135894775,
+        "tflops_median": 461.1210508802764,
+        "per_gemm_equivalent_ms": 3.227365493774414
+      },
+      "w2_wgrad": {
+        "median_ms": 5.535284996032715,
+        "min_ms": 5.486965179443359,
+        "tflops_median": 268.85809296732447
+      },
+      "w1_wgrad": {
+        "median_ms": 5.334683895111084,
+        "min_ms": 5.31244421005249,
+        "tflops_median": 278.9680133489917
+      },
+      "w3_wgrad": {
+        "median_ms": 5.323041915893555,
+        "min_ms": 5.303802013397217,
+        "tflops_median": 279.57814189298597
+      }
+    },
+    "wgrad_copy_cost": {
+      "copy_all_wgrad_lhs_median_ms": 1.2697299718856812,
+      "copy_w2_wgrad_lhs_median_ms": 0.6854450106620789,
+      "copy_w1_wgrad_lhs_median_ms": 0.28900301456451416,
+      "copy_w3_wgrad_lhs_median_ms": 0.27948200702667236
+    }
+  },
+  "padding_ratio_padded88_over_balanced": {
+    "flops_and_rows": 1.375,
+    "latency": {
+      "fwd_w1": 1.2679269250180651,
+      "w2_dgrad": 1.0748130629463097,
+      "w1w3_xgrad_pair": 1.0214134182564922,
+      "w2_wgrad": 1.2269014284725317,
+      "w1_wgrad": 1.217999068943473,
+      "w3_wgrad": 1.2147969100846652,
+      "copy_all_wgrad_lhs": 1.2654174858230698
+    }
+  },
+  "comparison_to_integrated_s4096_profile": {
+    "read": "Direct grouped BMMs reproduce the same order of magnitude as the integrated rocprof MoE attribution. The multi-ms cost is therefore already present in the small-row grouped GEMM shape, before higher-level dispatch/reduce overhead is considered.",
+    "matches": {
+      "balanced_w1w3_xgrad_pair_vs_rocprof_moe_routed_w1_w3_dgrad": {
+        "direct_grouped_bmm_ms": 6.319410800933838,
+        "integrated_block_ms": 6.793081993237138,
+        "integrated_over_direct": 1.074956550623307
+      },
+      "padded88_w2_dgrad_vs_rocprof_moe_routed_w2_dgrad": {
+        "direct_grouped_bmm_ms": 3.316986083984375,
+        "integrated_block_ms": 3.133186954073608,
+        "integrated_over_direct": 0.9445884502573375
+      },
+      "padded88_wgrad_vs_rocprof_wgrad_blocks": {
+        "direct_w2_wgrad_ms": 5.535284996032715,
+        "integrated_w2_wgrad_ms": 6.8028130335733294,
+        "direct_w1_wgrad_ms": 5.334683895111084,
+        "integrated_w1_wgrad_ms": 6.757172988727689,
+        "direct_w3_wgrad_ms": 5.323041915893555,
+        "integrated_w3_wgrad_ms": 6.17365597281605
+      }
+    }
+  },
+  "materialized_transpose_tradeoff": {
+    "read": "Materializing the transposed wgrad lhs operands makes several grouped contractions faster, but the required copy is larger than the observed total wgrad contraction savings for both row-count proxies. This is not a standalone full-path win unless another kernel can consume the materialized layout without paying the extra copy on the critical path.",
+    "balanced_rows_per_expert_64": {
+      "materialized_over_actual_latency": {
+        "fwd_w1": 1.054948766224591,
+        "w2_dgrad": 0.9749972632240742,
+        "w1w3_xgrad_pair": 0.9507036456165939,
+        "w2_wgrad": 0.9402774717130097,
+        "w1_wgrad": 0.9621621109638221,
+        "w3_wgrad": 0.9844252788382413
+      },
+      "wgrad_sum_actual_ms": 13.273309230804443,
+      "wgrad_sum_materialized_ms": 12.769894123077393,
+      "wgrad_sum_saved_ms": 0.5034151077270508,
+      "copy_all_wgrad_lhs_ms": 0.9955679774284363,
+      "net_saved_after_copy_ms": -0.4921528697013855
+    },
+    "padded_rows_per_expert_88": {
+      "materialized_over_actual_latency": {
+        "fwd_w1": 0.8992549417322067,
+        "w2_dgrad": 0.9149221617935248,
+        "w1w3_xgrad_pair": 0.9552085346401359,
+        "w2_wgrad": 0.9379471679570901,
+        "w1_wgrad": 0.9554013298422197,
+        "w3_wgrad": 0.9512613197544653
+      },
+      "wgrad_sum_actual_ms": 16.193010807037354,
+      "wgrad_sum_materialized_ms": 15.3521728515625,
+      "wgrad_sum_saved_ms": 0.8408379554748535,
+      "copy_all_wgrad_lhs_ms": 1.2520489692687988,
+      "net_saved_after_copy_ms": -0.4112110137939453
+    }
+  },
+  "decision": {
+    "status": "grouped_small_m_bmm_is_confirmed_primary_moe_math_bottleneck",
+    "read": "Large one-expert M=12288 dense GEMM is not the limiting floor; small-M grouped BMM at 384 experts and 64-88 rows/expert is. The current path pays 3-6 ms per major contraction, which explains the 31 ms routed-MoE dgrad and wgrad blocks. Materialized transpose improves some contractions but loses 0.4-0.5 ms after copy, so the next step should be compact-native small-M grouped kernels rather than pre-copying the current operands.",
+    "focus_next": [
+      "Prototype compact-native grouped MoE dgrad/wgrad kernels that consume group_sizes/group_offsets directly and avoid global max padding.",
+      "Test AITER/CK/Triton grouped-GEMM alternatives for the 384x64-88x7168x3072 shape instead of optimizing a single large M=12288 GEMM.",
+      "Avoid materializing transposed wgrad lhs as a standalone fix unless a later fused path reuses that layout enough to hide or remove the copy.",
+      "Fuse or co-schedule gather, SwiGLU derivative, W2/W1/W3 dgrad, and input-gradient reduce where possible so the backward path stops launching separate small grouped contractions and memory-motion kernels."
+    ],
+    "do_not_focus_next": [
+      "Replacing the raw dense M=12288 BF16 GEMM path as the main optimization.",
+      "Treating operand transposed-view layout as sufficient explanation without full-path evidence."
+    ]
+  },
+  "commands": {
+    "balanced_actual": "RUN_TAG=grouped_bmm_s4096_20260531 GROUPED_BMM_LAYOUT=actual TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=120 WAIT_IDLE_INTERVAL_SECONDS=10 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "padded88_actual": "RUN_TAG=grouped_bmm_s4096_20260531 GROUPED_BMM_LAYOUT=actual TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=120 WAIT_IDLE_INTERVAL_SECONDS=10 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-padded88",
+    "balanced_materialized_transpose": "RUN_TAG=grouped_bmm_s4096_mattrans_20260531 GROUPED_BMM_LAYOUT=materialized-transpose TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=120 WAIT_IDLE_INTERVAL_SECONDS=10 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "padded88_materialized_transpose": "RUN_TAG=grouped_bmm_s4096_mattrans_20260531 GROUPED_BMM_LAYOUT=materialized-transpose TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=120 WAIT_IDLE_INTERVAL_SECONDS=10 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-padded88"
+  },
+  "dependency_pin_changes": []
+}

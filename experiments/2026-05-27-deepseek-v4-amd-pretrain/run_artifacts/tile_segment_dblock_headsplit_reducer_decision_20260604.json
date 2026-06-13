@@ -1,0 +1,85 @@
+{
+  "status": "closed_no_promotion",
+  "scope": "actual_li_tile_segment_dblock_headsplit_compressed_dkv_reducer",
+  "date": "2026-06-04",
+  "question": "Can a prepacked tile-local segment reducer become the smaller keyed/segmented producer by slicing D and splitting H64 across lanes before global dKV writes?",
+  "implementation": {
+    "probe": "tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py",
+    "new_kernel": "tile_segment_dblock_headsplit_dkv_float",
+    "extension_cache_key": "dsv4_compressed_dkv_segmented_accumulator_v3_gfx950",
+    "contract": "one CTA owns one prepacked (token-block, selected-block, compressed-group) segment and one D block; threads split the H dimension, reduce partials in shared memory, then emit one reduced compressed-dKV D-block row"
+  },
+  "evidence": {
+    "s128_correctness": {
+      "artifact": "run_artifacts/actual_li_tile_segment_dblock_headsplit_s128_layer2_t32k256_20260604.json",
+      "seq_len": 128,
+      "selected_block": 256,
+      "block_d": 16,
+      "head_lanes": 16,
+      "max_abs_diff": 0.000019073486328125,
+      "event_median_ms": 0.10924100130796432,
+      "status": "passed"
+    },
+    "s512_gate": {
+      "artifact": "run_artifacts/actual_li_tile_segment_dblock_headsplit_s512_layer2_t32k256_20260604.json",
+      "seq_len": 512,
+      "selected_block": 256,
+      "block_d": 16,
+      "head_lanes": 16,
+      "max_abs_diff": 0.000034332275390625,
+      "event_median_ms": 1.378931999206543,
+      "threshold_ms": 3.081876039505005,
+      "status": "passed"
+    },
+    "s4096_primary_d16": {
+      "artifact": "run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_timing_20260604.json",
+      "seq_len": 4096,
+      "selected_block": 512,
+      "block_d": 16,
+      "head_lanes": 16,
+      "segments": 66029,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "event_median_ms": 117.53094482421875,
+      "threshold_ms": 8.80629825592041,
+      "status": "failed"
+    },
+    "s4096_d64_sanity": {
+      "artifact": "run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_d64_timing_20260604.json",
+      "seq_len": 4096,
+      "selected_block": 512,
+      "block_d": 64,
+      "head_lanes": 4,
+      "segments": 66029,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "event_median_ms": 84.49951934814453,
+      "threshold_ms": 8.80629825592041,
+      "status": "failed"
+    },
+    "retained_tilelang_reference": {
+      "artifact": "run_artifacts/tilelang_selected_limit_legacy_plan_actual_li_s4096_layer2_gp512_20260604.json",
+      "packed_kernel_only_ms": 6.180221080780029,
+      "source_indexed_kernel_ms": 7.282271862030029,
+      "pack_plus_kernel_ms": 8.192240715026855,
+      "write_reduction_x": 11.953140798066032
+    }
+  },
+  "read": "The D-block head-split reducer proves the prepacked segment contract is correct and helps at S512, but it collapses at S4096 because segment-owned CTAs still recompute contribution math and create hundreds of thousands to millions of small CTAs. D64 reduces CTA count but remains far above the sparse-atomic wall. This closes scalar segmented CTA variants as a speed path.",
+  "decision": {
+    "promote": false,
+    "retain": "TileLang selected-limit MFMA body, gp512/cap512/K64/D64/dblocks1",
+    "next": [
+      "Keep the TileLang selected-limit compressed-dKV kernel as the active candidate.",
+      "Do not pursue more scalar segment-owned D-block reducer tuning unless it is only for correctness diagnostics.",
+      "Next concrete TileLang/CK work should fuse or adjacent-produce P and scaled dP and reuse GPU LI route metadata so the bridge stops paying selected-state/materialized-probability costs."
+    ]
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions_v3 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 128 --layer-id 2 --contract-rung 32x256_d16_smoke --include-tile-segment-dblock --skip-scalar-candidate --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_dblock_headsplit_s128_layer2_t32k256_20260604.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions_v3 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 512 --layer-id 2 --contract-rung 32x256_d16_smoke --include-tile-segment-dblock --skip-scalar-candidate --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_dblock_headsplit_s512_layer2_t32k256_20260604.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions_v3 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 4096 --layer-id 2 --contract-rung 32x512_d16_primary --include-tile-segment-dblock --skip-scalar-candidate --skip-correctness --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_timing_20260604.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions_v3 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 512 --block-d 64 --include-tile-segment-dblock --skip-scalar-candidate --skip-correctness --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_d64_timing_20260604.json --json'",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_dblock_headsplit_s128_layer2_t32k256_20260604.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_dblock_headsplit_s512_layer2_t32k256_20260604.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_timing_20260604.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_dblock_headsplit_s4096_layer2_t32k512_d64_timing_20260604.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  ]
+}

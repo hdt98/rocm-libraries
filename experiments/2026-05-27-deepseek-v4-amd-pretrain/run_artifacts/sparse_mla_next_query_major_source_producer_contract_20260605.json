@@ -1,0 +1,128 @@
+{
+  "artifact": "sparse_mla_next_query_major_source_producer_contract",
+  "date": "2026-06-05",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "why_this_artifact_exists": "The rocWMMA selected-tile source-boundary branch was rejected because its producer is already too slow before dKV/dQ epilogues. This pins the replacement branch: keep the query-major dot schedule that is fast in Triton/TileLang, but consume source P/dP on chip instead of materializing slabs.",
+  "control_points": [
+    {
+      "name": "materialized_query_major_compact_micro_sink",
+      "artifact": "actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb128_d16h64k64_timing_20260604.json",
+      "median_ms": 8.383907318115234,
+      "reads_materialized_probs_grad_logits": true,
+      "emits_valid_dkv": false,
+      "read": "Fast query-major dot-K producer floor with route-slot traversal and checksum only. This is the schedule family to preserve, but it is not source-boundary."
+    },
+    {
+      "name": "materialized_actual_li_tilelang_selected_limit_dkv_body",
+      "artifact": "tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+      "median_ms": 6.912532806396484,
+      "reads_materialized_probs_grad_logits": true,
+      "emits_valid_dkv": "diagnostic_timing_only",
+      "read": "Current materialized-input actual-route TileLang dKV body timing. It proves the reduced dKV body can be in the right latency band if P/dP are already available."
+    },
+    {
+      "name": "source_recompute_pdp_sink",
+      "artifact": "sparse_dkv_tilelang_recompute_pdp_sink_decision_20260604.json",
+      "median_ms": 8.423,
+      "reads_materialized_probs_grad_logits": false,
+      "emits_valid_dkv": false,
+      "read": "Recomputes P and scaled-dP once from source tensors, but only writes a checksum sink. It is useful as a source row-term gate, not a detachable production stage."
+    },
+    {
+      "name": "source_recompute_pdp_store",
+      "artifact": "sparse_dkv_tilelang_recompute_pdp_store_decision_20260604.json",
+      "median_ms": 8.689,
+      "reads_materialized_probs_grad_logits": false,
+      "emits_valid_dkv": false,
+      "read": "Writes a BF16 P/scaled-dP slab. Store cost is not the only issue; adding the existing selected-limit dKV consumer projects to about 15.599 ms before integration overhead."
+    },
+    {
+      "name": "source_pdp_store_then_dkv",
+      "artifact": "sparse_dkv_tilelang_pdp_pipeline_grouped_dkv_decision_20260604.json",
+      "median_ms": 16.238,
+      "reads_materialized_probs_grad_logits": false,
+      "emits_valid_dkv": true,
+      "read": "Concrete two-kernel source P/dP slab pipeline. Rejected because the detached slab boundary erases the dKV body win."
+    },
+    {
+      "name": "source_chunked_grouped_recompute",
+      "artifact": "sparse_dkv_tilelang_chunked_grouped_recompute_decision_20260604.json",
+      "median_ms": 42.85,
+      "reads_materialized_probs_grad_logits": false,
+      "emits_valid_dkv": true,
+      "read": "Best legal slab-free grouped-D TileLang recompute point. Rejected because the accumulator/recompute shape is still far too expensive."
+    },
+    {
+      "name": "rocwmma_selected_tile_score_only",
+      "artifact": "sparse_mla_source_boundary_rocwmma_8wave_mode0_scoreonly_s4096_layer2_timing3_20260605.json",
+      "median_ms": 21.455720901489258,
+      "reads_materialized_probs_grad_logits": false,
+      "emits_valid_dkv": false,
+      "read": "Source-boundary rocWMMA selected-tile score-page producer. Rejected because it is already slower than the full sparse-attention backward gate before contribution, dKV, or dQ."
+    }
+  ],
+  "closed_branches": [
+    {
+      "branch": "detached P/dP recompute or store before dKV",
+      "reason": "Source row terms alone cost about 8.4-8.7 ms; adding a dKV consumer lands at about 15-16 ms and does not beat the 11.13 ms full-boundary gate."
+    },
+    {
+      "branch": "group-owned or panel-owned source recompute",
+      "reason": "It improves correctness semantics but loses query-major Q/dO reuse; legal target-shape points are tens of ms."
+    },
+    {
+      "branch": "rocWMMA selected-tile score page",
+      "reason": "The producer is 21.46 ms score-only and 41.60 ms with contribution sink, so epilogue tuning cannot rescue it."
+    },
+    {
+      "branch": "late dKV-only TileLang replacement as e2e integration",
+      "reason": "The dKV body is promising in isolation, but TorchTitan still pays materialized P/scaled-dP/selected-state bridge overhead before calling it."
+    }
+  ],
+  "next_kernel_contract": {
+    "goal": "source-boundary query-major sparse-MLA backward producer-consumer kernel",
+    "must_consume": [
+      "q [B,S,H,D] BF16",
+      "grad_output [B,S,H,D] BF16",
+      "output [B,S,H,D] BF16",
+      "lse [B,S,H] FP32",
+      "compressed/shared KV bank [B,KV,D] BF16",
+      "LightningIndexer route metadata [B,S,topk]"
+    ],
+    "must_not_materialize": [
+      "selected K/V [B,S,topk,D]",
+      "probability slab [B,H,S,topk]",
+      "scaled-dP or grad-logit slab [B,H,S,topk]",
+      "multi-GiB selected-row dKV partial slab"
+    ],
+    "schedule_requirements": [
+      "Preserve query-major Q/dO reuse like dot_k_compact_micro_sink, not group/panel-owned recompute.",
+      "Produce P/scaled-dP inside the same persistent or cooperative producer that consumes them.",
+      "Use local dQ accumulation or compact bounded dQ partials; do not selected-tile atomic-add dQ as the production schedule.",
+      "Use group-aware dKV segmented reduction before global writes, but only after the source producer is below the 8-11 ms band.",
+      "First gate should be producer-only or producer+checksum below 8 ms, then producer+dKV below the 11.13 ms full-boundary gate, before any TorchTitan e2e run."
+    ],
+    "preferred_implementation_surface": [
+      "CK block-attention style producer if it can express route-gathered sparse K/V and custom epilogue",
+      "raw HIP persistent producer-consumer with MFMA/rocWMMA fragments if CK cannot express the sparse route epilogue",
+      "TileLang only if a primitive appears that keeps a persistent grouped accumulator without full active-row materialization"
+    ]
+  },
+  "promotion_rule": {
+    "single_gpu_latency": "Do not promote to TorchTitan unless S4096 source-boundary sparse-attention backward latency beats the current 11.13 ms gate or clearly removes enough bridge overhead to improve full-boundary latency.",
+    "e2e": "Only run 4x/8x TFLOPs materialization after a latency candidate beats the current sparse-attention backward boundary or a MoE/MORI change is expected to move the sustained 64.91 TFLOPs/GPU baseline.",
+    "memory": "Record peak memory for every promoted run; no activation checkpointing plus expandable allocator is the current sustained e2e baseline."
+  },
+  "dependency_pins_changed": false
+}

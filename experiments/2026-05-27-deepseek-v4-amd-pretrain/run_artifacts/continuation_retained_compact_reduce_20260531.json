@@ -1,0 +1,152 @@
+{
+  "run_id": "continuation_retained_compact_reduce_20260531",
+  "date": "2026-05-31",
+  "branch": "sonle5_dsv4_amd_pretrain",
+  "single_gpu_host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+  "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+  "dtype": "bfloat16",
+  "shape": {
+    "batch": 1,
+    "hidden": 7168,
+    "topk": 6,
+    "experts": 384
+  },
+  "commands": [
+    "env RUN_TAG=retained_compact_reduce_bench_s2048_goal_cont_20260531T0700Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-2048",
+    "env RUN_TAG=retained_compact_reduce_blocks_s2048_goal_cont_20260531T0700Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh profile-blocks-2048",
+    "env RUN_TAG=retained_compact_reduce_bench_s4096_goal_cont_20260531T0700Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-4096",
+    "env RUN_TAG=retained_compact_reduce_rocprof_blocks_s2048_goal_cont_20260531T0715Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-blocks-2048"
+  ],
+  "artifacts": {
+    "s2048_summary": "run_artifacts/single_layer_retained_compact_reduce_s2048_goal_cont_20260531.json",
+    "s2048_block_summary": "run_artifacts/single_layer_retained_compact_reduce_s2048_blocks_goal_cont_20260531.json",
+    "s4096_summary": "run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+    "tile_contract": "run_artifacts/compact_moe_kernel_contract_tile_20260531.json",
+    "rocprof_s2048_block_summary": "run_artifacts/rocprof_retained_compact_reduce_s2048_blocks_goal_cont_20260531.json",
+    "rocprof_s2048_torch_summary": "run_artifacts/rocprof_retained_compact_reduce_s2048_torch_summary_goal_cont_20260531.json",
+    "rocprof_s2048_kernel_stats": "run_artifacts/rocprof_retained_compact_reduce_s2048_kernel_stats_goal_cont_20260531.csv",
+    "rocprof_s2048_domain_stats": "run_artifacts/rocprof_retained_compact_reduce_s2048_domain_stats_goal_cont_20260531.csv"
+  },
+  "results": {
+    "s2048": {
+      "target_ms": 43.3,
+      "avg_ms": 52.58071997668594,
+      "min_ms": 52.27565497625619,
+      "tokens_per_s": 38949.63783128253,
+      "estimated_tflops": 185.16585534463903,
+      "moe_gate_grad_norm": 0.00017442564421799034,
+      "status": "misses_development_target"
+    },
+    "s2048_block_profile": {
+      "phase_total_ms": 55.69806194398552,
+      "forward_ms": 18.64877692423761,
+      "backward_ms": 36.953925038687885,
+      "attention_dgrad_ms": 6.91871193703264,
+      "attention_wgrad_ms": 7.100100978277624,
+      "moe_routed_dgrad_ms": 27.989704976789653,
+      "moe_routed_wgrad_ms": 28.00784504506737,
+      "moe_routed_w1_w3_dgrad_ms": 6.3127229223027825,
+      "moe_routed_w2_dgrad_ms": 3.2360259210690856,
+      "moe_routed_w1_wgrad_ms": 6.258902023546398,
+      "moe_routed_w2_wgrad_ms": 5.9961030492559075,
+      "moe_routed_w3_wgrad_ms": 5.51775295753032
+    },
+    "s4096": {
+      "target_ms": 86.6,
+      "avg_ms": 76.57323967820655,
+      "min_ms": 76.30661700386554,
+      "tokens_per_s": 53491.27211037617,
+      "estimated_tflops": 276.50802181590427,
+      "moe_gate_grad_norm": 0.00012331381731200963,
+      "status": "clears_primary_target"
+    },
+    "rocprof_s2048_blocks": {
+      "total_kernel_duration_ms": 113.752437,
+      "attributed_kernel_duration_ms": 113.737357,
+      "unattributed_kernel_duration_ms": 0.01508,
+      "marker_range_count": 39,
+      "kernel_dispatch_count": 903,
+      "top_blocks": [
+        {
+          "name": "backward.moe.routed.dgrad",
+          "marker_ms": 27.522983,
+          "kernel_ms": 27.40845,
+          "kernel_count": 33
+        },
+        {
+          "name": "backward.moe.routed.wgrad",
+          "marker_ms": 27.376784,
+          "kernel_ms": 27.230685,
+          "kernel_count": 32
+        },
+        {
+          "name": "backward.attention.wgrad",
+          "marker_ms": 7.726694,
+          "kernel_ms": 7.153354,
+          "kernel_count": 172
+        },
+        {
+          "name": "backward.attention.dgrad",
+          "marker_ms": 7.413824,
+          "kernel_ms": 6.865833,
+          "kernel_count": 173
+        },
+        {
+          "name": "backward.moe.routed.w1_w3.dgrad",
+          "marker_ms": 6.186588,
+          "kernel_ms": 6.080144,
+          "kernel_count": 3
+        },
+        {
+          "name": "backward.moe.routed.w1.wgrad",
+          "marker_ms": 6.161287,
+          "kernel_ms": 6.067304,
+          "kernel_count": 1
+        },
+        {
+          "name": "backward.moe.routed.w2.wgrad",
+          "marker_ms": 5.981668,
+          "kernel_ms": 5.904462,
+          "kernel_count": 1
+        },
+        {
+          "name": "backward.moe.routed.w3.wgrad",
+          "marker_ms": 5.610178,
+          "kernel_ms": 5.521258,
+          "kernel_count": 1
+        },
+        {
+          "name": "backward.moe.routed.w2.dgrad",
+          "marker_ms": 3.135054,
+          "kernel_ms": 3.037592,
+          "kernel_count": 1
+        }
+      ]
+    }
+  },
+  "tile_contract_read": {
+    "s2048_tile_m8_rows": 13600,
+    "s2048_tile_m8_row_utilization": 0.9035294117647059,
+    "s2048_tile_m16_rows": 15120,
+    "s2048_tile_m16_row_utilization": 0.8126984126984127,
+    "s4096_tile_m8_rows": 25952,
+    "s4096_tile_m8_row_utilization": 0.9469790382244143,
+    "s4096_tile_m16_rows": 27488,
+    "s4096_tile_m16_row_utilization": 0.8940628637951106
+  },
+  "eight_gpu_lane": {
+    "host": "do-sonle5-mi350-gpu",
+    "status": "blocked_by_external_gpu_processes",
+    "busy_pids_observed": [
+      3335962,
+      3336399,
+      3336400,
+      3415710,
+      3415711
+    ],
+    "action": "did_not_kill_or_coschedule"
+  },
+  "read": "The retained learned-router bridge remains usable for 4K and clears the primary single-layer target, but S2048 remains MoE-backward bound. Fresh block attribution and rocprof both point to routed expert dgrad/wgrad as the next real optimization surface; tile-aware compact routing suggests tile_m 8 or 16, not 64, for a fused CDNA grouped-MoE training kernel."
+}

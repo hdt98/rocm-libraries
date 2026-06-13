@@ -1,0 +1,159 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does the MBS8 fit/uplift come from expert-Muon memory savings or from the new attention-only selective activation-checkpoint scope?",
+  "run_id": "torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "selective_attention_only",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_DSV4_EXPERTS_ON_MUON": "0",
+    "CANARY_OPTIMIZER_IMPLEMENTATION": "config_default_adamw",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "1": {
+      "tokens_per_gpu_s": 1611,
+      "node_tokens_s": 12888,
+      "tflops_per_gpu": 81.55,
+      "mfu_pct": 3.53,
+      "loss": 12.2338,
+      "grad_norm": 19.75,
+      "memory_gib_min": 211.93,
+      "memory_gib_max": 220.31
+    },
+    "2": {
+      "tokens_per_gpu_s": 7885,
+      "node_tokens_s": 63080,
+      "tflops_per_gpu": 399.24,
+      "mfu_pct": 17.29,
+      "loss": 8.88153,
+      "grad_norm": 68.0,
+      "memory_gib_min": 251.52,
+      "memory_gib_max": 256.54
+    },
+    "3": {
+      "tokens_per_gpu_s": 8238,
+      "node_tokens_s": 65904,
+      "tflops_per_gpu": 417.09,
+      "mfu_pct": 18.06,
+      "loss": 23.97455,
+      "grad_norm": 98.5,
+      "memory_gib_min": 255.54,
+      "memory_gib_max": 257.98
+    },
+    "4": {
+      "tokens_per_gpu_s": 8205,
+      "node_tokens_s": 65640,
+      "tflops_per_gpu": 415.42,
+      "mfu_pct": 17.99,
+      "loss": 16.15948,
+      "grad_norm": 33.75,
+      "memory_gib_min": 255.54,
+      "memory_gib_max": 258.88
+    },
+    "5": {
+      "tokens_per_gpu_s": 8245,
+      "node_tokens_s": 65960,
+      "tflops_per_gpu": 417.45,
+      "mfu_pct": 18.07,
+      "loss": 8.96017,
+      "grad_norm": 21.25,
+      "memory_gib_min": 255.54,
+      "memory_gib_max": 259.96
+    },
+    "6": {
+      "tokens_per_gpu_s": 8182,
+      "node_tokens_s": 65456,
+      "tflops_per_gpu": 414.26,
+      "mfu_pct": 17.94,
+      "loss": 7.20829,
+      "grad_norm": 28.375,
+      "memory_gib_min": 255.54,
+      "memory_gib_max": 260.04
+    }
+  },
+  "summary": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8151.0,
+    "steps_2_to_6_node_tokens_s_mean": 65208.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 413.292,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8210.67,
+    "steps_4_to_6_node_tokens_s_mean": 65685.33,
+    "steps_4_to_6_tflops_per_gpu_mean": 415.71,
+    "peak_logged_memory_gib": 260.04,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_steps_2_to_6": 0.6681,
+    "delta_vs_retained_mbs4_adamw_tokens_per_gpu_pct": 1.52,
+    "delta_vs_retained_mbs4_adamw_tflops_pct": 1.67,
+    "delta_vs_retained_mbs4_adamw_peak_memory_gib": 66.24,
+    "delta_vs_expert_muon_mbs8_attention_ac_tokens_per_gpu_pct": 1.61,
+    "delta_vs_expert_muon_mbs8_attention_ac_tflops_pct": 1.83,
+    "delta_vs_expert_muon_mbs8_attention_ac_peak_memory_gib": 16.82
+  },
+  "comparisons": {
+    "previous_lower_memory_adamw_mbs4": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+      "peak_logged_memory_gib": 193.8
+    },
+    "expert_muon_mbs8_attention_only": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_mbs8_selective_attention_ac_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8049.2,
+      "steps_2_to_6_tflops_per_gpu_mean": 407.53,
+      "peak_logged_memory_gib": 243.22
+    },
+    "adamw_mbs8_no_ac_failure": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_mbs8_fit_failure_8x_s4096_gbs128_20260607.json",
+      "result": "failed after step 1 with HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "step1_peak_logged_memory_gib": 259.68
+    }
+  },
+  "decision": {
+    "promote_as_throughput_best": true,
+    "memory_caveat": "high_memory_low_headroom",
+    "read": "The attention-only selective-AC scope, not expert-Muon, is the material MBS8 fit/perf lever. AdamW MBS8 with attention-only selective AC completes six steps and beats both retained MBS4 AdamW and MBS8 expert-Muon on throughput, but peaks at 260.04 GiB, leaving limited HBM headroom.",
+    "next_action": "Use this as the current throughput-best 8xMI350 candidate while keeping the MBS4 AdamW run as the lower-memory reference. Next optimization should reduce the high MBS8 peak or attack the profiled MoE/EP and sparse-MLA walls; Muon should not be treated as the primary memory/perf lever unless quality and memory headroom are separately solved."
+  },
+  "validation": {
+    "remote_e2e": "completed 6 steps on do-sonle5-mi350-gpu",
+    "node_after_run": "no active torchrun/torchtitan/python train process found",
+    "artifact_source": "remote docker-run.log grep plus direct run stdout"
+  }
+}

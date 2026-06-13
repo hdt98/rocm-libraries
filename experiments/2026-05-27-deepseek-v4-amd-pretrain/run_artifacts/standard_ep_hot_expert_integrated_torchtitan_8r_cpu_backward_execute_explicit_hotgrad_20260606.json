@@ -1,0 +1,672 @@
+{
+  "args": {
+    "atol": 0.0025,
+    "backend": "gloo",
+    "balanced_mode": "execute",
+    "device": "cpu",
+    "experts_per_rank": 4,
+    "forward_only": false,
+    "hidden": 32,
+    "hot_experts": 2,
+    "intermediate": 16,
+    "output": "/workspace/dsv4/outputs/standard_ep_hot_expert_integrated_torchtitan_8r_cpu_backward_execute_explicit_hotgrad_20260606.json",
+    "rtol": 0.0025,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 8,
+    "topk": 2
+  },
+  "artifact": "standard_ep_hot_expert_integrated_torchtitan",
+  "passed": true,
+  "rank_results": [
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.0710209608078003e-08,
+          "mean_abs": 2.796157194673299e-10,
+          "rel_l2": 0.002436289721660941,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.225271262228489e-08,
+          "mean_abs": 2.984653080240207e-10,
+          "rel_l2": 0.0023202207064032055,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 8.149072527885437e-09,
+          "mean_abs": 2.7133106872412327e-10,
+          "rel_l2": 0.0024016875317096615,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4901161193847656e-08,
+          "mean_abs": 1.994351350731449e-09,
+          "rel_l2": 0.0019708078931338895,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 0,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.122274160385132e-09,
+          "mean_abs": 2.4224677819262297e-10,
+          "rel_l2": 0.002287090458248301,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.51925802230835e-09,
+          "mean_abs": 2.3750859612370334e-10,
+          "rel_l2": 0.002368144995125133,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.3551048040390015e-09,
+          "mean_abs": 2.210572003225053e-10,
+          "rel_l2": 0.0021003375560746072,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.6763806343078613e-08,
+          "mean_abs": 2.2095605345384683e-09,
+          "rel_l2": 0.001934185291214573,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 1,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.402842700481415e-09,
+          "mean_abs": 2.64053945375764e-10,
+          "rel_l2": 0.0020419544627255774,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.587935447692871e-09,
+          "mean_abs": 2.439254354058562e-10,
+          "rel_l2": 0.002459655404785192,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.501068128272891e-09,
+          "mean_abs": 3.0419713969997986e-10,
+          "rel_l2": 0.0022233970517501044,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 8.381903171539307e-09,
+          "mean_abs": 1.5711165701759455e-09,
+          "rel_l2": 0.0017235505440620076,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 2,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.6356733441352844e-09,
+          "mean_abs": 2.2042927205756513e-10,
+          "rel_l2": 0.0020733840712267495,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.980794857256114e-09,
+          "mean_abs": 1.9765081238354298e-10,
+          "rel_l2": 0.002490677855908712,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.296897143125534e-09,
+          "mean_abs": 2.1212086254163154e-10,
+          "rel_l2": 0.00244348294356625,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.3969838619232178e-08,
+          "mean_abs": 1.6596715113337268e-09,
+          "rel_l2": 0.0017111430468364078,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 3,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 7.450580596923828e-09,
+          "mean_abs": 2.4044913282672553e-10,
+          "rel_l2": 0.0022282237970985184,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.093170329928398e-09,
+          "mean_abs": 2.3563431761353115e-10,
+          "rel_l2": 0.002166241701953489,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.781192496418953e-09,
+          "mean_abs": 2.2676742428284768e-10,
+          "rel_l2": 0.002320599899745645,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4901161193847656e-08,
+          "mean_abs": 1.9119141825285624e-09,
+          "rel_l2": 0.0018096289943678328,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 4,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.762558430433273e-09,
+          "mean_abs": 2.5529930947065793e-10,
+          "rel_l2": 0.002374623635920146,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.169567884877324e-09,
+          "mean_abs": 2.14529838338251e-10,
+          "rel_l2": 0.0023517538034837663,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 5.122274160385132e-09,
+          "mean_abs": 2.1562515661877057e-10,
+          "rel_l2": 0.002054007230040598,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4435499906539917e-08,
+          "mean_abs": 1.985270614568435e-09,
+          "rel_l2": 0.0017893437551713327,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 5,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.933501132763922e-09,
+          "mean_abs": 3.071187471004322e-10,
+          "rel_l2": 0.002217874226374409,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.017178874462843e-08,
+          "mean_abs": 3.012797789025967e-10,
+          "rel_l2": 0.002413432076967612,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 6.402842700481415e-09,
+          "mean_abs": 2.614515826060426e-10,
+          "rel_l2": 0.0022813041939270242,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.313225746154785e-09,
+          "mean_abs": 1.5912462458800292e-09,
+          "rel_l2": 0.0016665869108335534,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 6,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dtop_weight_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            2
+          ]
+        },
+        "dw1_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.2172677088528872e-08,
+          "mean_abs": 1.2157324036365935e-09,
+          "rel_l2": 0.002337098791406395,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dw2_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4854776964057237e-08,
+          "mean_abs": 1.2830023710108662e-09,
+          "rel_l2": 0.002279368286663463,
+          "shape": [
+            4,
+            32,
+            16
+          ]
+        },
+        "dw3_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.2798182069673203e-08,
+          "mean_abs": 1.201006516460268e-09,
+          "rel_l2": 0.0022477497191863054,
+          "shape": [
+            4,
+            16,
+            32
+          ]
+        },
+        "dx_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 1.4901161193847656e-08,
+          "mean_abs": 1.8899939391303633e-09,
+          "rel_l2": 0.0017149140651353308,
+          "shape": [
+            8,
+            32
+          ]
+        },
+        "out_local": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0,
+          "shape": [
+            8,
+            32
+          ]
+        }
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "passed": true,
+      "rank": 7,
+      "world": 8
+    }
+  ],
+  "scope": "Integrated TorchTitan AllToAllTokenDispatcher + GroupedExperts execute-mode hot-row split."
+}

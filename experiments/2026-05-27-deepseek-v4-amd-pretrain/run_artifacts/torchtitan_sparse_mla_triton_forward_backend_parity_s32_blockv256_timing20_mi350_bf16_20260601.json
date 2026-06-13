@@ -1,0 +1,63 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 8,
+  "candidate_estimated_selected_state_elements": 83886080,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": 0.06161361187696457,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 40,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "256"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": 4.76837158203125e-07,
+  "max_output_abs_diff": 0.00390625,
+  "max_param_grad_abs_diff": 3.814697265625e-06,
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 0.0,
+    "indexer.wk.weight": 0.0,
+    "indexer.wq.weight": 0.0,
+    "kv_norm.weight": 3.814697265625e-06,
+    "q_norm.weight": 1.1920928955078125e-07,
+    "wkv_a.weight": 3.814697265625e-06,
+    "wkv_b.weight": 9.5367431640625e-07,
+    "wo.weight": 4.76837158203125e-07,
+    "wq_a.weight": 2.384185791015625e-07,
+    "wq_b.weight": 2.384185791015625e-07
+  },
+  "reference_compressed_groups": 8,
+  "reference_estimated_selected_state_elements": 83886080,
+  "reference_kernel_module": null,
+  "reference_loss": 0.061613842844963074,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 40,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 32,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": true,
+      "iters": 20,
+      "last_loss": 0.06161361187696457,
+      "mean_ms": 7.85327015328221,
+      "peak_memory_allocated_bytes": 4555669504,
+      "peak_memory_allocated_gib": 4.2427978515625,
+      "warmup_iters": 3
+    },
+    "reference": {
+      "enabled": true,
+      "iters": 20,
+      "last_loss": 0.061613842844963074,
+      "mean_ms": 7.809645350789651,
+      "peak_memory_allocated_bytes": 4553572352,
+      "peak_memory_allocated_gib": 4.2408447265625,
+      "warmup_iters": 3
+    }
+  }
+}

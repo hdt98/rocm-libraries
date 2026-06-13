@@ -1,0 +1,102 @@
+{
+  "artifact": "dsv4_hyperconnection_reference_smoke",
+  "date_utc": "2026-06-03",
+  "status": "passed",
+  "scope": "Pure-PyTorch Hyper-Connection reference smoke for making HF/Ascend DeepSeek-V4-Flash block parity well-posed locally.",
+  "source": {
+    "local_reference": "tools/dsv4_layer_microbench/hyperconnection_reference.py",
+    "ascend_formula_source": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/models/deepseek_v4/model/model.py",
+    "ascend_mhc_smoke_source": "sources/references/torchtitan-npu-v0.2.2-dev/tests/smoke_tests/features/test_mhc_triton.py"
+  },
+  "contract": {
+    "hc_pre": "[B,S,hc_mult,D] -> [B,S,D] plus post [B,S,hc_mult] and comb [B,S,hc_mult,hc_mult]",
+    "hc_post": "[B,S,D] plus residual [B,S,hc_mult,D] -> [B,S,hc_mult,D]",
+    "hc_mult": 4,
+    "sinkhorn_iters": 20
+  },
+  "split_and_shape_smoke": {
+    "status": "passed",
+    "input_shape": [
+      2,
+      3,
+      4,
+      8
+    ],
+    "pre_output_shape": [
+      2,
+      3,
+      8
+    ],
+    "post_output_shape": [
+      2,
+      3,
+      4,
+      8
+    ],
+    "post_manual_max_abs_diff": 0.0,
+    "comb_row_sum_max_deviation": 1.0000000000287557e-06,
+    "comb_col_sum_max_deviation": 1.0000000000287557e-06,
+    "post_weight_min": 0.9069361910654081,
+    "pre_weight_min": 0.49471638281784996
+  },
+  "gradcheck": {
+    "status": "passed",
+    "fast_mode": true,
+    "elapsed_s": 0.233862882014364,
+    "input_shape": [
+      1,
+      2,
+      4,
+      3
+    ],
+    "hc_fn_shape": [
+      24,
+      12
+    ]
+  },
+  "flash_shape_smoke": [
+    {
+      "status": "passed",
+      "dtype": "float32",
+      "input_shape": [
+        1,
+        1,
+        4,
+        4096
+      ],
+      "output_shape": [
+        1,
+        1,
+        4,
+        4096
+      ],
+      "loss": 1.3300668001174927,
+      "backward_elapsed_s": 0.06301835388876498,
+      "input_grad_finite": true,
+      "finite_param_grad_count": 6,
+      "param_grad_count": 6
+    },
+    {
+      "status": "passed",
+      "dtype": "bfloat16",
+      "input_shape": [
+        1,
+        1,
+        4,
+        4096
+      ],
+      "output_shape": [
+        1,
+        1,
+        4,
+        4096
+      ],
+      "loss": 1.0652554035186768,
+      "backward_elapsed_s": 0.0202850759960711,
+      "input_grad_finite": true,
+      "finite_param_grad_count": 6,
+      "param_grad_count": 6
+    }
+  ],
+  "bottom_line": "Local HC primitive/reference coverage now exists and passes small gradcheck plus Flash hidden-size shape/gradient smokes. The full SparseMLA+MoE layer still needs this HC boundary threaded around its attention and MoE sublayers before HF matched-weight parity can be claimed."
+}

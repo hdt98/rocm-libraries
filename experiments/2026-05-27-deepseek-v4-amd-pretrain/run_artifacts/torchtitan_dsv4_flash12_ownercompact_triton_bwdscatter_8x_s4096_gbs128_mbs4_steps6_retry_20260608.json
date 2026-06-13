@@ -1,0 +1,111 @@
+{
+  "schema": "dsv4_pretrain_run_summary_v1",
+  "run_id": "torchtitan_dsv4_flash12_ownercompact_triton_bwdscatter_8x_s4096_gbs128_mbs4_steps6_retry_20260608",
+  "date": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_ownercompact_triton_bwdscatter_8x_s4096_gbs128_mbs4_steps6_retry_20260608/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_ownercompact_triton_bwdscatter_8x_s4096_gbs128_mbs4_steps6_retry_20260608",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "configuration": {
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "none",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "pytorch_alloc_conf": "expandable_segments:True"
+  },
+  "result": {
+    "status": "completed_six_steps_not_promoted",
+    "steps_completed": 6,
+    "loss_step1": 12.21368,
+    "loss_step6": 16.49272,
+    "peak_logged_memory_gib": 191.66,
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8055.0,
+    "steps_2_to_6_node_tokens_s_mean": 64440.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 405.822,
+    "steps_3_to_6_tokens_per_gpu_s_mean": 8145.25,
+    "steps_3_to_6_tflops_per_gpu_mean": 412.3875,
+    "per_step": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s": 1641,
+        "tflops_per_gpu": 83.08,
+        "loss": 12.21368,
+        "grad_norm": 20.0
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s": 7694,
+        "tflops_per_gpu": 389.56,
+        "loss": 7.54593,
+        "grad_norm": 29.25
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s": 8094,
+        "tflops_per_gpu": 409.79,
+        "loss": 20.52602,
+        "grad_norm": 105.0
+      },
+      {
+        "step": 4,
+        "tokens_per_gpu_s": 8083,
+        "tflops_per_gpu": 409.25,
+        "loss": 16.01615,
+        "grad_norm": 130.0
+      },
+      {
+        "step": 5,
+        "tokens_per_gpu_s": 8228,
+        "tflops_per_gpu": 416.57,
+        "loss": 22.17441,
+        "grad_norm": 16.75
+      },
+      {
+        "step": 6,
+        "tokens_per_gpu_s": 8176,
+        "tflops_per_gpu": 413.94,
+        "loss": 16.49272,
+        "grad_norm": 32.25
+      }
+    ]
+  },
+  "comparison": {
+    "lower_memory_reference_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+    "lower_memory_reference_steps_2_to_6_tokens_per_gpu_s_mean": 8051.75,
+    "lower_memory_reference_steps_2_to_6_tflops_per_gpu_mean": 407.6725,
+    "delta_vs_lower_memory_reference_tokens_per_gpu_pct": 0.04,
+    "delta_vs_lower_memory_reference_tflops_pct": -0.45,
+    "current_throughput_best_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_8x_s4096_gbs128_20260608.json",
+    "current_throughput_best_steps_2_to_20_tokens_per_gpu_s_mean": 8431.87,
+    "delta_vs_current_throughput_best_tokens_per_gpu_pct": -4.47
+  },
+  "decision": "The scoped hot-split Triton backward weighted-scatter backend is validated at the 8x target shape and is near-neutral against the lower-memory MBS4 owner-compact reference, but it does not promote over the MBS8 AdamW attention-only throughput baseline. Keep it as useful evidence for the compact-row helper backward path; the next MoE/EP target remains fused or batched helper grouped VJP plus weighted dX/compact-score return and overlap."
+}

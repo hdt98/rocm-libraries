@@ -1,0 +1,38 @@
+{
+  "backend": "triton",
+  "device": "cuda:0",
+  "env": {
+    "TORCHTITAN_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_BLOCK_M": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_BLOCK_N": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_NUM_WARPS": null
+  },
+  "kind": "standard_ep_weighted_scatter_probe",
+  "parity": {
+    "finite": true,
+    "out_max_abs_diff": 0.1875,
+    "score_grad_max_abs_diff": 0.0,
+    "src_grad_max_abs_diff": 0.0
+  },
+  "shape": {
+    "hidden": 7168,
+    "rows": 131072,
+    "score_dtype": "float32",
+    "src_dtype": "bfloat16",
+    "tokens": 16384
+  },
+  "timing": {
+    "torch": {
+      "max_ms": 6.923840045928955,
+      "mean_ms": 6.859189748764038,
+      "median_ms": 6.857117176055908,
+      "min_ms": 6.791155815124512
+    },
+    "triton": {
+      "max_ms": 6.379669189453125,
+      "mean_ms": 6.36773989200592,
+      "median_ms": 6.366152763366699,
+      "min_ms": 6.352673053741455
+    }
+  }
+}

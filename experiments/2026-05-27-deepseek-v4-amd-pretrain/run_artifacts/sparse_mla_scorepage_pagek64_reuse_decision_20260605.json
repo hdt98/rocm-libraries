@@ -1,0 +1,59 @@
+{
+  "artifact": "sparse_mla_scorepage_pagek64_reuse_decision",
+  "date": "2026-06-05",
+  "status": "measured_not_promoted",
+  "scope": "S4096 layer-2 source-boundary sparse-MLA dKV producer, query-major HIP/CK scorepage path with K64 contribution page reuse",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "seq_chunk": 1,
+    "selected_block": 64,
+    "threads": 256
+  },
+  "contract": {
+    "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "modes": {
+      "mode9": "K64 page contribution sink: stores prob/scaled-dP for selected_block=64 in LDS and consumes with d0 outermost so q/dO fragments are reused across that K64 page",
+      "mode10": "same K64 page path but emits valid compressed dKV atomics"
+    },
+    "read": "This uses an existing page-shaped branch rather than adding a new duplicate mode. It tests whether small selected-page reuse of q/dO in the dKV contribution consumer is enough to beat the retained sparse-attention backward boundary."
+  },
+  "baseline_gates_ms": {
+    "retained_triton_full_sparse_attention_backward": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.80629825592041,
+    "previous_mode9_k512_sink": 39.13343811035156,
+    "previous_mode10_k512_valid_dkv": null
+  },
+  "results_ms": {
+    "mode9_k64_page_sink": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode9_pagek64_sink_20260605.json",
+      "event_median_ms": 18.175315856933594,
+      "emits_valid_dkv": false
+    },
+    "mode10_k64_page_valid_dkv": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode10_pagek64_valid_dkv_20260605.json",
+      "event_median_ms": 19.841495513916016,
+      "emits_valid_dkv": true
+    },
+    "mode10_minus_mode9_global_write_delta_ms": 1.6661796569824219
+  },
+  "decision": {
+    "promote_to_full_sparse_attention_boundary": false,
+    "run_e2e_tflops": false,
+    "why": "K64 page reuse cuts the old full-K512 sidecar/page sink, but still fails the 11.13 ms retained full-boundary gate before adding dQ. The final valid dKV write delta is only about 1.67 ms, so the remaining wall is contribution production/consumption and lack of cross-token route coalescing, not final atomics alone.",
+    "next": "Test the measured split dQ/no-dKV plus union-dKV path with explicit two-stream launch as a stopgap A/B, while keeping the main target as a single cooperative owner that computes QK/P/scaled-dP once and feeds both dQ and group-aware dKV before HBM."
+  },
+  "commands": [
+    "python3 tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --extension-dir /workspace/torch_extensions_scorepage_mode9_sb64_pagek_20260605 --hip-define SCOREPAGE_PRODUCER_MODE=9 --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 64 --block-d 16 --threads 256 --skip-correctness --warmup-iters 1 --timed-iters 5 --summary-path run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode9_pagek64_sink_20260605.json --json",
+    "python3 tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --extension-dir /workspace/torch_extensions_scorepage_mode10_sb64_pagek_20260605 --hip-define SCOREPAGE_PRODUCER_MODE=10 --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 64 --block-d 16 --threads 256 --skip-correctness --warmup-iters 1 --timed-iters 5 --summary-path run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode10_pagek64_valid_dkv_20260605.json --json"
+  ],
+  "dependency_pin_changes": []
+}

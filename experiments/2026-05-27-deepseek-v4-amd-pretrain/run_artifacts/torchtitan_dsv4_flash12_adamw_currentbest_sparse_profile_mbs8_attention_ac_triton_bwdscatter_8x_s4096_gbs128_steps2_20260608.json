@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "run_id": "torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_two_steps_diagnostic_profile_only",
+  "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608/docker-run.log",
+  "raw_profile_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608/profile_timing",
+  "raw_additive_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608/additive_timing",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "config": {
+    "optimizer": "adamw",
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd"
+  },
+  "profile_flags": {
+    "torch_profiler_enabled": false,
+    "module_backward": true,
+    "dense_attention_backward": true,
+    "dense_linear_backward": true,
+    "sharedkv_backward": true,
+    "standard_ep_hot_split_backward_timing": true
+  },
+  "observed_metrics": {
+    "step_1": {
+      "loss": 12.12336,
+      "grad_norm": 20.25,
+      "tokens_per_gpu_s_range": [
+        1683,
+        1688
+      ],
+      "tflops_per_gpu_range": [
+        85.24,
+        85.45
+      ],
+      "peak_logged_memory_gib_rankmax": 213.22
+    },
+    "step_2": {
+      "loss": 9.21751,
+      "grad_norm": 72.5,
+      "tokens_per_gpu_s": 6512,
+      "tflops_per_gpu": 329.72,
+      "mfu_pct": 14.28,
+      "peak_logged_memory_gib_rankmax": 245.6
+    }
+  },
+  "retained_throughput_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "run_id": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608",
+    "steps_2_to_20_tokens_per_gpu_s_mean": 8518.8421,
+    "steps_2_to_20_tflops_per_gpu_mean": 431.3139,
+    "peak_logged_memory_gib": 251.97,
+    "read": "The two-step profile is intrusive and should not replace the 20-step retained throughput baseline."
+  },
+  "additive_step_2_rankmax_ms": {
+    "step_train_step": 8496.781,
+    "train_step_microbatch_forward_backward": 8385.036,
+    "train_step_forward_backward_call": 8384.85,
+    "forward_backward_model_forward": 2046.788,
+    "forward_backward_loss": 408.854,
+    "forward_backward_backward": 5959.396,
+    "train_step_optimizer_step": 46.517,
+    "train_step_grad_clip": 27.592,
+    "train_step_valid_tokens_all_reduce": 7.96,
+    "train_step_collect_dist_metrics": 3.508
+  },
+  "profile_step_2_approx_rankmax_ms": {
+    "sparse_mla_sharedkv_backward": {
+      "total": 1701.213,
+      "c4_total": 1229.997,
+      "c4_query_recompute": 1174.031,
+      "c4_grad_attn_sink": 56.264,
+      "c128_total": 471.941,
+      "c128_query_recompute": 349.151,
+      "c128_grad_attn_sink": 125.947,
+      "records": 160,
+      "read": "C4 SharedKV is the largest sparse-attention sub-bucket in the matched profile."
+    },
+    "dense_attention_backward": {
+      "total": 818.705,
+      "layer0_cr0": 409.411,
+      "layer1_cr0": 409.294
+    },
+    "dense_linear_backward": {
+      "total": 707.6,
+      "attention_wo": 425.862,
+      "attention_wq_b": 97.564,
+      "shared_experts_w2": 55.425,
+      "shared_experts_w3": 31.496,
+      "shared_experts_w1": 26.115,
+      "attention_wkv_b": 19.688,
+      "attention_wq_a": 19.177,
+      "attention_wkv_a": 11.302
+    },
+    "chunked_ce_loss": 405.832,
+    "standard_ep_dispatch": {
+      "total": 252.493,
+      "count_all_to_all": 94.294,
+      "permute": 77.242,
+      "hot_local_reorder": 21.433,
+      "hot_metadata": 19.366,
+      "local_reorder": 18.405
+    },
+    "standard_ep_combine": {
+      "total": 315.697,
+      "all_to_all_wait": 171.757,
+      "weighted_scatter_add": 108.952,
+      "unpermute": 45.167
+    },
+    "standard_ep_hot_weight": {
+      "total": 210.508,
+      "w3_backward_all_reduce_grad_hot_weight": 90.982,
+      "w2_forward_all_reduce_hot_weight": 59.434,
+      "w1_backward_all_reduce_grad_hot_weight": 18.786,
+      "w2_backward_all_reduce_grad_hot_weight": 18.424,
+      "w1_forward_all_reduce_hot_weight": 18.073,
+      "w3_forward_all_reduce_hot_weight": 17.713
+    },
+    "standard_ep_hot_split_forward": {
+      "total": 327.043,
+      "broadcast_hot_weights": 105.302,
+      "weighted_scatter_tokens": 94.325,
+      "grouped_w3": 47.703,
+      "grouped_w2": 46.36,
+      "grouped_w1": 40.287
+    },
+    "standard_ep_hot_split_backward": {
+      "total": 311.243,
+      "helper_mlp_vjp_to_sorted_x": 300.273,
+      "scatter_to_remote_y": 13.625
+    }
+  },
+  "memory_and_recompute_read": {
+    "adamw_current_peak_logged_memory_gib": 251.97,
+    "muon_triton_bwd_peak_logged_memory_gib": 234.38,
+    "muon_memory_savings_vs_adamw_gib": 17.59,
+    "muon_throughput_delta_vs_adamw_steps_2_to_20_pct": -1.9858,
+    "recompute_gates_tried": [
+      "none/no_ac",
+      "full",
+      "attention_only",
+      "sparse_attention_only",
+      "dense_attention_only",
+      "whole_block_or_transformer_block_style selective AC"
+    ],
+    "retained_recompute": "attention_only",
+    "read": "Muon saves optimizer-state memory, but MBS16, no-AC MBS8, and dense-attention-only AC still fail or regress because the remaining headroom wall is sparse MLA/LI activation and backward memory, not optimizer state alone."
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "diagnostic_profile_only",
+    "current_throughput_best_remains": "torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608",
+    "optimization_read": [
+      "Optimizer work is tiny in the current AdamW additive profile, about 46.5 ms rank-max, so Muon only helps throughput if it unlocks a better MBS/AC point; current gates say it does not yet.",
+      "Sparse SharedKV backward is active in the matched run and is the largest profiled attention sub-bucket, with C4 contributing about 1.23 s rank-max over the step.",
+      "Dense attention and attention.wo remain visible, but the largest near-term material levers are C4 SharedKV query-recompute/dCmpKV behavior and first-class standard-EP compact-row helper VJP/weighted return."
+    ]
+  }
+}

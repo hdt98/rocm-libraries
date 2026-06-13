@@ -1,0 +1,149 @@
+{
+  "artifact": "tilelang_e2e_tflops_8x_s4096_gbs128_20260604",
+  "created_at": "2026-06-04",
+  "superseded_by": "run_artifacts/tilelang_static_route_e2e_tflops_8x_s4096_gbs128_20260604.json",
+  "superseded_reason": "This run specialized TileLang on dynamic route active_rows and repeatedly compiled during training; the static-route rerun is the valid e2e read.",
+  "hardware": {
+    "accelerator": "MI350",
+    "num_gpus": 8
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash 4-layer BF16 canary",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1
+  },
+  "tilelang_runtime": {
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "base_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "dockerfile": "launchers/Dockerfile.nexus_tilelang_runtime",
+    "python": "/opt/conda/envs/py_3.10/bin/python3",
+    "torch": "2.13.0a0+gitccf72d7",
+    "rocm_runtime": "7.2.53211",
+    "tilelang": "0.1.10",
+    "numpy": "1.26.4",
+    "dependency_note": "The overlay keeps the MORI/AITER TorchTitan runtime intact and adds TileLang. Docker build warned that numba 0.57.1 requires numpy<1.25, but torch, tilelang, mori, and aiter import smokes passed."
+  },
+  "backend_config": {
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "li_kl_backend": "triton_tl_dot",
+    "chunked_cross_entropy_chunks": 2,
+    "activation_checkpointing": "full",
+    "checkpointing": false
+  },
+  "kernel_local_best_candidate": {
+    "name": "selected_limit_hsk_bf16_scaled_source",
+    "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_source_s4096_layer2_gp512_20260604.json",
+    "shape": "S4096 H64 D512 layer2 actual LI topk512",
+    "valid_pairs": 1572352,
+    "compressed_groups": 1024,
+    "kernel_only_ms": 6.178799,
+    "hsk_bf16_source_kernel_ms": 6.278879,
+    "pack_plus_kernel_ms": 8.164091,
+    "useful_tflop": 0.206091321344,
+    "modeled_executed_tflop": 0.237162725376,
+    "useful_tflops_per_s_at_hsk_bf16_time": 32.82,
+    "modeled_tflops_per_s_at_hsk_bf16_time": 37.77,
+    "read": "This is the best current TileLang kernel-local sparse compressed-dKV candidate. It is not an end-to-end training number."
+  },
+  "e2e_runs": [
+    {
+      "run_id": "torchtitan_dsv4_tilelang_sharedkv_8x_s4096_gbs128_20260604",
+      "status": "failed_pre_step",
+      "failure": "ModuleNotFoundError: No module named 'tilelang_sparse_dkv_selected_limit_adapter'",
+      "resolution": "Patched sparse_mla_shared_kv_triton_forward_backend.py to discover tools/dsv4_runtime_probe from parent directories or TORCHTITAN_DSV4_TILELANG_ADAPTER_DIR before importing the TileLang adapter."
+    },
+    {
+      "run_id": "torchtitan_dsv4_tilelang_sharedkv_8x_s4096_gbs128_retry1_20260604",
+      "status": "completed_2_steps",
+      "steps": [
+        {
+          "step": 1,
+          "loss": 12.19524,
+          "grad_norm": 12.875,
+          "tokens_per_gpu_s": 912,
+          "tflops_per_gpu": 17.25,
+          "mfu_percent": 0.75
+        },
+        {
+          "step": 2,
+          "loss": 8.30822,
+          "grad_norm": 20.75,
+          "tokens_per_gpu_s": 939,
+          "tflops_per_gpu": 17.78,
+          "mfu_percent": 0.77
+        }
+      ],
+      "peak_logged_memory_gib": 182.23,
+      "note": "Completed but showed repeated TileLang compilation of mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim during backward."
+    },
+    {
+      "run_id": "torchtitan_dsv4_tilelang_sharedkv_8x_s4096_gbs128_retry2_steps3_20260604",
+      "status": "completed_3_steps",
+      "steps": [
+        {
+          "step": 1,
+          "loss": 12.43635,
+          "grad_norm": 13.25,
+          "tokens_per_gpu_s": 842,
+          "tflops_per_gpu": 15.92,
+          "mfu_percent": 0.69
+        },
+        {
+          "step": 2,
+          "loss": 8.79686,
+          "grad_norm": 22.625,
+          "tokens_per_gpu_s": 987,
+          "tflops_per_gpu": 18.67,
+          "mfu_percent": 0.81
+        },
+        {
+          "step": 3,
+          "loss": 18.43319,
+          "grad_norm": 41.75,
+          "tokens_per_gpu_s": 893,
+          "tflops_per_gpu": 16.9,
+          "mfu_percent": 0.73
+        }
+      ],
+      "peak_logged_memory_gib": 199.9,
+      "note": "Confirmation run completed, but repeated TileLang JIT/compile messages persisted into step 3."
+    }
+  ],
+  "best_e2e_tilelang_step": {
+    "run_id": "torchtitan_dsv4_tilelang_sharedkv_8x_s4096_gbs128_retry2_steps3_20260604",
+    "step": 2,
+    "tokens_per_gpu_s": 987,
+    "tflops_per_gpu": 18.67,
+    "mfu_percent": 0.81,
+    "ratio_to_277_tflops_target": 0.0674,
+    "speedup_needed_to_277_tflops_target": 14.84
+  },
+  "comparison": {
+    "retained_non_tilelang_baseline_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "retained_non_tilelang_baseline_tflops_per_gpu": 58.71,
+    "tilelang_best_e2e_tflops_per_gpu": 18.67,
+    "tilelang_vs_retained_baseline_ratio": 0.318,
+    "retained_baseline_is_faster_by": 3.14,
+    "target_tflops_per_gpu": 277.0
+  },
+  "decision": {
+    "promote_to_retained_baseline": false,
+    "read": "The best TileLang kernel-local candidate remains promising for sparse compressed-dKV, but the current TorchTitan e2e integration is not competitive. E2E is dominated by repeated TileLang compilation/dynamic JIT behavior and possibly the current autograd call shape, so the retained e2e baseline stays the non-TileLang CE2/MORI run at 58.71 TFLOPs/GPU.",
+    "next_actions": [
+      "Make the TileLang kernel object statically cached per rank/layer/backend tuple instead of recompiling during backward.",
+      "Resolve or intentionally suppress the TileLang data-race checker warning only after confirming the group_acc update pattern is race-free.",
+      "Rerun e2e after compile caching to separate actual kernel latency from JIT overhead.",
+      "If cached e2e remains slow, profile the TileLang backward call boundary to see whether packing, Python dispatch, or autograd wrapper churn dominates."
+    ]
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "artifact": "sparse_mla_coop_vs_ascend_sasg_next_surface",
+  "date": "2026-06-05",
+  "status": "next_surface_selected",
+  "source_artifacts": {
+    "workgroup_feasibility": "run_artifacts/sparse_mla_coop_workgroup_feasibility_s4096_layer2_20260605.json",
+    "token_tile_decision": "run_artifacts/query_major_token_tile_size_decision_20260605.json",
+    "route_owned_reducer_rejection": "run_artifacts/compressed_dkv_tile_segment_dblock_latency_sweep_decision_20260605.json",
+    "ascend_sasg_reference": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/"
+  },
+  "actual_li_shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "workgroup_feasibility_read": {
+    "single_workgroup_candidate_exists": false,
+    "best_fully_parallel_standard_cta": {
+      "token_block": 4,
+      "selected_block": 512,
+      "threads": 1024,
+      "tile_local_write_reduction_x": 3.04843444037302,
+      "read": "Fits a normal HIP block, but the reduction is small and dense active-group epilogue is near/over the LDS target."
+    },
+    "first_useful_reduction": {
+      "token_block": 16,
+      "selected_block": 512,
+      "fully_parallel_threads": 4096,
+      "serial_token_batches_if_single_cta": 4,
+      "tile_local_write_reduction_x": 11.952959063438367
+    },
+    "preferred_reduction_window": {
+      "token_block": 32,
+      "selected_block": 512,
+      "fully_parallel_threads": 8192,
+      "serial_token_batches_if_single_cta": 8,
+      "tile_local_write_reduction_x": 23.813051840857806
+    }
+  },
+  "ascend_sasg_source_read": {
+    "cube4": {
+      "file": "cube_modules/cube4.h",
+      "role": "computes dk = ds^T * q and writes mm4ResWorkspaceGm"
+    },
+    "cube5": {
+      "file": "cube_modules/cube5.h",
+      "role": "computes dv = p^T * dy and writes mm5ResWorkspaceGm"
+    },
+    "scatter_add": {
+      "file": "basic_modules/vec_op.h",
+      "role": "reads mm4/mm5 workspace into UB/vector buffers and atomic-copies rows into original/compressed KV gradients"
+    },
+    "pipeline": "Gather/Cube12/Process/Cube345/Scatter with ping-pong preload and overlap; the scatter stage is a pipeline consumer, not a standalone raw selected-row HBM slab."
+  },
+  "amd_mapping": {
+    "rejected": [
+      {
+        "surface": "ordinary T32 single CTA",
+        "reason": "T32 H64 score recompute needs about 8192 threads if parallel; serializing into 8 token batches recreates the row-leader slowdown."
+      },
+      {
+        "surface": "route-owned scalar reducer",
+        "reason": "Measured 114-186 ms despite large modeled write reduction."
+      },
+      {
+        "surface": "detached raw ScatterAdd",
+        "reason": "Pays an HBM round trip over a huge selected-partial stream; previous detached scatter was about 10 ms by itself."
+      }
+    ],
+    "retained_next_surface": {
+      "name": "ascend_like_compact_page_producer_consumer",
+      "contract": "q,dO,compressed/shared KV,indices,lse/sink -> query-major MFMA score/prob/scaled-dP -> dQ plus compact grouped dKV page -> small final fold/scatter",
+      "critical_difference_from_failed_detached_scatter": "The page must be compact by compressed group/tile before HBM. It cannot be one row per selected (token,slot,D) contribution.",
+      "first_runtime_gate": "Build a source-boundary producer that emits compact page rows for T32 selected512 or a two-level T4/T8 producer-consumer page that merges to the same compact T32 groups, then compare full sparse-attention backward S4096 latency against the 11.13 ms Triton boundary and 8.8 ms dKV atomic wall."
+    }
+  },
+  "materialized_e2e_tflops": {
+    "measured": false,
+    "reason": "This is a kernel-surface feasibility decision. No e2e TorchTitan A/B is justified until the source-boundary sparse-attention latency improves in isolation."
+  }
+}

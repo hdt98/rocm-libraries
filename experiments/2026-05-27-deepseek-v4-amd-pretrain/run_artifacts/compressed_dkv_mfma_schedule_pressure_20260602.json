@@ -1,0 +1,137 @@
+{
+  "artifact": "compressed_dkv_mfma_schedule_pressure_20260602",
+  "created_date": "2026-06-02",
+  "status": "next_kernel_requires_dotk_contrib_reuse_plus_onchip_grouped_accumulation",
+  "scope": "Actual LightningIndexer layer-2 compressed dKV backward on 1xMI350, focused on why prior write-coalescing probes failed and what the MFMA-shaped replacement must preserve.",
+  "source_artifacts": {
+    "dotk_atomic_summary": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "dotk_micro_summary": "run_artifacts/actual_li_active_list_dotk_micro_triton_dkv_summary_20260602.json",
+    "dotk_partial_store_summary": "run_artifacts/actual_li_active_list_dotk_partial_store_triton_dkv_summary_20260602.json",
+    "tile_budget_summary": "run_artifacts/actual_li_tile_budget_lds_hash_candidate_summary_20260602.json",
+    "scalar_dense_group_s512_gate": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s512_layer2_contract32x256_gate_20260602.json",
+    "next_contract": "run_artifacts/compressed_dkv_mfma_segmented_reducer_next_contract_20260602.json"
+  },
+  "hard_shape": {
+    "sequence_length": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "topk": 512,
+    "heads": 64,
+    "head_dim": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "retained_fast_contribution_path": {
+    "name": "dot_k_atomic",
+    "best_observed_s4096_ms": 8.80629825592041,
+    "best_blocks": {
+      "seq_chunk": 32,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 64
+    },
+    "query_major_raw_atomic_elements": 805044224,
+    "actual_kernel_write_reduction_x": 1.0,
+    "coalesced_tile_target_elements": 33806848,
+    "coalesced_tile_target_reduction_x": 23.813051840857806,
+    "read": "This branch keeps the fast tl.dot KxD contribution body, but writes one global atomic row per valid selected compressed group. It is the current sparse-atomic wall to beat."
+  },
+  "rejected_write_coalescing_paths": {
+    "dotk_partial_store": {
+      "s4096_emit_only_ms": 8.794984817504883,
+      "s4096_full_reduce_ms": 9.507111549377441,
+      "read": "This computes each KxD contribution once, but stores the raw contribution volume into a global partial slab before reducing. Removing final atomics without reducing in on-chip storage does not beat dot_k_atomic."
+    },
+    "dotk_micro_active_groups": [
+      {
+        "blocks": {
+          "seq_chunk": 32,
+          "selected_block": 64,
+          "block_u": 128,
+          "block_d": 16,
+          "block_h": 64,
+          "block_k": 64,
+          "active_blocks": 8,
+          "selected_tiles": 8
+        },
+        "s4096_ms": 60.67277908325195,
+        "write_reduction_x": 3.428225069715621,
+        "estimated_contribution_recompute_x": 8,
+        "read": "Reduces global writes, but recomputes the KxD contribution for each active group block."
+      },
+      {
+        "blocks": {
+          "seq_chunk": 32,
+          "selected_block": 128,
+          "block_u": 256,
+          "block_d": 16,
+          "block_h": 64,
+          "block_k": 128,
+          "active_blocks": 4,
+          "selected_tiles": 4
+        },
+        "s4096_ms": 57.238929748535156,
+        "write_reduction_x": 6.368246896579656,
+        "estimated_contribution_recompute_x": 4,
+        "read": "Wider selected block improves write reduction, but repeated contribution generation still dominates."
+      },
+      {
+        "blocks": {
+          "seq_chunk": 32,
+          "selected_block": 256,
+          "block_u": 256,
+          "block_d": 16,
+          "block_h": 64,
+          "block_k": 256,
+          "active_blocks": 4,
+          "selected_tiles": 2
+        },
+        "s4096_ms": 124.83580017089844,
+        "write_reduction_x": 12.338365924856399,
+        "estimated_contribution_recompute_x": 4,
+        "read": "This approaches the first write-reduction rung, but the larger route matrix and repeated contribution body make it much slower."
+      }
+    ],
+    "scalar_dense_group_hip": {
+      "s512_contract_rung": "32x256/D16",
+      "s512_ms": 4.182168960571289,
+      "s512_gate_ms": 3.081876039505005,
+      "s512_gate_status": "failed",
+      "s512_write_reduction_x": 30.0,
+      "s512_max_abs_diff": 3.4332275390625e-05,
+      "read": "The local compressed-group table is correct and collapses writes, but the body serializes the head reduction and uses scalar LDS atomics. It fails before the S4096 gate."
+    }
+  },
+  "mechanism_read": {
+    "why_previous_branches_fail": "The winning contribution body and the winning write-count body have not yet been combined. dot_k_atomic computes contribution once but writes too much; dot_k_micro and fixed-panel variants reduce writes but recompute contribution for each active group block or group panel; scalar HIP local-table reduces writes but loses MFMA/tl.dot head reduction.",
+    "required_next_kernel_shape": "Compute contrib_kd = grad_logits^T * q * scale + probs^T * dO once per query tile, selected-key tile, head tile, and D16 block using MFMA/tensor-core style math; then accumulate selected rows into a tile-local compressed-group table or hash/segmented reducer before global writes.",
+    "must_not_do": [
+      "Do not materialize dense [H,S,G] route tensors.",
+      "Do not write a global partial slab with the raw selected KxD contribution volume.",
+      "Do not recompute contrib_kd once per active group block or fixed group panel.",
+      "Do not fall back to scalar per-head reductions in the hot body."
+    ]
+  },
+  "toolchain_status": {
+    "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "node": "do-sonle5-mi350-gpu",
+    "gpu": "AMD Instinct MI350X VF / gfx950",
+    "headers_present": {
+      "rocwmma": true,
+      "ck_tile": true,
+      "hip": true
+    },
+    "rocwmma_compile_smoke": {
+      "status": "passed",
+      "command_shape": "hipcc --offload-arch=gfx950 -I/opt/rocm/include -c rocwmma_smoke.cpp",
+      "read": "A minimal rocWMMA 16x16x16 half->float mma_sync kernel compiles in the current image. This only proves toolchain viability; it is not an implemented dKV kernel."
+    }
+  },
+  "next_executable_rung": {
+    "name": "rocwmma_or_cktile_dotk_contrib_tile_smoke",
+    "goal": "Prove a HIP extension can compute the KxD contribution tile with MFMA-style math and match the existing Triton dot_k/PyTorch contribution oracle before adding local group accumulation.",
+    "inputs": "Materialized diagnostic q, grad_output, probs, grad_logits, safe_groups, valid, with seq_chunk=32, selected_block initially 64 or 128, block_h=64, block_d=16.",
+    "first_gate": "S128/S512 contribution-tile parity and compile on gfx950.",
+    "promotion_gate": "After adding tile-local grouped accumulation, S512 must beat 3.08 ms and S4096 must beat the 8.6-8.8 ms sparse-atomic wall while avoiding selected-K/V, probability, global partial, or dense-route slabs."
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_needed_weight_layout_ab_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Gate the opt-in owner-compact needed hot-weight exchange layout against the retained selected-layout standard-EP hot-helper path, after extending the hot-helper ladder with MBS1 and MBS2.",
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": {
+    "gpu_count": 8,
+    "gpu": "AMD Instinct MI350X VF",
+    "logged_capacity_gib": 287.69
+  },
+  "shared_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mtp": false,
+    "mhc": false,
+    "dataset": "tests/assets/c4_test via tokenizer.json"
+  },
+  "shared_runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "training_checkpoint_enable": false,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "chunked_ce_num_chunks": 8,
+    "checkpoint_note": "CANARY_CHECKPOINT_ENABLE=false disables disk training checkpoints; attention-only activation recompute remains enabled."
+  },
+  "shared_sparse_attention_knobs": {
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "shared_standard_ep_knobs": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd"
+  },
+  "hot_helper_mbs_ladder_context": {
+    "mbs1_no_helper_steps_13_to_20_tok_per_gpu_s": 3822.375,
+    "mbs1_hot_helper_steps_13_to_20_tok_per_gpu_s": 4202.7188,
+    "mbs1_hot_helper_late_uplift": 0.0995,
+    "mbs1_peak_memory_delta_gib": -10.35,
+    "mbs2_no_helper_steps_13_to_20_tok_per_gpu_s": 4321.6406,
+    "mbs2_hot_helper_steps_13_to_20_tok_per_gpu_s": 5254.375,
+    "mbs2_hot_helper_late_uplift": 0.2158,
+    "mbs2_peak_memory_delta_gib": -24.98,
+    "mbs4_no_helper_steps_13_to_20_tok_per_gpu_s": 5058.125,
+    "mbs4_hot_helper_steps_13_to_20_tok_per_gpu_s": 6550.0,
+    "mbs4_hot_helper_late_uplift": 0.2949,
+    "mbs4_peak_memory_delta_gib": -48.87,
+    "mbs8_no_helper_status": "fail_before_first_metric",
+    "mbs8_hot_helper_selected_steps_13_to_20_tok_per_gpu_s": 8632.7813,
+    "mbs8_hot_helper_selected_tflops_per_gpu": 395.3734,
+    "mbs8_hot_helper_selected_peak_memory_gib": 256.19,
+    "context_artifacts": [
+      "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs1_mbs2_ce8_ladder_20step_20260612.json",
+      "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json"
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_selected_layout_mbs8_smoke3_control_8x_20260612",
+      "mode": "standard_ep_hot_helper_selected_weight_layout",
+      "weight_layout": "selected",
+      "steps_requested": 3,
+      "status": "pass_smoke_control",
+      "summary": {
+        "completed_steps": 3,
+        "step2_tok_per_gpu_s": 5874.0,
+        "step2_tflops_per_gpu": 290.82,
+        "step3_tok_per_gpu_s": 6030.0,
+        "step3_tflops_per_gpu": 298.53,
+        "peak_logged_memory_gib": 267.09,
+        "loss_step1_to_step3": [
+          15.7833,
+          15.99291
+        ]
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_selected_layout_mbs8_smoke3_control_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_selected_layout_mbs8_smoke3_control_8x_20260612"
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_layout_mbs8_smoke3_nonpromo_8x_20260612",
+      "mode": "standard_ep_hot_helper_needed_weight_layout",
+      "weight_layout": "needed",
+      "steps_requested": 3,
+      "status": "pass_smoke_not_decisive",
+      "summary": {
+        "completed_steps": 3,
+        "step2_tok_per_gpu_s": 5893.0,
+        "step2_tflops_per_gpu": 291.73,
+        "step3_tok_per_gpu_s": 6109.0,
+        "step3_tflops_per_gpu": 302.45,
+        "peak_logged_memory_gib": 267.75,
+        "loss_step1_to_step3": [
+          15.90622,
+          15.84427
+        ]
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_needed_layout_mbs8_smoke3_nonpromo_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_needed_layout_mbs8_smoke3_nonpromo_8x_20260612"
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_layout_mbs8_steps20_nonpromo_8x_20260612",
+      "mode": "standard_ep_hot_helper_needed_weight_layout",
+      "weight_layout": "needed",
+      "steps_requested": 20,
+      "status": "pass_rejected_for_perf",
+      "summary": {
+        "completed_steps": 20,
+        "steps_2_to_20_tok_per_gpu_s_mean": 6199.5789,
+        "steps_2_to_20_node_tok_s_mean": 49596.6316,
+        "steps_2_to_20_tflops_per_gpu_mean": 306.9247,
+        "steps_13_to_20_tok_per_gpu_s_mean": 6252.25,
+        "steps_13_to_20_node_tok_s_mean": 50018.0,
+        "steps_13_to_20_tflops_per_gpu_mean": 309.5338,
+        "steps_7_to_20_tok_per_gpu_s_mean": 6234.7857,
+        "steps_7_to_20_tflops_per_gpu_mean": 308.6693,
+        "peak_logged_memory_gib": 269.99,
+        "loss_step2_to_step20": [
+          10.941,
+          4.27365
+        ],
+        "relative_to_selected_layout_mbs8_20step": {
+          "selected_reference_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json",
+          "selected_steps_2_to_20_tok_per_gpu_s_mean": 8579.4605,
+          "selected_steps_13_to_20_tok_per_gpu_s_mean": 8632.7813,
+          "selected_peak_memory_gib": 256.19,
+          "steps_2_to_20_tok_per_gpu_s_delta_pct": -27.7393,
+          "steps_13_to_20_tok_per_gpu_s_delta_pct": -27.5755,
+          "peak_memory_delta_gib": 13.8
+        }
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_needed_layout_mbs8_steps20_nonpromo_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_needed_layout_mbs8_steps20_nonpromo_8x_20260612"
+      }
+    }
+  ],
+  "decision": {
+    "hot_helper_feature_read": "The MBS1/MBS2/MBS4/MBS8 ladder robustly establishes the MindSpeed-style top-8 hot-helper feature: it improves tok/GPU/s at every fitting MBS, saves memory at MBS1-4, and moves the fit boundary so MBS8 is usable while no-helper MBS8 fails.",
+    "needed_weight_layout_read": "The opt-in owner-compact needed exchange plan is functionally valid but not a performance path. A 3-step smoke was misleadingly close to selected layout, but the 20-step late window is 27.6% slower and 13.8 GiB higher-memory than the selected-layout hot-helper reference.",
+    "primus_turbo_vs_mori": "Continue native MORI balanced-MoE as the main path. Primus-Turbo TurboEPBackend remains a bounded side probe only for raw top-k/no-helper EP because it does not consume the winning hot/cold/helper owner-compact partition directly.",
+    "next_native_mori_target": "Do not keep adapting hot-helper onto a dense selected/needed weight ABI. Preserve the standard-EP owner-compact partition and make MORI consume/produce that compact-row layout directly for normal dispatch/combine, helper rows, dX/dTopK return, and hot dW reduction."
+  },
+  "validation": {
+    "commands": [
+      "python3 -m py_compile balanced_moe.py __init__.py test_balanced_moe.py token_dispatcher.py moe.py",
+      "8xMI350 selected-layout MBS8 3-step smoke",
+      "8xMI350 needed-layout MBS8 3-step smoke",
+      "8xMI350 needed-layout MBS8 20-step non-promotional gate",
+      "ssh do-vunguyen-mi350-gpu 'grep -E \"Traceback|Exception|RuntimeError|HSA_STATUS|out of memory|Memory access fault|nan|nonfinite|failed\" .../docker-run.log || true'"
+    ],
+    "failure_scan": "Only expected disabled nonfinite-scan env lines matched; no runtime failure lines found.",
+    "post_run_node_state": "No live Docker containers; KFD process list only showed gpuagent after completion.",
+    "dependency_pin_changes": "none"
+  }
+}

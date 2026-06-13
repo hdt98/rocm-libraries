@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "run_date": "2026-06-07",
+  "status": "rejected",
+  "experiment": "deepseek-v4-amd-pretrain",
+  "branch": "MORI/AITER hot-helper W13+W2 fused hot-weight collective",
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "gpu_type": "MI350",
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "none"
+  },
+  "environment": {
+    "target_host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "mori_shmem_heap_size": "80G",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "flag": "TORCHTITAN_MORI_AITER_HOT_SPLIT_FUSED_W13_W2",
+    "summary": "Add an opt-in autograd Function that packs hot W13 and W2 rows into one flat buffer, all-reduces once in forward/backward, then splits owner gradients back to local W13 and W2."
+  },
+  "attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_fused_w13w2_8x_s4096_gbs128_mbs2_steps2_20260607",
+      "change": "Initial fused W13/W2 collective returned strided split views.",
+      "outcome": "Stopped after clear first-step regression.",
+      "observed_rank0_fwd_bwd_ms": [83940.92, 57782.37, 56987.11],
+      "process_end": "manual SIGTERM after failed materialization"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_fused_w13w2_contig_8x_s4096_gbs128_mbs2_steps2_20260607",
+      "change": "Return contiguous W13/W2 hot tensors after splitting the fused flat buffer.",
+      "outcome": "Still rejected; contiguity did not remove the catastrophic first-microbatch cost.",
+      "observed_rank0_fwd_bwd_ms": [85262.36],
+      "process_end": "manual SIGTERM after failed materialization"
+    }
+  ],
+  "comparison": {
+    "current_reference": {
+      "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_w13_fixed_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+      "step2_tok_per_gpu_s": 4109,
+      "step2_tflops_per_gpu": 208.04,
+      "peak_memory_gib": 152.74
+    },
+    "decision": "Do not promote fused W13/W2 hot-weight collective. Keep the separate W13 and W2 hot-weight collectives for the MORI/AITER route-mask branch."
+  },
+  "diagnosis": {
+    "what_was_tested": "Whether combining W13 and W2 hot-weight broadcast/all-reduce into one symmetric all-rank collective would reduce helper partial reduction overhead.",
+    "what_failed": "The monolithic fused hot-weight collective makes each fwd/bwd microbatch tens of seconds, even after returning contiguous split tensors.",
+    "likely_reason": "The fused slab is too large and poorly scheduled for the current RCCL/MORI/AITER execution path; it removes two smaller collectives but creates one much larger blocking collective/copy point that destroys helper-path overlap and progress.",
+    "useful_lesson": "The helper dW partial reduction is not missing. Owner scatter is small; the remaining cost is collective wait/scheduling around hot weight broadcast/reduction, route planning/masks, and helper compute placement."
+  },
+  "next_actions": [
+    "Keep W13 and W2 separate and profile the current route-mask W13-fixed branch with hot-weight timing plus rank-max stage aggregation.",
+    "Avoid rank-divergent skips; all ranks must enter the same hot-weight collective graph.",
+    "Investigate owner-targeted MORI broadcast/reduce or chunked/pipelined hot-weight transfer instead of one dense all-reduce slab.",
+    "Compare the stage-level MORI/AITER trace against Ascend 8-layer and 12-layer force-balance traces for all-to-all, all-gather, reduce-scatter, and MoE helper execution."
+  ],
+  "validation": {
+    "local_py_compile": "passed",
+    "launcher_zsh_n": "passed",
+    "git_diff_check": "passed",
+    "remote_materialization": "failed/rejected before a completed step because first microbatch latency was already non-promotable"
+  }
+}

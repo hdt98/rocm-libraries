@@ -1,0 +1,209 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does preallocated chunk workspace make batched expert-Muon materialize into better MBS8 throughput or memory?",
+  "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_attention_ac_8x_s4096_gbs128_steps6_20260608",
+  "preflight_artifact": "run_artifacts/muon_prealloc_workspace_12layer_ns1_1xmi350_20260608.jsonl",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "selective_attention_only",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+    "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+    "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+    "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+    "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_WORKSPACE_MODE": "prealloc",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "preflight_1xmi350_12layer_ns1": {
+    "old_workspace_none_step2_ms": 223.5748,
+    "prealloc_workspace_step2_ms": 219.0211,
+    "delta_step2_ms": -4.5537,
+    "delta_step2_pct": -2.037,
+    "old_peak_allocated_gib": 56.0742,
+    "prealloc_peak_allocated_gib": 55.5742,
+    "prealloc_workspace_resident_gib": 1.5
+  },
+  "step_metrics": {
+    "1": {
+      "loss": 12.42891,
+      "grad_norm": 20.625,
+      "tokens_per_gpu_s": 1621.0,
+      "node_tokens_s": 12968.0,
+      "tflops_per_gpu": 82.085,
+      "mfu_pct": 3.5537,
+      "memory_gib_min": 214.68,
+      "memory_gib_max": 220.58
+    },
+    "2": {
+      "loss": 9.30343,
+      "grad_norm": 110.5,
+      "tokens_per_gpu_s": 7925.0,
+      "node_tokens_s": 63400.0,
+      "tflops_per_gpu": 401.2675,
+      "mfu_pct": 17.37,
+      "memory_gib_min": 234.06,
+      "memory_gib_max": 240.3
+    },
+    "3": {
+      "loss": 7.08162,
+      "grad_norm": 53.75,
+      "tokens_per_gpu_s": 8059.0,
+      "node_tokens_s": 64472.0,
+      "tflops_per_gpu": 408.0312,
+      "mfu_pct": 17.67,
+      "memory_gib_min": 236.25,
+      "memory_gib_max": 240.31
+    },
+    "4": {
+      "loss": 30.18973,
+      "grad_norm": 67.5,
+      "tokens_per_gpu_s": 8172.0,
+      "node_tokens_s": 65376.0,
+      "tflops_per_gpu": 413.7475,
+      "mfu_pct": 17.91,
+      "memory_gib_min": 236.25,
+      "memory_gib_max": 240.31
+    },
+    "5": {
+      "loss": 8.30782,
+      "grad_norm": 28.625,
+      "tokens_per_gpu_s": 8320.875,
+      "node_tokens_s": 66567.0,
+      "tflops_per_gpu": 421.2987,
+      "mfu_pct": 18.24,
+      "memory_gib_min": 236.25,
+      "memory_gib_max": 240.31
+    },
+    "6": {
+      "loss": 6.32028,
+      "grad_norm": 20.75,
+      "tokens_per_gpu_s": 8279.125,
+      "node_tokens_s": 66233.0,
+      "tflops_per_gpu": 419.1912,
+      "mfu_pct": 18.15,
+      "memory_gib_min": 236.37,
+      "memory_gib_max": 240.31
+    }
+  },
+  "summary": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8151.2,
+    "steps_2_to_6_node_tokens_s_mean": 65209.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 412.7072,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8257.3333,
+    "steps_4_to_6_node_tokens_s_mean": 66058.6667,
+    "steps_4_to_6_tflops_per_gpu_mean": 418.0791,
+    "peak_logged_memory_gib": 240.31,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_steps_2_to_6": 0.6681,
+    "delta_vs_previous_muon_mbs8_tokens_per_gpu_pct": 1.267,
+    "delta_vs_previous_muon_mbs8_tflops_pct": 1.27,
+    "delta_vs_previous_muon_mbs8_peak_memory_gib": -2.91,
+    "delta_vs_adamw_mbs8_tokens_per_gpu_pct": 0.002,
+    "delta_vs_adamw_mbs8_tflops_pct": -0.141,
+    "delta_vs_adamw_mbs8_peak_memory_gib": -19.73,
+    "delta_vs_lower_memory_mbs4_adamw_tokens_per_gpu_pct": 1.235,
+    "delta_vs_lower_memory_mbs4_adamw_tflops_pct": 1.235,
+    "delta_vs_lower_memory_mbs4_adamw_peak_memory_gib": 45.41
+  },
+  "comparisons": {
+    "previous_muon_mbs8_attention_only": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_mbs8_selective_attention_ac_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8049.2,
+      "steps_2_to_6_tflops_per_gpu_mean": 407.53,
+      "peak_logged_memory_gib": 243.22
+    },
+    "adamw_mbs8_attention_only": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8151.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 413.292,
+      "peak_logged_memory_gib": 260.04
+    },
+    "lower_memory_mbs4_adamw_ownercompact": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8051.75,
+      "steps_2_to_6_tflops_per_gpu_mean": 407.6725,
+      "peak_logged_memory_gib": 194.9
+    }
+  },
+  "decision": {
+    "promote_as_throughput_best": false,
+    "promote_as_best_muon_mbs8": true,
+    "read": "Preallocated chunk workspace is a real Muon improvement: it trims the 12-layer expert-optimizer slice by about 2.0%, improves the MBS8 Muon e2e run by about 1.27% tok/GPU/s versus previous Muon, and lowers logged peak by 2.91 GiB. It essentially ties AdamW MBS8 throughput while using 19.73 GiB less logged peak memory, but it still uses NS=1 Muon semantics, so it should be retained as the best Muon/memory branch rather than replacing AdamW as the quality-safe throughput baseline.",
+    "next_action": "Keep pushing a lower-level fused Muon update only if NS=1 quality is acceptable or if NS>1 can be accelerated. Otherwise use this branch as memory headroom evidence and return the main perf ladder to MoE/EP helper VJP and sparse SharedKV backward."
+  },
+  "validation": {
+    "local_py_compile": "passed for optimizer.py and probe_muon_optimizer_step.py",
+    "launcher_bash_n": "passed",
+    "remote_1xmi350_smoke": "passed for workspace none and prealloc on 1-layer expert bank",
+    "remote_1xmi350_preflight": "passed for 12-layer NS=1 expert bank",
+    "remote_e2e": "completed 6 steps on 8xMI350"
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "probe": "aiter_moe_forward_custom_backward",
+  "created_unix": 1780329447.639666,
+  "shape": {
+    "tokens": 64,
+    "hidden": 1024,
+    "intermediate": 128,
+    "experts": 8,
+    "topk": 2,
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.2
+  },
+  "contract": {
+    "forward": "AITER fused_moe with w13=cat([TorchTitan w1 gate, TorchTitan w3 up]), shuffle_weight(layout=(16,16)) for w13/w2, gate_mode=separated",
+    "backward": "custom autograd recomputes TorchTitan SwiGLU reference and returns dX, dW1_gate, dW3_up, dW2_down, and dTopkWeight",
+    "loss_for_vjp_check": "linear fixed upstream gradient, so the VJP comparison does not depend on small AITER-vs-reference forward roundoff",
+    "production_note": "diagnostic correctness bridge only; backward is PyTorch recompute, not the final fused training kernel"
+  },
+  "thresholds": {
+    "output_atol": 0.0625,
+    "grad_atol": 1e-05
+  },
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "forward_compare": {
+    "shape": [
+      64,
+      1024
+    ],
+    "dtype": "torch.bfloat16",
+    "max_abs_diff": 0.03125,
+    "mean_abs_diff": 0.003096172120422125,
+    "max_rel_diff": 23.824241638183594,
+    "cosine_distance": 5.4836273193359375e-06,
+    "actual_finite": true,
+    "expected_finite": true
+  },
+  "gradient_compare": {
+    "x": {
+      "shape": [
+        64,
+        1024
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0,
+      "max_rel_diff": 0.0,
+      "cosine_distance": 0.0,
+      "actual_finite": true,
+      "expected_finite": true
+    },
+    "w1_gate": {
+      "shape": [
+        8,
+        128,
+        1024
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0,
+      "max_rel_diff": 0.0,
+      "cosine_distance": 0.0,
+      "actual_finite": true,
+      "expected_finite": true
+    },
+    "w3_up": {
+      "shape": [
+        8,
+        128,
+        1024
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0,
+      "max_rel_diff": 0.0,
+      "cosine_distance": 0.0,
+      "actual_finite": true,
+      "expected_finite": true
+    },
+    "w2_down": {
+      "shape": [
+        8,
+        1024,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0,
+      "max_rel_diff": 0.0,
+      "cosine_distance": -2.384185791015625e-07,
+      "actual_finite": true,
+      "expected_finite": true
+    },
+    "topk_weight": {
+      "shape": [
+        64,
+        2
+      ],
+      "dtype": "torch.float32",
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0,
+      "max_rel_diff": 0.0,
+      "cosine_distance": -1.1920928955078125e-07,
+      "actual_finite": true,
+      "expected_finite": true
+    }
+  },
+  "bridge_usable_for_training_semantics": true,
+  "timing_ms": {
+    "custom_forward_backward_median": 4.527574062347412,
+    "custom_forward_backward_min": 4.492693901062012,
+    "custom_forward_backward_max": 4.62029504776001,
+    "iters": 3,
+    "read": "Includes AITER forward plus slow PyTorch recompute backward; not a performance target."
+  }
+}

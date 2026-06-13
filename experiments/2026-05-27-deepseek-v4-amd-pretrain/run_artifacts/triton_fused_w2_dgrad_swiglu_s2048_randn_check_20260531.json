@@ -1,0 +1,121 @@
+{
+  "best_triton": {
+    "block_k": 128,
+    "block_m": 16,
+    "block_n": 64,
+    "compact_tflops_median": 54.523796833823326,
+    "median_ms": 9.925315380096436,
+    "min_ms": 9.689335823059082,
+    "num_warps": 4,
+    "speedup_vs_torch_padded_w2_dgrad_swiglu_median": 0.3981976248258759,
+    "timing_ms": {
+      "triton_fused_bm16_bn64_bk128_w4_ms_max": 10.161294937133789,
+      "triton_fused_bm16_bn64_bk128_w4_ms_mean": 9.925315380096436,
+      "triton_fused_bm16_bn64_bk128_w4_ms_median": 9.925315380096436,
+      "triton_fused_bm16_bn64_bk128_w4_ms_min": 9.689335823059082
+    }
+  },
+  "check": {
+    "config": {
+      "block_k": 128,
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4
+    },
+    "dgate": {
+      "atol": 0.5,
+      "max_abs": 0.00390625,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 0.0028169379282747794,
+      "rtol": 0.025
+    },
+    "dup": {
+      "atol": 0.5,
+      "max_abs": 0.00390625,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 0.0028047075300583675,
+      "rtol": 0.025
+    },
+    "ok": true
+  },
+  "failed_triton_configs": [],
+  "flops": {
+    "compact_vs_padded_flop_ratio": 0.6808510638297872,
+    "compact_w2_dgrad": 541165879296.0,
+    "padded_global_max_w2_dgrad": 794837385216.0
+  },
+  "op_read": "dy_compact [assignments, hidden] x w2 [experts, hidden, intermediate] with SwiGLU backward epilogue -> dgate_compact, dup_compact",
+  "probe": "triton_fused_w2_dgrad_swiglu",
+  "read": "Promote only if the best Triton compact fused kernel is correct and beats the padded torch W2 dgrad plus SwiGLU backward baseline. A loss here means the fused contract is still right, but the simple Triton grouped-M schedule is not the route.",
+  "route_stats": {
+    "assignments": 12288,
+    "experts": 384,
+    "max_per_expert": 47,
+    "mean_per_expert": 32.0,
+    "min_per_expert": 15,
+    "padded_rows_global_max": 18048,
+    "padding_multiplier_global_max": 1.46875
+  },
+  "shape": {
+    "assignments": 12288,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tokens": 2048,
+    "topk": 6
+  },
+  "torch_padded_w2_dgrad_gather_compact_swiglu": {
+    "compact_equivalent_tflops_median": 146.87498774640287,
+    "median_ms": 3.684533953666687,
+    "timing_ms": {
+      "torch_padded_w2_dgrad_gather_swiglu_ms_max": 3.7258739471435547,
+      "torch_padded_w2_dgrad_gather_swiglu_ms_mean": 3.684533953666687,
+      "torch_padded_w2_dgrad_gather_swiglu_ms_median": 3.684533953666687,
+      "torch_padded_w2_dgrad_gather_swiglu_ms_min": 3.6431939601898193
+    }
+  },
+  "torch_padded_w2_dgrad_only": {
+    "compact_equivalent_tflops_median": 133.99853281408468,
+    "median_ms": 4.03859555721283,
+    "padded_tflops_median": 196.81034507068688,
+    "timing_ms": {
+      "torch_padded_w2_dgrad_only_ms_max": 4.108516216278076,
+      "torch_padded_w2_dgrad_only_ms_mean": 4.03859555721283,
+      "torch_padded_w2_dgrad_only_ms_median": 4.03859555721283,
+      "torch_padded_w2_dgrad_only_ms_min": 3.968674898147583
+    }
+  },
+  "torch_padded_w2_dgrad_swiglu": {
+    "compact_equivalent_tflops_median": 136.92647427936197,
+    "median_ms": 3.9522370100021362,
+    "padded_tflops_median": 201.11075909781292,
+    "timing_ms": {
+      "torch_padded_w2_dgrad_swiglu_ms_max": 4.3547210693359375,
+      "torch_padded_w2_dgrad_swiglu_ms_mean": 3.9522370100021362,
+      "torch_padded_w2_dgrad_swiglu_ms_median": 3.9522370100021362,
+      "torch_padded_w2_dgrad_swiglu_ms_min": 3.549752950668335
+    }
+  },
+  "triton_results": [
+    {
+      "block_k": 128,
+      "block_m": 16,
+      "block_n": 64,
+      "compact_tflops_median": 54.523796833823326,
+      "median_ms": 9.925315380096436,
+      "min_ms": 9.689335823059082,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_w2_dgrad_swiglu_median": 0.3981976248258759,
+      "timing_ms": {
+        "triton_fused_bm16_bn64_bk128_w4_ms_max": 10.161294937133789,
+        "triton_fused_bm16_bn64_bk128_w4_ms_mean": 9.925315380096436,
+        "triton_fused_bm16_bn64_bk128_w4_ms_median": 9.925315380096436,
+        "triton_fused_bm16_bn64_bk128_w4_ms_min": 9.689335823059082
+      }
+    }
+  ]
+}

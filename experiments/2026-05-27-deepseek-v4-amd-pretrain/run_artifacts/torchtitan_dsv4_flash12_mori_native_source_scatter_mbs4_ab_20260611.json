@@ -1,0 +1,366 @@
+{
+  "created_at": "2026-06-11T05:55:00+07:00",
+  "question": "Can native-MORI compact plus triton_flat source-scatter fit at MBS4, and how does the true no-AC surface compare apples-to-apples with the standard-EP MBS4 no-AC control?",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "data": "tests/assets/c4_test"
+  },
+  "shared_env": {
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "varies_by_run",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "varies_by_run",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "true",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_ORDER": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND": "triton_flat",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_MORI_JIT_CACHE_REMOTE": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/mori_ep_headerhash_20260611",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_USE_HYPER_CONNECTIONS": "false"
+  },
+  "control": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608",
+    "backend": "standard_ep_ownercompact_torch_collective_with_mori_sdma_hot_weight_transport",
+    "completed": true,
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 8051.75,
+      "node_tokens_s_mean": 64414.0,
+      "tflops_per_gpu_mean": 407.6725,
+      "peak_logged_memory_gib": 194.9
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s_mean": 8163.666666666667,
+      "node_tokens_s_mean": 65309.333333333336,
+      "tflops_per_gpu_mean": 413.35,
+      "peak_logged_memory_gib": 194.9
+    }
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_noac_steps6_8x_s4096_gbs128_20260611",
+      "completed": true,
+      "hot_weight_forward_backend": "torch",
+      "hot_weight_reduce_backend": "torch",
+      "console_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_noac_steps6_8x_s4096_gbs128_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_noac_steps6_8x_s4096_gbs128_20260611",
+      "steps": [
+        {
+          "step": 1,
+          "tokens_per_gpu_s_mean": 1830.625,
+          "tflops_per_gpu_mean": 92.6875,
+          "memory_gib_max": 138.58,
+          "loss": 12.13494,
+          "grad_norm": 20.25
+        },
+        {
+          "step": 2,
+          "tokens_per_gpu_s_mean": 6483.0,
+          "tflops_per_gpu_mean": 328.25,
+          "memory_gib_max": 176.26,
+          "loss": 8.4753,
+          "grad_norm": 59.5
+        },
+        {
+          "step": 3,
+          "tokens_per_gpu_s_mean": 6815.0,
+          "tflops_per_gpu_mean": 345.06875,
+          "memory_gib_max": 176.26,
+          "loss": 15.30438,
+          "grad_norm": 134.0
+        },
+        {
+          "step": 4,
+          "tokens_per_gpu_s_mean": 7101.0,
+          "tflops_per_gpu_mean": 359.54,
+          "memory_gib_max": 176.65,
+          "loss": 15.14992,
+          "grad_norm": 71.0
+        },
+        {
+          "step": 5,
+          "tokens_per_gpu_s_mean": 7565.0,
+          "tflops_per_gpu_mean": 383.03875,
+          "memory_gib_max": 176.65,
+          "loss": 7.91667,
+          "grad_norm": 40.75
+        },
+        {
+          "step": 6,
+          "tokens_per_gpu_s_mean": 7673.125,
+          "tflops_per_gpu_mean": 388.51125,
+          "memory_gib_max": 176.65,
+          "loss": 6.87684,
+          "grad_norm": 26.625
+        }
+      ],
+      "windows": {
+        "steps_2_to_6": {
+          "tokens_per_gpu_s_mean": 7127.425,
+          "node_tokens_s_mean": 57019.4,
+          "tflops_per_gpu_mean": 360.88175,
+          "peak_logged_memory_gib": 176.65
+        },
+        "steps_4_to_6": {
+          "tokens_per_gpu_s_mean": 7446.375,
+          "node_tokens_s_mean": 59571.0,
+          "tflops_per_gpu_mean": 377.03,
+          "peak_logged_memory_gib": 176.65
+        }
+      },
+      "activation_checkpoint_mode": "selective",
+      "activation_checkpoint_scope": "attention_only",
+      "comparison_scope": "fit_only_not_apples_to_apples_with_noac_control",
+      "note": "Run ID contains noac, but the actual launcher env used selective attention-only activation checkpointing."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611",
+      "completed": true,
+      "hot_weight_forward_backend": "mori_sdma",
+      "hot_weight_reduce_backend": "mori_sdma",
+      "console_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611",
+      "steps": [
+        {
+          "step": 1,
+          "tokens_per_gpu_s_mean": 1648.875,
+          "tflops_per_gpu_mean": 83.49125,
+          "memory_gib_max": 138.19,
+          "loss": 12.27927,
+          "grad_norm": 19.75
+        },
+        {
+          "step": 2,
+          "tokens_per_gpu_s_mean": 6564.0,
+          "tflops_per_gpu_mean": 332.34125,
+          "memory_gib_max": 175.62,
+          "loss": 8.6883,
+          "grad_norm": 49.75
+        },
+        {
+          "step": 3,
+          "tokens_per_gpu_s_mean": 6880.0,
+          "tflops_per_gpu_mean": 348.33,
+          "memory_gib_max": 175.62,
+          "loss": 22.06203,
+          "grad_norm": 119.0
+        },
+        {
+          "step": 4,
+          "tokens_per_gpu_s_mean": 7408.125,
+          "tflops_per_gpu_mean": 375.1,
+          "memory_gib_max": 175.62,
+          "loss": 8.63841,
+          "grad_norm": 34.5
+        },
+        {
+          "step": 5,
+          "tokens_per_gpu_s_mean": 7424.0,
+          "tflops_per_gpu_mean": 375.88,
+          "memory_gib_max": 175.62,
+          "loss": 11.59228,
+          "grad_norm": 63.5
+        },
+        {
+          "step": 6,
+          "tokens_per_gpu_s_mean": 7488.0,
+          "tflops_per_gpu_mean": 379.14,
+          "memory_gib_max": 175.62,
+          "loss": 10.23622,
+          "grad_norm": 41.0
+        }
+      ],
+      "windows": {
+        "steps_2_to_6": {
+          "tokens_per_gpu_s_mean": 7152.825,
+          "node_tokens_s_mean": 57222.6,
+          "tflops_per_gpu_mean": 362.15825,
+          "peak_logged_memory_gib": 175.62
+        },
+        "steps_4_to_6": {
+          "tokens_per_gpu_s_mean": 7440.041666666667,
+          "node_tokens_s_mean": 59520.333333333336,
+          "tflops_per_gpu_mean": 376.70666666666665,
+          "peak_logged_memory_gib": 175.62
+        }
+      },
+      "activation_checkpoint_mode": "selective",
+      "activation_checkpoint_scope": "attention_only",
+      "comparison_scope": "fit_only_not_apples_to_apples_with_noac_control",
+      "note": "Run ID contains noac, but the actual launcher env used selective attention-only activation checkpointing."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_true_steps6_8x_s4096_gbs128_20260611",
+      "completed": true,
+      "activation_checkpoint_mode": "none",
+      "activation_checkpoint_scope": null,
+      "comparison_scope": "apples_to_apples_with_noac_control",
+      "hot_weight_forward_backend": "mori_sdma",
+      "hot_weight_reduce_backend": "mori_sdma",
+      "console_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_true_steps6_8x_s4096_gbs128_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_mbs4_sdma_noac_true_steps6_8x_s4096_gbs128_20260611",
+      "steps": [
+        {
+          "step": 1,
+          "tokens_per_gpu_s_mean": 1774.75,
+          "tflops_per_gpu_mean": 89.865,
+          "memory_gib_max": 157.97,
+          "loss": 12.29734,
+          "grad_norm": 19.625
+        },
+        {
+          "step": 2,
+          "tokens_per_gpu_s_mean": 6786.0,
+          "tflops_per_gpu_mean": 343.56125,
+          "memory_gib_max": 195.73,
+          "loss": 7.88787,
+          "grad_norm": 52.75
+        },
+        {
+          "step": 3,
+          "tokens_per_gpu_s_mean": 7212.0,
+          "tflops_per_gpu_mean": 365.16,
+          "memory_gib_max": 195.73,
+          "loss": 20.20481,
+          "grad_norm": 115.5
+        },
+        {
+          "step": 4,
+          "tokens_per_gpu_s_mean": 7104.0,
+          "tflops_per_gpu_mean": 359.67,
+          "memory_gib_max": 195.85,
+          "loss": 17.32825,
+          "grad_norm": 37.0
+        },
+        {
+          "step": 5,
+          "tokens_per_gpu_s_mean": 7546.0,
+          "tflops_per_gpu_mean": 382.05,
+          "memory_gib_max": 195.85,
+          "loss": 7.84802,
+          "grad_norm": 120.5
+        },
+        {
+          "step": 6,
+          "tokens_per_gpu_s_mean": 7527.0,
+          "tflops_per_gpu_mean": 381.1,
+          "memory_gib_max": 195.85,
+          "loss": 18.4722,
+          "grad_norm": 41.5
+        }
+      ],
+      "windows": {
+        "steps_2_to_6": {
+          "tokens_per_gpu_s_mean": 7235.0,
+          "node_tokens_s_mean": 57880.0,
+          "tflops_per_gpu_mean": 366.30825,
+          "peak_logged_memory_gib": 195.85
+        },
+        "steps_4_to_6": {
+          "tokens_per_gpu_s_mean": 7392.333333333333,
+          "node_tokens_s_mean": 59138.666666666664,
+          "tflops_per_gpu_mean": 374.27333333333337,
+          "peak_logged_memory_gib": 195.85
+        }
+      }
+    }
+  ],
+  "comparisons": {
+    "attention_ac_native_sdma_vs_native_torch_steps_2_to_6_fit_only": {
+      "tokens_per_gpu_s_delta": 25.4,
+      "tokens_per_gpu_s_delta_pct": 0.3563699054273152,
+      "tflops_per_gpu_delta": 1.2765,
+      "memory_gib_delta": -1.03,
+      "note": "Both sides used selective attention-only activation checkpointing; this is only a hot-weight transport fit check."
+    },
+    "true_noac_native_sdma_vs_control_steps_2_to_6": {
+      "tokens_per_gpu_s_delta": -816.75,
+      "tokens_per_gpu_s_delta_pct": -10.143757568230509,
+      "tflops_per_gpu_delta": -41.36425000000003,
+      "memory_gib_delta": 0.9499999999999886
+    },
+    "true_noac_native_sdma_vs_control_steps_4_to_6": {
+      "tokens_per_gpu_s_delta": -771.3333333333339,
+      "tokens_per_gpu_s_delta_pct": -9.448368788534571,
+      "tflops_per_gpu_delta": -39.076666666666654,
+      "memory_gib_delta": 0.9499999999999886
+    },
+    "true_noac_native_sdma_vs_attention_ac_native_sdma_steps_2_to_6": {
+      "tokens_per_gpu_s_delta": 82.17500000000018,
+      "tokens_per_gpu_s_delta_pct": 1.1488467843124945,
+      "tflops_per_gpu_delta": 4.149999999999977,
+      "memory_gib_delta": 20.22999999999999,
+      "note": "This compares two native runs with different activation-checkpoint settings; it is useful for fit/headroom only, not for promotion."
+    }
+  },
+  "post_run_node_check": {
+    "rocm_smi_vram_returned_to_idle_after_true_noac_run": true,
+    "kfd_training_processes_left": false,
+    "note": "After the true no-AC run, all GPUs returned to about 0.28 GiB VRAM used; only gpuagent remained visible."
+  },
+  "decision": {
+    "promote": false,
+    "read": "The true no-AC native-MORI/source-scatter MBS4 run completes cleanly, so the node and baseline surface are healthy. However, apples-to-apples it is still 10.14% slower than the standard-EP owner-compact MBS4 no-AC control over steps 2-6 and 9.45% slower over steps 4-6, with essentially the same peak memory. The earlier attention-only AC native runs are fit evidence only and should not be compared against the no-AC control.",
+    "next_action": "Keep native compact/source-scatter as an opt-in profiling surface. The remaining work is to profile and remove native compact output/staging/final receive-layout overhead, while the standard-EP owner-compact path remains the lower-memory no-AC control."
+  },
+  "updated_at": "2026-06-11T06:20:00+07:00",
+  "surface_notes": {
+    "attention_only_ac_fit_runs": "The first two native runs below used selective attention-only activation checkpointing despite noac in their run IDs. They are retained only as stability/fit evidence.",
+    "true_noac_comparison_run": "The third native run uses CANARY_ACTIVATION_CHECKPOINT_MODE=none and is the apples-to-apples comparison against the standard-EP owner-compact MBS4 no-AC control."
+  }
+}

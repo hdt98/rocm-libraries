@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "artifact_kind": "microbench_decision",
+  "title": "Sparse shared-KV query-recompute layer-2 block-shape sweep",
+  "status": "h64n64_best_microbench_not_e2e_promoted",
+  "scope": "Actual LI S4096 layer-2 query-recompute sparse shared-KV backward block-shape sweep on one MI350",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024
+  },
+  "points_by_full_ms": [
+    {
+      "artifact": "actual_li_query_recompute_block_sweep_h64n64_s4096_layer2_20260604.json",
+      "block_env": {
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "64"
+      },
+      "full_ms": 11.0858154296875,
+      "no_dkv_ms": 1.951177954673767,
+      "dkv_reduce_sink_ms": 2.8729560375213623,
+      "global_dkv_accum_wall_ms": 8.212859392166138
+    },
+    {
+      "artifact": "actual_li_query_recompute_block_sweep_h64n128_s4096_layer2_20260604.json",
+      "block_env": {
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "128"
+      },
+      "full_ms": 11.164347648620605,
+      "no_dkv_ms": 1.5004149675369263,
+      "dkv_reduce_sink_ms": 2.1871819496154785,
+      "global_dkv_accum_wall_ms": 8.977165699005127
+    },
+    {
+      "artifact": "actual_li_query_recompute_block_sweep_h64n256_s4096_layer2_20260604.json",
+      "block_env": {
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "256"
+      },
+      "full_ms": 11.51546573638916,
+      "no_dkv_ms": 1.6430959701538086,
+      "dkv_reduce_sink_ms": 2.9144680500030518,
+      "global_dkv_accum_wall_ms": 8.600997686386108
+    },
+    {
+      "artifact": "actual_li_query_recompute_block_sweep_h32n128_s4096_layer2_20260604.json",
+      "block_env": {
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "32",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "128"
+      },
+      "full_ms": 36.928497314453125,
+      "no_dkv_ms": 23.956287384033203,
+      "dkv_reduce_sink_ms": 24.038959503173828,
+      "global_dkv_accum_wall_ms": 12.889537811279297
+    },
+    {
+      "artifact": "actual_li_query_recompute_block_sweep_h16n128_s4096_layer2_20260604.json",
+      "block_env": {
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "16",
+        "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "128"
+      },
+      "full_ms": 41.46847152709961,
+      "no_dkv_ms": 1.906738042831421,
+      "dkv_reduce_sink_ms": 3.340390920639038,
+      "global_dkv_accum_wall_ms": 38.12808060646057
+    }
+  ],
+  "winner": {
+    "artifact": "actual_li_query_recompute_block_sweep_h64n64_s4096_layer2_20260604.json",
+    "block_env": {
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "64"
+    },
+    "full_ms": 11.0858154296875,
+    "no_dkv_ms": 1.951177954673767,
+    "dkv_reduce_sink_ms": 2.8729560375213623,
+    "global_dkv_accum_wall_ms": 8.212859392166138
+  },
+  "e2e_materialization": {
+    "artifact": "torchtitan_query_recompute_h64n64_4x_s4096_gbs64_20260604.json",
+    "late_steps4_to6_tflops_per_gpu": 77.0533,
+    "baseline_artifact": "torchtitan_query_recompute_stability_4x_s4096_gbs64_20260604.json",
+    "baseline_late_steps4_to6_tflops_per_gpu": 77.4,
+    "delta_tflops_per_gpu": -0.3467
+  },
+  "read": [
+    "H64/N64/D128 is the best measured block point for the hard layer-2 query-recompute microbench, with full backward around 11.09 ms.",
+    "H16/N128 is much worse for full dKV accumulation, around 41.47 ms, despite acceptable no-dKV timing.",
+    "The e2e H64/N64 run does not exceed the existing 4x query-recompute baseline, so the next speed path is not more simple block-size tuning."
+  ],
+  "next_action": "Implement the real query-major group-aware dKV producer/reducer and continue MORI owner-rank VJP fusion; do not spend more time on plain block H/N sweeps unless a profiler shows this kernel is the active e2e limiter under the promoted run.",
+  "dependency_pin_changes": []
+}

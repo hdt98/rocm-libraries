@@ -1,0 +1,132 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mbs4_mori_heap_vmm_ladder_4x_s4096_gbs128_20260606",
+  "date": "2026-06-06",
+  "status": "rejected_mbs4_not_promotable_current_mori_memory",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "objective": "Check whether the retained 12-layer all-compressed 4xMI350 candidate can move from MBS2/GA16 to MBS4/GA8 at GBS128, and whether MORI vmm_heap mode fixes the static heap wall.",
+  "shape": {
+    "model": "flash_12layer_ceiling_probe",
+    "layers": 12,
+    "compress_ratios_recipe": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "compress_ratios_torchtitan": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpoint": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW",
+    "sparse_mla": "all_compressed_c4_c128_shared_kv_query_recompute_h64_n64_d128",
+    "mori_local_vjp": "aiter_compact_ptgmm_expert_loop",
+    "dx_return_mode": "sync_dx_first",
+    "allocator": "PYTORCH_ALLOC_CONF=expandable_segments:True"
+  },
+  "retained_baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+    "run_id": "torchtitan_dsv4_flash12_allcompressed_h64n64d128_4x_s4096_gbs128_mbs2_heap40_steps6b_20260606",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS2_GBS128_S4096_GA16",
+    "mori_shmem_mode": "static_heap",
+    "mori_shmem_heap_size": "40G",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 4034.4,
+    "steps_2_to_6_node_tokens_s_mean": 16137.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 204.272,
+    "peak_logged_memory_gib": 223.2,
+    "decision": "still_current_12layer_batch_ladder_candidate"
+  },
+  "launcher_change": {
+    "file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "change": "Added CANARY_MORI_SHMEM_MODE pass-through to Docker env, remote env forwarding, and launch config logging.",
+    "validated_by": "bash -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "mori_source_contract": "sources/references/mori/src/shmem/init.cpp accepts MORI_SHMEM_MODE values static_heap, vmm_heap, and isolation."
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap40_steps2_20260606",
+      "gpus": [0, 1, 2, 3],
+      "mori_shmem_mode": "static_heap",
+      "mori_shmem_heap_size": "40G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap40_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "mori_static_heap_exhausted",
+      "failure_message": "Out of heap memory! Requested: 540540928 bytes (aligned), Current heap size: 42949672960 bytes.",
+      "completed_optimizer_steps": 0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap48_steps2_20260606",
+      "gpus": [0, 1, 2, 3],
+      "mori_shmem_mode": "static_heap",
+      "mori_shmem_heap_size": "48G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap48_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "mori_static_heap_exhausted",
+      "failure_message": "Out of heap memory! Requested: 540540928 bytes (aligned), Current heap size: 51539607552 bytes.",
+      "completed_optimizer_steps": 0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap56_steps2_20260606",
+      "gpus": [0, 1, 2, 3],
+      "mori_shmem_mode": "static_heap",
+      "mori_shmem_heap_size": "56G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap56_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "mori_static_heap_exhausted",
+      "failure_message": "Out of heap memory! Requested: 540540928 bytes (aligned), Current heap size: 60129542144 bytes.",
+      "completed_optimizer_steps": 0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap64_steps2_20260606",
+      "gpus": [0, 1, 2, 3],
+      "mori_shmem_mode": "static_heap",
+      "mori_shmem_heap_size": "64G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_expand_smoke_4x_s4096_gbs128_heap64_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "mori_static_heap_exhausted",
+      "failure_message": "Out of heap memory! Requested: 540540928 bytes (aligned), Current heap size: 68719476736 bytes.",
+      "completed_optimizer_steps": 0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_vmmheap96_expand_smoke_4x_s4096_gbs128_gpus4to7_steps2_20260606",
+      "gpus": [4, 5, 6, 7],
+      "mori_shmem_mode": "vmm_heap",
+      "mori_shmem_heap_size": "96G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_vmmheap96_expand_smoke_4x_s4096_gbs128_gpus4to7_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "mori_vmm_heap_va_exhausted_or_fragmented",
+      "failure_message": "Out of heap memory! Requested: 540540928 bytes (aligned), Current heap size: 103079215104 bytes. VA stats: total=1333 free=72 alloc=1261 freeSpace=26860487680 largest=540540928.",
+      "completed_optimizer_steps": 0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_syncdxfirst_mbs4_vmmheap128_expand_smoke_4x_s4096_gbs128_gpus4to7_steps2_20260606",
+      "gpus": [4, 5, 6, 7],
+      "mori_shmem_mode": "vmm_heap",
+      "mori_shmem_heap_size": "128G",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_syncdxfirst_mbs4_vmmheap128_expand_smoke_4x_s4096_gbs128_gpus4to7_steps2_20260606/docker-run.log",
+      "result": "failed_before_step1",
+      "failure_class": "hsa_out_of_resources_vram_exhausted_during_mori_op_creation",
+      "failure_message": "HSA_STATUS_ERROR_OUT_OF_RESOURCES with Available Free mem : 0 MB while creating MORI dispatch/combine op in forward.",
+      "completed_optimizer_steps": 0
+    }
+  ],
+  "external_workload_note": {
+    "observed": true,
+    "details": "During later tests GPUs 0-3 were occupied by an external Primus/Qwen3 job owned by longnguyen37, so the vmm_heap runs were moved to GPUs 4-7. The external job was not killed."
+  },
+  "decision": {
+    "promote_mbs4": false,
+    "materialized_tflops_per_gpu": null,
+    "materialized_tokens_per_gpu_s": null,
+    "read": "MBS4/GA8 does not reach a usable optimizer step under current MORI memory behavior. Static heap 40G through 64G fills before step 1; vmm_heap gets past the static fixed-size limit but fails either VMM VA allocation at 96G or whole-device HSA resource exhaustion at 128G.",
+    "next_actions": [
+      "Do not promote MBS4 as a batch-ladder candidate yet.",
+      "Keep CANARY_MORI_SHMEM_MODE as a diagnostic launcher knob.",
+      "Return to MORI/AITER allocation reduction: reuse dispatch/combine op workspaces, reduce max-receive sizing, avoid per-microbatch large transient routed buffers, and implement fused compact owner-rank training backward.",
+      "Retain MBS2 all-compressed H64/N64/D128 as the current 12-layer baseline until a real MBS4 step completes and reports tok/s, TFLOPs/GPU, and memory."
+    ]
+  }
+}

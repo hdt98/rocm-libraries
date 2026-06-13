@@ -1,0 +1,173 @@
+{
+  "status": "passed_guarded_s512_direct_torchtitan_1x_and_4x",
+  "date": "2026-06-01",
+  "experiment": "2026-05-27-deepseek-v4-amd-pretrain",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "code_changes": {
+    "selected_state_guard": {
+      "env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS",
+      "launcher_env": "CANARY_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS",
+      "default_elements": 4000000000,
+      "read": "The bounded PyTorch sparse-MLA fallback now falls back to dense MLA when materialized selected K/V state exceeds this element budget. This keeps S256 sparse-LI enabled while avoiding the S512 materialized backward fault. It is a guard for the temporary PyTorch fallback, not the final fused sparse MLA kernel."
+    },
+    "diagnostics": {
+      "single_rank_fsdp_skip_env": "TORCHTITAN_DSV4_SKIP_SINGLE_RANK_FSDP",
+      "launcher_single_rank_fsdp_skip_env": "CANARY_SKIP_SINGLE_RANK_FSDP",
+      "indexer_loss_coeff_env": "TORCHTITAN_DSV4_DSA_INDEXER_LOSS_COEFF",
+      "launcher_indexer_loss_coeff_env": "CANARY_DSA_INDEXER_LOSS_COEFF"
+    }
+  },
+  "layer_probe": {
+    "s256_layers_2_3": {
+      "command_shape": "verify_torchtitan_dsv4_sparse_li_flash_layers.py --device cuda --dtype bf16 --seq-len 256 --layers 2,3",
+      "result": "passed",
+      "compressed_layers_all_sparse_used": true,
+      "compressed_layers_all_indexer_grads_present": true,
+      "compressed_layers_any_indexer_grad_nonzero": true,
+      "layer2": {
+        "compress_ratio": 4,
+        "estimated_selected_state_elements": 3221225472,
+        "sparse_used": true,
+        "last_sparse_selected_keys": 192,
+        "last_sparse_compressed_groups": 64,
+        "last_indexer_loss": 4.459327465156093e-05,
+        "indexer_grad_norms": {
+          "wq.weight": 8.303852519020438e-05,
+          "wk.weight": 0.00010351005767006427,
+          "weights_proj.weight": 7.965384429553524e-05
+        }
+      },
+      "layer3": {
+        "compress_ratio": 128,
+        "estimated_selected_state_elements": 2181038080,
+        "sparse_used": true,
+        "last_sparse_selected_keys": 130,
+        "last_sparse_compressed_groups": 2,
+        "last_indexer_loss": 8.677890406261213e-09,
+        "indexer_grad_norms": {
+          "wq.weight": 8.922659731069871e-07,
+          "wk.weight": 8.864797678143077e-07,
+          "weights_proj.weight": 6.655432116531301e-07
+        }
+      }
+    },
+    "s512_layers_2_3": {
+      "command_shape": "verify_torchtitan_dsv4_sparse_li_flash_layers.py --device cuda --dtype bf16 --seq-len 512 --layers 2,3",
+      "result": "passed_dense_fallback_by_selected_state_guard",
+      "compressed_layers_all_sparse_used": false,
+      "compressed_layers_any_indexer_grad_nonzero": false,
+      "layer2": {
+        "compress_ratio": 4,
+        "estimated_selected_state_elements": 8589934592,
+        "sparse_used": false,
+        "sparse_skip_reason": "selected_state_elements_over_threshold"
+      },
+      "layer3": {
+        "compress_ratio": 128,
+        "estimated_selected_state_elements": 4429185024,
+        "sparse_used": false,
+        "sparse_skip_reason": "selected_state_elements_over_threshold"
+      }
+    },
+    "pre_guard_observation": {
+      "layer2_s512": "faulted standalone with GPU memory access fault, exit code 139, before the selected-state guard was tightened",
+      "layer3_s512": "had previous standalone sparse-LI backward pass evidence, but full-model S512 still faulted until layer3 also fell back"
+    }
+  },
+  "training_runs": {
+    "s512_1x_no_fsdp_gbs1": {
+      "run_id": "torchtitan_direct_dsv4_s512_selected_state_guard4b_1xmi350_gbs1_noac_nofsdp_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512",
+      "skip_single_rank_fsdp": true,
+      "checkpoint_enable": false,
+      "loss": 12.15967,
+      "grad_norm": 13.25,
+      "memory_gib": 207.05,
+      "tokens_per_gpu_s": 53,
+      "tflops": 0.70,
+      "torchtitan_reported_mfu_pct_a100_fallback": 0.22,
+      "mi350x_peak_normalized_mfu_pct": 0.03,
+      "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_selected_state_guard4b_1xmi350_gbs1_noac_nofsdp_20260601T000000/docker-run.log"
+    },
+    "s512_1x_fsdp_gbs1": {
+      "run_id": "torchtitan_direct_dsv4_s512_selected_state_guard4b_1xmi350_gbs1_noac_fsdp_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512",
+      "skip_single_rank_fsdp": false,
+      "checkpoint_enable": false,
+      "loss": 12.26154,
+      "grad_norm": 13.4375,
+      "memory_gib": 259.39,
+      "tokens_per_gpu_s": 45,
+      "tflops": 0.60,
+      "torchtitan_reported_mfu_pct_a100_fallback": 0.19,
+      "mi350x_peak_normalized_mfu_pct": 0.03,
+      "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_selected_state_guard4b_1xmi350_gbs1_noac_fsdp_20260601T000000/docker-run.log"
+    },
+    "s512_4x_fsdp_ep_gbs64": {
+      "run_id": "torchtitan_direct_dsv4_s512_selected_state_guard4b_4xmi350_noac_retry_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+      "checkpoint_enable": false,
+      "checkpoint_directory_created": false,
+      "remote_output_size": "828K",
+      "remote_log_size": "20K",
+      "loss": 12.26200,
+      "grad_norm": 10.3125,
+      "memory_gib": 75.66,
+      "tokens_per_gpu_s_range": [
+        554,
+        557
+      ],
+      "tflops_range": [
+        7.35,
+        7.40
+      ],
+      "torchtitan_reported_mfu_pct_range_a100_fallback": [
+        2.36,
+        2.37
+      ],
+      "mi350x_peak_normalized_mfu_pct_range": [
+        0.32,
+        0.32
+      ],
+      "target_comparison": {
+        "normalized_4x_target_tokens_per_gpu_s_range": [
+          2200,
+          2400
+        ],
+        "normalized_4x_target_node_tokens_per_s_range": [
+          8800,
+          9600
+        ],
+        "observed_node_tokens_per_s_range": [
+          2216,
+          2228
+        ],
+        "observed_ratio_to_target_range": [
+          0.231,
+          0.253
+        ],
+        "target_speedup_needed_range": [
+          3.95,
+          4.33
+        ],
+        "tokens_per_step_at_gbs64_s512": 32768,
+        "observed_step_time_s_range": [
+          14.71,
+          14.79
+        ],
+        "target_step_time_s_range": [
+          3.41,
+          3.72
+        ]
+      },
+      "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_selected_state_guard4b_4xmi350_noac_retry_20260601T000000/docker-run.log"
+    }
+  },
+  "mfu_note": "The raw TorchTitan MFU fields in these runs used the old A100 fallback peak of 312e12. The MI350X-normalized fields use dense BF16 peak 2309.6e12.",
+  "read": "The prior S512 failure was a bounded PyTorch sparse-MLA materialization/backward hazard, not Primus and not generic S512 FSDP/EP. The safe direct TorchTitan fallback now preserves S256 sparse-LI coverage and lets S512 train by falling back on both compressed layers. The 4x S512 guarded run is about 23-25% of the normalized 4xMI350 throughput target, requiring about 4.0-4.3x speedup. Final S4096 still requires a fused sparse MLA/LightningIndexer kernel rather than this materializing fallback."
+}

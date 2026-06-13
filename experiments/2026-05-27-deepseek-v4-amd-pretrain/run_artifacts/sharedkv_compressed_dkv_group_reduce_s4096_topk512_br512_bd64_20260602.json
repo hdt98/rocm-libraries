@@ -1,0 +1,72 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 1848.951904296875,
+    "dkv_atol": 0.75,
+    "max_abs_diff": 0.00014495849609375,
+    "mean_abs_diff": 2.8188736678202986e-07,
+    "passed": true,
+    "reference_norm": 1848.9517822265625
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This diagnostic handles only the compressed prefix route. It uses forward lse/output to recompute per-group probabilities, aggregates block_rows token-head contributions locally, then atomic-adds one D block per compressed group. It tests whether reducing dKV atomic granularity is a promising direction before building a production sparse MLA/LI/compressor fused backward.",
+  "scope": "sparse_mla_shared_latent_kv_compressed_dkv_group_reduce_probe",
+  "seed": 1234,
+  "shape": {
+    "atomic_elements_upper_bound": 134217728,
+    "atomic_vectors_upper_bound": 2097152,
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "materialized_probs_fp32_gib": 0.5,
+    "materialized_shared_selected_kv_fp32_gib": 4.0,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "tile": {
+    "block_d": 64,
+    "block_rows": 512,
+    "d_blocks": 8,
+    "dot_block_d": 64,
+    "row_blocks_max": 512
+  },
+  "timing": {
+    "triton_compressed_dkv_group_reduce": {
+      "checksum_norm": 1848.951904296875,
+      "event": {
+        "enabled": true,
+        "max_ms": 334.2797546386719,
+        "mean_ms": 333.98265584309894,
+        "median_ms": 333.8633728027344,
+        "min_ms": 333.8048400878906,
+        "samples_ms": [
+          334.2797546386719,
+          333.8048400878906,
+          333.8633728027344
+        ],
+        "stdev_ms": 0.25895422457435063
+      },
+      "label": "triton_compressed_dkv_group_reduce",
+      "peak_memory_allocated_bytes": 918555136,
+      "peak_memory_allocated_gib": 0.855471134185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 334.41964793018997,
+        "mean_ms": 334.0836123097688,
+        "median_ms": 333.93721899483353,
+        "min_ms": 333.8939700042829,
+        "samples_ms": [
+          334.41964793018997,
+          333.8939700042829,
+          333.93721899483353
+        ],
+        "stdev_ms": 0.29181770412329916
+      }
+    }
+  }
+}

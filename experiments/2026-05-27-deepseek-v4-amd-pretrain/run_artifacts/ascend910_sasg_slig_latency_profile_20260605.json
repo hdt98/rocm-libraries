@@ -1,0 +1,100 @@
+{
+  "artifact": "ascend910_sasg_slig_latency_profile_20260605",
+  "created_at": "2026-06-05",
+  "remote_node": "ascend-910-dev",
+  "remote_hostname": "A1",
+  "remote_run_dir": "/data2/sonle/dsv4_ascend910_fit_20260601",
+  "hardware_context": {
+    "device": "Ascend 910C",
+    "logical_dies_observed": 16,
+    "hbm_per_die_mb": 65536,
+    "comparison_note": "User maps 8 dual-die Ascend 910C devices to roughly the memory capacity of 4xMI350."
+  },
+  "node_state_at_inspection": {
+    "fresh_profile_run_possible": false,
+    "reason": "All 16 dies were occupied by VLLMWorker_TP processes using about 61 GiB per die, so only existing msprof artifacts were mined."
+  },
+  "profile_source": {
+    "run_id": "bf16_compile_customopp_novirtual_fullac_forcebalance_msprof_delay600_20260602T033625",
+    "profile_dir": "/data2/sonle/dsv4_ascend910_fit_20260601/profiles/bf16_compile_customopp_novirtual_fullac_forcebalance_msprof_delay600_20260602T033625",
+    "training_shape_from_log": {
+      "local_batch_size": 1,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 8,
+      "sequence_length": 4096,
+      "total_steps": 5
+    },
+    "e2e_log_observation": {
+      "best_late_steps_tflops_per_gpu": "73.86-73.91",
+      "best_late_steps_elapsed_s": "11.066-11.074"
+    }
+  },
+  "ascend_shape_specific_msprof_latency_ms": {
+    "sparse_attn_sharedkv_grad_c4_topk512_closest_to_amd_layer2": {
+      "op_type": "SparseAttnSharedkvGrad",
+      "input_shape_signature": "query=[1,4096,64,512], ori_kv=[1,4096,1,512], cmp_kv=[1,1024,1,512], d_out=[1,4096,64,512], out=[1,4096,64,512], lse=[1,4096,64,1], cmp_sparse_indices=[1,4096,1,512]",
+      "calls": 148,
+      "min_ms": 22.984,
+      "median_ms": 25.364,
+      "avg_ms": 25.481,
+      "p90_ms": 27.664,
+      "max_ms": 28.981
+    },
+    "sparse_lightning_indexer_grad_kl_loss": {
+      "op_type": "SparseLightningIndexerGradKLLoss",
+      "input_shape_signature": "q_index=[1,4096,64,512], key_index=[1,1024,1,512], q=[1,4096,64,128], key=[1,1024,1,128], weights=[1,4096,64], topk_indices=[1,4096,1,512]",
+      "calls": 148,
+      "min_ms": 9.731,
+      "median_ms": 9.808,
+      "avg_ms": 9.809,
+      "p90_ms": 9.847,
+      "max_ms": 9.888
+    },
+    "sparse_attn_sharedkv_forward_c4_topk512": {
+      "op_type": "SparseAttnSharedkv",
+      "input_shape_signature": "query=[1,4096,64,512], ori_kv=[1,4096,1,512], cmp_kv=[1,1024,1,512], cmp_sparse_indices=[1,4096,1,512]",
+      "calls": 291,
+      "min_ms": 3.796,
+      "median_ms": 3.951,
+      "avg_ms": 3.972,
+      "p90_ms": 4.118,
+      "max_ms": 4.335
+    },
+    "sparse_attn_sharedkv_grad_no_cmp_shape": {
+      "op_type": "SparseAttnSharedkvGrad",
+      "input_shape_signature": "query=[1,4096,64,512], ori_kv=[1,4096,1,512], cmp_kv=undefined",
+      "calls": 444,
+      "min_ms": 16.96,
+      "median_ms": 19.219,
+      "avg_ms": 19.057,
+      "p90_ms": 21.444,
+      "max_ms": 21.655
+    },
+    "sparse_attn_sharedkv_grad_s3_32_shape": {
+      "op_type": "SparseAttnSharedkvGrad",
+      "input_shape_signature": "query=[1,4096,64,512], ori_kv=[1,4096,1,512], cmp_kv=[1,32,1,512]",
+      "calls": 147,
+      "min_ms": 26.937,
+      "median_ms": 30.441,
+      "avg_ms": 29.834,
+      "p90_ms": 31.515,
+      "max_ms": 34.506
+    }
+  },
+  "combined_backward_bounds_ms": {
+    "c4_topk512_sasg_plus_slig_serial_avg": 35.29,
+    "c4_topk512_sasg_plus_slig_perfect_overlap_lower_bound_avg": 25.481,
+    "note": "SparseLightningIndexerGradKLLoss is a separate op and does not consume d_cmp_kv, so the lower bound is max(SASG, SLIG) if scheduling can overlap them. The existing msprof summary does not prove such overlap."
+  },
+  "amd_comparison_anchors_from_local_artifacts": {
+    "actual_li_layer2_query_major_full_atomic_ms": 11.080920219421387,
+    "actual_li_layer2_no_dkv_ms": 1.974,
+    "actual_li_layer2_global_dkv_accumulation_ms": 8.286,
+    "sparse_li_kl_triton_public_abi_s4096_ms": 4.17,
+    "sources": [
+      "run_artifacts/actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+      "run_artifacts/torchtitan_sparse_li_kl_triton_backend_public_abi_sharedkv_s4096_timing_mi350_20260602.json"
+    ]
+  },
+  "read": "Existing Ascend msprof artifacts are sufficient for a first apples-to-apples full-op comparison at the public operator boundary. The closest C4/topk512 SparseAttnSharedkvGrad row is about 25.5 ms average, plus SparseLightningIndexerGradKLLoss at about 9.8 ms if serialized. Standard msprof does not expose the internal SASG Gather/Cube/Process/Cube/Scatter stage split; that would require operator-internal instrumentation or special build hooks, not just CSV post-processing."
+}

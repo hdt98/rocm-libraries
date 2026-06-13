@@ -1,0 +1,197 @@
+{
+  "artifact": "flash_s4096_split_triton_attention_decision",
+  "created": "2026-05-31",
+  "status": "split_compressed_triton_softmax_promoted_for_attention_candidate",
+  "shape_contract": {
+    "model": "DeepSeek-V4-Flash",
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden_size": 4096,
+    "num_heads": 64,
+    "kv_dim": 512,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "moe_intermediate": 2048,
+    "num_experts": 256,
+    "routed_top_k": 6,
+    "shared_experts": 1,
+    "window_size": 128,
+    "csa_tokens": 1024,
+    "hca_tokens": 32,
+    "keys_excluding_sink": 1184,
+    "keys_including_sink": 1185,
+    "dtype": "bfloat16"
+  },
+  "source_artifacts": {
+    "hf_shape_contract": "deepseek_v4_flash_hf_config_contract_20260531.json",
+    "previous_attention_decision": "flash_s4096_rocprof_and_attention_variant_decision_20260531.json",
+    "baseline_full_layer": "single_layer_flash_s4096_compact_reduce_20260531.json",
+    "baseline_block_profile": "single_layer_flash_s4096_compact_reduce_blocks_20260531.json",
+    "baseline_sparse_mla_backward": "sparse_mla_backward_flash_s4096_20260531.json",
+    "split_small_correctness": "sparse_mla_backward_split_triton_small_check_20260531.json",
+    "split_full_shape_correctness": "sparse_mla_backward_flash_retained_check_split_triton_20260531.json",
+    "split_sparse_mla_backward": "sparse_mla_backward_flash_split_triton_20260531.json",
+    "split_full_layer": "single_layer_flash_s4096_split_triton_20260531.json",
+    "split_block_profile": "single_layer_flash_s4096_split_triton_blocks_20260531.json"
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-split-ch-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "changed_files": [
+      "tools/dsv4_layer_microbench/triton_ops.py",
+      "tools/dsv4_layer_microbench/reference_layer.py",
+      "tools/dsv4_layer_microbench/probe_sparse_mla_backward_ops.py",
+      "tools/dsv4_layer_microbench/run_microbench.py",
+      "tools/dsv4_layer_microbench/profile_microbench.py",
+      "tools/dsv4_layer_microbench/check_correctness.py"
+    ],
+    "read": "Split the softmax backward dot across window, CSA, and HCA branches instead of concatenating CSA+HCA compressed keys into a 1056-lane branch that rounds to a larger block."
+  },
+  "remote_execution": {
+    "node": "do-sonle-kernel",
+    "remote_workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531",
+    "raw_outputs_policy": "Only compact JSON summaries were copied into the repo; raw logs and traces remain under /local/data."
+  },
+  "correctness": {
+    "small_shape": {
+      "source": "sparse_mla_backward_split_triton_small_check_20260531.json",
+      "ok": true,
+      "max_abs": {
+        "out": 0.0001220703125,
+        "q": 0.0000019073486328125,
+        "kv": 0.0,
+        "csa": 0.0,
+        "hca": 0.0,
+        "attn_sink": 0.0
+      },
+      "tolerance": {
+        "atol": 0.02,
+        "rtol": 0.02
+      }
+    },
+    "full_flash_shape": {
+      "source": "sparse_mla_backward_flash_retained_check_split_triton_20260531.json",
+      "ok": true,
+      "max_abs": {
+        "out": 0.0001220703125,
+        "q": 0.0000019073486328125,
+        "kv": 0.000030517578125,
+        "csa": 0.00000762939453125,
+        "hca": 0.00048828125,
+        "attn_sink": 0.000000014901161193847656
+      },
+      "tolerance": {
+        "atol": 0.02,
+        "rtol": 0.02
+      },
+      "timing_read": "This correctness-only command used warmup=0, so its 1464.77 ms compile-included timing is ignored."
+    }
+  },
+  "isolated_sparse_mla_backward": {
+    "baseline": {
+      "source": "sparse_mla_backward_flash_s4096_20260531.json",
+      "variant": "retained",
+      "median_ms": 5.068769931793213,
+      "mean_ms": 5.211424986521403,
+      "largest_primitive_medians_ms": {
+        "softmax_backward_scores": 1.2538520097732544,
+        "compressed_grad_probs": 0.7993280291557312,
+        "compressed_grad_from_probs": 0.7925670146942139,
+        "grad_compressed_q_add": 0.5521649718284607,
+        "grad_selected_q_add": 0.5058850049972534,
+        "grad_q_compressed_add": 0.5020449757575989
+      }
+    },
+    "split_compressed_triton_softmax": {
+      "source": "sparse_mla_backward_flash_split_triton_20260531.json",
+      "median_ms": 4.638721942901611,
+      "mean_ms": 4.752536296844482,
+      "min_ms": 4.565561771392822,
+      "max_ms": 5.053325176239014,
+      "delta_vs_baseline_median_ms": -0.43004798889160156,
+      "ratio_vs_baseline_median": 0.9151573271861916,
+      "improvement_vs_baseline_median_pct": 8.484267281380841
+    }
+  },
+  "full_layer": {
+    "target_full_layer_ms": 24.9,
+    "baseline": {
+      "source": "single_layer_flash_s4096_compact_reduce_20260531.json",
+      "avg_ms": 31.697463981496792,
+      "min_ms": 31.495711067691445,
+      "tokens_per_s": 129221.69427784556,
+      "estimated_tflops": 280.48244830910835
+    },
+    "split_compressed_triton_softmax": {
+      "source": "single_layer_flash_s4096_split_triton_20260531.json",
+      "avg_ms": 31.398327322676778,
+      "min_ms": 31.2746309209615,
+      "tokens_per_s": 130452.80909094003,
+      "estimated_tflops": 283.154647422857,
+      "delta_vs_baseline_avg_ms": -0.2991366588200144,
+      "improvement_vs_baseline_avg_pct": 0.9437242644857458,
+      "delta_vs_baseline_min_ms": -0.22108014672994614,
+      "improvement_vs_baseline_min_pct": 0.7019373090348502,
+      "time_ratio_to_target": 1.260977000910714,
+      "throughput_fraction_of_target": 0.7930358755772478
+    }
+  },
+  "block_attribution": {
+    "read": "Single-iteration profiling has overhead and variance; use deltas to prioritize, not as pass/fail timing.",
+    "baseline_source": "single_layer_flash_s4096_compact_reduce_blocks_20260531.json",
+    "split_source": "single_layer_flash_s4096_split_triton_blocks_20260531.json",
+    "phase_ms": {
+      "baseline": {
+        "forward": 13.848819071426988,
+        "backward": 20.366013050079346,
+        "loss": 0.09894999675452709,
+        "total": 34.31378211826086
+      },
+      "split_compressed_triton_softmax": {
+        "forward": 14.338045031763613,
+        "backward": 19.88432602956891,
+        "loss": 0.09683007374405861,
+        "total": 34.31920113507658
+      }
+    },
+    "attention_backward_ms": {
+      "dgrad_baseline": 8.473509922623634,
+      "dgrad_split": 8.067623944953084,
+      "dgrad_delta_ms": -0.40588597767055035,
+      "wgrad_baseline": 8.681330014951527,
+      "wgrad_split": 8.397183031775057,
+      "wgrad_delta_ms": -0.2841469831764698,
+      "sparse_mla_dgrad_qkv_baseline": 4.905959009192884,
+      "sparse_mla_dgrad_qkv_split": 4.543525050394237,
+      "sparse_mla_dgrad_qkv_delta_ms": -0.3624339587986469,
+      "sparse_mla_sink_wgrad_baseline": 4.965819069184363,
+      "sparse_mla_sink_wgrad_split": 4.5609259977936745,
+      "sparse_mla_sink_wgrad_delta_ms": -0.4048930713906884
+    },
+    "moe_backward_ms": {
+      "routed_dgrad_baseline": 9.989417041651905,
+      "routed_dgrad_split": 9.910927969031036,
+      "routed_wgrad_baseline": 9.907177998684347,
+      "routed_wgrad_split": 9.847118053585291
+    }
+  },
+  "decision": {
+    "promote_attention_variant": "split_compressed_triton_softmax",
+    "why": [
+      "Full Flash-shape correctness matches retained within bf16 tolerance.",
+      "Isolated sparse MLA backward improves median time by 0.43 ms, or 8.48%, versus the retained primitive-profile baseline.",
+      "Integrated full-layer timing improves by 0.30 ms average and 0.22 ms minimum without changing the MoE implementation.",
+      "Block attribution shows the win lands in sparse MLA backward dgrad/sink-wgrad, which was the intended hot path."
+    ],
+    "not_done": [
+      "Full-layer S=4096 is still 31.40 ms versus the 24.9 ms aspirational single-layer target.",
+      "Attention backward still spends about 4.54 ms in sparse_mla.dgrad_qkv and 4.56 ms in sparse_mla.sink_wgrad.",
+      "MoE routed dgrad/wgrad remain about 9.9 ms each; the next large step is routed-token dispatch/packing/combine and backward integration, not a selector-only attention tweak."
+    ],
+    "next_optimization_priority": [
+      "Fuse more of sparse MLA backward around score softmax, compressed branch gradient accumulation, and q/kv add reductions.",
+      "Continue MoE compact routed backward work, especially packing/combine and grouped-ragged dgrad/wgrad integration.",
+      "Use this split attention implementation as the attention candidate for the next full-layer comparison."
+    ]
+  }
+}

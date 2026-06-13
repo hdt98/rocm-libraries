@@ -1,0 +1,63 @@
+{
+  "schema": "dsv4_sparse_mla_full_sharedkv_split_union_compressed_decision",
+  "created_at": "2026-06-05",
+  "node": "do-sonle-kernel",
+  "gpu": "MI350",
+  "container": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "source_script": "tools/dsv4_runtime_probe/benchmark_sparse_mla_full_sharedkv_split_union_compressed.py",
+  "question": "Does the compressed-only union dKV split materialize when measured against the actual full shared-KV attention contract with local-window plus compressed indices?",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "window": 128,
+    "topk": 512,
+    "selected_keys_full": 640,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "token_block": 4,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "block_d": 128
+  },
+  "artifacts": {
+    "timing": "run_artifacts/sparse_mla_full_sharedkv_split_union_compressed_s4096_layer2_t4_u256_20260605.json",
+    "correctness": "run_artifacts/sparse_mla_full_sharedkv_split_union_compressed_s4096_layer2_t4_u256_correctness_20260605.json",
+    "compressed_only_split": "run_artifacts/sparse_mla_query_major_selected_dq_union_dkv_parallel_t4k512_u256_s4096_layer2_20260605.json"
+  },
+  "timing_ms": {
+    "retained_sparse_attention_backward_gate": 11.1347,
+    "compressed_only_serial_split": 10.740462303161621,
+    "full_sharedkv_split_boundary": 13.316407203674316,
+    "full_dq_no_dkv": 4.121997833251953,
+    "local_dkv_only_full": 2.093179941177368,
+    "compressed_union_dkv_only_full": 7.468911170959473
+  },
+  "correctness": {
+    "checked": true,
+    "passed": true,
+    "dq_max_abs_diff": 0.0077648162841796875,
+    "dkv_max_abs_diff": 0.05084228515625,
+    "dkv_atol": 1.0
+  },
+  "decision": {
+    "compressed_only_split": "kept_as_diagnostic",
+    "full_sharedkv_split": "rejected_for_materialization",
+    "e2e_tflops_run": "not_run_because_full_sharedkv_latency_regressed_vs_gate",
+    "promoted_kernel_boundary": false
+  },
+  "read": [
+    "The compressed-only split can beat the compressed-only retained gate, but the actual full shared-KV contract includes a 128-token local window plus 512 compressed LI groups.",
+    "Once dQ is computed over all 640 selected keys and local dKV is added, the split boundary is 13.32 ms, slower than the retained 11.13 ms sparse-attention backward gate.",
+    "This closes the immediate materialization branch: launching separate dQ/local-dKV/compressed-union-dKV kernels is not a valid TorchTitan/e2e promotion path.",
+    "The next viable sparse-attention kernel has to share the QK/P/scaled-dP producer across full dQ, local dKV, and compressed group-aware dKV, ideally in a HIP/CK/rocWMMA cooperative owner rather than a multi-launch Triton split."
+  ],
+  "next": [
+    "Do not wire this full split into TorchTitan as the promoted backend; it would likely reduce e2e TFLOPs.",
+    "Use the full-contract numbers to size the cooperative kernel: recover about 2.2-2.9 ms by eliminating repeated producer work and the local+compressed dKV add before this branch beats the retained gate materially.",
+    "Continue the low-level cooperative owner path where the score tile is consumed before HBM and dKV epilogue is group-aware within the same producer."
+  ]
+}

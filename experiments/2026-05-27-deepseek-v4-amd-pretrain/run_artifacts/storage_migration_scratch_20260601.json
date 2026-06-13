@@ -1,0 +1,35 @@
+{
+  "status": "migrated_to_scratch",
+  "date": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "source_before_migration": "/local/data/sonle5/dsv4_pretrain_canary_20260527",
+  "canonical_root_after_migration": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "compatibility_path": "/local/data/sonle5/dsv4_pretrain_canary_20260527",
+  "compatibility_path_state": "symlink",
+  "compatibility_path_target": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "scratch_payload_size": "959G",
+  "post_migration_df": {
+    "/": {
+      "size": "2.0T",
+      "used": "924G",
+      "available": "1.1T",
+      "use_percent": "47%"
+    },
+    "/scratch": {
+      "size": "40T",
+      "used": "1007G",
+      "available": "37T",
+      "use_percent": "3%"
+    }
+  },
+  "verification": {
+    "readlink_f": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "legacy_path_du": "0",
+    "s4096_parity_artifact_present_via_legacy_path": true
+  },
+  "notes": [
+    "Initial rsync copied about 1.03 TB and exited with code 24 because transient files vanished while walking the tree.",
+    "Before a second pass could run from the original path, the source was moved to a delete-pending path and then removed by external cleanup.",
+    "The scratch mirror contains the full active payload and the legacy path now resolves to scratch for older launch commands."
+  ]
+}

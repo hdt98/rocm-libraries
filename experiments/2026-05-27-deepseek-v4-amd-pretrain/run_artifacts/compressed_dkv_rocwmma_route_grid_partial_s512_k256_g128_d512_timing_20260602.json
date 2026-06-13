@@ -1,0 +1,109 @@
+{
+  "artifact": "compressed_dkv_rocwmma_route_grid_probe",
+  "scope": "full_grid_token_selected_d16_rocwmma_with_raw_vs_tile_local_grouped_global_atomics",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "seq_len": 512,
+    "topk": 256,
+    "selected_rows": 131072,
+    "h_dim": 64,
+    "d_dim": 512,
+    "token_block": 32,
+    "selected_block": 256,
+    "d_tile": 16,
+    "group_count": 128,
+    "route_pattern": "modulo",
+    "formula": "out[g,d] = sum_{t,k:group[t,k]=g} (dL_scaled[t,k,H] @ Q[t,H,d] + P[t,k,H] @ dO[t,H,d])"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 0.5941793469246477,
+  "extension_dir": "/workspace/cache/torch_extensions_rocwmma_route_grid_partial_smoke",
+  "write_model": {
+    "token_tiles": 16,
+    "selected_tiles": 1,
+    "d_blocks": 32,
+    "raw_scalar_writes": 67108864,
+    "grouped_scalar_writes": 1048576,
+    "partial_dense_scalar_writes": 1048576,
+    "tile_group_rows": 2048,
+    "min_tile_groups": 128,
+    "max_tile_groups": 128,
+    "modeled_write_reduction_x": 64.0,
+    "partial_dense_write_reduction_x": 64.0
+  },
+  "parity": {
+    "skipped": true,
+    "raw_vs_grouped_max_abs_diff": 4.38690185546875e-05,
+    "raw_vs_partial_reduce_max_abs_diff": 4.38690185546875e-05
+  },
+  "timing_ms": {
+    "raw_atomic": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "median_ms": 1.447018027305603,
+      "min_ms": 1.4234189987182617,
+      "max_ms": 1.4524990320205688,
+      "mean_ms": 1.4411704063415527
+    },
+    "grouped_atomic": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "median_ms": 1.1481349468231201,
+      "min_ms": 1.1446950435638428,
+      "max_ms": 1.1503349542617798,
+      "mean_ms": 1.1479670047760009
+    },
+    "grouped_partial_emit": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "median_ms": 1.142295002937317,
+      "min_ms": 1.1420949697494507,
+      "max_ms": 1.149454951286316,
+      "mean_ms": 1.1438469648361207
+    },
+    "grouped_partial_reduce": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "median_ms": 0.008520999923348427,
+      "min_ms": 0.007319999858736992,
+      "max_ms": 0.01759999990463257,
+      "mean_ms": 0.010120199993252754
+    },
+    "grouped_partial_emit_plus_reduce": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "median_ms": 1.1478149890899658,
+      "min_ms": 1.1472150087356567,
+      "max_ms": 1.1540549993515015,
+      "mean_ms": 1.1492709875106812
+    },
+    "grouped_vs_raw_speedup_x": 1.2603205148571515,
+    "partial_emit_vs_grouped_atomic_speedup_x": 1.0051124655809456,
+    "partial_emit_plus_reduce_vs_grouped_atomic_speedup_x": 1.0002787537505569
+  },
+  "tensor_stats": {
+    "raw_candidate": {
+      "norm": 1871.6492919921875,
+      "max_abs": 32.46714782714844,
+      "mean_abs": 5.794734477996826
+    },
+    "grouped_candidate": {
+      "norm": 1871.6492919921875,
+      "max_abs": 32.467166900634766,
+      "mean_abs": 5.794734477996826
+    },
+    "partial_reduced_candidate": {
+      "norm": 1871.6492919921875,
+      "max_abs": 32.4671630859375,
+      "mean_abs": 5.794734477996826
+    }
+  },
+  "read": "This probe tests whether the local grouped-reduction contract keeps working when expanded from one CTA to a full token/selected/D grid. It still materializes diagnostic probabilities and grad logits, and can either use grouped global atomics or emit grouped route-tile partials for a separate reduction, so it is a schedule-pressure probe rather than the final fused sparse-MLA/LI backward kernel."
+}

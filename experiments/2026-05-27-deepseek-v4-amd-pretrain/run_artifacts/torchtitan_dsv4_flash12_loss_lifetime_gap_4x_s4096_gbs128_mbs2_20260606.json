@@ -1,0 +1,345 @@
+{
+  "artifact_type": "loss_lifetime_gap_attribution",
+  "created_at": "2026-06-06",
+  "purpose": "Attribute the current 12-layer MBS2 forward/backward wrapper residual using exact additive sidecar timing, and connect it to the earlier drop-original-loss lifetime probe.",
+  "source_profile_artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_20260606.json",
+  "source_profile_run_id": "torchtitan_dsv4_flash12_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW",
+    "tokens_per_step": 524288
+  },
+  "raw_timing_logs": {
+    "remote_additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/additive_timing.jsonl",
+    "remote_mori_aiter_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_aiter_timing.jsonl",
+    "remote_dsv4_profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_compact_ptgmm_expertrecompute_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/dsv4_profile_timing.jsonl",
+    "local_parse_dir": "/tmp/dsv4_expertrecompute_profile"
+  },
+  "logged_step2": {
+    "step": 2,
+    "loss": 9.84507,
+    "grad_norm": 76.5,
+    "tokens_per_gpu_s_values": [
+      3817,
+      3817,
+      3817,
+      3817
+    ],
+    "tokens_per_gpu_s_mean": 3817.0,
+    "node_tokens_s_mean": 15268.0,
+    "tflops_per_gpu_values": [
+      193.24,
+      193.24,
+      193.24,
+      193.24
+    ],
+    "tflops_per_gpu_mean": 193.24,
+    "memory_gib_values": [
+      217.33,
+      218.06,
+      217.24,
+      218.14
+    ],
+    "memory_gib_max": 218.14,
+    "mfu_percent_mean": 8.37
+  },
+  "profile_overhead_vs_retained_non_profile_candidate": {
+    "retained_artifact": "run_artifacts/torchtitan_dsv4_flash12_aiter_compact_ptgmm_expertrecompute_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+    "retained_step2_tokens_per_gpu_s": 3937.0,
+    "retained_step2_tflops_per_gpu": 199.33,
+    "retained_steps_2_to_6_tokens_per_gpu_s": 3925.6,
+    "retained_steps_2_to_6_tflops_per_gpu": 198.74,
+    "retained_steps_4_to_6_tokens_per_gpu_s": 3928.0,
+    "profile_step2_tokens_per_gpu_s": 3817.0,
+    "profile_step2_tflops_per_gpu": 193.24,
+    "profile_step2_peak_memory_gib": 218.14,
+    "profile_step2_overhead_vs_retained_step2_tokens_pct": -3.05,
+    "profile_step2_overhead_vs_retained_steps_2_to_6_tokens_pct": -2.77
+  },
+  "step2_phase_rankmax_s": {
+    "step_train_step": {
+      "rank_max_s": 34.323292,
+      "rank_mean_s": 34.322588,
+      "max_local_rank": 3
+    },
+    "microbatch_forward_backward": {
+      "rank_max_s": 33.744335,
+      "rank_mean_s": 33.739259,
+      "max_local_rank": 2
+    },
+    "forward_backward_call": {
+      "rank_max_s": 33.742445,
+      "rank_mean_s": 33.737068,
+      "max_local_rank": 2
+    },
+    "model_forward": {
+      "rank_max_s": 7.771192,
+      "rank_mean_s": 7.757495,
+      "max_local_rank": 0
+    },
+    "loss": {
+      "rank_max_s": 0.980709,
+      "rank_mean_s": 0.979814,
+      "max_local_rank": 0
+    },
+    "backward": {
+      "rank_max_s": 19.587732,
+      "rank_mean_s": 19.587355,
+      "max_local_rank": 0
+    },
+    "post_dataloading_process": {
+      "rank_max_s": 0.008909,
+      "rank_mean_s": 0.007816,
+      "max_local_rank": 3
+    },
+    "train_context_exit": {
+      "rank_max_s": 0.000677,
+      "rank_mean_s": 0.000658,
+      "max_local_rank": 3
+    },
+    "post_backward_finalize": {
+      "rank_max_s": 0.000407,
+      "rank_mean_s": 0.000382,
+      "max_local_rank": 1
+    },
+    "release_tensors": {
+      "rank_max_s": 0.0005,
+      "rank_mean_s": 0.000467,
+      "max_local_rank": 3
+    },
+    "return_loss": {
+      "rank_max_s": 0.000451,
+      "rank_mean_s": 0.000423,
+      "max_local_rank": 1
+    },
+    "forward_backward_call_returned": {
+      "rank_max_s": 0.000911,
+      "rank_mean_s": 0.000743,
+      "max_local_rank": 0
+    }
+  },
+  "derived_step2_wrapper_residual_s_by_rank": {
+    "1": 5.420846,
+    "2": 5.436187,
+    "0": 5.393713,
+    "3": 5.407634
+  },
+  "total_phase_sync_s_by_rank": {
+    "1": 1.344784,
+    "2": 1.330863,
+    "0": 1.335552,
+    "3": 1.321003
+  },
+  "microbatch_rankmax_gap_after_return_loss": [
+    {
+      "microbatch": 0,
+      "max_residual_local_rank": 3,
+      "outer_microbatch_forward_backward_s": 2.067431,
+      "model_forward_s": 0.748186,
+      "loss_s": 0.060623,
+      "backward_s": 1.257353,
+      "derived_residual_s": 0.00127,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.000395,
+      "gap_after_return_loss_to_call_returned_start_s": 0.000412
+    },
+    {
+      "microbatch": 1,
+      "max_residual_local_rank": 3,
+      "outer_microbatch_forward_backward_s": 2.171645,
+      "model_forward_s": 0.469413,
+      "loss_s": 0.061236,
+      "backward_s": 1.263697,
+      "derived_residual_s": 0.377299,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.376343,
+      "gap_after_return_loss_to_call_returned_start_s": 0.376385
+    },
+    {
+      "microbatch": 2,
+      "max_residual_local_rank": 0,
+      "outer_microbatch_forward_backward_s": 2.114145,
+      "model_forward_s": 0.463945,
+      "loss_s": 0.061206,
+      "backward_s": 1.220785,
+      "derived_residual_s": 0.368208,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.366841,
+      "gap_after_return_loss_to_call_returned_start_s": 0.366872
+    },
+    {
+      "microbatch": 3,
+      "max_residual_local_rank": 1,
+      "outer_microbatch_forward_backward_s": 2.099548,
+      "model_forward_s": 0.463567,
+      "loss_s": 0.061037,
+      "backward_s": 1.213171,
+      "derived_residual_s": 0.361773,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.360695,
+      "gap_after_return_loss_to_call_returned_start_s": 0.360732
+    },
+    {
+      "microbatch": 4,
+      "max_residual_local_rank": 1,
+      "outer_microbatch_forward_backward_s": 2.104955,
+      "model_forward_s": 0.461274,
+      "loss_s": 0.06146,
+      "backward_s": 1.217741,
+      "derived_residual_s": 0.36448,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.363184,
+      "gap_after_return_loss_to_call_returned_start_s": 0.363215
+    },
+    {
+      "microbatch": 5,
+      "max_residual_local_rank": 2,
+      "outer_microbatch_forward_backward_s": 2.119604,
+      "model_forward_s": 0.470146,
+      "loss_s": 0.061287,
+      "backward_s": 1.21214,
+      "derived_residual_s": 0.376031,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.374701,
+      "gap_after_return_loss_to_call_returned_start_s": 0.374739
+    },
+    {
+      "microbatch": 6,
+      "max_residual_local_rank": 1,
+      "outer_microbatch_forward_backward_s": 2.095111,
+      "model_forward_s": 0.468967,
+      "loss_s": 0.06137,
+      "backward_s": 1.212731,
+      "derived_residual_s": 0.352043,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.350785,
+      "gap_after_return_loss_to_call_returned_start_s": 0.350833
+    },
+    {
+      "microbatch": 7,
+      "max_residual_local_rank": 1,
+      "outer_microbatch_forward_backward_s": 2.117438,
+      "model_forward_s": 0.46453,
+      "loss_s": 0.06133,
+      "backward_s": 1.220435,
+      "derived_residual_s": 0.371144,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.370042,
+      "gap_after_return_loss_to_call_returned_start_s": 0.370081
+    },
+    {
+      "microbatch": 8,
+      "max_residual_local_rank": 2,
+      "outer_microbatch_forward_backward_s": 2.109093,
+      "model_forward_s": 0.467656,
+      "loss_s": 0.061201,
+      "backward_s": 1.215584,
+      "derived_residual_s": 0.364652,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.363375,
+      "gap_after_return_loss_to_call_returned_start_s": 0.363411
+    },
+    {
+      "microbatch": 9,
+      "max_residual_local_rank": 2,
+      "outer_microbatch_forward_backward_s": 2.118505,
+      "model_forward_s": 0.466869,
+      "loss_s": 0.061357,
+      "backward_s": 1.22146,
+      "derived_residual_s": 0.36882,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.367528,
+      "gap_after_return_loss_to_call_returned_start_s": 0.367557
+    },
+    {
+      "microbatch": 10,
+      "max_residual_local_rank": 3,
+      "outer_microbatch_forward_backward_s": 2.112736,
+      "model_forward_s": 0.470756,
+      "loss_s": 0.061223,
+      "backward_s": 1.21669,
+      "derived_residual_s": 0.364068,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.361127,
+      "gap_after_return_loss_to_call_returned_start_s": 0.361162
+    },
+    {
+      "microbatch": 11,
+      "max_residual_local_rank": 3,
+      "outer_microbatch_forward_backward_s": 2.13341,
+      "model_forward_s": 0.466644,
+      "loss_s": 0.061169,
+      "backward_s": 1.225128,
+      "derived_residual_s": 0.380469,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.379234,
+      "gap_after_return_loss_to_call_returned_start_s": 0.379267
+    },
+    {
+      "microbatch": 12,
+      "max_residual_local_rank": 3,
+      "outer_microbatch_forward_backward_s": 2.111917,
+      "model_forward_s": 0.463214,
+      "loss_s": 0.061208,
+      "backward_s": 1.225153,
+      "derived_residual_s": 0.362343,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.360879,
+      "gap_after_return_loss_to_call_returned_start_s": 0.360916
+    },
+    {
+      "microbatch": 13,
+      "max_residual_local_rank": 1,
+      "outer_microbatch_forward_backward_s": 2.090557,
+      "model_forward_s": 0.468931,
+      "loss_s": 0.061125,
+      "backward_s": 1.219795,
+      "derived_residual_s": 0.340706,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.339438,
+      "gap_after_return_loss_to_call_returned_start_s": 0.339475
+    },
+    {
+      "microbatch": 14,
+      "max_residual_local_rank": 2,
+      "outer_microbatch_forward_backward_s": 2.09961,
+      "model_forward_s": 0.464761,
+      "loss_s": 0.061388,
+      "backward_s": 1.221164,
+      "derived_residual_s": 0.352298,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.350759,
+      "gap_after_return_loss_to_call_returned_start_s": 0.350796
+    },
+    {
+      "microbatch": 15,
+      "max_residual_local_rank": 2,
+      "outer_microbatch_forward_backward_s": 2.109812,
+      "model_forward_s": 0.464966,
+      "loss_s": 0.06136,
+      "backward_s": 1.224298,
+      "derived_residual_s": 0.359188,
+      "gap_after_return_loss_to_forward_backward_call_end_s": 0.357723,
+      "gap_after_return_loss_to_call_returned_start_s": 0.357767
+    }
+  ],
+  "microbatch_gap_stats_excluding_mb0_s": {
+    "residual_min": 0.340706,
+    "residual_median": 0.36448,
+    "residual_max": 0.380469,
+    "gap_after_return_loss_to_call_returned_start_min": 0.339475,
+    "gap_after_return_loss_to_call_returned_start_median": 0.363215,
+    "gap_after_return_loss_to_call_returned_start_max": 0.379267
+  },
+  "corroborating_existing_lifetime_probes": {
+    "return_detached_loss_negative_control": "run_artifacts/torchtitan_return_detached_loss_probe_ep8_s4096_gbs128_20260603.json",
+    "drop_original_loss_localization": "run_artifacts/torchtitan_drop_original_loss_probe_ep8_s4096_gbs128_20260603.json",
+    "drop_original_loss_read": "Explicitly deleting the original graph-bearing loss before return moved the prior 4.6-4.9s wrapper residual into forward_backward.drop_original_loss and collapsed remaining call-boundary residual to about 5 ms on the EP8 diagnostic shape."
+  },
+  "read": [
+    "The current 12-layer retained-candidate profile has a 5.4047s rank-max microbatch wrapper/residual in step 2: microbatch fwd/bwd 33.7443s minus forward 7.7712s, loss 0.9807s, and backward 19.5877s.",
+    "The residual repeats after microbatch 0: microbatches 1-15 show about 0.341-0.380s each, and the gap sits after forward_backward.return_loss before train_step.forward_backward_call fully unwinds.",
+    "Tiny named phases around the boundary are sub-ms rank-max totals: return_loss 0.000451s, release_tensors 0.000494s, post_backward_finalize 0.000406s, train_context_exit 0.000689s, and call_returned 0.000911s.",
+    "This signature matches the earlier drop-original-loss probe: the hidden work is graph-bearing loss lifetime release / autograd-FSDP allocator free-path work, not MORI route packing, not compact prepare_ops, and not scalar loss-return bookkeeping.",
+    "This artifact names the bucket but does not promote a throughput change. For performance, keep focus on fused compact owner-rank MoE backward and sparse attention backward; only return to this residual if pursuing FSDP/autograd/allocator lifetime changes."
+  ],
+  "decision": "diagnostic_attribution_only_not_a_promoted_throughput_candidate"
+}

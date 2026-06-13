@@ -1,0 +1,846 @@
+{
+  "artifact": "mori_hot_expert_replication_plan",
+  "bad_jsonl_lines": 0,
+  "bottom_line": "If the selected remote-hot row counts are large and critical owner rows drop materially, the next AMD implementation target is not another dispatch/combine tuple sweep. It is a hot-expert helper-compute path: broadcast selected W13/W2, compute remote-hot owner VJP rows on source ranks, reduce dW13/dW2 to the true owner, and remeasure e2e tok/s.",
+  "call_count": 96,
+  "complete_call_count": 96,
+  "date": "2026-06-06",
+  "ep_size": 8,
+  "expert_tensor_model": {
+    "dtype_bytes": 2,
+    "ffn_hidden_size": 2048,
+    "hidden_size": 4096,
+    "w13_plus_w2_tensor_mib_per_expert": 48.0
+  },
+  "model": {
+    "hot_expert_selection": "For each call, choose the owner rank with max modeled rows, then choose that owner's largest remaining expert. Move that expert's rows to their source ranks according to the recorded source-rank histogram, matching the load update in MindSpeed balanced_moe.",
+    "remote_hot_rows": "Rows for a selected hot expert whose source rank differs from the expert owner rank. Ascend computes these on helper/source ranks after hot weight broadcast, then reduces weight grads back."
+  },
+  "record_count": 768,
+  "record_kinds": [
+    "standard_ep_hot_expert_stats"
+  ],
+  "scope": "Replay MindSpeed balanced_moe-style greedy hot-expert selection on AMD hot-expert telemetry. This is a planning artifact, not a materialized training-throughput result.",
+  "source_jsonl": "/tmp/dsv4_stage1_recompute_cached12_hotexpert_timing_20260606.jsonl",
+  "topn": {
+    "1": {
+      "approx_two_collective_tensor_payload_mib_per_call": 96.0,
+      "call_count": 96,
+      "critical_owner_row_reduction_pct_mean": 10.914778843535638,
+      "critical_owner_rows_after": {
+        "count": 96,
+        "max": 169724.0,
+        "mean": 138704.85416666666,
+        "min": 109541.0,
+        "p50": 137592.0,
+        "p90": 165210.5,
+        "p99": 169096.05
+      },
+      "critical_owner_rows_before": {
+        "count": 96,
+        "max": 230219.0,
+        "mean": 155699.0625,
+        "min": 120244.0,
+        "p50": 149643.0,
+        "p90": 194136.0,
+        "p99": 227932.34999999998
+      },
+      "critical_owner_rows_saved": {
+        "count": 96,
+        "max": 80716.0,
+        "mean": 16994.208333333332,
+        "min": -2573.0,
+        "p50": 11520.0,
+        "p90": 49795.5,
+        "p99": 79808.75
+      },
+      "hot_weight_tensor_mib_per_expert": 48.0,
+      "max_over_mean_after": {
+        "count": 96,
+        "max": 1.7265218098958333,
+        "mean": 1.4109787411159938,
+        "min": 1.1143086751302083,
+        "p50": 1.399658203125,
+        "p90": 1.6806081136067708,
+        "p99": 1.7201339721679687
+      },
+      "max_over_mean_before": {
+        "count": 96,
+        "max": 2.3419087727864585,
+        "mean": 1.583852767944336,
+        "min": 1.2231852213541667,
+        "p50": 1.522247314453125,
+        "p90": 1.974853515625,
+        "p99": 2.318647766113281
+      },
+      "missing_source_hist_per_call": {
+        "count": 96,
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 0.0
+      },
+      "payload_note": "One hot expert tensor contains W13 plus W2, modeled as 3*hidden*ffn_hidden*dtype_bytes. The two-collective payload is a per-rank tensor-size lower-bound for broadcast plus grad reduce, not a topology-specific network-byte model.",
+      "selected_hot_experts_per_call": {
+        "count": 96,
+        "max": 1.0,
+        "mean": 1.0,
+        "min": 1.0,
+        "p50": 1.0,
+        "p90": 1.0,
+        "p99": 1.0
+      },
+      "selected_hot_rows_per_call": {
+        "count": 96,
+        "max": 122158.0,
+        "mean": 45175.427083333336,
+        "min": 12556.0,
+        "p50": 28386.5,
+        "p90": 101650.0,
+        "p99": 121094.95
+      },
+      "selected_max_helper_rows_per_call": {
+        "count": 96,
+        "max": 15502.0,
+        "mean": 6048.510416666667,
+        "min": 1691.0,
+        "p50": 3947.5,
+        "p90": 13080.0,
+        "p99": 15398.45
+      },
+      "selected_remote_hot_rows_per_call": {
+        "count": 96,
+        "max": 106812.0,
+        "mean": 39589.885416666664,
+        "min": 10772.0,
+        "p50": 24861.5,
+        "p90": 89049.5,
+        "p99": 106146.05
+      }
+    },
+    "2": {
+      "approx_two_collective_tensor_payload_mib_per_call": 192.0,
+      "call_count": 96,
+      "critical_owner_row_reduction_pct_mean": 15.084340718707494,
+      "critical_owner_rows_after": {
+        "count": 96,
+        "max": 168688.0,
+        "mean": 132212.88541666666,
+        "min": 106625.0,
+        "p50": 128809.5,
+        "p90": 158949.5,
+        "p99": 168354.55000000002
+      },
+      "critical_owner_rows_before": {
+        "count": 96,
+        "max": 230219.0,
+        "mean": 155699.0625,
+        "min": 120244.0,
+        "p50": 149643.0,
+        "p90": 194136.0,
+        "p99": 227932.34999999998
+      },
+      "critical_owner_rows_saved": {
+        "count": 96,
+        "max": 85279.0,
+        "mean": 23486.177083333332,
+        "min": -10925.0,
+        "p50": 15377.5,
+        "p90": 64296.5,
+        "p99": 84263.45
+      },
+      "hot_weight_tensor_mib_per_expert": 48.0,
+      "max_over_mean_after": {
+        "count": 96,
+        "max": 1.7159830729166667,
+        "mean": 1.3449390199449327,
+        "min": 1.0846455891927083,
+        "p50": 1.3103179931640625,
+        "p90": 1.616917928059896,
+        "p99": 1.712591044108073
+      },
+      "max_over_mean_before": {
+        "count": 96,
+        "max": 2.3419087727864585,
+        "mean": 1.583852767944336,
+        "min": 1.2231852213541667,
+        "p50": 1.522247314453125,
+        "p90": 1.974853515625,
+        "p99": 2.318647766113281
+      },
+      "missing_source_hist_per_call": {
+        "count": 96,
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 0.0
+      },
+      "payload_note": "One hot expert tensor contains W13 plus W2, modeled as 3*hidden*ffn_hidden*dtype_bytes. The two-collective payload is a per-rank tensor-size lower-bound for broadcast plus grad reduce, not a topology-specific network-byte model.",
+      "selected_hot_experts_per_call": {
+        "count": 96,
+        "max": 2.0,
+        "mean": 2.0,
+        "min": 2.0,
+        "p50": 2.0,
+        "p90": 2.0,
+        "p99": 2.0
+      },
+      "selected_hot_rows_per_call": {
+        "count": 96,
+        "max": 238257.0,
+        "mean": 88424.88541666667,
+        "min": 23755.0,
+        "p50": 55248.5,
+        "p90": 165916.0,
+        "p99": 236804.45
+      },
+      "selected_max_helper_rows_per_call": {
+        "count": 96,
+        "max": 15502.0,
+        "mean": 6832.322916666667,
+        "min": 1792.0,
+        "p50": 4178.5,
+        "p90": 13471.0,
+        "p99": 15398.45
+      },
+      "selected_remote_hot_rows_per_call": {
+        "count": 96,
+        "max": 208227.0,
+        "mean": 77426.77083333333,
+        "min": 20789.0,
+        "p50": 48323.0,
+        "p90": 145264.0,
+        "p99": 207518.3
+      }
+    },
+    "4": {
+      "approx_two_collective_tensor_payload_mib_per_call": 384.0,
+      "call_count": 96,
+      "critical_owner_row_reduction_pct_mean": 22.21716438829981,
+      "critical_owner_rows_after": {
+        "count": 96,
+        "max": 141581.0,
+        "mean": 121107.14583333333,
+        "min": 107112.0,
+        "p50": 118515.5,
+        "p90": 133477.5,
+        "p99": 141099.35
+      },
+      "critical_owner_rows_before": {
+        "count": 96,
+        "max": 230219.0,
+        "mean": 155699.0625,
+        "min": 120244.0,
+        "p50": 149643.0,
+        "p90": 194136.0,
+        "p99": 227932.34999999998
+      },
+      "critical_owner_rows_saved": {
+        "count": 96,
+        "max": 104225.0,
+        "mean": 34591.916666666664,
+        "min": 8873.0,
+        "p50": 25144.0,
+        "p90": 68115.0,
+        "p99": 103526.75
+      },
+      "hot_weight_tensor_mib_per_expert": 48.0,
+      "max_over_mean_after": {
+        "count": 96,
+        "max": 1.4402364095052083,
+        "mean": 1.231965594821506,
+        "min": 1.089599609375,
+        "p50": 1.2056020100911458,
+        "p90": 1.3578033447265625,
+        "p99": 1.4353368123372394
+      },
+      "max_over_mean_before": {
+        "count": 96,
+        "max": 2.3419087727864585,
+        "mean": 1.583852767944336,
+        "min": 1.2231852213541667,
+        "p50": 1.522247314453125,
+        "p90": 1.974853515625,
+        "p99": 2.318647766113281
+      },
+      "missing_source_hist_per_call": {
+        "count": 96,
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 0.0
+      },
+      "payload_note": "One hot expert tensor contains W13 plus W2, modeled as 3*hidden*ffn_hidden*dtype_bytes. The two-collective payload is a per-rank tensor-size lower-bound for broadcast plus grad reduce, not a topology-specific network-byte model.",
+      "selected_hot_experts_per_call": {
+        "count": 96,
+        "max": 4.0,
+        "mean": 4.0,
+        "min": 4.0,
+        "p50": 4.0,
+        "p90": 4.0,
+        "p99": 4.0
+      },
+      "selected_hot_rows_per_call": {
+        "count": 96,
+        "max": 321616.0,
+        "mean": 150718.625,
+        "min": 46775.0,
+        "p50": 102534.0,
+        "p90": 288470.0,
+        "p99": 318878.1
+      },
+      "selected_max_helper_rows_per_call": {
+        "count": 96,
+        "max": 15502.0,
+        "mean": 7102.875,
+        "min": 2082.0,
+        "p50": 4261.0,
+        "p90": 13471.0,
+        "p99": 15398.45
+      },
+      "selected_remote_hot_rows_per_call": {
+        "count": 96,
+        "max": 282590.0,
+        "mean": 131900.45833333334,
+        "min": 41415.0,
+        "p50": 90117.5,
+        "p90": 252058.0,
+        "p99": 279398.94999999995
+      }
+    },
+    "8": {
+      "approx_two_collective_tensor_payload_mib_per_call": 768.0,
+      "call_count": 96,
+      "critical_owner_row_reduction_pct_mean": 27.6098857906311,
+      "critical_owner_rows_after": {
+        "count": 96,
+        "max": 127438.0,
+        "mean": 112710.72916666667,
+        "min": 104359.0,
+        "p50": 110990.5,
+        "p90": 120341.5,
+        "p99": 127071.29999999999
+      },
+      "critical_owner_rows_before": {
+        "count": 96,
+        "max": 230219.0,
+        "mean": 155699.0625,
+        "min": 120244.0,
+        "p50": 149643.0,
+        "p90": 194136.0,
+        "p99": 227932.34999999998
+      },
+      "critical_owner_rows_saved": {
+        "count": 96,
+        "max": 112521.0,
+        "mean": 42988.333333333336,
+        "min": 12084.0,
+        "p50": 30958.0,
+        "p90": 76061.0,
+        "p99": 108829.29999999999
+      },
+      "hot_weight_tensor_mib_per_expert": 48.0,
+      "max_over_mean_after": {
+        "count": 96,
+        "max": 1.2963663736979167,
+        "mean": 1.1465528276231554,
+        "min": 1.0615946451822917,
+        "p50": 1.129053751627604,
+        "p90": 1.224177042643229,
+        "p99": 1.2926361083984372
+      },
+      "max_over_mean_before": {
+        "count": 96,
+        "max": 2.3419087727864585,
+        "mean": 1.583852767944336,
+        "min": 1.2231852213541667,
+        "p50": 1.522247314453125,
+        "p90": 1.974853515625,
+        "p99": 2.318647766113281
+      },
+      "missing_source_hist_per_call": {
+        "count": 96,
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 0.0
+      },
+      "payload_note": "One hot expert tensor contains W13 plus W2, modeled as 3*hidden*ffn_hidden*dtype_bytes. The two-collective payload is a per-rank tensor-size lower-bound for broadcast plus grad reduce, not a topology-specific network-byte model.",
+      "selected_hot_experts_per_call": {
+        "count": 96,
+        "max": 8.0,
+        "mean": 8.0,
+        "min": 8.0,
+        "p50": 8.0,
+        "p90": 8.0,
+        "p99": 8.0
+      },
+      "selected_hot_rows_per_call": {
+        "count": 96,
+        "max": 556025.0,
+        "mean": 254237.20833333334,
+        "min": 97362.0,
+        "p50": 191053.5,
+        "p90": 445026.0,
+        "p99": 552468.2
+      },
+      "selected_max_helper_rows_per_call": {
+        "count": 96,
+        "max": 15502.0,
+        "mean": 7344.583333333333,
+        "min": 2082.0,
+        "p50": 5284.0,
+        "p90": 13471.0,
+        "p99": 15398.45
+      },
+      "selected_remote_hot_rows_per_call": {
+        "count": 96,
+        "max": 487884.0,
+        "mean": 222535.03125,
+        "min": 85347.0,
+        "p50": 167220.5,
+        "p90": 389027.5,
+        "p99": 483588.1
+      }
+    }
+  },
+  "worst_calls_by_topn": {
+    "1": {
+      "call_id": 81,
+      "loads_after": [
+        134877,
+        73496,
+        46897,
+        75322,
+        61634,
+        149503,
+        138076,
+        106627
+      ],
+      "loads_before": [
+        122544,
+        60031,
+        33867,
+        61980,
+        48836,
+        135833,
+        230219,
+        93122
+      ],
+      "max_over_mean_after": 1.5208231608072917,
+      "max_over_mean_before": 2.3419087727864585,
+      "max_owner_rows_after": 149503,
+      "max_owner_rows_before": 230219,
+      "max_owner_rows_saved": 80716,
+      "missing_source_hist": 0,
+      "rank_records": 8,
+      "selected_hot_expert_count": 1,
+      "selected_hot_experts": [
+        {
+          "global_expert_id": 194,
+          "local_expert_id": 2,
+          "max_helper_rows": 13670,
+          "owner": 6,
+          "owner_local_rows": 12919,
+          "remote_hot_rows": 92143,
+          "rows": 105062,
+          "source_rank_counts": [
+            12333,
+            13465,
+            13030,
+            13342,
+            12798,
+            13670,
+            12919,
+            13505
+          ]
+        }
+      ],
+      "selected_hot_rows": 105062,
+      "selected_max_helper_rows": 13670,
+      "selected_remote_hot_rows": 92143
+    },
+    "2": {
+      "call_id": 81,
+      "loads_after": [
+        141027,
+        80187,
+        53802,
+        81922,
+        68141,
+        103240,
+        144940,
+        113173
+      ],
+      "loads_before": [
+        122544,
+        60031,
+        33867,
+        61980,
+        48836,
+        135833,
+        230219,
+        93122
+      ],
+      "max_over_mean_after": 1.4744059244791667,
+      "max_over_mean_before": 2.3419087727864585,
+      "max_owner_rows_after": 144940,
+      "max_owner_rows_before": 230219,
+      "max_owner_rows_saved": 85279,
+      "missing_source_hist": 0,
+      "rank_records": 8,
+      "selected_hot_expert_count": 2,
+      "selected_hot_experts": [
+        {
+          "global_expert_id": 194,
+          "local_expert_id": 2,
+          "max_helper_rows": 13670,
+          "owner": 6,
+          "owner_local_rows": 12919,
+          "remote_hot_rows": 92143,
+          "rows": 105062,
+          "source_rank_counts": [
+            12333,
+            13465,
+            13030,
+            13342,
+            12798,
+            13670,
+            12919,
+            13505
+          ]
+        },
+        {
+          "global_expert_id": 188,
+          "local_expert_id": 28,
+          "max_helper_rows": 6905,
+          "owner": 5,
+          "owner_local_rows": 6678,
+          "remote_hot_rows": 46263,
+          "rows": 52941,
+          "source_rank_counts": [
+            6150,
+            6691,
+            6905,
+            6600,
+            6507,
+            6678,
+            6864,
+            6546
+          ]
+        }
+      ],
+      "selected_hot_rows": 158003,
+      "selected_max_helper_rows": 13670,
+      "selected_remote_hot_rows": 138406
+    },
+    "4": {
+      "call_id": 81,
+      "loads_after": [
+        103375,
+        94649,
+        65850,
+        94847,
+        81061,
+        116089,
+        104567,
+        125994
+      ],
+      "loads_before": [
+        122544,
+        60031,
+        33867,
+        61980,
+        48836,
+        135833,
+        230219,
+        93122
+      ],
+      "max_over_mean_after": 1.28167724609375,
+      "max_over_mean_before": 2.3419087727864585,
+      "max_owner_rows_after": 125994,
+      "max_owner_rows_before": 230219,
+      "max_owner_rows_saved": 104225,
+      "missing_source_hist": 0,
+      "rank_records": 8,
+      "selected_hot_expert_count": 4,
+      "selected_hot_experts": [
+        {
+          "global_expert_id": 194,
+          "local_expert_id": 2,
+          "max_helper_rows": 13670,
+          "owner": 6,
+          "owner_local_rows": 12919,
+          "remote_hot_rows": 92143,
+          "rows": 105062,
+          "source_rank_counts": [
+            12333,
+            13465,
+            13030,
+            13342,
+            12798,
+            13670,
+            12919,
+            13505
+          ]
+        },
+        {
+          "global_expert_id": 188,
+          "local_expert_id": 28,
+          "max_helper_rows": 6905,
+          "owner": 5,
+          "owner_local_rows": 6678,
+          "remote_hot_rows": 46263,
+          "rows": 52941,
+          "source_rank_counts": [
+            6150,
+            6691,
+            6905,
+            6600,
+            6507,
+            6678,
+            6864,
+            6546
+          ]
+        },
+        {
+          "global_expert_id": 210,
+          "local_expert_id": 18,
+          "max_helper_rows": 7237,
+          "owner": 6,
+          "owner_local_rows": 6204,
+          "remote_hot_rows": 46618,
+          "rows": 52822,
+          "source_rank_counts": [
+            6924,
+            7097,
+            6033,
+            6356,
+            7237,
+            6357,
+            6204,
+            6614
+          ]
+        },
+        {
+          "global_expert_id": 28,
+          "local_expert_id": 28,
+          "max_helper_rows": 7365,
+          "owner": 0,
+          "owner_local_rows": 6325,
+          "remote_hot_rows": 44576,
+          "rows": 50901,
+          "source_rank_counts": [
+            6325,
+            7365,
+            6015,
+            6569,
+            5683,
+            6492,
+            6245,
+            6207
+          ]
+        }
+      ],
+      "selected_hot_rows": 261726,
+      "selected_max_helper_rows": 13670,
+      "selected_remote_hot_rows": 229600
+    },
+    "8": {
+      "call_id": 81,
+      "loads_after": [
+        78714,
+        117174,
+        89465,
+        117698,
+        103606,
+        100652,
+        81550,
+        97573
+      ],
+      "loads_before": [
+        122544,
+        60031,
+        33867,
+        61980,
+        48836,
+        135833,
+        230219,
+        93122
+      ],
+      "max_over_mean_after": 1.1972859700520833,
+      "max_over_mean_before": 2.3419087727864585,
+      "max_owner_rows_after": 117698,
+      "max_owner_rows_before": 230219,
+      "max_owner_rows_saved": 112521,
+      "missing_source_hist": 0,
+      "rank_records": 8,
+      "selected_hot_expert_count": 8,
+      "selected_hot_experts": [
+        {
+          "global_expert_id": 194,
+          "local_expert_id": 2,
+          "max_helper_rows": 13670,
+          "owner": 6,
+          "owner_local_rows": 12919,
+          "remote_hot_rows": 92143,
+          "rows": 105062,
+          "source_rank_counts": [
+            12333,
+            13465,
+            13030,
+            13342,
+            12798,
+            13670,
+            12919,
+            13505
+          ]
+        },
+        {
+          "global_expert_id": 188,
+          "local_expert_id": 28,
+          "max_helper_rows": 6905,
+          "owner": 5,
+          "owner_local_rows": 6678,
+          "remote_hot_rows": 46263,
+          "rows": 52941,
+          "source_rank_counts": [
+            6150,
+            6691,
+            6905,
+            6600,
+            6507,
+            6678,
+            6864,
+            6546
+          ]
+        },
+        {
+          "global_expert_id": 210,
+          "local_expert_id": 18,
+          "max_helper_rows": 7237,
+          "owner": 6,
+          "owner_local_rows": 6204,
+          "remote_hot_rows": 46618,
+          "rows": 52822,
+          "source_rank_counts": [
+            6924,
+            7097,
+            6033,
+            6356,
+            7237,
+            6357,
+            6204,
+            6614
+          ]
+        },
+        {
+          "global_expert_id": 28,
+          "local_expert_id": 28,
+          "max_helper_rows": 7365,
+          "owner": 0,
+          "owner_local_rows": 6325,
+          "remote_hot_rows": 44576,
+          "rows": 50901,
+          "source_rank_counts": [
+            6325,
+            7365,
+            6015,
+            6569,
+            5683,
+            6492,
+            6245,
+            6207
+          ]
+        },
+        {
+          "global_expert_id": 251,
+          "local_expert_id": 27,
+          "max_helper_rows": 6609,
+          "owner": 7,
+          "owner_local_rows": 6837,
+          "remote_hot_rows": 45200,
+          "rows": 52037,
+          "source_rank_counts": [
+            6460,
+            6487,
+            6287,
+            6467,
+            6409,
+            6481,
+            6609,
+            6837
+          ]
+        },
+        {
+          "global_expert_id": 174,
+          "local_expert_id": 14,
+          "max_helper_rows": 5455,
+          "owner": 5,
+          "owner_local_rows": 4690,
+          "remote_hot_rows": 33226,
+          "rows": 37916,
+          "source_rank_counts": [
+            5455,
+            4460,
+            4894,
+            4630,
+            4561,
+            4690,
+            4377,
+            4849
+          ]
+        },
+        {
+          "global_expert_id": 221,
+          "local_expert_id": 29,
+          "max_helper_rows": 6151,
+          "owner": 6,
+          "owner_local_rows": 5661,
+          "remote_hot_rows": 39780,
+          "rows": 45441,
+          "source_rank_counts": [
+            5766,
+            5727,
+            6151,
+            5636,
+            5036,
+            5574,
+            5661,
+            5890
+          ]
+        },
+        {
+          "global_expert_id": 30,
+          "local_expert_id": 30,
+          "max_helper_rows": 6539,
+          "owner": 0,
+          "owner_local_rows": 6488,
+          "remote_hot_rows": 42342,
+          "rows": 48830,
+          "source_rank_counts": [
+            6488,
+            5851,
+            6283,
+            6118,
+            6539,
+            5734,
+            5777,
+            6040
+          ]
+        }
+      ],
+      "selected_hot_rows": 445950,
+      "selected_max_helper_rows": 13670,
+      "selected_remote_hot_rows": 390148
+    }
+  }
+}

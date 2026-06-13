@@ -1,0 +1,153 @@
+{
+  "artifact": "deepseek_v4_flash_hf_config_contract_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Authoritative DeepSeek V4-Flash shape contract used to retarget the one-MI350 single-layer pretraining microbench away from the older Pro-sized harness defaults.",
+  "sources": {
+    "hf_config": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash/raw/main/config.json",
+    "hf_config_checked_at": "2026-05-31",
+    "ascend_recipe_readme": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/ascend-cann-recipes-train/llm_pretrain/deepseekv4/README.md",
+    "ascend_autofuse_report": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md"
+  },
+  "flash_hf_config": {
+    "architectures": [
+      "DeepseekV4ForCausalLM"
+    ],
+    "model_type": "deepseek_v4",
+    "torch_dtype": "bfloat16",
+    "expert_dtype": "fp4",
+    "hidden_size": 4096,
+    "num_hidden_layers": 43,
+    "num_attention_heads": 64,
+    "num_key_value_heads": 1,
+    "head_dim": 512,
+    "qk_rope_head_dim": 64,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "sliding_window": 128,
+    "moe_intermediate_size": 2048,
+    "n_routed_experts": 256,
+    "n_shared_experts": 1,
+    "num_experts_per_tok": 6,
+    "index_n_heads": 64,
+    "index_head_dim": 128,
+    "index_topk": 512,
+    "routed_scaling_factor": 1.5,
+    "compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      0
+    ]
+  },
+  "single_layer_flash_contract": {
+    "input_hidden": [
+      "B",
+      "S",
+      4096
+    ],
+    "output_hidden": [
+      "B",
+      "S",
+      4096
+    ],
+    "target_sequence_length": 4096,
+    "attention": {
+      "q": [
+        "B",
+        "S",
+        64,
+        512
+      ],
+      "kv": [
+        "B",
+        "S",
+        512
+      ],
+      "window_size": 128,
+      "csa_ratio": 4,
+      "hca_ratio": 128,
+      "s4096_csa_tokens": 1024,
+      "s4096_hca_tokens": 32,
+      "s4096_sparse_keys_excluding_sink": 1184,
+      "s4096_sparse_keys_including_sink": 1185
+    },
+    "moe": {
+      "tokens": [
+        "B",
+        "S"
+      ],
+      "hidden_size": 4096,
+      "expert_intermediate": 2048,
+      "experts": 256,
+      "top_k": 6,
+      "s4096_assignments": 24576,
+      "s4096_mean_assignments_per_expert": 96
+    }
+  },
+  "mismatch_with_prior_harness_defaults": {
+    "prior_default_hidden_size": 7168,
+    "prior_default_num_attention_heads": 128,
+    "prior_default_q_lora_rank": 1536,
+    "prior_default_moe_intermediate_size": 3072,
+    "prior_default_n_routed_experts": 384,
+    "read": "Prior single-layer artifacts remain useful as Pro-sized stress tests, but the active goal is Flash. New target runs should pass Flash overrides to run_microbench.py or use Flash defaults in focused probes."
+  },
+  "flash_run_microbench_overrides": [
+    "--hidden-size 4096",
+    "--num-heads 64",
+    "--kv-dim 512",
+    "--rope-dim 64",
+    "--q-lora-rank 1024",
+    "--o-lora-rank 1024",
+    "--o-groups 8",
+    "--moe-intermediate 2048",
+    "--num-experts 256",
+    "--routed-top-k 6",
+    "--shared-experts 1",
+    "--window-size 128",
+    "--csa-ratio 4",
+    "--hca-ratio 128"
+  ],
+  "dependency_pin_changes": []
+}

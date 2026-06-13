@@ -1,0 +1,82 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "kernel": {
+    "block_d_index": 64,
+    "block_d_main": 64,
+    "block_k": 64,
+    "read": "Prototype exact SLIG backward schedule. It materializes compact main and LI logits, not selected main-K tensors, then computes d_query_index, d_key_index, and d_weights with Triton atomics.",
+    "workspace": {
+      "head_logits_bytes": 256,
+      "li_logits_bytes": 256,
+      "main_logits_bytes": 256,
+      "p_bytes": 256,
+      "row_count": 13
+    }
+  },
+  "max_abs_diff": {
+    "index_k": 1.1641532182693481e-10,
+    "index_q": 5.820766091346741e-11,
+    "weights": 5.820766091346741e-11
+  },
+  "oracle": {
+    "grad_norms": {
+      "index_k": 0.0010013640858232975,
+      "index_q": 0.0008737487951293588,
+      "weights": 0.00036456421366892755
+    },
+    "loss": 0.0012652893783524632,
+    "row_count": 13.0
+  },
+  "scope": "triton_sparse_lightning_indexer_grad_kl_loss_prototype",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 4,
+    "head_dim": 16,
+    "main_head_dim": 16,
+    "main_heads": 1,
+    "n_heads": 1,
+    "seq_len": 16,
+    "topk": 4
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.5561249852180481,
+      "mean_ms": 0.3188293327887853,
+      "median_ms": 0.21044200658798218,
+      "min_ms": 0.18992100656032562,
+      "samples_ms": [
+        0.5561249852180481,
+        0.21044200658798218,
+        0.18992100656032562
+      ],
+      "stdev_ms": 0.20576004922459046
+    },
+    "peak_memory_allocated_bytes": 159397376,
+    "peak_memory_allocated_gib": 0.14845037460327148,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.6005479954183102,
+      "mean_ms": 0.3505190446351965,
+      "median_ms": 0.23661006707698107,
+      "min_ms": 0.21439907141029835,
+      "samples_ms": [
+        0.6005479954183102,
+        0.23661006707698107,
+        0.21439907141029835
+      ],
+      "stdev_ms": 0.21681602628589253
+    },
+    "warmup_iters": 1
+  },
+  "triton_grad_norms": {
+    "index_k": 0.0010013639694079757,
+    "index_q": 0.0008737486787140369,
+    "weights": 0.00036456415546126664
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "artifact": "mori_ep_overlap_reference_20260601",
+  "purpose": "Record the AMD MORI reference import and the current standalone tile-ready overlap evidence to map into TorchTitan MoE EP.",
+  "source_reference": {
+    "remote": "https://github.com/ROCm/mori.git",
+    "branch": "main",
+    "commit": "5dd02d6815e9113381a72f6de6b22034fc09b5a3",
+    "path": "sources/references/mori",
+    "role": "AMD EP dispatch/combine, split send/recv, SHMEM, and tile-ready overlap reference"
+  },
+  "mori_api_findings": {
+    "python_operator": "mori.ops.EpDispatchCombineOp",
+    "single_node_kernel_type": "EpDispatchCombineKernelType.IntraNode",
+    "supports_split_dispatch_combine": true,
+    "split_calls": ["dispatch_send", "dispatch_recv", "combine_send", "combine_recv"],
+    "standard_moe_helpers": ["dispatch_standard_moe", "combine_standard_moe"],
+    "required_init": "mori.shmem.shmem_torch_process_group_init(\"default\")",
+    "training_integration_caveat": "The public Python dispatch/combine path is not a drop-in autograd replacement for TorchTitan's all_to_all_single_autograd path; training needs an autograd-safe dispatcher or an explicit backward integration."
+  },
+  "standalone_tile_ready_probe": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "remote_root": "/local/data/sonle5/dsv4_mori_tile_overlap_20260530",
+    "log": "/local/data/sonle5/dsv4_mori_tile_overlap_20260530/logs/mori_down_gemm_sbo_split_group32_directptr_8gpu_smoke_tokens64_warm1_iter2_20260601_gpus01234567_e64.log",
+    "command_shape": "python3 -B tools/mori_down_gemm_tile_ready_probe.py --world-size 8 --tokens 64 --hidden 1024 --inter 128 --stage1-k 128 --experts 64 --topk 2 --tile-rows 64 --modes none --run-sbo-split-fixed-shape --sbo-split-dynamic-peer --sbo-split-dynamic-peer-direct-p2p-ptrs --sbo-split-directptr-worker-blocks 64 --sbo-split-group 32 --sbo-split-producer-queued-first --sbo-split-accum-wait-backoff --warmup 1 --iters 2",
+    "result": "passed",
+    "reported_ok": true,
+    "rank_result_summary": {
+      "mode": "sbo_split_fixed_shape",
+      "comm_route": "dynamic_peer_directptr_persistent64_accum_sleep",
+      "schedule": "producer_queued_first_dynamic_peer_directptr_persistent64_accum_sleep_single_stream",
+      "token_count_per_rank": 64,
+      "hidden": 1024,
+      "experts": 64,
+      "topk": 2,
+      "sbo_split_group": 32,
+      "max_abs": 0.0,
+      "output_max_abs": 0.0,
+      "ready_wait_failures": 0,
+      "wait_failures": 0
+    }
+  },
+  "torchtitan_mapping": {
+    "current_path": "torchtitan.models.common.token_dispatcher.AllToAllTokenDispatcher with PyTorch all_to_all_single_autograd",
+    "target_path": "Mori-backed EP dispatcher plus tile-ready expert output/registered-combine handoff",
+    "required_before_training_use": [
+      "define forward layout contract from TorchTitan top_scores/selected_experts_indices to MORI dispatch records",
+      "preserve training autograd for dispatch/combine or implement custom backward",
+      "connect grouped expert GEMM output to MORI registered combine input for tile-ready overlap",
+      "validate against the PyTorch all-to-all dispatcher on 4x and 8x",
+      "profile overlap vs current all-to-all baseline"
+    ]
+  }
+}

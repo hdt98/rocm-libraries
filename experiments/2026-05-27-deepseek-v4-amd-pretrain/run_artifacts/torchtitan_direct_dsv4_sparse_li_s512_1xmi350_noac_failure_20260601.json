@@ -1,0 +1,42 @@
+{
+  "run_id": "torchtitan_direct_dsv4_sparse_li_s512_1xmi350_noac_20260601T000000",
+  "date_utc": "2026-05-31",
+  "result": "failed_before_step_metric",
+  "selected_execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "host": "do-sonle5-mi350-gpu",
+  "visible_devices": "0",
+  "model": "DeepSeek-V4-Flash_4layer_bounded_pytorch_sparse_mla_lightning_indexer",
+  "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS16_S512",
+  "checkpoint_enable": false,
+  "activation_checkpoint_mode": "none",
+  "sparse_mla_max_seq_len": "default_512",
+  "gradient_accumulation_steps": 16,
+  "command": "env GPUS_PER_NODE=1 CANARY_VISIBLE_DEVICES=0 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=16 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none MASTER_PORT=29543 RUN_ID=torchtitan_direct_dsv4_sparse_li_s512_1xmi350_noac_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "observed": {
+    "created_meshes": [],
+    "trainer_initialized": true,
+    "training_started_step": 1,
+    "step_metrics_logged": false,
+    "remote_output_size": "172K",
+    "checkpoint_directory_created": false
+  },
+  "failure": {
+    "phase": "loss.backward",
+    "error_class": "gpu_memory_access_fault",
+    "torch_elastic_root_cause_rank": 0,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "messages": [
+      "Memory access fault by GPU node-2: Reason: Unknown",
+      "Fatal Python error: Aborted",
+      "torch.distributed.fsdp._fully_shard._fsdp_collectives.chunk_cat",
+      "torch.distributed.fsdp._fully_shard._fsdp_collectives.foreach_reduce_scatter_copy_in",
+      "torch.distributed.elastic.multiprocessing.errors.ChildFailedError"
+    ]
+  },
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_sparse_li_s512_1xmi350_noac_20260601T000000/docker-run.log",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_s512_1xmi350_noac_20260601T000000",
+  "read": "S512 sparse-LI also faults with one visible MI350 and EP=1/FSDP=1, so the failure is not primarily multi-rank EP all-to-all. The stack reaches FSDP fully_shard post-backward collection after sparse-LI autograd has contributed gradients."
+}

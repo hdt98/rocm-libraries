@@ -1,0 +1,227 @@
+{
+  "artifact": "hipkittens_sharedkv_query_chunk_sweep_20260607",
+  "status": "query_chunking_fixes_hipkittens_serial_query_sweep_lower_bound_not_yet_e2e",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "scope": "HipKittens SharedKV latent-dKV epilogue fork, active C4 compressed tiles, D128 chunk",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_latent_epilogue_fork.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py",
+    "build_file": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/Makefile"
+  },
+  "code_change_under_test": {
+    "summary": "Add compile-time ATTN_QUERY_CHUNKS to split the all-query sweep across more CTAs. When ATTN_QUERY_CHUNKS > 1, the dV part of latent dKV uses packed BF16 atomics instead of overwrite-store so query-chunk partials can accumulate.",
+    "why": "The previous raw HipKittens KV-owned fork timed 16 active C4 compressed-group tiles at about the same latency as all 64 dense tiles, showing the wall was serial query sweep / too few long CTAs rather than output tile count."
+  },
+  "shape": {
+    "batch": 4,
+    "seq_len": 4096,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim_per_hipkittens_chunk": 128,
+    "target_dim": 512,
+    "active_cmp_tiles": 16,
+    "active_cmp_rows": 1024,
+    "route_mode": "all_cmp",
+    "timed_boundary": "HipKittens kernel only; O/L/delta precomputed outside timing"
+  },
+  "build_resource_report": {
+    "total_sgprs": 105,
+    "vgprs": 256,
+    "agprs": 256,
+    "scratch_bytes_per_lane": 0,
+    "occupancy_waves_per_simd": 1,
+    "sgpr_spill": 0,
+    "vgpr_spill": 0
+  },
+  "baseline_previous_gate": {
+    "artifact": "hipkittens_sharedkv_cmp_owned_active_tiles_gate_20260607.json",
+    "query_chunks": 1,
+    "event_median_ms": 16.923562049865723,
+    "event_mean_ms": 16.930844116210938,
+    "projected_d512_if_four_serial_chunks_ms": 67.69424819946289,
+    "read": "Rejected raw KV-owned schedule: D128 was already slower than the current D512 Triton C4 source-boundary gate."
+  },
+  "query_chunk_sweep": [
+    {
+      "query_chunks": 8,
+      "event_ms": {
+        "median": 4.404995918273926,
+        "mean": 4.424367237091064,
+        "min": 4.370753765106201,
+        "max": 4.581075191497803
+      },
+      "wall_ms": {
+        "median": 4.419759497977793,
+        "mean": 4.4478002935647964,
+        "min": 4.383660038001835,
+        "max": 4.63259790558368
+      },
+      "precompute_o_l_delta_ms": 1526.4639760134742,
+      "outputs": {
+        "d_q_nonzero": 134113960,
+        "d_cmp_kv_nonzero": 524205,
+        "d_cmp_kv_finite": true,
+        "d_cmp_kv_norm": 46.736106872558594
+      }
+    },
+    {
+      "query_chunks": 16,
+      "event_ms": {
+        "median": 4.494522333145142,
+        "mean": 4.511546802520752,
+        "min": 4.4722418785095215,
+        "max": 4.6481242179870605
+      },
+      "wall_ms": {
+        "median": 4.514863481745124,
+        "mean": 4.537010402418673,
+        "min": 4.487838945351541,
+        "max": 4.693355993367732
+      },
+      "precompute_o_l_delta_ms": 1393.3398800436407,
+      "outputs": {
+        "d_q_nonzero": 134113865,
+        "d_cmp_kv_nonzero": 524217,
+        "d_cmp_kv_finite": true,
+        "d_cmp_kv_norm": 46.736045837402344
+      }
+    },
+    {
+      "query_chunks": 32,
+      "event_ms": {
+        "median": 4.650064945220947,
+        "mean": 4.66938009262085,
+        "min": 4.619563102722168,
+        "max": 4.821805953979492
+      },
+      "wall_ms": {
+        "median": 4.6679615043103695,
+        "mean": 4.69490229152143,
+        "min": 4.634966957382858,
+        "max": 4.867583978921175
+      },
+      "precompute_o_l_delta_ms": 1399.7348370030522,
+      "outputs": {
+        "d_q_nonzero": 134113990,
+        "d_cmp_kv_nonzero": 524247,
+        "d_cmp_kv_finite": true,
+        "d_cmp_kv_norm": 46.732059478759766
+      }
+    }
+  ],
+  "followup_recheck_20260607": {
+    "reason": "Repeat the query-chunk gate after the HipKittens Triton-schedule HIP owner was rejected, and add active-1/C128-style points to test whether the active compressed tile count is still the wall.",
+    "command_shape": "docker run ... make hk_sharedkv_bwd_latent_epilogue GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H=64 ATTN_H_KV=1 ATTN_N=4096 ATTN_QUERY_CHUNKS=${q}; python probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py --batch 4 --seq 4096 --heads 64 --kv-heads 1 --dim 128 --query-chunks ${q} --route-mode all_cmp --active-cmp-tiles ${tiles} --warmup 2 --iters 5",
+    "host": "do-vunguyen-mi350-gpu",
+    "active16_c4_recheck": [
+      {
+        "query_chunks": 1,
+        "event_ms": {
+          "median": 17.007354736328125,
+          "mean": 17.02021255493164,
+          "min": 16.91787338256836,
+          "max": 17.176076889038086
+        },
+        "d_cmp_kv_nonzero": 524043,
+        "d_q_nonzero": 134113867
+      },
+      {
+        "query_chunks": 2,
+        "event_ms": {
+          "median": 8.681856155395508,
+          "mean": 8.668386650085449,
+          "min": 8.522014617919922,
+          "max": 8.780142784118652
+        },
+        "d_cmp_kv_nonzero": 524108,
+        "d_q_nonzero": 134113736
+      },
+      {
+        "query_chunks": 4,
+        "event_ms": {
+          "median": 4.493545055389404,
+          "mean": 4.519457626342773,
+          "min": 4.3993449211120605,
+          "max": 4.680747032165527
+        },
+        "d_cmp_kv_nonzero": 524161,
+        "d_q_nonzero": 134113835
+      },
+      {
+        "query_chunks": 8,
+        "event_ms": {
+          "median": 4.5500688552856445,
+          "mean": 4.570052719116211,
+          "min": 4.501227855682373,
+          "max": 4.696188926696777
+        },
+        "d_cmp_kv_nonzero": 524215,
+        "d_q_nonzero": 134113829
+      },
+      {
+        "query_chunks": 16,
+        "event_ms": {
+          "median": 4.577792167663574,
+          "mean": 4.635360336303711,
+          "min": 4.567552089691162,
+          "max": 4.793033123016357
+        },
+        "d_cmp_kv_nonzero": 524212,
+        "d_q_nonzero": 134113858
+      }
+    ],
+    "active1_c128_style_recheck": [
+      {
+        "query_chunks": 4,
+        "event_ms": {
+          "median": 4.344510078430176,
+          "mean": 4.3638224601745605,
+          "min": 4.309390068054199,
+          "max": 4.438751220703125
+        },
+        "active_cmp_rows": 64,
+        "d_cmp_kv_nonzero": 32763,
+        "d_q_nonzero": 134217724
+      },
+      {
+        "query_chunks": 8,
+        "event_ms": {
+          "median": 4.331185817718506,
+          "mean": 4.366578578948975,
+          "min": 4.30778694152832,
+          "max": 4.455546855926514
+        },
+        "active_cmp_rows": 64,
+        "d_cmp_kv_nonzero": 32759,
+        "d_q_nonzero": 134217724
+      },
+      {
+        "query_chunks": 16,
+        "event_ms": {
+          "median": 4.365581035614014,
+          "mean": 4.395389175415039,
+          "min": 4.334061145782471,
+          "max": 4.4677019119262695
+        },
+        "active_cmp_rows": 64,
+        "d_cmp_kv_nonzero": 32761,
+        "d_q_nonzero": 134217724
+      }
+    ],
+    "read": "The D128 KV-owned fork now scales almost exactly as expected from q1 to q4, but then plateaus around 4.3-4.6 ms. Active-1 is only slightly faster than active-16, so this path is dominated by the dense query sweep/dQ producer, not the number of compressed output tiles. Route metadata and late output gating are therefore insufficient; exact route membership must enter before QK/P/dP/dQ producer work or the branch should be used only as a compressed-dKV side branch with the faster Triton dQ path."
+  },
+  "comparison_to_current_c4_gate": {
+    "current_triton_c4_sharedkv_full_d512_ms": 11.01801586151123,
+    "current_triton_c4_no_dkv_ms": 1.932217001914978,
+    "current_triton_c4_global_dkv_accumulation_ms": 8.179350852966309,
+    "best_hipkittens_chunked_d128_ms": 4.404995918273926,
+    "best_hipkittens_chunked_projected_d512_if_four_serial_chunks_ms": 17.619983673095703
+  },
+  "decision": {
+    "read": "Query chunking directly fixes the earlier HipKittens serial query-sweep failure: active C4 D128 latency improves from 16.92 ms to 4.40 ms at query_chunks=8. More chunks do not help: 16 chunks is 4.49 ms and 32 chunks is 4.65 ms, so the sweet spot is near 8 for this shape.",
+    "promoted_kernel_direction": "Keep the query-chunked HipKittens branch alive as a SharedKV producer template.",
+    "not_promoted_e2e": "This is not a TorchTitan e2e candidate yet. The measured kernel is D128, does not apply the exact DSv4 top-k route mask inside the HipKittens P/dP tile, precomputes O/L/delta outside timing, and has no materialized 4x/8x TFLOPs uplift.",
+    "next_gate": "Add exact route masking inside the query-chunked P/dP tile and either fuse/parallelize the four D128 chunks for D512 or use this branch specifically for compressed dKV while retaining the faster Triton dQ path. Promotion requires beating the current 11.02 ms C4 SharedKV D512 boundary before any e2e TFLOPs run."
+  }
+}

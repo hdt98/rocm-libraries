@@ -1,0 +1,69 @@
+{
+  "artifact": "mori_native_balanced_moe_source_partition_api_20260611",
+  "date": "2026-06-11",
+  "goal_alignment": "Move balanced-MoE source-rank hot/cold/helper partitioning into the MORI vendor snapshot API so training and inference callers can import the same MORI-owned contract.",
+  "status": "source_partition_api_added_not_yet_e2e_throughput_promotion",
+  "source_changes": [
+    {
+      "file": "sources/references/mori/python/mori/ops/balanced_moe.py",
+      "change": "Added build_source_partition_from_offsets(...), optional selected/owner_compact presort and group-end metadata, kept build_source_partition(plan, ...), and tightened threshold-disabled plans to reset execution load and modeled reduction."
+    },
+    {
+      "file": "sources/references/mori/python/mori/ops/__init__.py",
+      "change": "Exported build_source_partition_from_offsets through the public mori.ops surface."
+    },
+    {
+      "file": "sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "change": "Added coverage for offset-based source partition parity, owner-compact presort/group ends, and stricter threshold-disabled plan semantics."
+    },
+    {
+      "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "change": "Added JSON-safe owner-shard/owner-compact fields to the balanced-MoE plan record and updated the hot-helper execute path to prefer mori.ops.balanced_moe.build_source_partition_from_offsets."
+    }
+  ],
+  "validation": [
+    {
+      "where": "local macOS workspace",
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/balanced_moe.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "result": "passed"
+    },
+    {
+      "where": "local macOS workspace",
+      "command": "git -C /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/balanced_moe.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/__init__.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/tests/python/ops/test_balanced_moe.py sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "result": "passed"
+    },
+    {
+      "where": "local macOS workspace",
+      "command": "PYTHONPATH=experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python python3 -m pytest -q experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/tests/python/ops/test_balanced_moe.py",
+      "result": "not_run_local_pytest_missing"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "python -m pytest -q tests/python/ops/test_balanced_moe.py",
+      "result": "5 passed in 0.88s"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "from mori.ops import build_source_partition_from_offsets, build_balanced_moe_plan_from_global_counts",
+      "result": "passed"
+    },
+    {
+      "where": "do-sonle5-mi350-gpu container",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "from torchtitan.models.common import token_dispatcher; token_dispatcher._standard_ep_owner_compact_fields_from_selected(...)",
+      "result": "passed"
+    }
+  ],
+  "remote_notes": {
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "gpu_throughput_gate": "not_launched",
+    "reason": "This pass was API/import validation only; an unrelated NexusTitan job was active on the node."
+  },
+  "next_steps": [
+    "Add a MORI EP C++/HIP API that accepts the source partition and owner-compact metadata directly instead of staging through the standard-EP wrapper.",
+    "Collapse normal/cold compact dispatch final layout so AITER/helper grouped MLP can consume MORI-owned expert-major rows directly.",
+    "Add a low-intrusion profile gate comparing standard owner-compact hot-helper to the new MORI-native partition path before attempting a long 8x throughput gate."
+  ]
+}

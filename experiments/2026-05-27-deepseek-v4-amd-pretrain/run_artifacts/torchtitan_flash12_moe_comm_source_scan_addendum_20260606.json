@@ -1,0 +1,19 @@
+{
+  "artifact": "torchtitan_flash12_moe_comm_source_scan_addendum_20260606",
+  "date": "2026-06-06",
+  "question": "Does the communication source contain a hidden load-balancing scheduler that redistributes overloaded experts, or is it count/capacity aware movement?",
+  "source_refs": {
+    "npu_router": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/models/deepseek_v4/model/moe.py:145-175",
+    "npu_permute_dispatch": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permute.py:124-204",
+    "npu_grouped_gmm_backward": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/gmm.py:30-73",
+    "mori_capacity": "sources/references/mori/src/ops/dispatch_combine/dispatch_combine.cpp:145-156",
+    "mori_buffer_sizing": "sources/references/mori/src/ops/dispatch_combine/dispatch_combine.cpp:190-210",
+    "mori_local_expert_count": "sources/references/mori/src/ops/dispatch_combine/ep_local_expert_count.hpp:29-41"
+  },
+  "read": {
+    "ascend": "Expert balance is decided by router-side expert_bias or debug force-balance. The NPU communication path exchanges num_tokens_per_expert, derives all-to-all splits, locally permutes rows into expert-contiguous groups, and feeds npu_grouped_matmul backward.",
+    "mori": "MORI exposes receive capacity, buffer sizing, SDMA/AsyncLL transport, and local expert count atomics. The inspected source observes and transports the routed distribution; it does not reassign overloaded experts.",
+    "amd_gap": "The active AMD gap is not a missing hidden communication scheduler. It is local expert-contiguous compaction plus a fused compact owner-rank training VJP that avoids the current adapter-heavy recompute/gather/scale/wgrad/xgrad/dTopK sequence.",
+    "next": "Keep MORI for movement, but focus kernel work on saved-route local token permute plus compact grouped owner VJP. Treat dX-return overlap as a follow-up after owner VJP skew is reduced."
+  }
+}

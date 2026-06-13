@@ -1,0 +1,72 @@
+{
+  "artifact": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Validate the launcher-selected CE2 default on the retained 8xMI350 target-shape canary.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603/docker-run.log",
+  "shape": {
+    "gpu": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "steps": 2
+  },
+  "launcher_default_validation": {
+    "canary_chunked_ce_num_chunks_env_was_unset": true,
+    "observed_header_chunked_ce_num_chunks": 2
+  },
+  "retained_settings": {
+    "checkpoint_enable": false,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_tuple": [64, 32, 8],
+    "mori_shmem_heap_size": "32G"
+  },
+  "result": {
+    "status": "passed",
+    "loss_movement": "12.20713 -> 8.75234",
+    "step1": {
+      "loss": 12.20713,
+      "grad_norm": 11.5625,
+      "tok_per_gpu_s_range": [1938, 1940],
+      "tflops_per_gpu_range": [36.67, 36.7],
+      "mfu_percent": 1.59
+    },
+    "step2": {
+      "loss": 8.75234,
+      "grad_norm": 20.75,
+      "tok_per_gpu_s": 3103,
+      "node_tok_s": 24824,
+      "implied_step_time_s": 21.12,
+      "tflops_per_gpu": 58.71,
+      "mfu_percent": 2.54,
+      "peak_logged_memory_gib": 166.47
+    },
+    "process_groups_destroyed": true
+  },
+  "comparison": {
+    "retained_ce8_registered_combine_step2_tok_per_gpu_s": 3026,
+    "manual_ce2_prior_step2_tok_per_gpu_s_range": [3136, 3137],
+    "default_ce2_step2_tok_per_gpu_s": 3103,
+    "default_ce2_uplift_percent_vs_retained_ce8": 2.5,
+    "target_tok_per_gpu_s_range": [2200, 2400],
+    "target_status": "passes normalized throughput target"
+  },
+  "read": [
+    "The launcher CE2 shape-gated default is validated because CANARY_CHUNKED_CE_NUM_CHUNKS was unset and the run header printed chunked_ce_num_chunks=2.",
+    "This no-profile pass is slightly below the prior manual CE2 A/B but still improves the old CE8 registered-combine baseline and remains above the normalized 8xMI350 target band.",
+    "CE2 is a loss-side canary lever; it does not change the broader ranking that MoE backward overlap/skew and owner-rank VJP math are the largest structural targets."
+  ]
+}

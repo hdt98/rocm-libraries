@@ -1,0 +1,103 @@
+{
+  "artifact": "sparse_mla_forward_group_sidecar_epilogue_gate",
+  "date": "2026-06-05",
+  "scope": "source-boundary sparse-MLA dKV backward epilogue using forward-carried compressed-group sidecar",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "batch": 1
+  },
+  "contract": {
+    "q_tensor": "q[B,S,H,D] remains BF16 numeric activation; group ids are not embedded into q because group id is per (token, selected_slot), not per (token, head, D)",
+    "forward_sidecar": "group_ids[B,S,K] is carried from forward into backward; probe emulates a group-anchored sidecar by sorting valid group ids along K before calling backward",
+    "math_invariant": "selected-group order is immaterial to sparse attention output, lse, and dKV accumulation as long as the selected set is unchanged"
+  },
+  "runs": [
+    {
+      "name": "target_group_sorted_sidecar_valid_dkv",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode3_group_sorted_sidecar_valid_dkv_20260605.json",
+      "kernel": "source_boundary_query_major_scorepage_dparallel.hip",
+      "mode": "SCOREPAGE_PRODUCER_MODE=3",
+      "seq_chunk": 1,
+      "selected_block": 512,
+      "sidecar_order": "sorted_by_compressed_group",
+      "valid_dkv": true,
+      "median_ms": 22.806007385253906,
+      "read": "Sorting/carrying the forward group-id sidecar improves destination order versus the older unsorted valid-dKV path, but atomic element count remains unchanged because each CTA owns only one token."
+    },
+    {
+      "name": "full_selected_window_sidecar_page_sink",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode9_sidecar_sink_20260605.json",
+      "kernel": "source_boundary_query_major_scorepage_dparallel.hip",
+      "mode": "SCOREPAGE_PRODUCER_MODE=9",
+      "seq_chunk": 1,
+      "selected_block": 512,
+      "sidecar_order": "original_selected_slot_order",
+      "valid_dkv": false,
+      "median_ms": 39.13343811035156,
+      "read": "A full K512 prob/scaled-dP sidecar page is rejected. It avoids selected-slot metadata recompute, but the large staged page destroys the producer economics before final atomics are even emitted."
+    },
+    {
+      "name": "token_tile_group_panel_sidecar_reduced_dkv",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_t32_gp32_k512_mode12_group_sidecar_reduced_dkv_20260605.json",
+      "kernel": "source_boundary_query_major_scorepage_dparallel.hip",
+      "mode": "SCOREPAGE_PRODUCER_MODE=12,SCOREPAGE_GROUP_PANEL=32",
+      "seq_chunk": 32,
+      "selected_block": 512,
+      "group_panel": 32,
+      "sidecar_order": "sorted_by_compressed_group",
+      "valid_dkv": true,
+      "modeled_atomic_reduction_x": 23.813051840857806,
+      "median_ms": 174.2340087890625,
+      "read": "This is the literal group-anchored sidecar reduction attempt: one CTA owns a token tile and compressed-group panel, accumulates [group,D] in LDS, then emits final global atomics. It reduces modeled global writes by 23.8x, but latency explodes because the fast one-token query-major producer is serialized across the token tile and pays heavy LDS atomic/update traffic."
+    },
+    {
+      "name": "bounded_token_tile_group_panel_sidecar_reduced_dkv",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_t32_gp32_k512_mode13_bounded_group_sidecar_reduced_dkv_20260605.json",
+      "kernel": "source_boundary_query_major_scorepage_dparallel.hip",
+      "mode": "SCOREPAGE_PRODUCER_MODE=13,SCOREPAGE_GROUP_PANEL=32",
+      "seq_chunk": 32,
+      "selected_block": 512,
+      "group_panel": 32,
+      "sidecar_order": "sorted_by_compressed_group_with_invalid_sentinel",
+      "valid_dkv": true,
+      "modeled_atomic_reduction_x": 23.813051840857806,
+      "median_ms": 154.99237060546875,
+      "read": "Binary-searching panel bounds from the sorted forward sidecar avoids rescanning all K512 selected slots for each group panel, but the kernel remains far slower than the one-token query-major producer. This proves K-range lookup was not the only wall."
+    },
+    {
+      "name": "bounded_token_tile_group_panel_sidecar_sink",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_t32_gp32_k512_mode14_bounded_group_sidecar_sink_20260605.json",
+      "kernel": "source_boundary_query_major_scorepage_dparallel.hip",
+      "mode": "SCOREPAGE_PRODUCER_MODE=14,SCOREPAGE_GROUP_PANEL=32",
+      "seq_chunk": 32,
+      "selected_block": 512,
+      "group_panel": 32,
+      "sidecar_order": "sorted_by_compressed_group_with_invalid_sentinel",
+      "valid_dkv": false,
+      "modeled_atomic_reduction_x": 23.813051840857806,
+      "median_ms": 152.29849243164062,
+      "read": "Replacing final global dKV atomics with a checksum sink only saves about 2.69 ms versus mode 13. The dominant cost is the bounded token-tile producer/LDS accumulation path, not final global writes."
+    }
+  ],
+  "comparison": {
+    "older_unsorted_valid_dkv_ms": 25.938,
+    "older_triton_full_sparse_attention_backward_ms": 11.13,
+    "older_triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "sorted_sidecar_vs_unsorted_valid_speedup_x": 1.1374238562596079,
+    "sorted_sidecar_vs_triton_full_boundary_x": 2.0499557417114915,
+    "token_tile_group_panel_vs_triton_full_boundary_x": 15.651752812183513,
+    "bounded_token_tile_group_panel_vs_triton_full_boundary_x": 13.926537340113998,
+    "bounded_final_global_write_delta_ms": 2.693878173828125
+  },
+  "decision": {
+    "status": "not_promoted",
+    "why": "Forward-carried group ids are the right metadata contract, and sorting the sidecar improves destination order, but sidecar ordering alone cannot reduce writes when the CTA owns one token. The literal token-tile group-panel reducer reduces modeled writes but destroys the fast producer by serializing tokens inside one CTA. Adding sidecar-derived panel bounds improves mode 12 by only about 19 ms, and disabling final global writes saves only about 2.7 ms, so the remaining wall is producer/LDS accumulation inside the token-tile owner.",
+    "next_kernel_contract": "Keep the one-token query-major QK/PV producer and group_ids[B,S,K] sidecar sorted by compressed group. Do not materialize a full K512 prob/scaled-dP page and do not make one CTA own a full token tile. The next candidate needs either a persistent multi-CTA reducer or a compact partial stream where producer CTAs stay fast and a small reducer performs the cross-token group accumulation."
+  }
+}

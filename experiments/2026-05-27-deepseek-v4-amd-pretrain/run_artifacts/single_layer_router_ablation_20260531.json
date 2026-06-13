@@ -1,0 +1,86 @@
+{
+  "artifact": "single_layer_router_ablation",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_router_ablation_20260531T0330Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_router_ablation_20260531T0330Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16"
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "boundary_impl": "separate",
+    "rmsnorm_save_policy": "saved-accum"
+  },
+  "commands": {
+    "router_ablation": "RUN_TAG=retained_router_ablation_20260531T0330Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-router-ablation-2048",
+    "cpu_smoke": "ssh do-sonle-kernel 'docker exec -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc \"PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/run_microbench.py --preset tiny --impl reference --batch 1 --seqlen 4 --dtype float32 --device cpu --warmup 0 --iters 1 --cached-learned-router --json\"'"
+  },
+  "raw_artifacts": {
+    "timing_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_router_ablation_20260531T0330Z/router_ablation_s2048",
+    "learned": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_router_ablation_20260531T0330Z/router_ablation_s2048/learned.json",
+    "cached_learned": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_router_ablation_20260531T0330Z/router_ablation_s2048/cached_learned.json",
+    "fixed_balanced": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_router_ablation_20260531T0330Z/router_ablation_s2048/fixed_balanced.json"
+  },
+  "timing_sweep": {
+    "note": "Quick ranking run uses warmup=1 and iters=3. Cached-learned and fixed-balanced router modes bypass learned router gradients and are ablations, not valid full-training results.",
+    "target_ms": 43.3,
+    "variants": {
+      "learned": {
+        "router_override_mode": "learned",
+        "avg_ms": 53.31339927700659,
+        "min_ms": 52.50542797148228,
+        "tokens_per_s": 38414.35788701016,
+        "estimated_tflops": 182.62114442436393,
+        "moe_gate_grad_present": true,
+        "router_override_stats": null
+      },
+      "cached_learned": {
+        "router_override_mode": "cached_learned",
+        "avg_ms": 51.1410516143466,
+        "min_ms": 50.930195953696966,
+        "tokens_per_s": 40046.10651036113,
+        "estimated_tflops": 190.37844709451997,
+        "moe_gate_grad_present": false,
+        "router_override_stats": {
+          "assignments": 12288,
+          "experts": 384,
+          "nonzero_experts": 384,
+          "min_per_expert": 17,
+          "max_per_expert": 50,
+          "mean_per_expert": 32.0,
+          "padded_rows_32": 18080,
+          "padding_multiplier_32": 1.4713541666666667
+        }
+      },
+      "fixed_balanced": {
+        "router_override_mode": "fixed_balanced",
+        "avg_ms": 47.015822026878595,
+        "min_ms": 46.59032099880278,
+        "tokens_per_s": 43559.80416186648,
+        "estimated_tflops": 207.082500515548,
+        "moe_gate_grad_present": false,
+        "router_override_stats": {
+          "assignments": 12288,
+          "experts": 384,
+          "nonzero_experts": 384,
+          "min_per_expert": 32,
+          "max_per_expert": 32,
+          "mean_per_expert": 32.0,
+          "padded_rows_32": 12288,
+          "padding_multiplier_32": 1.0
+        }
+      }
+    },
+    "cached_learned_delta_ms_vs_learned": -2.1723476626599856,
+    "fixed_balanced_delta_ms_vs_cached_learned": -4.1252295874680045,
+    "fixed_balanced_delta_ms_vs_learned": -6.29757725012799,
+    "fixed_balanced_gap_to_target_ms": 3.7158220268785915
+  },
+  "conclusion": "At B=1 S=2048, detaching and caching the learned route map removes about 2.17 ms from the full learned-router path, isolating router/top-k/gate-gradient overhead. Replacing that cached learned map with a perfectly balanced fixed map removes another 4.13 ms and reduces the estimated 32-row padded routed rows from 18080 to 12288. The larger opportunity is therefore dynamic route balance, padding, and dispatch/build shape in the MoE path; router MLP/top-k is meaningful but not the dominant reason fixed-router ablations approach the 43.3 ms development target."
+}

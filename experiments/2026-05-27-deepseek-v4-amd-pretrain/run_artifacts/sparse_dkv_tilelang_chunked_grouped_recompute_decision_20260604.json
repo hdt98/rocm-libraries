@@ -1,0 +1,132 @@
+{
+  "status": "negative_for_promotion_but_kernel_works",
+  "scope": "TileLang sparse-MLA compressed dKV backward, slab-free P/dP recompute plus in-producer compressed-group reduction",
+  "implemented": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "new_metadata": "build_chunk_compact_slots() creates selected-K-chunk active compressed-group tables and pair slots",
+    "new_modes": [
+      "recompute_pdp_chunked_grouped_dkv_limited",
+      "recompute_pdp_chunked_rowblock_dkv_limited"
+    ],
+    "contract": "consume real q/dO/output/lse/compressed_kv plus packed group ids, recompute P and scaled dP inside TileLang, reduce by compressed group before final [groups, D] dKV atomic writes"
+  },
+  "correctness_gate": {
+    "artifact": "run_artifacts/tilelang_sparse_chunked_grouped_dkv_recompute_s512_topk128_tb16_cap128_k64d32x2_thr512_20260604.json",
+    "shape": {
+      "seq_len": 512,
+      "groups": 128,
+      "topk": 128,
+      "heads": 64,
+      "dim": 512,
+      "token_block": 16,
+      "group_panel_size": 128,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 32,
+      "d_blocks_per_kernel": 2
+    },
+    "median_ms": 2.783858060836792,
+    "max_abs_diff_vs_materialized_oracle": 0.014528393745422363,
+    "mean_abs_diff_vs_materialized_oracle": 0.00044945869012735784,
+    "read": "The kernel is mechanically correct in the expected BF16 recompute band on S512 and is faster than the previous legal full-panel grouped-D S512 gate."
+  },
+  "s4096_results": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_chunked_grouped_dkv_recompute_s4096_topk1024_tb16_gp128cap128_k64d32x2_thr512_20260604.json",
+      "group_panel_size": 128,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 32,
+      "d_blocks_per_kernel": 2,
+      "median_ms": 87.39049530029297,
+      "chunk_active_rows": 234850,
+      "chunk_max_active_groups": 128,
+      "chunk_write_reduction_x": 6.695133063657654
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_chunked_grouped_dkv_recompute_s4096_topk1024_tb16_gp128cap128_k64d32x4_thr512_20260604.json",
+      "group_panel_size": 128,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 32,
+      "d_blocks_per_kernel": 4,
+      "median_ms": 78.05426025390625,
+      "chunk_active_rows": 234850,
+      "chunk_max_active_groups": 128,
+      "chunk_write_reduction_x": 6.695133063657654
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_chunked_grouped_dkv_recompute_s4096_topk1024_tb16_gp128cap128_k64d32x8_thr512_20260604.json",
+      "group_panel_size": 128,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 32,
+      "d_blocks_per_kernel": 8,
+      "median_ms": 42.848426818847656,
+      "chunk_active_rows": 234850,
+      "chunk_max_active_groups": 128,
+      "chunk_write_reduction_x": 6.695133063657654,
+      "read": "Best retained S4096 chunked-grouped fused recompute point in this sweep."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_chunked_grouped_dkv_recompute_s4096_topk1024_tb16_gp128cap128_k64d64x2_thr512_20260604.json",
+      "group_panel_size": 128,
+      "selected_window": 128,
+      "block_k": 64,
+      "block_d": 64,
+      "d_blocks_per_kernel": 2,
+      "median_ms": 77.04434967041016,
+      "chunk_active_rows": 234850,
+      "chunk_max_active_groups": 128,
+      "chunk_write_reduction_x": 6.695133063657654
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_chunked_rowblock_dkv_recompute_s4096_topk1024_tb16_cap512_k64d32x2_rb16_thr512_20260604.json",
+      "group_panel_size": 512,
+      "selected_window": 512,
+      "block_k": 64,
+      "block_d": 32,
+      "d_blocks_per_kernel": 2,
+      "row_block": 16,
+      "median_ms": 1596.5841064453125,
+      "chunk_active_rows": 604661,
+      "chunk_max_active_groups": 471,
+      "chunk_write_reduction_x": 2.6003860014123616,
+      "read": "Compile-safe row-block fallback is rejected; it destroys reuse and explodes CTA count."
+    }
+  ],
+  "compile_failures": [
+    {
+      "shape": "S4096 gp512/cap512 K64 D32x2 and D32x1",
+      "mode": "recompute_pdp_chunked_grouped_dkv_limited",
+      "failure": "TileLang layout inference: no available layout found",
+      "read": "Full 512-wide panel chunks still have max chunk active groups up to 471 and are too irregular/large for the grouped-table lowering."
+    },
+    {
+      "shape": "S4096 gp128/cap128 K64 D16x16",
+      "mode": "recompute_pdp_chunked_grouped_dkv_limited",
+      "failure": "TileLang MFMA layout inference divide by zero",
+      "read": "D16 tile is not usable in this TileLang/MFMA lowering path."
+    },
+    {
+      "shape": "S4096 gp128/cap128 K64 D64x4",
+      "mode": "recompute_pdp_chunked_grouped_dkv_limited",
+      "failure": "requested dynamic shared memory 172032 exceeds device limit 163840",
+      "read": "D64x4 is just over the MI350 shared-memory limit; D32x8 remains the best legal high-reuse point."
+    }
+  ],
+  "comparison": {
+    "materialized_input_selected_limit_dkv_ms": 6.910138130187988,
+    "pdp_recompute_sink_only_best_ms": 8.423,
+    "previous_legal_full_panel_grouped_dkv_s4096_ms": 61.64236068725586,
+    "new_best_slab_free_final_dkv_ms": 42.848426818847656,
+    "new_best_speedup_vs_previous_legal_grouped_dkv": 1.4386040281850265,
+    "new_best_gap_vs_materialized_input_selected_limit": 6.200905402633167
+  },
+  "decision": {
+    "promote": false,
+    "retained_positive": "The TileLang chunked grouped kernel is real, correctness-passing at S512, and improves the best legal slab-free S4096 grouped-D attempt from 61.64 ms to 42.85 ms.",
+    "blocker": "At S4096, useful no-slab P/dP reuse still requires either too much TileLang reduction state or too many chunk-group CTAs/atomics. Even the best legal D32x8 point is 6.2x slower than the materialized-input selected-limit dKV producer and already far above the sparse-attention backward budget.",
+    "next": "Keep the materialized-input selected-limit TileLang producer as the current dKV output candidate. For slab-free production, move the fused P/dP plus compressed dKV reducer to a lower-level HIP/CK/rocWMMA path or find a TileLang primitive that supports a persistent grouped accumulator without full active-row materialization."
+  }
+}

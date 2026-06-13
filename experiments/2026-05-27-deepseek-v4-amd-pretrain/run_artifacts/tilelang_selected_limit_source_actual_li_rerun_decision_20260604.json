@@ -1,0 +1,103 @@
+{
+  "status": "promote_kernel_body_keep_materialized_bridge_diagnostic",
+  "scope": "tilelang_selected_limit_source_actual_li_compressed_dkv_rerun",
+  "date": "2026-06-04",
+  "hardware": "MI350X",
+  "remote": {
+    "host": "do-sonle5-mi350-gpu",
+    "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "hip_visible_devices": "0"
+  },
+  "code": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "kernel_builder": "make_mfma_panel_atomic_final_limited_bshd_source_indexed_kernel_builder",
+    "entrypoint": "run_selected_limit_dkv_from_source",
+    "contract": "q,dO [S,H,D] bf16; probs,scaled_dP [S,K,H] bf16 in original LI selected-slot order; SourceSelected/PairSlots/TileOffsets/ActiveGroups static route metadata; output [compressed_groups,D] fp32"
+  },
+  "why_this_is_the_real_tilelang_step": {
+    "raw_overwrite_store_diagnostic_ms": 9.259,
+    "straight_tilelang_atomic_reference_ms": 28.086,
+    "read": "The source-indexed selected-limit kernel keeps the query-major MFMA contribution body, reduces by compressed group inside the TileLang CTA, and writes only final reduced [group,D] dKV slices. This directly attacks the raw selected-row write wall."
+  },
+  "s128_correctness": {
+    "artifact": "run_artifacts/tilelang_selected_limit_source_actual_li_s128_layer2_gp32_rerun_20260604.json",
+    "shape": {
+      "seq_len": 128,
+      "compressed_groups": 32,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 32,
+      "actual_li_valid_pairs": 2016,
+      "group_panel_size": 32,
+      "panel_capacity": 32,
+      "token_block": 16,
+      "block_k": 32,
+      "block_d": 64,
+      "threads": 256
+    },
+    "max_abs_diff_vs_torch_reference": 0.00000667572021484375,
+    "source_vs_packed_max_abs_diff": 0.0,
+    "source_indexed_kernel_median_ms": 0.07040099799633026,
+    "write_reduction_x": 14.0
+  },
+  "s512_correctness": {
+    "artifact": "run_artifacts/tilelang_selected_limit_source_actual_li_s512_layer2_gp128_rerun_20260604.json",
+    "shape": {
+      "seq_len": 512,
+      "compressed_groups": 128,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 128,
+      "actual_li_valid_pairs": 32640,
+      "group_panel_size": 128,
+      "panel_capacity": 128,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "max_abs_diff_vs_torch_reference": 0.00000762939453125,
+    "source_vs_packed_max_abs_diff": 0.0,
+    "source_indexed_kernel_median_ms": 0.2636440098285675,
+    "write_reduction_x": 15.454545454545455
+  },
+  "s4096_timing": {
+    "artifact": "run_artifacts/tilelang_selected_limit_source_actual_li_s4096_layer2_gp512_rerun_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 512,
+      "actual_li_valid_pairs": 1572352,
+      "actual_li_compress_ratio": 4,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "packed_topk": 1024,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "active_rows": 131543,
+    "write_reduction_x": 11.953140798066032,
+    "route_limit_modeled_chunk_fraction": 0.431396484375,
+    "warmed_plan_median_ms": 1.623581051826477,
+    "packed_kernel_only_median_ms": 6.171392917633057,
+    "source_indexed_kernel_median_ms": 7.231564998626709,
+    "pack_only_median_ms": 1.9981060028076172,
+    "pack_plus_kernel_median_ms": 8.165535926818848
+  },
+  "decision": {
+    "promote_tilelang_kernel_body": true,
+    "promote_materialized_pack_bridge": false,
+    "read": "This is a concrete working TileLang kernel body that beats the current 8.0-8.8 ms sparse-atomic compressed-dKV wall when the source-indexed path is used. The remaining diagnostic costs are materialized probs/scaled-dP and route metadata; production still needs P/scaled-dP fusion or adjacent production without selected-state slabs.",
+    "next": [
+      "Use selected_limit_source as the retained TileLang dKV branch for bridge experiments.",
+      "Fuse or adjacent-produce P and scaled-dP so the producer no longer requires 512 MiB probs plus 512 MiB grad-logit slabs at S4096.",
+      "Connect final [compressed_groups,D] dKV to compressor and LightningIndexer backward while preserving the no-selected-state saved-tensor contract."
+    ]
+  }
+}

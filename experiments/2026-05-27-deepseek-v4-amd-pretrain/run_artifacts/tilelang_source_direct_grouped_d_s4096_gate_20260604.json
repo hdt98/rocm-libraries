@@ -1,0 +1,78 @@
+{
+  "scope": "tilelang_sparse_mla_whole_boundary_source_direct_grouped_d_gate",
+  "date": "2026-06-04",
+  "question": "Can the no-HSK TileLang source-direct dKV reducer become a target-shape candidate by processing multiple D blocks per CTA, preserving some QK/PV recompute while reducing dKV writes by compressed group?",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+    "device": "1xMI350",
+    "hip_visible_devices": "0",
+    "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "command_shape": {
+    "tool": "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py",
+    "candidate_mode": "tilelang_source_direct_dkv",
+    "env": {
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND": "dblocked_grouped_source",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_K": "16",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_D": "64",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_PANEL_CAPACITY": "16",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_D_BLOCKS_PER_KERNEL": "4",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_STATIC_ROUTE_SHAPE": "1"
+    },
+    "args": {
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "local_count": 128,
+      "compressed_count": 512,
+      "group_count": 1024,
+      "warmup": 1,
+      "iters": 2,
+      "skip_parity": true,
+      "skip_explicit_timing": true
+    }
+  },
+  "artifacts": {
+    "full_local128": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s4096_h64_d512_dpk4_20260604b.json",
+    "near_compressed_only_local16": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s4096_h64_d512_dpk4_local16_20260604b.json"
+  },
+  "result": {
+    "status": "rejected_for_latency",
+    "full_local128_median_ms": 457.33290100097656,
+    "full_local128_times_ms": [
+      458.49371337890625,
+      456.1720886230469
+    ],
+    "near_compressed_only_local16_median_ms": 419.1053924560547,
+    "near_compressed_only_local16_times_ms": [
+      420.2561340332031,
+      417.95465087890625
+    ],
+    "shape": {
+      "batch": 1,
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "selected_total": 640,
+      "local_selected": 128,
+      "compressed_selected": 512,
+      "compressed_groups": 1024
+    }
+  },
+  "comparison": {
+    "s512_grouped_d_best_seen_ms": 41.98959732055664,
+    "s4096_source_direct_dblocked_prior_ms": 77.21022033691406,
+    "s4096_source_hsk_export_bridge_ms": 58.79916000366211,
+    "s4096_direct_atomic_whole_boundary_ms": 42.53963851928711,
+    "s4096_materialized_actual_li_bridge_ms": 21.466854125261307,
+    "s4096_materialized_actual_li_tilelang_dkv_body_ms": 7.307250022888184,
+    "old_sparse_atomic_dkv_wall_ms": "8.0-8.8"
+  },
+  "read": "Grouped-D source-direct is not a viable target-shape TileLang whole-boundary branch. It avoids HSK slabs and reduces dKV by group, but it still recomputes QK/PV for route-owned D-block CTAs; at S4096/H64/D512 the recompute and schedule cost explode to roughly 457 ms. A near-compressed-only run with local_count=16 is still roughly 419 ms, so local-window dKV is not hiding a fast compressed result. This confirms the e2e TileLang gap is not final fold, route planning, local-window overhead, or lack of D-block grouping. The missing kernel remains a query-major source producer that computes probabilities/dP/dQ once while performing group-aware dKV reduction in the epilogue before global memory.",
+  "next": [
+    "Do not promote tilelang_source_direct_dkv or grouped-D source-direct into TorchTitan e2e.",
+    "Keep selected_limit_source/HSK BF16 only as a materialized-input dKV body and source of route metadata lessons.",
+    "The next implementation surface is a fused query-major producer with an epilogue segmented by compressed group; if TileLang cannot express that without recompute or dynamic-slot lowering failures, move the producer to HIP/rocWMMA or CK while preserving the no-selected-state ABI."
+  ]
+}

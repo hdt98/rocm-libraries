@@ -1,0 +1,51 @@
+{
+  "artifact": "torchtitan_standard_ep_flatpos_abi_8x_s4096_gbs128_20260609",
+  "date_utc": "2026-06-09",
+  "node": "do-sonle5-mi350-gpu",
+  "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260609T091732Z",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "layers": 12
+  },
+  "mode": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "hot_experts": 8,
+    "hot_weight_forward_backend": "mori_sdma",
+    "hot_weight_reduce_backend": "mori_sdma",
+    "hot_split_materialize_backend": "torch",
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact",
+    "weighted_scatter_backend": "triton_bwd",
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "profile_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/standard_ep_flatpos_abi_8x_mbs8_steps3_20260609",
+  "output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260609T091732Z",
+  "throughput_note": {
+    "status": "profile ABI validation only, not a throughput promotion",
+    "step_2_tok_per_gpu_s": 6642,
+    "step_2_tflops_per_gpu": 336.30,
+    "step_3_tok_per_gpu_s": 6740,
+    "step_3_tflops_per_gpu": 341.25
+  },
+  "standard_ep_dispatch_flat_position_validation": {
+    "dispatch_records": 576,
+    "bad_records": 0,
+    "has_normal_flat_positions_true": 576,
+    "has_normal_flat_positions_false": 0,
+    "has_normal_flat_positions_missing": 0,
+    "normal_flat_positions_rows_min": 38229,
+    "normal_flat_positions_rows_max": 183154,
+    "routed_rows_after_hot_mask_min": 38229,
+    "routed_rows_after_hot_mask_max": 183154,
+    "invariant": "normal_flat_positions_rows == routed_rows_after_hot_mask for every standard_ep_dispatch timing record"
+  },
+  "read": "The standard-EP hot-helper path now exposes the expert-sorted cold/normal flattened route positions needed by a native MORI compact-row dispatcher, without reconstructing the raw token x top-k route matrix."
+}

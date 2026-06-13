@@ -1,0 +1,104 @@
+{
+  "status": "stage_profile_pins_selected_limit_source_bridge_ladder",
+  "scope": "TorchTitan shared-KV selected-limit-source TileLang bridge stage profile",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code_changes": {
+    "profile_script": "tools/dsv4_runtime_probe/profile_torchtitan_shared_kv_tilelang_bridge.py",
+    "added_flags": [
+      "--plan-on-device",
+      "--include-packed-control"
+    ],
+    "read": "The profile can now match the selected_limit_source bridge by building selected-limit metadata from device-resident groups and skipping the packed-weight control kernel."
+  },
+  "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_stage_profile_selected_limit_source_s4096_20260604.json",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 128,
+    "compressed_count": 512,
+    "group_count": 1024,
+    "selected": 640,
+    "plan_on_device": true,
+    "include_packed_control": false
+  },
+  "route_caveat": {
+    "route_source": "verify_torchtitan_shared_kv_tilelang_backward_bridge.build_indices",
+    "read": "This is a synthetic unique compressed route profile, not actual LightningIndexer layer-2 fan-in. Every token has 512 valid compressed selections, so valid pairs and route-limit chunk work are higher than the actual-LI layer-2 adapter case.",
+    "profile_valid_pairs": 2097152,
+    "profile_write_reduction_x": 8.000183109659798,
+    "profile_route_limit_modeled_chunk_fraction": 0.625,
+    "actual_li_layer2_valid_pairs_reference": 1572352,
+    "actual_li_selected_limit_write_reduction_reference_x": 11.953140798066032,
+    "actual_li_selected_limit_route_limit_chunk_fraction_reference": 0.431396484375
+  },
+  "autograd_bridge_timing": {
+    "selected_limit_source_bridge_event_ms": 30.12781524658203,
+    "manual_component_median_sum_ms": 31.599241964053363,
+    "manual_component_wall_sum_ms": 32.077713520266116,
+    "peak_memory_gib": 13.926276683807373
+  },
+  "top_components": [
+    {
+      "component": "tilelang_dkv_source_indexed_kernel_b0",
+      "median_ms": 9.80976915359497,
+      "pct_of_component_sum": 31.044317976850074
+    },
+    {
+      "component": "gather_selected_kv_fp32",
+      "median_ms": 3.2416964769363403,
+      "pct_of_component_sum": 10.258779247375701
+    },
+    {
+      "component": "scores_qk",
+      "median_ms": 2.4879274368286133,
+      "pct_of_component_sum": 7.873376961570242
+    },
+    {
+      "component": "grad_probs_do_v",
+      "median_ms": 2.303745985031128,
+      "pct_of_component_sum": 7.290510283923333
+    },
+    {
+      "component": "grad_q",
+      "median_ms": 2.296345591545105,
+      "pct_of_component_sum": 7.267090755396537
+    },
+    {
+      "component": "local_scatter",
+      "median_ms": 2.093063473701477,
+      "pct_of_component_sum": 6.623777482012076
+    },
+    {
+      "component": "forward_with_lse",
+      "median_ms": 1.9186415076255798,
+      "pct_of_component_sum": 6.071795993739933
+    },
+    {
+      "component": "route_plan_b0",
+      "median_ms": 1.7329378752037883,
+      "pct_of_component_sum": 5.484112173244985
+    }
+  ],
+  "derived_buckets": {
+    "selected_state_and_explicit_row_terms_ms": 9.764706373214722,
+    "local_dkv_path_ms": 5.471373438835144,
+    "compressed_dkv_tilelang_source_ms": 9.80976915359497,
+    "route_metadata_ms": 1.811897884234786,
+    "compressed_pdp_bf16_pack_ms": 1.2912544906139374,
+    "read": "The bridge is still dominated by selected-state materialization/explicit QK-PV-dQ work plus the source-indexed compressed dKV kernel. Device-side selected-limit planning is visible but not the lead wall in the synthetic-route profile."
+  },
+  "decision": {
+    "promote_profile_script_update": true,
+    "promote_selected_limit_source_as_bridge_candidate": true,
+    "production_default": false,
+    "next_work": [
+      "Run or construct the same stage profile on actual LI layer-2 boundary tensors so the route fan-in matches production.",
+      "Fuse or adjacent-produce selected-state row terms: selected-KV gather, scores/probs, grad_probs, grad_logits, and grad_q.",
+      "Keep reducing TileLang source-indexed dKV for the heavier all-valid route, but actual-LI layer-2 already points more strongly at removing materialized P/dP and selected-KV slabs."
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "local_weight_shape": [
+    8,
+    16,
+    16
+  ],
+  "num_local_experts": 8,
+  "probe": "standard_ep_hotweight_backend_parity",
+  "results": [
+    {
+      "case": "balanced",
+      "rankmax_grad_abs_diff": 0.0,
+      "rankmax_hot_abs_diff": 0.0,
+      "rankmax_owner_sharded_grouped_grad_abs_diff": 0.0,
+      "rankmax_owner_sharded_grouped_out_abs_diff": 0.0,
+      "selected_global_experts": [
+        0,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56
+      ]
+    },
+    {
+      "case": "skewed",
+      "rankmax_grad_abs_diff": 0.0,
+      "rankmax_hot_abs_diff": 0.0,
+      "rankmax_owner_sharded_grouped_grad_abs_diff": 0.0,
+      "rankmax_owner_sharded_grouped_out_abs_diff": 0.0,
+      "selected_global_experts": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "world_size": 8
+}

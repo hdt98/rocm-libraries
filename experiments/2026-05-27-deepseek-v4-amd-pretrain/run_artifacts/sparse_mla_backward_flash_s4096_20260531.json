@@ -1,0 +1,298 @@
+{
+  "active_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+  "artifact": "sparse_mla_backward_ops_probe",
+  "correctness": {},
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flags": {
+    "bf16_contracts": true,
+    "body_tail_window_grad_reduce": true,
+    "diagonal_window_grad_reduce": true,
+    "direct_compressed_value_out": true,
+    "direct_scores_out": true,
+    "direct_selected_grad_out": true,
+    "prealloc_scores": true,
+    "softmax_dot_triton": true,
+    "softmax_dot_vecdot": false,
+    "softmax_forward_triton": true,
+    "softmax_sinkgrad_triton": false,
+    "split_compressed_branches": false,
+    "triton_window_grad_reduce": false
+  },
+  "primitive_profile": {
+    "compressed_grad_from_probs_ms_max": 0.8183280229568481,
+    "compressed_grad_from_probs_ms_mean": 0.7994740207990011,
+    "compressed_grad_from_probs_ms_median": 0.7925670146942139,
+    "compressed_grad_from_probs_ms_min": 0.7875270247459412,
+    "compressed_grad_probs_ms_max": 0.8702089786529541,
+    "compressed_grad_probs_ms_mean": 0.8073946634928385,
+    "compressed_grad_probs_ms_median": 0.7993280291557312,
+    "compressed_grad_probs_ms_min": 0.7526469826698303,
+    "grad_compressed_q_add_ms_max": 0.5764859914779663,
+    "grad_compressed_q_add_ms_mean": 0.5468319853146871,
+    "grad_compressed_q_add_ms_median": 0.5521649718284607,
+    "grad_compressed_q_add_ms_min": 0.5118449926376343,
+    "grad_q_compressed_add_ms_max": 0.5077250003814697,
+    "grad_q_compressed_add_ms_mean": 0.5023916562398275,
+    "grad_q_compressed_add_ms_median": 0.5020449757575989,
+    "grad_q_compressed_add_ms_min": 0.4974049925804138,
+    "grad_q_from_window_scores_ms_max": 0.19576199352741241,
+    "grad_q_from_window_scores_ms_mean": 0.19450866182645163,
+    "grad_q_from_window_scores_ms_median": 0.1939219981431961,
+    "grad_q_from_window_scores_ms_min": 0.19384199380874634,
+    "grad_selected_q_add_ms_max": 0.5066050291061401,
+    "grad_selected_q_add_ms_mean": 0.5028316775957743,
+    "grad_selected_q_add_ms_median": 0.5058850049972534,
+    "grad_selected_q_add_ms_min": 0.49600499868392944,
+    "intermediate_meta": {
+      "compressed_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          1056,
+          512
+        ],
+        "stride": [
+          540672,
+          512,
+          1
+        ]
+      },
+      "grad_probs_window_base": {
+        "dtype": "float32",
+        "is_contiguous": false,
+        "shape": [
+          1,
+          64,
+          4096,
+          128
+        ],
+        "stride": [
+          33554432,
+          128,
+          8192,
+          1
+        ]
+      },
+      "grad_selected_base": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          128,
+          512
+        ],
+        "stride": [
+          268435456,
+          65536,
+          512,
+          1
+        ]
+      },
+      "probs_all": {
+        "dtype": "float32",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          64,
+          4096,
+          1185
+        ],
+        "stride": [
+          310640640,
+          4853760,
+          1185,
+          1
+        ]
+      },
+      "q_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          64,
+          512
+        ],
+        "stride": [
+          134217728,
+          32768,
+          512,
+          1
+        ]
+      },
+      "selected_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          128,
+          512
+        ],
+        "stride": [
+          268435456,
+          65536,
+          512,
+          1
+        ]
+      }
+    },
+    "modeled_primitive_median_sum_ms": 5.285250008106232,
+    "sink_grad_reduce_ms_max": 0.029839999973773956,
+    "sink_grad_reduce_ms_mean": 0.024586666996280353,
+    "sink_grad_reduce_ms_median": 0.0225600004196167,
+    "sink_grad_reduce_ms_min": 0.0213600005954504,
+    "softmax_backward_scores_ms_max": 1.2577719688415527,
+    "softmax_backward_scores_ms_mean": 1.2543456554412842,
+    "softmax_backward_scores_ms_median": 1.2538520097732544,
+    "softmax_backward_scores_ms_min": 1.2514129877090454,
+    "sparse_grad_probs_window_ms_max": 0.24928200244903564,
+    "sparse_grad_probs_window_ms_mean": 0.23748200138409933,
+    "sparse_grad_probs_window_ms_median": 0.23500199615955353,
+    "sparse_grad_probs_window_ms_min": 0.2281620055437088,
+    "sparse_grad_selected_from_probs_ms_max": 0.4008840024471283,
+    "sparse_grad_selected_from_probs_ms_mean": 0.3246166706085205,
+    "sparse_grad_selected_from_probs_ms_median": 0.28820300102233887,
+    "sparse_grad_selected_from_probs_ms_min": 0.28476300835609436,
+    "window_grad_reduce_body_tail_ms_max": 0.14048099517822266,
+    "window_grad_reduce_body_tail_ms_mean": 0.13962766528129578,
+    "window_grad_reduce_body_tail_ms_median": 0.13972100615501404,
+    "window_grad_reduce_body_tail_ms_min": 0.13868099451065063
+  },
+  "read": "Backward timing excludes forward graph construction but uses the exact saved-tensor contract produced by the no-kv-cat sparse MLA autograd function. Primitive timings are unfused op timings for prioritizing a fused sparse MLA backward kernel.",
+  "shape": {
+    "batch": 1,
+    "csa_tokens": 1024,
+    "hca_tokens": 32,
+    "heads": 64,
+    "keys_excluding_sink": 1184,
+    "keys_including_sink": 1185,
+    "kv_dim": 512,
+    "seqlen": 4096,
+    "window_size": 128
+  },
+  "tensor_meta": {
+    "attn_invalid_mask": {
+      "dtype": "bool",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        1,
+        4096,
+        1184
+      ],
+      "stride": [
+        4849664,
+        4849664,
+        1184,
+        1
+      ]
+    },
+    "attn_sink": {
+      "dtype": "float32",
+      "is_contiguous": true,
+      "shape": [
+        64
+      ],
+      "stride": [
+        1
+      ]
+    },
+    "csa": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        1024,
+        512
+      ],
+      "stride": [
+        524288,
+        512,
+        1
+      ]
+    },
+    "grad_output": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        64,
+        512
+      ],
+      "stride": [
+        134217728,
+        32768,
+        512,
+        1
+      ]
+    },
+    "hca": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        32,
+        512
+      ],
+      "stride": [
+        16384,
+        512,
+        1
+      ]
+    },
+    "kv": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        512
+      ],
+      "stride": [
+        2097152,
+        512,
+        1
+      ]
+    },
+    "q": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        64,
+        512
+      ],
+      "stride": [
+        134217728,
+        32768,
+        512,
+        1
+      ]
+    },
+    "sparse_key_indices": {
+      "dtype": "int64",
+      "is_contiguous": true,
+      "shape": [
+        4096,
+        1184
+      ],
+      "stride": [
+        1184,
+        1
+      ]
+    }
+  },
+  "timing": {
+    "backward_ms_max": 5.6419758796691895,
+    "backward_ms_mean": 5.211424986521403,
+    "backward_ms_median": 5.068769931793213,
+    "backward_ms_min": 4.923529148101807
+  },
+  "variant": "retained"
+}

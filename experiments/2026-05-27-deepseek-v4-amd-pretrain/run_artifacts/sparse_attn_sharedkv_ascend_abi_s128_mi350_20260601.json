@@ -1,0 +1,58 @@
+{
+  "backend": {
+    "ascend_shared_kv_abi": "sparse_attn_sharedkv(query, ori_kv, cmp_kv, cmp_sparse_indices, sinks, softmax_scale, cmp_ratio, ...)",
+    "kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "path": "sparse_mla_shared_kv_triton_forward_backend.py",
+    "shared_kv_backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "supports_ascend_sparse_attn_sharedkv_abi": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "parity": {
+    "backward": {
+      "ascend_abi_loss": 0.05560394376516342,
+      "enabled": true,
+      "legacy_loss": 0.05560394376516342,
+      "max_cmp_kv_grad_abs_diff": 1.4901161193847656e-08,
+      "max_ori_kv_grad_abs_diff": 1.4901161193847656e-08,
+      "max_q_grad_abs_diff": 0.0,
+      "max_sinks_grad_abs_diff": 0.0
+    },
+    "cmp_indices_shape": [
+      1,
+      128,
+      32
+    ],
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "grad_atol": 1e-06,
+    "legacy_indices_shape": [
+      1,
+      128,
+      160
+    ],
+    "local_count": 128,
+    "max_output_abs_diff": 0.0,
+    "output_atol": 0.0,
+    "selected_count": 160,
+    "seq_len": 128,
+    "status": "passed"
+  },
+  "read": "The Ascend-style wrapper is compared against the legacy concatenated-bank shared-KV ABI. Backward comparison splits the legacy dKV bank into dOriKv and dCmpKv.",
+  "scope": "sparse_attn_sharedkv_ascend_abi_verifier",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 512,
+    "heads": 64,
+    "local_count": 128,
+    "seq_len": 128,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "enabled": false
+  }
+}

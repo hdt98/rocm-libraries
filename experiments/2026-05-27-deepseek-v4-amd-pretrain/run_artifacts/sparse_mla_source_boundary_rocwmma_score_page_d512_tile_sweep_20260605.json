@@ -1,0 +1,72 @@
+{
+  "artifact": "sparse_mla_source_boundary_rocwmma_score_page_d512_tile_sweep",
+  "date": "2026-06-05",
+  "status": "simple_tiling_sweep_complete_not_promoted",
+  "scope": "S4096 layer-2 source-boundary rocWMMA D512 score-page full dKV atomic path, SCORE_PAGE_MODE=2",
+  "source_file": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+  "harness": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "rows": [
+    {
+      "seq_chunk": 32,
+      "selected_block": 64,
+      "event_median_ms": 105.42322540283203,
+      "route_atomic_reduction_x": 3.428225069715621,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json"
+    },
+    {
+      "seq_chunk": 16,
+      "selected_block": 64,
+      "event_median_ms": 66.47088623046875,
+      "route_atomic_reduction_x": 2.084076027887496,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json"
+    },
+    {
+      "seq_chunk": 8,
+      "selected_block": 64,
+      "event_median_ms": 67.2119369506836,
+      "route_atomic_reduction_x": 1.4862027702213492,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc8_sb64_bd512_thr64_timing5_20260605.json"
+    },
+    {
+      "seq_chunk": 16,
+      "selected_block": 32,
+      "event_median_ms": 72.6686782836914,
+      "route_atomic_reduction_x": 1.5162404882512848,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc16_sb32_bd512_thr64_timing5_20260605.json"
+    },
+    {
+      "seq_chunk": 8,
+      "selected_block": 32,
+      "event_median_ms": 71.12667846679688,
+      "route_atomic_reduction_x": 1.2393742718729752,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc8_sb32_bd512_thr64_timing5_20260605.json"
+    },
+    {
+      "seq_chunk": 8,
+      "selected_block": 16,
+      "event_median_ms": 85.90275573730469,
+      "route_atomic_reduction_x": 1.1201401998988394,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc8_sb16_bd512_thr64_timing5_20260605.json"
+    }
+  ],
+  "best": {
+    "seq_chunk": 16,
+    "selected_block": 64,
+    "event_median_ms": 66.47088623046875,
+    "improvement_x_vs_sc32_sb64": 1.5860142705265906,
+    "vs_triton_full_sparse_attention_backward_x": 5.972227872459007,
+    "triton_full_sparse_attention_backward_ms": 11.13
+  },
+  "read": "Shrinking the token tile exposes missing parallelism in the bring-up kernel: 16x64 cuts the full dKV path from 105.42 ms to 66.47 ms while preserving more selected-panel coalescing than 8x32 or 8x16. Simple tiling is now exhausted: 8x64 ties/slightly loses, and selected_block=16/32 loses dKV reduction efficiency. The next step is a different CK/MFMA schedule and grouped epilogue, not another scalar tile split."
+}

@@ -1,0 +1,119 @@
+{
+  "artifact": "bmm_backend_sweep_s2048_max52_decision_20260531",
+  "date": "2026-05-31",
+  "node": "do-sonle-kernel",
+  "gpu": "1xMI350",
+  "shape": {
+    "layer": "DeepSeek V4-Pro single layer proxy",
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "moe_intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "dtype": "bfloat16",
+    "tokens_per_group_emulation": 52,
+    "tokens_per_group_source": "retained S2048 learned-router padded max_per_expert from dynamic_moe_bridge_ops_compact_reduce_gpu_s2048_20260531.json"
+  },
+  "goal": {
+    "s2048_target_ms": 43.3,
+    "retained_baseline_avg_ms": 52.328626019880176,
+    "retained_baseline_min_ms": 52.19650699291378,
+    "promotion_gate_avg_ms": 51.328626019880176
+  },
+  "source_artifacts": {
+    "retained_full_layer_baseline": "paired_compact_reduce_full_layer_s2048_20260531.json",
+    "live_baseline_refresh": "compact_moe_budget_baseline_s2048_20260531.json",
+    "current_backend_sweep": "bmm_backend_sweep_s2048_max52_current_20260531.json",
+    "default_backend_sweep": "bmm_backend_sweep_s2048_max52_default_20260531.json",
+    "hipblas_backend_sweep": "bmm_backend_sweep_s2048_max52_hipblas_20260531.json",
+    "hipblaslt_backend_sweep": "bmm_backend_sweep_s2048_max52_hipblaslt_20260531.json",
+    "hipblas_full_layer": "full_layer_s2048_hipblas_backend_20260531.json"
+  },
+  "isolated_bmm_results": [
+    {
+      "request": "current",
+      "effective_backend": "Cublaslt",
+      "op_median_ms": {
+        "fwd_w1": 2.932950973510742,
+        "w2_dgrad": 3.1402299404144287,
+        "w1w3_xgrad": 6.457820892333984,
+        "w2_wgrad": 5.110326766967773,
+        "w1_wgrad": 5.007727146148682,
+        "w3_wgrad": 5.01700496673584
+      },
+      "backward_moe_gemm_median_sum_ms": 24.733109712600708,
+      "copy_all_wgrad_lhs_median_ms": 0.6651260256767273
+    },
+    {
+      "request": "default",
+      "effective_backend": "Cublaslt",
+      "op_median_ms": {
+        "fwd_w1": 2.9769840240478516,
+        "w2_dgrad": 3.1800670623779297,
+        "w1w3_xgrad": 6.414773941040039,
+        "w2_wgrad": 5.111321926116943,
+        "w1_wgrad": 5.026280879974365,
+        "w3_wgrad": 5.01655912399292
+      },
+      "backward_moe_gemm_median_sum_ms": 24.749002933502197,
+      "copy_all_wgrad_lhs_median_ms": 0.6690459847450256
+    },
+    {
+      "request": "hipblas",
+      "effective_backend": "Cublas",
+      "op_median_ms": {
+        "fwd_w1": 2.934662103652954,
+        "w2_dgrad": 3.138343095779419,
+        "w1w3_xgrad": 6.427526950836182,
+        "w2_wgrad": 5.143798828125,
+        "w1_wgrad": 5.007476806640625,
+        "w3_wgrad": 5.010676860809326
+      },
+      "backward_moe_gemm_median_sum_ms": 24.727821826934814,
+      "copy_all_wgrad_lhs_median_ms": 0.6426849961280823
+    },
+    {
+      "request": "hipblaslt",
+      "effective_backend": "Cublaslt",
+      "op_median_ms": {
+        "fwd_w1": 2.9580209255218506,
+        "w2_dgrad": 3.147507905960083,
+        "w1w3_xgrad": 6.437538146972656,
+        "w2_wgrad": 5.13240385055542,
+        "w1_wgrad": 5.011641979217529,
+        "w3_wgrad": 5.01068115234375
+      },
+      "backward_moe_gemm_median_sum_ms": 24.73977303504944,
+      "copy_all_wgrad_lhs_median_ms": 0.6253650188446045
+    }
+  ],
+  "full_layer_check": {
+    "request": "hipblas",
+    "effective_backend": "Cublas",
+    "avg_ms": 54.591374192386866,
+    "min_ms": 54.16968499775976,
+    "tokens_per_s": 37515.08421060423,
+    "estimated_tflops": 178.34601405724956,
+    "delta_vs_retained_baseline_avg_ms": 2.2627481725066894,
+    "promoted": false
+  },
+  "rejected_or_inconclusive_paths": [
+    {
+      "request": "ck",
+      "result": "rejected_first_probe_shape",
+      "reason": "RuntimeError: device_gemm with the specified compilation parameters does not support this GEMM problem"
+    },
+    {
+      "request": "TunableOp",
+      "result": "inconclusive_hung",
+      "reason": "PYTORCH_TUNABLEOP_ENABLED=1 probe with max_tuning_iters=20 and max_tuning_duration_ms=100 produced no stdout, stderr, csv, or summary after more than 2 minutes and was killed as a user-owned experiment process"
+    }
+  ],
+  "decision": {
+    "promote_backend_override": false,
+    "recommended_backend": "retain current compact-reduce bmm-out/dense-wgrad path with default/current backend selection",
+    "rationale": "Backend selection does not materially change the isolated max52 routed-MoE BMM budget, and the hipblas full-layer check regresses by 2.26 ms versus the retained S2048 baseline. This path cannot close the 9.03 ms S2048 target gap.",
+    "next_optimization_direction": "Focus on structural MoE backward reductions and routing/padding work, especially wgrad/dgrad/xgrad fusion or a higher-utilization compact grouped GEMM path via CK/TileLang/library kernels rather than simple backend toggles."
+  }
+}

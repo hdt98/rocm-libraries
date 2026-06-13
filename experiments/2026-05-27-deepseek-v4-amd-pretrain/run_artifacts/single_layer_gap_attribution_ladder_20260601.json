@@ -1,0 +1,204 @@
+{
+  "artifact": "single_layer_gap_attribution_ladder_20260601",
+  "date_local": "2026-06-01",
+  "scope": "one_mi350_deepseek_v4_flash_s4096_single_layer_gap_attribution",
+  "status": "attribution_ready_with_torch_profiler_cross_check_non_additive_subsystem_caveat",
+  "target": {
+    "sequence_length": 4096,
+    "full_layer_fwd_bwd_grads_ms": 24.9,
+    "attention_forward_anchor_ms": 3.6,
+    "moe_routed_expert_gemm_family_fwd_bwd_anchor_ms": 12.9,
+    "source": "user_updated_goal_2026_06_01"
+  },
+  "current_best_integrated_proxy": {
+    "artifact_read": "metrics.md retained fixed-router packed-sim BF16-contract S4096 run",
+    "full_layer_ms": 68.2089,
+    "forward_ms": 22.577,
+    "backward_ms": 45.4889,
+    "tokens_per_s": 60050.82,
+    "estimated_tflops": 310.415755,
+    "target_time_gap_x": 2.7393132530120483,
+    "required_reduction_ms": 43.3089,
+    "target_time_fraction_of_current": 0.36505503369140624,
+    "caveat": "Fixed-router packed-sim is the fastest current math proxy, but it is not final learned-router training behavior."
+  },
+  "normal_loss_backward_profiler_cross_check": {
+    "artifact": "run_artifacts/single_layer_s4096_fixed_torchtrace_20260601.json",
+    "scope": "one-iteration torch.profiler trace of the same S4096 fixed-router retained path using normal loss.backward",
+    "phase_total_ms": 71.04081788565964,
+    "forward_ms": 24.766995920799673,
+    "backward_ms": 46.12274200189859,
+    "profiler_overhead_vs_clean_baseline_ratio": 1.041518303472274,
+    "forward_kernel_family_ms": {
+      "cijk_gemm": 14.382,
+      "copy_cast": 3.069,
+      "softmax": 2.527,
+      "other": 2.18
+    },
+    "backward_kernel_family_ms": {
+      "cijk_gemm": 36.166,
+      "copy_cast": 3.546,
+      "elementwise": 1.958,
+      "softmax": 1.683,
+      "other": 1.8
+    },
+    "torch_key_average_highlights": {
+      "aten_bmm_self_cuda_ms": 38.078,
+      "aten_mm_self_cuda_ms": 7.084,
+      "aten_baddbmm_self_cuda_ms": 5.386,
+      "aten_copy_self_cuda_ms": 6.899,
+      "sparse_mla_forward_cuda_total_ms": 7.433,
+      "sparse_mla_backward_cuda_total_ms": 8.799
+    },
+    "read": "This cross-check replaces the earlier rank-0 uncertainty with a normal backward sanity check. It still is not a perfect additive subsystem tree, but it confirms that the backward phase is dominated by GEMM/BMM-family kernels and that copy/cast movement is secondary."
+  },
+  "exact_phase_gap_read": {
+    "forward_fraction_of_target": 0.9067068273092369,
+    "backward_fraction_of_target": 1.827867469879518,
+    "target_minus_current_forward_ms": 2.323,
+    "read": "The current forward pass alone consumes about 90.7% of the whole 24.9 ms layer budget, and current backward alone is about 1.83x the whole target. Closing the gap therefore requires both attention/LI backward and MoE training-GEMM replacement; a dispatch-only or forward-only tweak cannot close 43.31 ms."
+  },
+  "current_forward_breakdown": {
+    "sparse_mla_forward_ms": 6.987,
+    "routed_moe_forward_ms": 9.6633,
+    "other_forward_ms": 5.9267,
+    "sparse_mla_forward_excess_vs_3p6_anchor_ms": 3.387,
+    "routed_moe_forward_fraction_of_12p9_moe_fwd_bwd_anchor": 0.7490930232558139,
+    "sglang_runtime_comparability_artifact": "run_artifacts/sglang_dsv4_run_env_forward_comparability_20260601.json",
+    "sharper_attention_boundary_forward_ms": 4.30511999130249,
+    "read": "The retained forward sparse-MLA path is still 3.39 ms above the 3.6 ms forward anchor, and routed-MoE forward alone already uses about three quarters of the entire 12.9 ms MoE fwd+bwd anchor."
+  },
+  "backward_attribution_non_additive": {
+    "source": "metrics.md S4096 1-iter retained-path segmented backward attribution",
+    "phase_backward_ms": 45.1513,
+    "warning": "The following block timings are segmented attribution probes and are not additive; dgrad and wgrad rows rerun slices of the backward graph to rank bottleneck families.",
+    "ranked_blocks_ms": {
+      "moe_routed_wgrad": 26.4905,
+      "moe_routed_dgrad": 26.3351,
+      "attention_wgrad": 15.7438,
+      "attention_dgrad": 15.3536,
+      "attention_sparse_mla_sink_wgrad": 8.8608,
+      "attention_sparse_mla_dgrad_qkv": 8.8394,
+      "moe_routed_w1_w3_dgrad": 6.5695,
+      "moe_routed_w2_wgrad": 5.9223,
+      "moe_routed_w1_wgrad": 5.7928,
+      "moe_routed_w3_wgrad": 5.1172,
+      "attention_q_path_dgrad": 3.2536,
+      "moe_routed_w2_dgrad": 3.2013,
+      "attention_q_path_wgrad": 3.1399
+    },
+    "read": "The ranking says MoE routed dgrad/wgrad are the largest current fixed-router training families, while sparse-MLA backward remains a large attention-side family. These rows should guide kernel work, not be summed as a full-layer total."
+  },
+  "attention_li_current_evidence": {
+    "shared_kv_attention_boundary_fwd_bwd_ms": 23.363208770751953,
+    "shared_kv_raw_fwd_bwd_ms": 17.83935546875,
+    "output_projection_fwd_bwd_ms": 3.3245890140533447,
+    "other_q_wkva_rope_li_compression_ms": 2.1992642879486084,
+    "shared_kv_boundary_forward_ms": 4.494760036468506,
+    "wide_tile_unfused_li_pipeline_ms": 4.486985206604004,
+    "attention_plus_unfused_li_floor_ms": 27.850193977355957,
+    "attention_plus_unfused_li_over_full_layer_target_ms": 2.9501939773559585,
+    "planning_budget_ms": {
+      "range": [
+        8.7,
+        10.0
+      ],
+      "basis": "3.6 ms forward anchor plus prior about 5.07 ms sparse-MLA backward anchor, with only small allowance for LI/boundary integration."
+    },
+    "route_slice": {
+      "full_local128_compressed512_raw_backward_ms": 14.392242431640625,
+      "local128_only_raw_backward_ms": 3.8283939361572266,
+      "compressed512_only_raw_backward_ms": 11.017240524291992,
+      "compressed_only_ratio_of_full": 0.765499,
+      "read": "The compressed top-k route dominates the raw query-major shared-KV backward slice; local sliding-window attention is not the first wall."
+    },
+    "retired_inverse_route_dkv_reduction": {
+      "artifact": "run_artifacts/structured_dkv_inverse_route_sweep_20260601/summary.json",
+      "small_s128_structured_ms": 0.0809210017323494,
+      "small_s128_atomic_compare_ms": 0.20260100066661835,
+      "best_s4096_structured_two_pass_ms": 140.67405700683594,
+      "extended_s4096_structured_two_pass_range_ms": [
+        432.1130828857422,
+        482.8509979248047
+      ],
+      "decision": "Do not pursue the key-major scratch two-pass dKV reduction as the production sparse MLA backward route. It removes atomics and tightens numerics, but loses query/key reuse and is 10x+ slower than the retained query-major raw slice at S4096."
+    },
+    "read": "The current attention plus LI diagnostic floor already exceeds the entire 24.9 ms layer target before MoE, residual/RMSNorm, compressor backward integration, and layer bookkeeping."
+  },
+  "moe_current_evidence": {
+    "integrated_fixed_router_forward_moe_ms": 9.6633,
+    "dynamic_learned_router_integrated_full_layer_ms": 77.4362,
+    "dynamic_moe_bridge_isolated_s4096": {
+      "best_variant": "no-mask",
+      "train_total_ms": 46.34222436696291,
+      "forward_total_ms": 14.791835509240627,
+      "backward_total_ms": 31.550388857722282,
+      "forward_gemm_ms": 13.432826519012451,
+      "backward_dgrad_path_using_bmm_out_ms": 13.077775850892067,
+      "backward_wgrad_gemm_ms": 18.142251014709473,
+      "forward_glue_ms": 1.3590089902281761,
+      "output_scale_reduce_ms": 0.9800869822502136,
+      "input_reduce_only_ms": 0.7862859964370728,
+      "top_score_grad_ms": 0.3303619921207428,
+      "padding_multiplier": 1.28125,
+      "caveat": "Isolated op medians, not an end-to-end fused latency prediction."
+    },
+    "aiter_dynamic_gmm_read": "AITER BF16 compact grouped-GEMM probes are correctness-clean but slower than the retained padded torch.bmm/hipBLASLt path for these training contractions, so the current AITER wrapper is not the missing win.",
+    "read": "The MoE issue is padded/ragged grouped GEMM math and tile efficiency, not mainly dispatch/combine glue. At S4096, route build, gather, score grad, and reduce pieces are small compared with routed GEMM families."
+  },
+  "gap_ladder": [
+    {
+      "rank": 0,
+      "item": "Keep the fresh S4096 torch-profiler trace as a normal-backward cross-check",
+      "current_signal": "Profiler trace measured 71.04 ms total with 24.77 ms forward and 46.12 ms backward; phase kernel sums show backward at 36.17 ms Cijk GEMM-family kernels, 3.55 ms copy/cast, 1.96 ms elementwise, and 1.68 ms softmax.",
+      "why": "The exact 68.21 ms run remains the clean baseline for gap math, but the normal loss.backward trace confirms the segmented ranking without relying only on repeated autograd.grad probes.",
+      "remaining_caveat": "The trace does not yet provide a perfect additive backward tree split into attention backward versus MoE backward, so segmented rows still guide subsystem-specific kernel work."
+    },
+    {
+      "rank": 1,
+      "item": "Treat SGLang DSv4 forward as a fusion reference, not a training-latency oracle",
+      "current_signal": "The image-local run_dsv4.sh selects DeepSeek-V4-Pro, TP=8, compressed attention, FP8 KV-cache Triton path, fused compress, TileLang indexer, AITER MHC pre/post, fused hash top-k, fused WQA/WKV, and inference MoE knobs.",
+      "target_signal": "Port the compatible forward-boundary fusions into the BF16 TorchTitan training contract while keeping autograd and no-selected-state backward constraints.",
+      "expected_role_in_gap": "This sharpens the forward side: the current 22.58 ms forward is a real training proxy number, but SGLang says it should be decomposed into attention-boundary, MoE forward, and boundary/bookkeeping fusions rather than treated as one irreducible wall.",
+      "implementation_shape": "Use the current 4.31-4.47 ms TorchTitan-shaped attention-boundary forward profile as the forward attention guide; focus the remaining forward gap on MoE forward tile efficiency and SGLang-style q/wkv/compress/indexer fusion."
+    },
+    {
+      "rank": 2,
+      "item": "Replace the shared-KV sparse-MLA backward compressed top-k route",
+      "current_signal": "Raw query-major full local+compressed backward is 14.39 ms; compressed-only is 11.02 ms. A structured inverse-route dKV two-pass reduction is retired: its best S4096 point is 140.67 ms and the lower-scratch extended sweep is 432-483 ms.",
+      "target_signal": "Move raw sparse-MLA backward toward the prior about 5.07 ms sparse-MLA backward anchor.",
+      "expected_role_in_gap": "Primary attention-side reduction, roughly high single-digit milliseconds before full boundary integration effects.",
+      "implementation_shape": "Fused compressed top-k dKV/scatter with dynamic selected-group reuse; keep query-major QK/probability/PV reuse and the no selected K/V or probability saved-state contract."
+    },
+    {
+      "rank": 3,
+      "item": "Fuse LI target-probs, KL derivative, and LI dQ/dK/dW into sparse MLA/compressor backward",
+      "current_signal": "Wide-tile unfused LI pipeline is 4.49 ms, with LI grads about 3.18 ms and d_index_k about 2.71 ms.",
+      "target_signal": "Make LI a fused side product of sparse MLA/compressor backward rather than a separate diagnostic pipeline.",
+      "expected_role_in_gap": "Recover a few milliseconds and remove intermediate tensors/launches that block the attention boundary from fitting in the layer budget."
+    },
+    {
+      "rank": 4,
+      "item": "Drive the full attention plus LI boundary to an about 9-10 ms planning budget",
+      "current_signal": "Shared-KV attention boundary fwd+bwd is 23.36 ms; adding unfused LI gives a 27.85 ms diagnostic floor.",
+      "target_signal": "Forward around 3.6-4.5 ms, backward near the prior about 5 ms class, and LI integrated cheaply.",
+      "expected_role_in_gap": "This is the attention-side must-have; without it, attention plus LI alone is already 2.95 ms over the full-layer target."
+    },
+    {
+      "rank": 5,
+      "item": "Build compact-native grouped MoE training GEMM/backward",
+      "current_signal": "Fixed-router routed-MoE forward is 9.66 ms; segmented routed dgrad/wgrad are about 26 ms each; dynamic isolated MoE train-path sum is about 46.34 ms.",
+      "target_signal": "Whole routed expert GEMM family fwd+bwd around the 12.9 ms anchor.",
+      "expected_role_in_gap": "Primary MoE-side reduction. Dispatch/combine-only wrappers cannot close the gap because route/reduce glue is small relative to GEMM families.",
+      "implementation_shape": "Consume group sizes/offsets directly, avoid max-padding, fuse activation gather, W2 dgrad, W1/W3 xgrad, W1/W2/W3 wgrad, and token-gradient reduce around a resident expert-weight layout."
+    },
+    {
+      "rank": 6,
+      "item": "Clean boundary RMSNorm/residual/projection/bookkeeping after the math walls move",
+      "current_signal": "Current forward other is about 5.93 ms; older boundary backward rows are low single-digit milliseconds.",
+      "target_signal": "Leave only about 1-2 ms for residual/RMSNorm/bookkeeping in the final 24.9 ms layer budget.",
+      "expected_role_in_gap": "Final mop-up after attention/LI and MoE training GEMM are no longer dominant."
+    }
+  ],
+  "read": "The 68.21 -> 24.9 ms gap is not attributable to one wrapper. The current evidence says the 22.58 ms forward is a valid TorchTitan training-proxy number, but SGLang's DSv4 AMD runtime is an inference/TP8/FP8 KV-cache fusion reference rather than a direct training-latency oracle. Attention/LI must still drop from a 27.85 ms diagnostic floor into roughly a 9-10 ms budget, and MoE routed training GEMMs must move from padded/ragged BMM-style contractions toward the 12.9 ms whole-MoE fwd+bwd anchor. Those two changes are the ladder; dispatch/combine cleanup and boundary fusion are secondary."
+}

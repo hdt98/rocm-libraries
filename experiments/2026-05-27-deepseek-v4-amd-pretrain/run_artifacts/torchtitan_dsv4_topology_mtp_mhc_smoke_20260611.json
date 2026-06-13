@@ -1,0 +1,79 @@
+{
+  "date_utc": "2026-06-11",
+  "scope": "DeepSeek-V4 reduced 12-layer topology smoke",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 128,
+    "global_batch_size": 8,
+    "micro_batch_size": 1,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "topology": {
+    "layers": 12,
+    "first_three_layers_present": true,
+    "hash_routing_first_three_layers": true,
+    "router_top_k": 6,
+    "mtp_modules": 1,
+    "mtp_loss_weight": 0.3,
+    "grouped_wo": true,
+    "compress_rope_theta": 160000,
+    "hyper_connections": "smoked at S128; target S4096 still needs custom mHC kernels for stable/perf fit"
+  },
+  "checks": [
+    {
+      "name": "runtime_check_config",
+      "result": "passed",
+      "command_shape": "CANARY_USE_HYPER_CONNECTIONS=true CANARY_DSV4_NUM_MTP_MODULES=1 check-config",
+      "observed": {
+        "training_num_mtp_modules": 1,
+        "training_mtp_loss_weight": 0.3,
+        "model_num_mtp_modules": 1,
+        "model_layers": 12,
+        "attention_compress_ratio_by_layer": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+        "router_top_k_by_layer": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+        "router_hash_routing_vocab_by_layer": [129280, 129280, 129280, null, null, null, null, null, null, null, null, null],
+        "attention_grouped_wo_by_layer": [true, true, true, true, true, true, true, true, true, true, true, true],
+        "attention_compress_rope_theta_by_layer": [160000, 160000, 160000, 160000, 160000, 160000, 160000, 160000, 160000, 160000, 160000, 160000],
+        "layer_use_hyper_connections": [true, true, true, true, true, true, true, true, true, true, true, true]
+      }
+    },
+    {
+      "name": "mtp_runtime_smoke_no_mhc",
+      "result": "passed",
+      "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260611T032741Z",
+      "command_shape": "S128 GBS8 MBS1 FSDP8 EP8 CANARY_DSV4_NUM_MTP_MODULES=1 CANARY_USE_HYPER_CONNECTIONS=false",
+      "completed_steps": 1,
+      "loss": 16.10427,
+      "grad_norm": 15.6875,
+      "peak_logged_memory_gib": 118.47,
+      "tokens_per_gpu_s": 5,
+      "tflops_per_gpu": 0.15,
+      "read": "Tiny cold functional smoke only; not a perf baseline."
+    },
+    {
+      "name": "mtp_runtime_smoke_with_mhc",
+      "result": "passed",
+      "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260611T033410Z",
+      "command_shape": "S128 GBS8 MBS1 FSDP8 EP8 CANARY_DSV4_NUM_MTP_MODULES=1 CANARY_USE_HYPER_CONNECTIONS=true",
+      "completed_steps": 1,
+      "loss": 15.98726,
+      "grad_norm": 15.75,
+      "peak_logged_memory_gib": 118.49,
+      "tokens_per_gpu_s": 5,
+      "tflops_per_gpu": 0.14,
+      "model_total_parameters": 87090279432,
+      "read": "Tiny cold functional smoke only; proves the mHC+MTP topology builds and backpropagates at S128. It does not change the S4096 mHC fit conclusion."
+    }
+  ],
+  "notes": [
+    "FLOP/token accounting was patched to include the MTP module's attention score/PV term in addition to MTP parameters.",
+    "The corrected S4096 performance baseline still needs an Ascend-style custom mHC pre/post backend; PyTorch/chunked mHC remains the memory-fit bottleneck at MBS8."
+  ]
+}

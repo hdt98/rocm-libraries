@@ -1,0 +1,66 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_decision_20260602",
+  "date_local": "2026-06-02",
+  "scope": "compressed_shared_kv_actual_li_dkv_reduction_primitive_floor",
+  "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocprim_reduce_by_key.py",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "source_artifacts": {
+    "s512_sorted_smoke": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_s512_d16_smoke_20260602.json",
+    "s512_random_sort_smoke": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_s512_d16_random_smoke_20260602.json",
+    "s4096_sorted_timing": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_s4096_validproxy_d16_sorted_timing_20260602.json",
+    "s4096_random_sort_timing": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_s4096_validproxy_d16_random_sort_timing_20260602.json"
+  },
+  "contract": {
+    "keys": "int32 scalar key = compressed_group * d_tile + d",
+    "values": "float32 scalar dKV contribution",
+    "d_tile": 16,
+    "groups": 1024,
+    "s4096_valid_pair_proxy": 1572864,
+    "s4096_scalar_items_per_d16_tile": 25165824,
+    "full_d512_multiplier": 32
+  },
+  "results": {
+    "s512_sorted_parity": {
+      "passed": true,
+      "max_abs_diff": 0.0000095367431640625,
+      "reduce_only_d16_ms": 0.018420000560581684,
+      "full_d512_reduce_only_extrapolated_ms": 0.5894400179386139
+    },
+    "s512_random_sort_parity": {
+      "passed": true,
+      "max_abs_diff": 0.000011444091796875,
+      "sort_reorder_reduce_d16_ms": 0.2337220013141632,
+      "full_d512_sort_reorder_reduce_extrapolated_ms": 7.479104042053223
+    },
+    "s4096_sorted_timing": {
+      "reduce_only_d16_ms": 0.11068100109696388,
+      "full_d512_reduce_only_extrapolated_ms": 3.5417920351028442,
+      "resident_tensor_gib": 0.3750986233353615
+    },
+    "s4096_random_sort_timing": {
+      "reduce_only_d16_ms": 0.10972099751234055,
+      "sort_only_d16_ms": 1.0530489683151245,
+      "sort_reorder_reduce_d16_ms": 1.4330919981002808,
+      "full_d512_sort_reorder_reduce_extrapolated_ms": 45.858943939208984,
+      "resident_tensor_gib": 0.5625986233353615
+    }
+  },
+  "decision": {
+    "rocprim_reduce_by_key_primitive": "promising_only_if_keys_are_already_grouped_or_grouping_is_reused",
+    "scalar_global_sort_per_d_tile": "rejected_for_s4096_layer2",
+    "why": [
+      "The optimistic sorted reduce floor is about 0.111 ms for one D16 tile, or about 3.54 ms if repeated across D512, so rocPRIM reduce itself is not the wall.",
+      "Random scalar sort plus value reorder plus reduce is about 1.43 ms for one D16 tile, or about 45.86 ms if repeated across D512, which is worse than the current query-major compressed dKV wall.",
+      "A production path must avoid scalar global sort per D tile by reusing pair-level route ordering, grouping inside the query-major tile, or using a custom vector segmented reducer."
+    ],
+    "next_branch": "custom_query_major_D16_tile_local_grouped_or_segmented_accumulator_with_pair_level_route_order_and_no_materialized_scalar_sort"
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,61 @@
+{
+  "artifact": "hipkittens_sharedkv_routekeyed_64row_d512_rowterms_score_gate_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "path": {
+    "source": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_routekeyed_64row_d512_rowterms_score.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_score.py"
+  },
+  "shape": {
+    "batch": 4,
+    "sequence_length": 4096,
+    "kv_heads": 1,
+    "full_dim": 512,
+    "chunk_dim": 128,
+    "kv_tiles": 64,
+    "route_tile_rows": 64,
+    "query_rows_per_program": 16
+  },
+  "timed_boundary": "HipKittens route-keyed 64-row D512 row-term producer gate. QK and dO*V^T are accumulated over four D128 chunks before LSE/softmax_dot row terms, then P/dP feed one D128 dK/dV scratch epilogue. This is not full SparseAttnSharedkvGrad: it does not emit full-D dQ, dOriKV, dCmpKV, or dSinks.",
+  "build": {
+    "command": "make hk_sharedkv_routekeyed_64row_d512_rowterms_score GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H_KV=1 ATTN_N=4096",
+    "result": "passed_after_register_range_and_tile_coordinate_fix",
+    "resource_report": {
+      "sgprs": 80,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spills": 0,
+      "vgpr_spills": 0
+    }
+  },
+  "latency_ms": {
+    "production_source_no_padding_after_fix": {
+      "active_0_median": 0.038179999217391014,
+      "active_0_mean": 0.04153239987790584,
+      "active_16_median": 0.045720500871539116,
+      "active_16_mean": 0.0482404001057148,
+      "active_32_median": 0.047304000705480576,
+      "active_32_mean": 0.0571809995919466,
+      "active_64_median": 0.04756049998104572,
+      "active_64_mean": 0.05078449994325638,
+      "active_64_min": 0.041919998824596405,
+      "active_64_max": 0.06812100112438202,
+      "finite": true
+    },
+    "pre_fix_diagnostic": {
+      "active_63": "gpu_memory_access_fault",
+      "active_64": "gpu_memory_access_fault",
+      "source_padded_128_rows_active_64_median": 0.04821999929845333,
+      "root_cause": "D512 loop passed element offset d_start as HipKittens tile coordinate; unit_coord multiplied it by ST::cols, causing out-of-bounds source column reads for chunks > 0."
+    }
+  },
+  "read": {
+    "decision": "slice_gate_passed_not_promoted",
+    "compile_read": "The full-D row-term producer compiles with no spills but is resource-heavy at 256 VGPRs, 256 AGPRs, and one wave per SIMD.",
+    "runtime_read": "After replacing D512 source-load column coordinates from element offsets to tile coordinates, active_tiles=64 is finite with production-sized S4096 source tensors and no source padding. Median latency is 0.04756 ms for this limited gate.",
+    "next_action": "Extend the same corrected coordinate contract toward the full SharedKV boundary: full-D dQ, dOriKV, route-aware dCmpKV, and true dSinks. Do not compare this tiny 16-query-row scratch epilogue gate directly to the Triton 11.02 ms C4 source-boundary baseline."
+  }
+}

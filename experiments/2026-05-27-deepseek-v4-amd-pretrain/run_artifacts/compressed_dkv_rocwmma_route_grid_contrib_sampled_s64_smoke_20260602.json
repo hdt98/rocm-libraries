@@ -1,0 +1,117 @@
+{
+  "artifact": "compressed_dkv_rocwmma_route_grid_probe",
+  "scope": "full_grid_token_selected_d16_rocwmma_raw_grouped_atomic_and_grouped_partial_reduction",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "seq_len": 64,
+    "topk": 32,
+    "selected_rows": 2048,
+    "h_dim": 64,
+    "d_dim": 512,
+    "token_block": 8,
+    "selected_block": 32,
+    "d_tile": 16,
+    "group_count": 32,
+    "group_panel": 32,
+    "route_pattern": "random_unique",
+    "formula": "out[g,d] = sum_{t,k:group[t,k]=g} (dL_scaled[t,k,H] @ Q[t,H,d] + P[t,k,H] @ dO[t,H,d])"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 18.73537242785096,
+  "extension_dir": "/workspace/tmp/torch_extensions/route_grid_contrib_sampled_s64_20260602",
+  "write_model": {
+    "token_tiles": 8,
+    "selected_tiles": 1,
+    "d_blocks": 32,
+    "panel_tiles": 1,
+    "raw_scalar_writes": 1048576,
+    "grouped_scalar_writes": 131072,
+    "partial_dense_scalar_writes": 131072,
+    "group_panel_scalar_writes": 131072,
+    "tile_group_rows": 256,
+    "min_tile_groups": 32,
+    "max_tile_groups": 32,
+    "modeled_write_reduction_x": 8.0,
+    "partial_dense_write_reduction_x": 8.0,
+    "group_panel_write_reduction_x": 8.0,
+    "group_panel_recompute_x": 1,
+    "k16_route_tiles": 128,
+    "k16_duplicate_route_tiles": 0,
+    "k16_unique_route_contract": true,
+    "cluster_width": null
+  },
+  "parity": {
+    "raw_atomic": {
+      "allclose": true,
+      "atol": 0.0001,
+      "rtol": 0.0001,
+      "max_abs_diff": 1.9073486328125e-06,
+      "mean_abs_diff": 2.3613171151737333e-07,
+      "reference_max_abs": 6.0953874588012695
+    },
+    "grouped_atomic": null,
+    "grouped_direct_unique": null,
+    "grouped_partial_reduce": null,
+    "group_panel_atomic": null,
+    "raw_vs_grouped_max_abs_diff": null,
+    "raw_vs_grouped_direct_unique_max_abs_diff": null,
+    "raw_vs_partial_reduce_max_abs_diff": null,
+    "raw_vs_group_panel_max_abs_diff": null
+  },
+  "timing_ms": {
+    "raw_atomic": {
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "median_ms": 0.047359999269247055,
+      "min_ms": 0.046799998730421066,
+      "max_ms": 0.049160998314619064,
+      "mean_ms": 0.047773665438095726
+    },
+    "contrib_sink": {
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "median_ms": 0.01947999931871891,
+      "min_ms": 0.019279999658465385,
+      "max_ms": 0.02443999983370304,
+      "mean_ms": 0.02106666627029578
+    },
+    "grouped_atomic": null,
+    "grouped_direct_unique": null,
+    "group_panel_atomic": null,
+    "grouped_partial_emit": null,
+    "grouped_partial_reduce": null,
+    "grouped_partial_emit_plus_reduce": null,
+    "grouped_vs_raw_speedup_x": null,
+    "raw_minus_contrib_sink_ms": 0.027879999950528145,
+    "contrib_sink_vs_raw_ratio": 0.4113175595289364,
+    "partial_emit_vs_grouped_atomic_speedup_x": null,
+    "partial_emit_plus_reduce_vs_grouped_atomic_speedup_x": null,
+    "grouped_direct_unique_vs_grouped_atomic_speedup_x": null,
+    "grouped_direct_unique_vs_raw_speedup_x": null,
+    "group_panel_vs_grouped_atomic_speedup_x": null
+  },
+  "tensor_stats": {
+    "raw_candidate": {
+      "norm": 197.43614196777344,
+      "max_abs": 6.0953874588012695,
+      "mean_abs": 1.2324846982955933
+    },
+    "contrib_sink_candidate": {
+      "norm": 14.896143913269043,
+      "max_abs": 2.6714558601379395,
+      "mean_abs": 0.7470679879188538
+    },
+    "grouped_candidate": null,
+    "grouped_direct_unique_candidate": null,
+    "partial_reduced_candidate": null,
+    "group_panel_candidate": null
+  },
+  "read": "This probe tests whether the local grouped-reduction contract keeps working when expanded from one CTA to a full token/selected/D grid. The optional contrib_sink path computes rocWMMA contribution tiles and writes only one sampled scalar per route tile, so raw_atomic minus contrib_sink approximates the selected-row dKV write path. It still materializes diagnostic probabilities and grad logits, and can either use grouped global atomics or emit grouped route-tile partials for a separate reduction, so it is a schedule-pressure probe rather than the final fused sparse-MLA/LI backward kernel."
+}

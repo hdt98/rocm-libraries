@@ -1,0 +1,150 @@
+{
+  "artifact": "tilelang_static_route_additive_alloc_profile_8x_s4096_gbs128_20260604",
+  "created_at": "2026-06-04",
+  "scope": "Focused 8xMI350 S4096 GBS128 TileLang static-route e2e pass with allocator expansion and additive timing enabled.",
+  "run": {
+    "run_id": "torchtitan_dsv4_tilelang_static_route_additive_alloc_8x_s4096_gbs128_steps4_20260604",
+    "host": "do-sonle5-mi350-gpu",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_static_route_additive_alloc_8x_s4096_gbs128_steps4_20260604/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_static_route_additive_alloc_8x_s4096_gbs128_steps4_20260604",
+    "additive_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_static_route_additive_alloc_8x_s4096_gbs128_steps4_20260604/profiling/additive_timing.jsonl",
+    "status": "completed_4_steps",
+    "process_groups_destroyed": true,
+    "tilelang_compile_lines_in_log": 0,
+    "tilelang_data_race_warning_lines_in_log": 0,
+    "allocation_retry_warning_lines_in_log": 0
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash 4-layer BF16 canary",
+    "accelerator": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full"
+  },
+  "runtime_config": {
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "static_route_shape": true,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_shmem_heap_size": "32G",
+    "pytorch_cuda_alloc_conf": "expandable_segments:True",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "checkpoint_enable": false,
+    "chunked_cross_entropy_chunks": 2,
+    "profile_timing": false,
+    "additive_timing": true
+  },
+  "console_steps": [
+    {
+      "step": 1,
+      "loss": 12.25249,
+      "grad_norm": 11.3125,
+      "tokens_per_gpu_s_range": [1872, 1877],
+      "tflops_per_gpu_range": [35.43, 35.52],
+      "peak_memory_gib_min": 38.5,
+      "peak_memory_gib_mean": 42.26625,
+      "peak_memory_gib_max": 45.38
+    },
+    {
+      "step": 2,
+      "loss": 9.43218,
+      "grad_norm": 22.75,
+      "tokens_per_gpu_s": 2935,
+      "tflops_per_gpu": 55.54,
+      "mfu_percent": 2.4,
+      "peak_memory_gib_min": 56.97,
+      "peak_memory_gib_mean": 64.4575,
+      "peak_memory_gib_max": 68.59
+    },
+    {
+      "step": 3,
+      "loss": 13.63061,
+      "grad_norm": 38.25,
+      "tokens_per_gpu_s": 2582,
+      "tflops_per_gpu": 48.85,
+      "mfu_percent": 2.12,
+      "peak_memory_gib_min": 64.31,
+      "peak_memory_gib_mean": 88.515,
+      "peak_memory_gib_max": 104.16
+    },
+    {
+      "step": 4,
+      "loss": 13.51089,
+      "grad_norm": 30.75,
+      "tokens_per_gpu_s": 2557,
+      "tflops_per_gpu": 48.37,
+      "mfu_percent": 2.09,
+      "peak_memory_gib_min": 90.35,
+      "peak_memory_gib_mean": 99.8875,
+      "peak_memory_gib_max": 104.4
+    }
+  ],
+  "additive_rank_max_ms": {
+    "step2": {
+      "step_train_step": 20781.25,
+      "microbatch_forward_backward": 20405.11,
+      "forward_backward_call": 20402.25,
+      "model_forward": 2346.46,
+      "loss": 474.07,
+      "backward": 13196.54,
+      "fwd_bwd_call_residual": 4385.18,
+      "grad_clip": 33.46,
+      "optimizer_step": 17.07
+    },
+    "step3": {
+      "step_train_step": 25379.9,
+      "microbatch_forward_backward": 25002.33,
+      "forward_backward_call": 24999.34,
+      "model_forward": 2485.57,
+      "loss": 462.71,
+      "backward": 17589.39,
+      "fwd_bwd_call_residual": 4461.67,
+      "grad_clip": 26.12,
+      "optimizer_step": 17.3
+    },
+    "step4": {
+      "step_train_step": 25630.62,
+      "microbatch_forward_backward": 25254.15,
+      "forward_backward_call": 25250.94,
+      "model_forward": 2490.71,
+      "loss": 467.17,
+      "backward": 17829.18,
+      "fwd_bwd_call_residual": 4463.68,
+      "grad_clip": 18.67,
+      "optimizer_step": 17.29
+    }
+  },
+  "microbatch_forward_backward_read": {
+    "step2": "All 16 microbatches are steady around 1.18-1.32 s max-rank wall.",
+    "step3": "Allocator expansion removes the previous final-microbatch 8 s cliff; all 16 microbatches are around 1.51-1.78 s max-rank wall.",
+    "step4": "All 16 microbatches remain steady around 1.49-1.61 s max-rank wall."
+  },
+  "comparison": {
+    "previous_static_route_step2_tflops_per_gpu": 56.66,
+    "previous_static_route_step3_tflops_per_gpu": 38.61,
+    "allocator_profile_step2_tflops_per_gpu": 55.54,
+    "allocator_profile_step3_tflops_per_gpu": 48.85,
+    "allocator_profile_step4_tflops_per_gpu": 48.37,
+    "target_tflops_per_gpu": 277.0,
+    "step4_ratio_to_target": 0.1746,
+    "step4_speedup_needed_to_target": 5.73
+  },
+  "read": [
+    "The TileLang compile issue is fixed for e2e: this run has zero TileLang compile lines and zero data-race warning lines.",
+    "Allocator expansion materially improves memory behavior versus the prior static-route run: step-2 max rank peak falls from 189.95 GiB to 68.59 GiB, and the severe step-3 final-microbatch stall disappears.",
+    "The TileLang dKV kernel-body improvement does not translate to e2e TFLOPs because the current explicit_tilelang_dkv bridge only accelerates one compressed-dKV subkernel while the e2e step remains dominated by the full backward phase plus a roughly 4.46 s forward/backward-call lifetime/free residual.",
+    "The step-2 to step-4 slowdown is mainly backward: additive rank-max backward grows from 13.20 s to 17.83 s. Forward grows only about 0.14 s, loss is flat around 0.46-0.47 s, and optimizer/checkpoint are negligible.",
+    "The next e2e optimization target is not another isolated TileLang dKV microkernel alone. It is reducing the full backward wall: remove explicit selected-state/probability/logit materialization around TileLang, fuse/adjacent-produce LI dP/P and compressor/LI backward consumers, and continue attacking MoE/FSDP backward lifetime/skew."
+  ]
+}

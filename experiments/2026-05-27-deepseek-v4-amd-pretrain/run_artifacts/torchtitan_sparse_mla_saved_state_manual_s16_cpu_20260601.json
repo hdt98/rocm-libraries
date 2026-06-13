@@ -1,0 +1,283 @@
+{
+  "batch": 1,
+  "category_bytes": {
+    "attention_activation": 2097152,
+    "full_probability": 81920,
+    "full_selected_kv": 83886080
+  },
+  "category_counts": {
+    "attention_activation": 1,
+    "full_probability": 1,
+    "full_selected_kv": 2
+  },
+  "compressed_groups": 4,
+  "csa_count": 4,
+  "device": "cpu",
+  "dtype": "float32",
+  "estimated_selected_state_elements": 20971520,
+  "flavor": "flash_4layer",
+  "full_selected_state_saved": true,
+  "full_selected_state_saved_records": [
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 42,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 43,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 81920,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 44,
+      "numel": 20480,
+      "requires_grad": false,
+      "shape": [
+        1,
+        64,
+        16,
+        20
+      ]
+    }
+  ],
+  "input_grad_norm": 0.004400691948831081,
+  "layer_id": 2,
+  "local_count": 16,
+  "loss": 0.10217633843421936,
+  "mode": "manual",
+  "module": null,
+  "no_selected_state_or_probs_saved": false,
+  "saved_tensor_count": 72,
+  "saved_tensor_total_bytes": 952798100,
+  "saved_tensor_total_gib": 0.8873623795807362,
+  "seed": 1234,
+  "selected_keys": 20,
+  "selected_state_saved": true,
+  "selected_state_saved_records": [
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 42,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 43,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 81920,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 44,
+      "numel": 20480,
+      "requires_grad": false,
+      "shape": [
+        1,
+        64,
+        16,
+        20
+      ]
+    }
+  ],
+  "seq_len": 16,
+  "sparse_used": true,
+  "status": "failed_selected_state_or_probs_saved",
+  "top_saved_tensors_by_bytes": [
+    {
+      "bytes": 536870912,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 68,
+      "numel": 134217728,
+      "requires_grad": true,
+      "shape": [
+        32768,
+        4096
+      ]
+    },
+    {
+      "bytes": 134217728,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 8,
+      "numel": 33554432,
+      "requires_grad": true,
+      "shape": [
+        1024,
+        32768
+      ]
+    },
+    {
+      "bytes": 125829120,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 20,
+      "numel": 31457280,
+      "requires_grad": true,
+      "shape": [
+        512,
+        61440
+      ]
+    },
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 42,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 41943040,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 43,
+      "numel": 10485760,
+      "requires_grad": false,
+      "shape": [
+        1,
+        16,
+        20,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 33554432,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 26,
+      "numel": 8388608,
+      "requires_grad": true,
+      "shape": [
+        1024,
+        8192
+      ]
+    },
+    {
+      "bytes": 16777216,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 0,
+      "numel": 4194304,
+      "requires_grad": true,
+      "shape": [
+        4096,
+        1024
+      ]
+    },
+    {
+      "bytes": 9437184,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 11,
+      "numel": 2359296,
+      "requires_grad": true,
+      "shape": [
+        4096,
+        576
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 30,
+      "numel": 524288,
+      "requires_grad": true,
+      "shape": [
+        4096,
+        128
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 41,
+      "numel": 524288,
+      "requires_grad": true,
+      "shape": [
+        1,
+        16,
+        64,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 48,
+      "numel": 524288,
+      "requires_grad": true,
+      "shape": [
+        64,
+        16,
+        512
+      ]
+    },
+    {
+      "bytes": 2097152,
+      "device": "cpu",
+      "dtype": "float32",
+      "index": 69,
+      "numel": 524288,
+      "requires_grad": true,
+      "shape": [
+        16,
+        32768
+      ]
+    }
+  ]
+}

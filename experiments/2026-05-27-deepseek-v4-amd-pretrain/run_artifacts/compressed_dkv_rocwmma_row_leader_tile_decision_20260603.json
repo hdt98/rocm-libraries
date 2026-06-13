@@ -1,0 +1,48 @@
+{
+  "artifact": "compressed_dkv_rocwmma_row_leader_tile_decision",
+  "created_at": "2026-06-03",
+  "scope": "actual_li_materialized_probs_sparse_attention_backward_dkv_scatteradd_kernel_rewrite",
+  "status": "implemented_correct_small_scale_rejected_s4096_latency",
+  "code_path": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py",
+  "kernel_mode": "row_leader_tile",
+  "kernel_summary": {
+    "producer": "query-major rocWMMA K16xD16 contribution tile over H64",
+    "accumulator": "no LDS accumulator table; no LDS atomicAdd",
+    "coalescing": "within each token and K16 selected-key microtile, only the first row for a compressed group emits after summing duplicate same-group rows in registers",
+    "global_emit": "global atomicAdd remains per unique compressed group within each K16 microtile and D16 block",
+    "diagnostic_contract": "consumes materialized probs and grad_logits_scaled; does not yet fuse probability, LI, or compressor recompute"
+  },
+  "results": {
+    "s128_layer2_sc32_sb64": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_row_leader_tile_s128_layer2_sc32_sb64_20260603.json",
+      "correctness": "passed",
+      "median_ms": 0.438
+    },
+    "s512_layer2_sc32_sb64": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_row_leader_tile_s512_layer2_sc32_sb64_20260603.json",
+      "correctness": "passed",
+      "median_ms": 1.837
+    },
+    "s4096_layer2_sc32_sb64": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_row_leader_tile_s4096_layer2_sc32_sb64_20260603.json",
+      "correctness": "timing_only_skipped_reference",
+      "median_ms": 133.183,
+      "passes_sparse_atomic_gate": false
+    }
+  },
+  "baseline_gate": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "kernel": "dot_k_atomic",
+    "s4096_layer2_median_ms": 8.80629825592041
+  },
+  "diagnosis": {
+    "root_cause": "K16-local duplicate coalescing is too weak for actual LI layer-2 S4096 fan-in. It removes LDS hash/local atomic overhead, but it still preserves almost all global dKV atomic traffic and adds per-row leader scans.",
+    "lesson": "The next rewrite must reduce across a larger route segment than K16 without scalar local atomics. It likely needs sort/pack or group-owned work assignment plus MFMA-friendly contribution reuse, not a query-major microtile-only leader rule.",
+    "next_kernel_requirement": "Use a block/warp segmented reduction over a prepacked route segment or a group-owned tile that accumulates multiple query/selected microtiles per group before global write. The accumulator cannot be a per-contribution local atomic table, and the write reduction must be large at S4096 layer 2."
+  },
+  "commands": {
+    "s128": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode row_leader_tile --seq-len 128 --layer-id 2 --seq-chunk 32 --selected-block 64 --extension-dir /workspace/torch_extensions/rocwmma_row_leader_tile_v1",
+    "s512": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode row_leader_tile --seq-len 512 --layer-id 2 --seq-chunk 32 --selected-block 64 --extension-dir /workspace/torch_extensions/rocwmma_row_leader_tile_v1",
+    "s4096": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode row_leader_tile --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 64 --skip-correctness --skip-reference-timing --allow-large-materialization --extension-dir /workspace/torch_extensions/rocwmma_row_leader_tile_v1"
+  }
+}

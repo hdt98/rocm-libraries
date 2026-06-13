@@ -1,0 +1,151 @@
+{
+  "artifact": "torchtitan_mori_mbs4_memory_fix_20260605",
+  "created_at": "2026-06-05",
+  "status": "mori_mbs4_noac_memory_fix_materialized_six_step_pass",
+  "node": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 4,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "micro_batch_size": 4,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 8,
+    "sequence_length": 4096,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false
+  },
+  "data": {
+    "dataset": "c4_test",
+    "dataset_path": "tests/assets/c4_test",
+    "read": "Matches the small c4_test input family observed in the Ascend comparison logs, not a synthetic/random-data run."
+  },
+  "code_changes": {
+    "torchtitan_models_common_mori_aiter_moe_py": [
+      "Added compact xgrad path to avoid materializing full padded dX slabs.",
+      "Added direct chunked dTopkWeight computation from padded expert output, avoiding out_padded -> compact full gather.",
+      "Added streamed SwiGLU W1/W3 backward helper that computes dgate/dup per expert row chunk, accumulates dw1/dw3, computes xgrad, and scatters dX without full padded dgate/dup tensors.",
+      "Applied streamed SwiGLU W1/W3 path to normal padded VJP, padded_saved VJP, and dx_first VJP."
+    ],
+    "launcher": [
+      "Added passthrough and log reporting for CANARY_MORI_AITER_XGRAD_MODE.",
+      "Added passthrough and log reporting for CANARY_MORI_AITER_XGRAD_PADDED_LIMIT_GIB.",
+      "Added passthrough and log reporting for CANARY_MORI_AITER_DTOPK_CHUNK_ROWS.",
+      "Added passthrough and log reporting for CANARY_MORI_AITER_SWIGLU_CHUNK_ROWS."
+    ]
+  },
+  "pre_fix_oom_ladder": [
+    {
+      "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs4_ga8_vu_20260605",
+      "result": "failed",
+      "progress": "step 1 completed at about 85.5 TFLOPs/GPU with about 203 GiB logged",
+      "failure": "rank 2 OOM in MORI routed MoE VJP torch.bmm(dgate, w1_local)",
+      "allocation": "22.57 GiB"
+    },
+    {
+      "run_id": "torchtitan_dsv4_mori_xgrad_compact_auto_noac_4x_s4096_gbs128_mbs4_ga8_vu_20260605",
+      "result": "failed",
+      "progress": "step 2 completed at about 176.00 TFLOPs/GPU but grad_norm was nan",
+      "failure": "OOM while gathering out_padded to compact for dTopkWeight",
+      "allocation": "3.00 GiB"
+    },
+    {
+      "run_id": "torchtitan_dsv4_mori_xgrad_dtopk_compact_noac_4x_s4096_gbs128_mbs4_ga8_vu_20260605",
+      "result": "failed",
+      "progress": "step 2 completed at about 177.25 TFLOPs/GPU but grad_norm was nan",
+      "failure": "OOM in direct dTopkWeight product/sum chunk before row chunking",
+      "allocation": "1.00 GiB"
+    },
+    {
+      "run_id": "torchtitan_dsv4_mori_xgrad_dtopk_chunked_noac_4x_s4096_gbs128_mbs4_ga8_vu_20260605",
+      "result": "failed",
+      "progress": "step 2 completed at about 177.19 TFLOPs/GPU but grad_norm was nan",
+      "failure": "OOM in _triton_swiglu_backward at full padded dup allocation",
+      "allocation": "16.00 GiB"
+    },
+    {
+      "run_id": "torchtitan_dsv4_mori_streamed_swiglu_noac_4x_s4096_gbs128_mbs4_ga8_vu_20260605",
+      "result": "failed_before_step_1",
+      "failure": "MORI static SHMEM heap exhaustion at default 4 GiB heap during dispatch/combine setup",
+      "fix": "rerun with CANARY_MORI_SHMEM_HEAP_SIZE=32G"
+    }
+  ],
+  "retained_fix_run": {
+    "run_id": "torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605",
+    "result": "passed",
+    "steps": 6,
+    "command_shape": {
+      "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+      "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+      "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+      "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+      "CANARY_MORI_AITER_XGRAD_MODE": "compact",
+      "CANARY_MORI_AITER_DTOPK_CHUNK_ROWS": 1024,
+      "CANARY_MORI_AITER_SWIGLU_CHUNK_ROWS": 8192,
+      "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+      "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+    },
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605/docker-run.log",
+    "remote_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605",
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.30439,
+        "grad_norm": 9.125,
+        "tflops_per_gpu": 93.02,
+        "max_logged_memory_gib": 100.93
+      },
+      {
+        "step": 2,
+        "loss": 7.54627,
+        "grad_norm": 34.0,
+        "tflops_per_gpu": 184.53,
+        "max_logged_memory_gib": 173.76
+      },
+      {
+        "step": 3,
+        "loss": 18.39466,
+        "grad_norm": 24.875,
+        "tflops_per_gpu": 170.08,
+        "max_logged_memory_gib": 204.27
+      },
+      {
+        "step": 4,
+        "loss": 12.01982,
+        "grad_norm": 25.75,
+        "tflops_per_gpu": 135.71,
+        "max_logged_memory_gib": 246.03
+      },
+      {
+        "step": 5,
+        "loss": 12.29536,
+        "grad_norm": 39.0,
+        "tflops_per_gpu": 148.47,
+        "max_logged_memory_gib": 246.03
+      },
+      {
+        "step": 6,
+        "loss": 9.88083,
+        "grad_norm": 35.25,
+        "tflops_per_gpu": 156.95,
+        "max_logged_memory_gib": 246.03
+      }
+    ],
+    "summary": {
+      "mean_tflops_steps_2_to_6": 158.15,
+      "mean_tflops_steps_4_to_6": 147.04,
+      "peak_logged_memory_gib": 246.03,
+      "nan_grad_norm_seen": false,
+      "clean_process_group_teardown": true
+    }
+  },
+  "read": {
+    "what_is_fixed": "The MBS4/GBS128/GA8 no-activation-checkpoint MORI path no longer OOMs in the routed local VJP. The immediate blockers were full padded dX, compact dTopk gather, full dTopk product, full padded SwiGLU dgate/dup, and MORI default heap size.",
+    "what_is_not_fixed": "This is not yet the final optimized MORI backward kernel. The streamed SwiGLU path trades memory for more per-expert chunk work, and late-step 4-6 throughput is about 147 TFLOPs/GPU, still below the 277 TFLOPs/GPU target.",
+    "next_action": "Profile the streamed MORI VJP late steps to see whether the new wall is chunked SwiGLU/W1-W3 wgrad/xgrad launch overhead, MORI combine wait/skew, or remaining dense/loss wrapper work."
+  }
+}

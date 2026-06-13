@@ -1,0 +1,156 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_execstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "created_at": "2026-06-06",
+  "result": "completed_two_step_telemetry_gate_not_promoted",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_execstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_execstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "remote_sidecar": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_execstats_8x_s4096_gbs128_mbs4_steps2_20260606/mori_aiter_timing.jsonl",
+  "local_sidecar_copy": "/tmp/dsv4_standard_ep_hot_execute_top2_min10_execstats_20260606.jsonl",
+  "shape": {
+    "gpus": 8,
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 2,
+    "CANARY_MOE_BALANCED_MOE_MIN_REDUCTION_PCT": 10,
+    "CANARY_CHECKPOINT_ENABLE": false,
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.26404,
+      "grad_norm": 19.625,
+      "tokens_per_gpu_s": 1874,
+      "tflops_per_gpu": 94.89,
+      "rank_max_logged_memory_gib": 152.0
+    },
+    "step_2": {
+      "loss": 8.60003,
+      "grad_norm": 54.75,
+      "tokens_per_gpu_s": 7481,
+      "tflops_per_gpu": 378.79,
+      "rank_max_logged_memory_gib": 191.29
+    }
+  },
+  "telemetry_code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "new_record_kind": "standard_ep_hot_expert_execute_stats",
+    "read": "The sidecar now records the actual post-threshold execute decision and source-local remote-hot rows in addition to the pre-threshold modeled plan."
+  },
+  "sidecar_summary": {
+    "records_total": 1536,
+    "plan_records": 768,
+    "execute_records": 768,
+    "expected_records_per_kind": "2 steps * 4 GA * 12 layers * 8 ranks = 768",
+    "call_ids_per_rank": 96,
+    "exec_without_plan": 0,
+    "plan_without_exec": 0,
+    "call_id_null_execute_records": 0,
+    "execute_reasons": {
+      "executed": 360,
+      "skipped_threshold": 408
+    },
+    "per_rank_execute_calls": 45,
+    "per_rank_skipped_calls": 51,
+    "call_level": {
+      "calls_total": 96,
+      "calls_executed": 45,
+      "calls_skipped": 51,
+      "modeled_reduction_pct_all": {
+        "mean": 12.77007821602339,
+        "median": 9.598936425813308,
+        "min": -1.4349824472512758,
+        "max": 32.86110592158369
+      },
+      "modeled_reduction_pct_executed": {
+        "mean": 20.81585450844893,
+        "median": 21.991177928507337,
+        "min": 10.005457522284884,
+        "max": 32.86110592158369
+      },
+      "modeled_reduction_pct_skipped": {
+        "mean": 5.670863840353794,
+        "median": 6.5370334928229665,
+        "min": -1.4349824472512758,
+        "max": 9.891158072196507
+      },
+      "planned_remote_rows_total_all_calls": 7245715,
+      "planned_remote_rows_total_executed_calls": 4356963,
+      "planned_remote_rows_total_skipped_calls": 2888752,
+      "executed_remote_rows_total": 4356963,
+      "executed_remote_unique_tokens_total": 3415694,
+      "executed_to_planned_remote_rows_ratio_executed_calls": 1.0,
+      "executed_to_planned_remote_rows_ratio_all_calls": 0.46875
+    },
+    "top_executed_calls_by_remote_rows": [
+      {
+        "call_id": 72,
+        "planned_remote_rows": 189120,
+        "executed_remote_rows": 189120,
+        "modeled_reduction_pct": 23.835485667311925
+      },
+      {
+        "call_id": 96,
+        "planned_remote_rows": 188112,
+        "executed_remote_rows": 188112,
+        "modeled_reduction_pct": 21.22120831049345
+      },
+      {
+        "call_id": 60,
+        "planned_remote_rows": 187146,
+        "executed_remote_rows": 187146,
+        "modeled_reduction_pct": 22.853607054462074
+      },
+      {
+        "call_id": 84,
+        "planned_remote_rows": 186430,
+        "executed_remote_rows": 186430,
+        "modeled_reduction_pct": 23.229205470704063
+      }
+    ]
+  },
+  "comparison": {
+    "previous_min10_timing_gate_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_ab_8x_s4096_gbs128_mbs4_steps2_20260606.json",
+    "previous_min10_step2_tokens_per_gpu_s": 7448,
+    "previous_min10_step2_tflops_per_gpu": 377.12,
+    "previous_min10_peak_logged_memory_gib": 191.01,
+    "delta_vs_previous_min10_step2_tokens_per_gpu_s": 33,
+    "delta_vs_previous_min10_step2_tflops_per_gpu": 1.67,
+    "delta_vs_previous_min10_peak_logged_memory_gib": 0.28,
+    "current_12layer_six_step_baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_stage1_recompute_cached12_8x_s4096_gbs128_mbs4_heap96_steps6_20260606.json",
+    "current_12layer_six_step_baseline_steps_2_to_6_tokens_per_gpu_s": 7211.2,
+    "current_12layer_six_step_baseline_steps_2_to_6_tflops_per_gpu": 363.916
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "This is a two-step telemetry validation for the standard-EP hot-expert branch. The new execution rows are correct and low-overhead, but promotion still requires a sustained six-step run and comparison against the current stage1_recompute_cached12 baseline.",
+    "next_action": "Use the execution stats to tune the hot-expert branch only if it can reduce hot W broadcast/reduce overhead or move the mechanism into the stronger MORI/AITER owner-VJP path."
+  },
+  "validation": {
+    "local_py_compile": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "launcher_syntax": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "run_completed": true,
+    "json_sidecar_parse": true
+  }
+}

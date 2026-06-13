@@ -1,0 +1,251 @@
+{
+  "artifact": "torchtitan_8x_stability_recheck_fullac_vs_noac_20260604",
+  "created_at": "2026-06-04",
+  "status": "completed_scoreboard_update_required",
+  "purpose": "Answer whether the previous two-step full-activation-checkpoint CE2 anchor at 58.71 TFLOPs/GPU is stable, and compare it against a clean six-step no-activation-checkpoint allocator-expanded gate.",
+  "common_shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "checkpoint_enable": false,
+    "chunked_ce_num_chunks": 2,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "enable_profiling": false,
+    "enable_structured_logging": false,
+    "sharedkv_backward_profile": false,
+    "raw_logs_outside_repo": true
+  },
+  "previous_two_step_anchor": {
+    "artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "activation_checkpoint_mode": "full",
+    "steps_completed": 2,
+    "step2_tflops_per_gpu": 58.71,
+    "read": "This was too thin to claim stability. The six-step recheck below rejects it as a stable promoted baseline."
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "activation_checkpoint_mode": "none",
+      "pytorch_cuda_alloc_conf": "expandable_segments:True",
+      "pytorch_alloc_conf": "expandable_segments:True",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604/docker-run.log",
+      "status": "passed_6_steps",
+      "process_groups_destroyed": true,
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 12.24229,
+          "grad_norm": 12.8125,
+          "tok_per_gpu_s_range": [
+            2211,
+            2218
+          ],
+          "tflops_per_gpu_range": [
+            41.83,
+            41.97
+          ],
+          "peak_logged_memory_gib_range": [
+            67.71,
+            68.83
+          ]
+        },
+        {
+          "step": 2,
+          "loss": 8.44044,
+          "grad_norm": 22.75,
+          "tok_per_gpu_s": 4675,
+          "tflops_per_gpu": 88.45,
+          "peak_logged_memory_gib_range": [
+            80.66,
+            84.19
+          ]
+        },
+        {
+          "step": 3,
+          "loss": 15.77353,
+          "grad_norm": 29.75,
+          "tok_per_gpu_s": 3939,
+          "tflops_per_gpu": 74.54,
+          "peak_logged_memory_gib_range": [
+            80.66,
+            102.71
+          ]
+        },
+        {
+          "step": 4,
+          "loss": 14.15383,
+          "grad_norm": 58.0,
+          "tok_per_gpu_s": 3386,
+          "tflops_per_gpu": 64.07,
+          "peak_logged_memory_gib_range": [
+            80.66,
+            107.42
+          ]
+        },
+        {
+          "step": 5,
+          "loss": 11.76451,
+          "grad_norm": 43.5,
+          "tok_per_gpu_s": 3440,
+          "tflops_per_gpu": 65.10,
+          "peak_logged_memory_gib_range": [
+            80.91,
+            108.04
+          ]
+        },
+        {
+          "step": 6,
+          "loss": 9.01112,
+          "grad_norm": 46.75,
+          "tok_per_gpu_s": 3465,
+          "tflops_per_gpu": 65.56,
+          "peak_logged_memory_gib_range": [
+            80.91,
+            108.04
+          ]
+        }
+      ],
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 69.94,
+        "mean_steps3_to6_tflops_per_gpu": 65.07,
+        "mean_steps4_to6_tflops_per_gpu": 64.91,
+        "step2_to_step6_tflops_drop_percent": 25.88,
+        "late_steps4_to6_uplift_vs_previous_58p71_anchor_percent": 10.65,
+        "allocation_retry_warning_count": 0,
+        "target_tflops_per_gpu": 277.0,
+        "late_steps4_to6_target_fraction_percent": 23.43
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604",
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "activation_checkpoint_mode": "full",
+      "pytorch_cuda_alloc_conf": "default",
+      "pytorch_alloc_conf": "default",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604/docker-run.log",
+      "status": "passed_6_steps_but_not_stable",
+      "process_groups_destroyed": true,
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 12.20663,
+          "grad_norm": 12.875,
+          "tok_per_gpu_s_range": [
+            1361,
+            1368
+          ],
+          "tflops_per_gpu_range": [
+            25.75,
+            25.89
+          ],
+          "peak_logged_memory_gib_range": [
+            72.71,
+            75.88
+          ]
+        },
+        {
+          "step": 2,
+          "loss": 8.54615,
+          "grad_norm": 31.125,
+          "tok_per_gpu_s": 3054,
+          "tflops_per_gpu": 57.80,
+          "peak_logged_memory_gib_range": [
+            81.72,
+            167.83
+          ]
+        },
+        {
+          "step": 3,
+          "loss": 22.46840,
+          "grad_norm": 19.25,
+          "tok_per_gpu_s": 2615,
+          "tflops_per_gpu": 49.49,
+          "peak_logged_memory_gib_range": [
+            86.41,
+            199.83
+          ]
+        },
+        {
+          "step": 4,
+          "loss": 10.35305,
+          "grad_norm": 32.5,
+          "tok_per_gpu_s": 2358,
+          "tflops_per_gpu": 44.62,
+          "peak_logged_memory_gib_range": [
+            140.62,
+            248.83
+          ],
+          "cuda_memory_allocation_retry_warning_count": 1
+        },
+        {
+          "step": 5,
+          "loss": 8.69003,
+          "grad_norm": 37.0,
+          "tok_per_gpu_s": 2473,
+          "tflops_per_gpu": 46.80,
+          "peak_logged_memory_gib_range": [
+            144.55,
+            248.83
+          ],
+          "cuda_memory_allocation_retry_warning_count": 1
+        },
+        {
+          "step": 6,
+          "loss": 7.50457,
+          "grad_norm": 16.0,
+          "tok_per_gpu_s": 2405,
+          "tflops_per_gpu": 45.51,
+          "peak_logged_memory_gib_range": [
+            144.55,
+            248.83
+          ],
+          "cuda_memory_allocation_retry_warning_count": 1
+        }
+      ],
+      "summary": {
+        "mean_steps2_to6_tflops_per_gpu": 48.84,
+        "mean_steps3_to6_tflops_per_gpu": 47.11,
+        "mean_steps4_to6_tflops_per_gpu": 45.64,
+        "step2_to_step6_tflops_drop_percent": 21.26,
+        "late_steps4_to6_delta_vs_previous_58p71_anchor_percent": -22.26,
+        "allocation_retry_warning_count": 3,
+        "target_tflops_per_gpu": 277.0,
+        "late_steps4_to6_target_fraction_percent": 16.48
+      }
+    }
+  ],
+  "decision": {
+    "answer_to_stability_question": "The previous 58.71 TFLOPs/GPU full-AC CE2 anchor is not proven stable; the six-step recheck rejects promoting it as the best sustained candidate.",
+    "current_best_six_step_materialized_candidate": "no_activation_checkpoint_expandable_allocator",
+    "current_best_six_step_late_steps4_to6_tflops_per_gpu": 64.91,
+    "current_best_six_step_peak_step_tflops_per_gpu": 88.45,
+    "remaining_speedup_to_277_from_late_steps4_to6": 4.27,
+    "read": [
+      "The one-step burst is real but not the right promoted metric. In the clean no-AC allocator-expanded run, step 2 reaches 88.45 TFLOPs/GPU, then the late band stabilizes around 64-66 TFLOPs/GPU.",
+      "The burst-to-late-step slowdown correlates with memory growth and dynamic MoE routing/owner-rank skew. The allocator-expanded no-AC run keeps memory below about 108 GiB and avoids allocation retries, while the full-AC recheck climbs to about 249 GiB and emits allocation-retry warnings.",
+      "For reporting, use late-step or multi-step averages rather than a single step-2 burst. The current best materialized six-step sustained number is 64.91 TFLOPs/GPU over steps 4-6, not the old 58.71 two-step full-AC number."
+    ]
+  },
+  "commands": [
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori RUN_ID=torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_MBS=1 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_ENABLE_PROFILING=false CANARY_ENABLE_STRUCTURED_LOGGING=false CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_AITER_BLOCK_NUM=64 CANARY_MORI_AITER_RDMA_BLOCK_NUM=32 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29571 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori RUN_ID=torchtitan_dsv4_fullac_ce2_noprofile6_ep8_s4096_gbs128_20260604 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_MBS=1 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_ENABLE_PROFILING=false CANARY_ENABLE_STRUCTURED_LOGGING=false CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_AITER_BLOCK_NUM=64 CANARY_MORI_AITER_RDMA_BLOCK_NUM=32 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29573 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,509 @@
+{
+  "dims": {
+    "128": {
+      "backends": {
+        "aiter_ops_mha_flash_attn_func": {
+          "error": "RuntimeError('[aiter] build [module_fmha_v3_fwd] under /opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/build/module_fmha_v3_fwd/build failed !!!!!!')",
+          "status": "failed",
+          "traceback_tail": [
+            "    return func(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 1644, in custom_wrapper",
+            "    return wrapper(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 1439, in wrapper",
+            "    build_module(",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 934, in build_module",
+            "    mp_lock(lockPath=lock_path, MainFunc=MainFunc, FinalFunc=FinalFunc)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 46, in mp_lock",
+            "    ret = MainFunc()",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 925, in MainFunc",
+            "    raise RuntimeError(",
+            "RuntimeError: [aiter] build [module_fmha_v3_fwd] under /opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/build/module_fmha_v3_fwd/build failed !!!!!!"
+          ]
+        },
+        "aiter_triton_mha_flash_attn_func": {
+          "dk": {
+            "abs_max": 0.056640625,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.0001538978685857728,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dq": {
+            "abs_max": 4.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024176424369215965,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 1.000000238418579,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "latency_ms": {
+            "max": 12.49775505065918,
+            "mean": 12.377414226531982,
+            "median": 12.377414226531982,
+            "min": 12.257073402404785
+          },
+          "output": {
+            "abs_max": 3.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.02462017349898815,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "status": "ok"
+        },
+        "aiter_triton_mha_v3_flash_attn_func": {
+          "dk": {
+            "abs_max": 0.056640625,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.00015389789768960327,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dq": {
+            "abs_max": 4.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024176426231861115,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 1.000000238418579,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "latency_ms": {
+            "max": 19.045555114746094,
+            "mean": 18.928933143615723,
+            "median": 18.928933143615723,
+            "min": 18.81231117248535
+          },
+          "output": {
+            "abs_max": 3.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.02462017349898815,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "status": "ok"
+        },
+        "pytorch_sdpa_current_path": {
+          "dk": {
+            "abs_max": 0.056640625,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.00015389788313768804,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dq": {
+            "abs_max": 4.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024176426231861115,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 1.000000238418579,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "latency_ms": {
+            "max": 16.951051712036133,
+            "mean": 16.860130310058594,
+            "median": 16.860130310058594,
+            "min": 16.769208908081055
+          },
+          "output": {
+            "abs_max": 3.84375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.02462017349898815,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              128
+            ]
+          },
+          "status": "ok"
+        }
+      },
+      "module_audit": {
+        "aiter.ops.mha": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/mha.py",
+          "flash_attn_func_signature": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1, 0), bias=None, alibi_slopes=None, deterministic=True, return_lse=False, return_attn_probs=False, how_v3_bf16_cvt=1, cu_seqlens_q: Optional[torch.Tensor] = None, cu_seqlens_kv: Optional[torch.Tensor] = None, sink_ptr: Optional[torch.Tensor] = None)",
+          "status": "ok"
+        },
+        "aiter.ops.triton.attention.mha": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/triton/attention/mha.py",
+          "flash_attn_func_signature": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), bias=None, alibi_slopes=None, deterministic=True, return_lse=False, return_attn_probs=False, sink=None, config: Optional[dict[str, any]] = None)",
+          "status": "ok"
+        },
+        "aiter.ops.triton.attention.mha_v3": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/triton/attention/mha_v3.py",
+          "flash_attn_func_signature": "(q: 'torch.Tensor', k: 'torch.Tensor', v: 'torch.Tensor', softmax_scale: 'Optional[float]' = None, causal: 'bool' = False, qv: 'Optional[torch.Tensor]' = None, q_descale: 'Optional[torch.Tensor]' = None, k_descale: 'Optional[torch.Tensor]' = None, v_descale: 'Optional[torch.Tensor]' = None, window_size: 'Tuple[int, int]' = (-1, -1), attention_chunk: 'int' = 0, softcap: 'float' = 0.0, num_splits: 'int' = 1, pack_gqa: 'Optional[bool]' = None, deterministic: 'bool' = False, sm_margin: 'int' = 0)",
+          "status": "ok"
+        }
+      },
+      "shape": {
+        "k": [
+          4,
+          4096,
+          64,
+          128
+        ],
+        "q": [
+          4,
+          4096,
+          64,
+          128
+        ],
+        "scale": 0.08838834764831843,
+        "v": [
+          4,
+          4096,
+          64,
+          128
+        ]
+      }
+    },
+    "512": {
+      "backends": {
+        "aiter_ops_mha_flash_attn_func": {
+          "error": "RuntimeError('CK only supports head dimension at most 256')",
+          "status": "failed",
+          "traceback_tail": [
+            "    getattr(torch.ops.aiter, f\"{loadName}\")(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/_ops.py\", line 1275, in __call__",
+            "    return self._op(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/utils/torch_guard.py\", line 308, in outer_wrapper",
+            "    wrapper(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/utils/torch_guard.py\", line 203, in wrapper",
+            "    return func(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 1644, in custom_wrapper",
+            "    return wrapper(*args, **kwargs)",
+            "  File \"/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit/core.py\", line 1640, in wrapper",
+            "    return op(*args, **kwargs)",
+            "RuntimeError: CK only supports head dimension at most 256"
+          ]
+        },
+        "aiter_triton_mha_flash_attn_func": {
+          "dk": {
+            "abs_max": 0.0771484375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.00015386121231131256,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dq": {
+            "abs_max": 5.21875,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024253565818071365,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.9999991655349731,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "latency_ms": {
+            "max": 350.411865234375,
+            "mean": 350.36085510253906,
+            "median": 350.36085510253906,
+            "min": 350.3098449707031
+          },
+          "output": {
+            "abs_max": 4.53125,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024644210934638977,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "status": "ok"
+        },
+        "aiter_triton_mha_v3_flash_attn_func": {
+          "dk": {
+            "abs_max": 0.0771484375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.00015386122686322778,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dq": {
+            "abs_max": 5.21875,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024253567680716515,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.9999992847442627,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "latency_ms": {
+            "max": 249.43516540527344,
+            "mean": 249.33318328857422,
+            "median": 249.33318328857422,
+            "min": 249.231201171875
+          },
+          "output": {
+            "abs_max": 4.53125,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024644210934638977,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "status": "ok"
+        },
+        "pytorch_sdpa_current_path": {
+          "dk": {
+            "abs_max": 0.0771484375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.000153861241415143,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dq": {
+            "abs_max": 5.21875,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024253563955426216,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "dv": {
+            "abs_max": 8.9375,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.9999991059303284,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "latency_ms": {
+            "max": 100.7397232055664,
+            "mean": 100.56214141845703,
+            "median": 100.56214141845703,
+            "min": 100.38455963134766
+          },
+          "output": {
+            "abs_max": 4.53125,
+            "dtype": "torch.bfloat16",
+            "finite": true,
+            "mean_abs": 0.024644210934638977,
+            "nonfinite": 0,
+            "shape": [
+              4,
+              4096,
+              64,
+              512
+            ]
+          },
+          "status": "ok"
+        }
+      },
+      "module_audit": {
+        "aiter.ops.mha": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/mha.py",
+          "flash_attn_func_signature": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1, 0), bias=None, alibi_slopes=None, deterministic=True, return_lse=False, return_attn_probs=False, how_v3_bf16_cvt=1, cu_seqlens_q: Optional[torch.Tensor] = None, cu_seqlens_kv: Optional[torch.Tensor] = None, sink_ptr: Optional[torch.Tensor] = None)",
+          "status": "ok"
+        },
+        "aiter.ops.triton.attention.mha": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/triton/attention/mha.py",
+          "flash_attn_func_signature": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), bias=None, alibi_slopes=None, deterministic=True, return_lse=False, return_attn_probs=False, sink=None, config: Optional[dict[str, any]] = None)",
+          "status": "ok"
+        },
+        "aiter.ops.triton.attention.mha_v3": {
+          "__file__": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/ops/triton/attention/mha_v3.py",
+          "flash_attn_func_signature": "(q: 'torch.Tensor', k: 'torch.Tensor', v: 'torch.Tensor', softmax_scale: 'Optional[float]' = None, causal: 'bool' = False, qv: 'Optional[torch.Tensor]' = None, q_descale: 'Optional[torch.Tensor]' = None, k_descale: 'Optional[torch.Tensor]' = None, v_descale: 'Optional[torch.Tensor]' = None, window_size: 'Tuple[int, int]' = (-1, -1), attention_chunk: 'int' = 0, softcap: 'float' = 0.0, num_splits: 'int' = 1, pack_gqa: 'Optional[bool]' = None, deterministic: 'bool' = False, sm_margin: 'int' = 0)",
+          "status": "ok"
+        }
+      },
+      "shape": {
+        "k": [
+          4,
+          4096,
+          64,
+          512
+        ],
+        "q": [
+          4,
+          4096,
+          64,
+          512
+        ],
+        "scale": 0.044194173824159216,
+        "v": [
+          4,
+          4096,
+          64,
+          512
+        ]
+      }
+    }
+  },
+  "runtime": {
+    "device": "AMD Instinct MI350X VF",
+    "torch_hip": "7.2.53211",
+    "torch_version": "2.13.0a0+gitccf72d7"
+  },
+  "scope": "dsv4_dense_attention_aiter_backend_probe",
+  "shape_base": {
+    "batch": 4,
+    "dims": [
+      512,
+      128
+    ],
+    "dtype": "torch.bfloat16",
+    "heads": 64,
+    "iters": 2,
+    "scale_input": 0.01,
+    "seq": 4096,
+    "warmup": 1
+  }
+}

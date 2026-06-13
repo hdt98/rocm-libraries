@@ -1,0 +1,219 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_activecap_wallonly_step1_20260610",
+  "created_utc": "2026-06-10T10:15:00Z",
+  "purpose": "Profile-gated native MORI compact active-capacity telemetry on the 8xMI350 flash_12layer shape. This is a capacity/residency diagnostic only, not a throughput promotion.",
+  "node": "do-sonle5-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_activecap_wallonly_step1_20260610",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_activecap_wallonly_step1_20260610",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_activecap_wallonly_step1_20260610/docker-run.log",
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "use_hyper_connections": false,
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_order": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_mori_native_role_split": true,
+    "standard_ep_mori_native_reuse_forward_handles_for_backward": true,
+    "standard_ep_mori_native_keep_released_handles": true,
+    "standard_ep_mori_native_compact_max_peer_rows": 131072,
+    "mori_shmem_heap_size": "32G"
+  },
+  "status": "completed_one_step_profile_only",
+  "profile_mode": {
+    "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_activecap_wallonly_step1_20260610/dsv4_profile_timing_rank{rank}.jsonl",
+    "timing_mode": "wall_only_no_sync",
+    "note": "Wall-only timing avoids profiler synchronize overhead but includes first-call/JIT/init outliers. Use this artifact for split/capacity telemetry, not for stable stage latency or tok/s promotion."
+  },
+  "completed_step": {
+    "step": 1,
+    "loss": 12.26886,
+    "grad_norm": 12.875,
+    "tok_per_gpu_s_range": [
+      1121.0,
+      1123.0
+    ],
+    "tflops_per_gpu_range": [
+      56.75,
+      56.87
+    ],
+    "memory_gib_range": [
+      219.36,
+      225.01
+    ]
+  },
+  "timing_records": {
+    "rank_files": 8,
+    "records_per_rank": 266,
+    "total_records": 2128,
+    "kind_counts": {
+      "standard_ep_dispatch": 192,
+      "standard_ep_combine": 192,
+      "standard_ep_hot_weight": 1152,
+      "standard_ep_hot_split": 192,
+      "chunked_ce_loss": 16,
+      "standard_ep_mori_native_compact_autograd": 384
+    }
+  },
+  "native_compact_capacity_summary": {
+    "dispatch": {
+      "records": 192,
+      "active_peer_rows": {
+        "min": 21841,
+        "mean": 25775.359375,
+        "median": 24388.5,
+        "max": 37710
+      },
+      "capacity_peer_rows": {
+        "min": 131072,
+        "mean": 131072.0,
+        "median": 131072.0,
+        "max": 131072
+      },
+      "capacity_over_active": {
+        "min": 3.475788915407054,
+        "mean": 5.166843575505796,
+        "median": 5.374340062236067,
+        "max": 6.001190421683988
+      },
+      "input_rows": {
+        "min": 152986,
+        "mean": 169826.86458333334,
+        "median": 170081.0,
+        "max": 184307
+      },
+      "output_rows": {
+        "min": 124304,
+        "mean": 169826.86458333334,
+        "median": 171640.0,
+        "max": 195642
+      },
+      "input_splits_max_over_mean": {
+        "min": 1.0473106134820842,
+        "mean": 1.2096593424090047,
+        "median": 1.1544630354410543,
+        "max": 1.7447834698676943
+      },
+      "output_splits_max_over_mean": {
+        "min": 1.014892619981027,
+        "mean": 1.1710920394298114,
+        "median": 1.1299603676513752,
+        "max": 1.6267018953384917
+      }
+    },
+    "combine": {
+      "records": 192,
+      "active_peer_rows": {
+        "min": 21841,
+        "mean": 25775.359375,
+        "median": 24388.5,
+        "max": 37710
+      },
+      "capacity_peer_rows": {
+        "min": 131072,
+        "mean": 131072.0,
+        "median": 131072.0,
+        "max": 131072
+      },
+      "capacity_over_active": {
+        "min": 3.475788915407054,
+        "mean": 5.166843575505796,
+        "median": 5.374340062236067,
+        "max": 6.001190421683988
+      },
+      "input_rows": {
+        "min": 124304,
+        "mean": 169826.86458333334,
+        "median": 171640.0,
+        "max": 195642
+      },
+      "output_rows": {
+        "min": 152986,
+        "mean": 169826.86458333334,
+        "median": 170081.0,
+        "max": 184307
+      },
+      "input_splits_max_over_mean": {
+        "min": 1.014892619981027,
+        "mean": 1.1710920394298114,
+        "median": 1.1299603676513752,
+        "max": 1.6267018953384917
+      },
+      "output_splits_max_over_mean": {
+        "min": 1.0473106134820842,
+        "mean": 1.2096593424090047,
+        "median": 1.1544630354410543,
+        "max": 1.7447834698676943
+      }
+    }
+  },
+  "wall_only_stage_notes": {
+    "dispatch_mori_native_compact_launch_ms": {
+      "median": 0.31322699987867964,
+      "mean": 2.17423608853314,
+      "max": 42.8917970002658
+    },
+    "combine_mori_native_compact_launch_ms": {
+      "median": 2.6701774997945904,
+      "mean": 2.9783682135473555,
+      "max": 11.748579000141035
+    },
+    "dispatch_mori_native_compact_init_ms": {
+      "median": 0.050740000006044284,
+      "mean": 938.3877672656075,
+      "max": 22596.190166999804,
+      "read": "Large mean/max are first-call native handle/JIT/init outliers; median is the useful steady issue-time indicator in this wall-only file."
+    },
+    "weighted_scatter_add_ms": {
+      "median": 0.5736079999678623,
+      "mean": 12.044322421881285,
+      "max": 163.50676499996553
+    },
+    "count_all_to_all_ms": {
+      "median": 0.2099460000408726,
+      "mean": 396.57561958333076,
+      "max": 9606.566089999887
+    }
+  },
+  "discarded_prior_attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_activecap_profile_stage_20260610",
+      "status": "failed_after_step1",
+      "reason": "Event-timing flush synchronized CUDA/HIP and failed with HSA_STATUS_ERROR_OUT_OF_RESOURCES; timing path pointed at /workspace/output, which is not mounted by the launcher."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_activecap_wallonly_profile_20260610",
+      "status": "failed_in_step2_backward",
+      "reason": "Wall-only mode avoided flush sync, but the path still pointed at /workspace/output, so no timing files were persisted."
+    }
+  ],
+  "baseline_node_read": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_mhc_nodecheck_20260610.json",
+    "nomhc_control_status": "completed_six_steps",
+    "nomhc_steps_2_to_6_tok_per_gpu_s": 8228.0,
+    "nomhc_steps_2_to_6_tflops_per_gpu": 416.594,
+    "nomhc_peak_logged_memory_gib": 245.99,
+    "mhc_same_shape_status": "failed_before_first_completed_step_with_HSA_STATUS_ERROR_OUT_OF_RESOURCES_and_0_MB_free",
+    "read": "The no-mHC retained-shape control is healthy on the same node. The corrected mHC failure is therefore a memory/lifetime fit issue, not evidence that do-sonle5-mi350-gpu is generally broken."
+  },
+  "decision": "Keep the active-capacity telemetry. Do not treat step-1 tok/s as a throughput result. The native compact ABI is systematically over-reserving fixed peer-row capacity by roughly 3.5x to 6.0x versus active rows; the next source target is active-row/staged-output residency reduction or a final-layout MORI receive ABI, not more node checks."
+}

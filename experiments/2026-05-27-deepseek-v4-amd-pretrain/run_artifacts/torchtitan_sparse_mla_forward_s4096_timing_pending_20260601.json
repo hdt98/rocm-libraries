@@ -1,0 +1,55 @@
+{
+  "status": "pending_node_availability",
+  "date": "2026-06-01",
+  "goal": "Measure TorchTitan DeepSeek-V4 sparse MLA forward-only S4096 timing against the 3.6 ms 1a attention-forward anchor.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_torchtitan_sparse_mla_forward.py",
+  "intended_candidate": {
+    "mode": "fused",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+    "seq_len": 4096,
+    "batch": 1,
+    "dtype": "bf16",
+    "layer_id": 2,
+    "target_forward_ms": 3.6,
+    "env": {
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512",
+      "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_MAX_SELECTED_STATE_ELEMENTS": "0"
+    }
+  },
+  "blocking_state_observed": {
+    "do-sonle5-mi350-gpu": {
+      "reason": "all eight MI350 GPUs were occupied by an active dsv4_ep8_mori_notbo_bind_30157 workload",
+      "storage": {
+        "/": {
+          "used": "617G",
+          "available": "1.4T",
+          "use_percent": "32%"
+        },
+        "/scratch": {
+          "used": "1007G",
+          "available": "37T",
+          "use_percent": "3%"
+        }
+      },
+      "torch_titan_image_available": true,
+      "canonical_payload": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+    },
+    "do-sonle-kernel": {
+      "reason": "single MI350 GPU was occupied by active objective_thompson SGLang container running dsv4_coda_attention_layer_gate.py",
+      "torch_titan_image_available": false,
+      "available_relevant_images": [
+        "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+        "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260526-DSv4",
+        "rocm/primus:v26.3"
+      ],
+      "pretrain_payload_present": true
+    }
+  },
+  "next_rerun_shape": "Run the forward probe on one free MI350 with PYTHONPATH pointing at sources/wip/torchtitan and tools/dsv4_runtime_probe, using the TorchTitan image if available.",
+  "notes": [
+    "No active workload was stopped.",
+    "The harness CPU smoke passed separately in torchtitan_sparse_mla_forward_probe_cpu_smoke_20260601.json.",
+    "This artifact records why the S4096 MI350 timing number is not present yet."
+  ]
+}

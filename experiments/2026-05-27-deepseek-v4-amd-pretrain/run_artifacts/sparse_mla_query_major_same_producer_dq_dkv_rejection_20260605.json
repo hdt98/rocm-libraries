@@ -1,0 +1,44 @@
+{
+  "artifact": "sparse_mla_query_major_same_producer_dq_dkv_rejection",
+  "date": "2026-06-05",
+  "hardware": "1xMI350",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "compressed_topk": 512,
+    "valid_pairs": 1572352
+  },
+  "candidate": {
+    "name": "query_major_scorepage_same_producer_dq_dkv",
+    "timing_artifact": "sparse_mla_source_boundary_query_major_scorepage_dparallel_qm_dqdkv_s4096_layer2_sb512_sc1_thr256_20260605.json",
+    "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "compile_defines": [
+      "SCOREPAGE_PRODUCER_MODE=3",
+      "SCOREPAGE_EMIT_DQ=1"
+    ],
+    "tile": {
+      "seq_chunk": 1,
+      "selected_block": 512,
+      "block_d": 16,
+      "threads": 256
+    },
+    "contract": "One query-major CTA computes the H64 score/prob/scaled-dP page, then emits both dQ and compressed dKV from that same source-boundary producer without materialized probs/grad_logits or scaled-dP HBM page."
+  },
+  "measurements_ms": {
+    "candidate_event_median": 30.599851608276367,
+    "retained_full_sparse_attention_backward_gate": 11.13,
+    "retained_sparse_atomic_dkv_wall": 8.80629825592041
+  },
+  "decision": {
+    "status": "rejected_for_promotion",
+    "passes_full_boundary_gate": false,
+    "run_e2e_tflops": false,
+    "reason": "Sharing the score/prob/scaled-dP page in one launch does not make this schedule viable. The same producer still reloads KV for dQ over all D blocks and uses raw compressed-group dKV atomics, so the full source-boundary output path is 30.60 ms versus the 11.13 ms retained gate.",
+    "next_kernel_direction": "Move to a lower-level cooperative/persistent owner where score/prob/scaled-dP tiles are consumed by dQ and group-aware dKV before HBM, with D-parallel consumers that avoid serial KV replay and a compressed-group epilogue that reduces before global atomics."
+  }
+}

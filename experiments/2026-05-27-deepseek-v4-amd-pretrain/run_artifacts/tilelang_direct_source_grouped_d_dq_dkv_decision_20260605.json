@@ -1,0 +1,62 @@
+{
+  "scope": "tilelang_direct_source_grouped_d_dq_dkv_decision",
+  "date": "2026-06-05",
+  "artifacts": {
+    "d32x4": "run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json",
+    "d32x2": "run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x2_20260605.json",
+    "score_reuse_floor": "run_artifacts/tilelang_hsk_dq_score_reuse_floor_s4096_layer2_gp256_tb32_k64_d64_20260605.json",
+    "score_reuse_floor_decision": "run_artifacts/tilelang_hsk_dq_score_reuse_floor_decision_20260605.json"
+  },
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "packed_topk": 1024,
+    "token_block": 32,
+    "block_k": 64,
+    "block_d": 32,
+    "threads": 512
+  },
+  "timing_ms": {
+    "direct_source_grouped_d_dq_dkv_d32x4": 15.681693077087402,
+    "direct_source_grouped_d_dq_dkv_d32x2": 21.316797256469727,
+    "d32x4_late_dkv_kernel_only": 5.322484016418457,
+    "d32x4_source_indexed_late_dkv": 6.026370048522949,
+    "d32x2_late_dkv_kernel_only": 7.73344612121582,
+    "d32x2_source_indexed_late_dkv": 8.478653907775879,
+    "previous_direct_source_dq_dkv_full": 16.570850372314453,
+    "materialized_score_reuse_dq_plus_dkv_floor": 7.966623067855835,
+    "triton_sparse_attention_backward_boundary": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.806
+  },
+  "read": "The simple grouped-D score-reuse family does not close the sparse-attention backward gap. D32x4 improves the old direct-source TileLang dQ+dKV boundary only slightly, from 16.57 ms to 15.68 ms, and remains slower than the Triton sparse-attention backward boundary around 11.13 ms. D32x2 regresses to 21.32 ms. The score-reuse idea is valid, but serializing D blocks inside one CTA loses too much D-block parallelism and occupancy, so it does not materialize into a viable whole-boundary sparse-attention kernel.",
+  "decision": {
+    "promote_grouped_d_direct_source_dq_dkv": false,
+    "closed": [
+      "block_d32_d_blocks_per_kernel_2",
+      "block_d32_d_blocks_per_kernel_4",
+      "simple_grouped_d_cta_loop_as_final_schedule"
+    ],
+    "kept_lesson": "QK and softmax row terms should still be computed once and reused across dQ and dKV work, but the reuse cannot come from a serial D-loop that destroys parallelism.",
+    "next_kernel_requirement": "Keep token/head/query-major and D-block parallelism, while sharing score/probability state through an epilogue or cooperative producer design. The next viable design needs score reuse plus group-aware dKV reduction before HBM without collapsing independent D-block CTAs.",
+    "forward_saved_full_qk_or_probs_default": false,
+    "why_not_forward_save_full_qk": "Saving q^T k_g or probabilities from forward would avoid part of backward QK recompute, but at S4096/H64/topk512 it requires about 134M selected score entries, roughly 256 MiB per bf16 tensor per layer or 512 MiB per fp32 tensor per layer, and it still does not provide dO^T v_g because dO only exists in backward."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle-kernel 'docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size=64g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/work/tools/dsv4_runtime_probe -e TILELANG_CACHE_DIR=/work/cache/tilelang_direct_grouped_d_dq_20260605 -e PYTORCH_ROCM_ARCH=gfx950 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/work -w /work rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full python3 tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py --device cuda --dtype bfloat16 --seq-len 4096 --groups 1024 --heads 64 --dim 512 --layer-id 2 --group-panel-size 256 --panel-capacity 256 --token-block 32 --block-k 64 --block-d 32 --d-blocks-per-kernel 4 --threads 512 --input-layout bshd --plan-on-device --skip-group-filter --include-direct-source-grouped-d-dq-dkv --warmup-iters 2 --timed-iters 3 --output-json /work/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json'",
+    "ssh do-sonle-kernel 'docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size=64g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/work/tools/dsv4_runtime_probe -e TILELANG_CACHE_DIR=/work/cache/tilelang_direct_grouped_d_dq_20260605_d32x2 -e PYTORCH_ROCM_ARCH=gfx950 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/work -w /work rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full python3 tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py --device cuda --dtype bfloat16 --seq-len 4096 --groups 1024 --heads 64 --dim 512 --layer-id 2 --group-panel-size 256 --panel-capacity 256 --token-block 32 --block-k 64 --block-d 32 --d-blocks-per-kernel 2 --threads 512 --input-layout bshd --plan-on-device --skip-group-filter --include-direct-source-grouped-d-dq-dkv --warmup-iters 2 --timed-iters 3 --output-json /work/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x2_20260605.json'",
+    "scp do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/",
+    "scp do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x2_20260605.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/",
+    "jq empty experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json",
+    "jq empty experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_s4096_layer2_gp256_tb32_k64_d32x2_20260605.json"
+  ]
+}

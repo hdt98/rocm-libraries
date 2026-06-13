@@ -1,0 +1,64 @@
+{
+  "artifact": "compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_decision_20260603",
+  "created_at": "2026-06-03",
+  "scope": "actual_li_s4096_layer2_split_producer_compact_partial_reducer_floor",
+  "status": "reducer_floor_positive_producer_still_open",
+  "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocprim_reduce_by_key.py",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "contract": {
+    "planned_shape_source": "run_artifacts/actual_li_compact_partial_reducer_plan_20260603.json",
+    "token_block": 32,
+    "selected_block": 512,
+    "d_tile": 16,
+    "d_blocks": 32,
+    "compressed_groups": 1024,
+    "key_space": 32768,
+    "key": "compressed_group * d_blocks + d_block",
+    "value": "float32[16] compact partial dKV row",
+    "num_partial_rows_all_dblocks": 2112928,
+    "partial_value_stream_mib": 128.962890625,
+    "total_partial_stream_mib_from_plan": 137.1480712890625,
+    "write_reduction_x_from_plan": 23.813051840857806
+  },
+  "source_artifacts": {
+    "metadata_plan": "run_artifacts/actual_li_compact_partial_reducer_plan_20260603.json",
+    "sorted_reduce_floor": "run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_sorted_timing_20260603.json",
+    "random_sort_reduce_floor": "run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_random_sort_timing_20260603.json",
+    "sparse_atomic_gate": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_rerun_20260603.json"
+  },
+  "results": {
+    "sorted_grouped_reduce_only": {
+      "median_ms": 0.4376469999551773,
+      "p90_ms": 0.45034598708152773,
+      "resident_tensor_gib": 0.2688707187771797,
+      "temp_bytes": 1339524
+    },
+    "random_sort_reorder_reduce": {
+      "sort_only_median_ms": 0.1640625,
+      "sort_reorder_values_median_ms": 0.6616889834403992,
+      "sort_reorder_values_plus_reduce_median_ms": 1.1080750226974487,
+      "sort_reorder_values_plus_reduce_p90_ms": 1.1164349675178526,
+      "resident_tensor_gib": 0.4026823118329048,
+      "temp_bytes": 1339524
+    },
+    "script_extrapolation_note": "The tool's full_d512 extrapolation fields are intentionally ignored for these two runs because d_block is already encoded in the key space; the measured values cover all 32 D16 blocks."
+  },
+  "decision": {
+    "reducer_stage": "promote_as_viable_floor",
+    "standalone_branch": "not_promoted_without_a_better_producer",
+    "read": "The final compact reducer is not the current blocker. If a split producer can emit the 32x512 compact partial rows without the 18 ms LDS pair-slot body or the 133 ms persistent-CTA body, rocPRIM reduce-by-key is cheap enough to be a second stage.",
+    "next_kernel_requirement": "Implement or adapt a producer that keeps the fast query-major dot-K/MFMA contribution schedule, emits compact rows keyed by compressed group and D16 block, and avoids per-contribution LDS atomics/table initialization. The promotion gate remains beating the 8.19-8.81 ms sparse-atomic dKV slice end to end."
+  },
+  "commands": {
+    "sorted": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocprim_reduce_by_key.py --value-kind vec16 --mode sorted_balanced --num-pairs 2112928 --groups 32768 --skip-parity --summary-path run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_sorted_timing_20260603.json",
+    "random_sort_reduce": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocprim_reduce_by_key.py --value-kind vec16 --mode random_sort_reduce --num-pairs 2112928 --groups 32768 --skip-parity --summary-path run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_random_sort_timing_20260603.json"
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,74 @@
+{
+  "artifact": "updated_single_layer_target_gap_20260531",
+  "date": "2026-05-31",
+  "target_basis": {
+    "source": "user_updated_goal_2026_05_31",
+    "normalized_layer_tokens_per_s": 128100,
+    "ascend_mfu": 0.288,
+    "single_mi350x_end_to_end_tokens_per_gpu_s": 2980,
+    "layers": 43
+  },
+  "targets": {
+    "s1024": {
+      "tokens": 1024,
+      "target_ms": 8.0
+    },
+    "s2048": {
+      "tokens": 2048,
+      "target_ms": 16.0
+    },
+    "s4096": {
+      "tokens": 4096,
+      "target_ms": 32.0
+    }
+  },
+  "current_best_evidence": {
+    "s2048": {
+      "artifact": "run_artifacts/paired_compact_reduce_full_layer_s2048_20260531.json",
+      "avg_ms": 52.328626019880176,
+      "min_ms": 52.19650699291378,
+      "tokens_per_s": 39137.2783077076,
+      "estimated_tflops": 186.05789468695653,
+      "target_ms": 16.0,
+      "target_tokens_per_s": 128100,
+      "time_gap_multiplier": 3.270539126242511,
+      "throughput_fraction_of_target": 0.30552129826469633,
+      "needed_speedup": 3.2730903249257266
+    },
+    "s4096": {
+      "artifact": "run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+      "avg_ms": 76.57323967820655,
+      "min_ms": 76.30661700386554,
+      "tokens_per_s": 53491.27211037617,
+      "estimated_tflops": 276.50802181590427,
+      "target_ms": 32.0,
+      "target_tokens_per_s": 128100,
+      "time_gap_multiplier": 2.3929137399439546,
+      "throughput_fraction_of_target": 0.41757433341433387,
+      "needed_speedup": 2.394646874926822
+    }
+  },
+  "recent_backend_demotions_for_w2_dgrad": [
+    {
+      "backend": "aiter_tuned_gmm",
+      "reason": "Correct but slower than retained torch.bmm(out=) at S2048 and S4096."
+    },
+    {
+      "backend": "triton_compact_grouped_gemm",
+      "reason": "Correct but slower than retained torch.bmm(out=) for compact W2 dgrad."
+    },
+    {
+      "backend": "tilelang_example_grouped_gemm",
+      "reason": "Correct but slower than retained torch.bmm(out=)."
+    },
+    {
+      "backend": "tilelang_descriptor_grouped_gemm",
+      "reason": "Correct and removes expert-scan overhead, but still slower than retained torch.bmm(out=)."
+    },
+    {
+      "backend": "stock_ck_tile_grouped_gemm_example",
+      "reason": "Reaches 394.757 TFLOPs on padded work, but pads each expert to M=128 and lands at 5.48353 ms vs 3.624269 ms retained torch.bmm(out=)."
+    }
+  ],
+  "read": "The updated target makes the retained single-layer path a 2.39x gap at S4096 and a 3.27x gap at S2048. The W2 dgrad replacement attempts so far do not close the gap; the next useful work should attack larger block-level costs or build a true small-M CK/CK-Tile kernel rather than retry stock grouped GEMM examples."
+}

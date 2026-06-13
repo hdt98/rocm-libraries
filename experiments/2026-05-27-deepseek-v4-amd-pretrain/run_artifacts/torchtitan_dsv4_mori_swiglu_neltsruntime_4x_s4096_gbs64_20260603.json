@@ -1,0 +1,47 @@
+{
+  "artifact": "torchtitan_dsv4_mori_swiglu_neltsruntime_4x_s4096_gbs64_20260603",
+  "code_change": "Triton SwiGLU n_elements changed from tl.constexpr to runtime scalar in mori_aiter_moe.py to avoid per-shape specialization for dynamic routed padded rows.",
+  "knobs": {
+    "assume_identical_dispatch_order": 1,
+    "experimental_mori_aiter_moe": 1,
+    "li_kl_backend": "triton_tl_dot",
+    "local_vjp_mode": "padded",
+    "local_vjp_swiglu_backend": "triton",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_op_cache_mode": "backward",
+    "sharedkv_scatter_mode": "auto"
+  },
+  "read": "Normal no-timing 4x target slice passed after the runtime-n_elements SwiGLU patch. Step 2 exceeds the 4x normalized target and improves over earlier retained 4x MORI routed padded runs.",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_swiglu_neltsruntime_4x_s4096_gbs64_20260603",
+  "result": {
+    "checkpoint_enabled": false,
+    "grad_norm_step1": 9.0625,
+    "grad_norm_step2": 47.25,
+    "loss_step1": 12.22981,
+    "loss_step2": 8.95948,
+    "mfu_step2_pct_mi350": 3.35,
+    "passed": true,
+    "peak_memory_gib_range_step2": [
+      141.82,
+      167.86
+    ],
+    "tflops_per_gpu_step2": 77.35,
+    "tokens_per_gpu_s_step1": 2414,
+    "tokens_per_gpu_s_step2": 4088
+  },
+  "run_id": "torchtitan_dsv4_mori_swiglu_neltsruntime_4x_s4096_gbs64_20260603",
+  "shape": {
+    "activation_checkpointing": "full",
+    "cp": 1,
+    "ep": 4,
+    "fsdp": 4,
+    "gbs": 64,
+    "gpus": 4,
+    "mbs": 1,
+    "pp": 1,
+    "sequence_length": 4096,
+    "steps": 2,
+    "tp": 1
+  }
+}

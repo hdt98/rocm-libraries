@@ -1,0 +1,56 @@
+{
+  "run_id": "torchtitan_mori_hot_split_recompute_dockerenv_smoke_4x_s128_gbs64_mbs4_20260607",
+  "date": "2026-06-07",
+  "status": "completed_smoke_not_promoted",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "0,1,2,3",
+    "sequence_length": 128,
+    "global_batch_size": 64,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "steps": 1,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false
+  },
+  "candidate": {
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "aiter_stage1_recompute",
+    "mori_aiter_balanced_moe_mode": "execute",
+    "mori_aiter_balanced_moe_hot_experts": 2,
+    "mori_aiter_balanced_moe_execute_impl": "route_mask",
+    "mori_aiter_balanced_moe_min_helper_rows": 512,
+    "mori_aiter_balanced_moe_hot_split_backward": "recompute",
+    "moe_force_load_balance": false
+  },
+  "metrics": {
+    "completed_steps": 1,
+    "loss_step1": 12.32058,
+    "grad_norm_step1": 13.5625,
+    "tokens_per_gpu_s_step1": 94,
+    "tflops_per_gpu_step1": 3.01,
+    "peak_logged_memory_gib": 178.19
+  },
+  "validation": {
+    "local_py_compile": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "local_diff_check": "git -C /Users/sonle5/.codex/worktrees/0a57/one-mount-ai-platform diff --check -- sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh sdks/mlops/playground/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "remote_py_compile": "PYTHONPATH=/workspace/sources/wip/torchtitan python3 -m py_compile /workspace/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "docker_env_fix": "launcher now forwards CANARY_MORI_AITER_BALANCED_MOE_HOT_SPLIT_BACKWARD as TORCHTITAN_MORI_AITER_BALANCED_MOE_HOT_SPLIT_BACKWARD in docker_args",
+    "remote_result": "one finite step completed and process groups destroyed cleanly"
+  },
+  "logs": {
+    "docker_run": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_hot_split_recompute_dockerenv_smoke_4x_s128_gbs64_mbs4_20260607/docker-run.log",
+    "structured_logs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_hot_split_recompute_dockerenv_smoke_4x_s128_gbs64_mbs4_20260607/structured_logs/"
+  },
+  "read": "This is a fit/correctness smoke for the opt-in MORI/AITER helper hot-row recompute VJP path after fixing the Docker env pass-through. It proves the recompute branch can run through distributed TorchTitan without moe_force_load_balance, but it is not a throughput result. The next gate is an 8xMI350 S4096 GBS128 e2e A/B against the route-mask autograd path and the retained MORI/AITER and standard-EP helper baselines."
+}

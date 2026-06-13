@@ -1,0 +1,159 @@
+{
+  "artifact": "torchtitan_mori_saved_dispatch_profile_4x_s4096_20260605",
+  "created_at": "2026-06-05",
+  "purpose": "Profile the retained 4xMI350 MORI+AITER saved-forward-dispatch canary to decide which forward-pass state is worth reusing in backward.",
+  "run": {
+    "run_id": "torchtitan_dsv4_mori_saved_dispatch_profile_4x_s4096_gbs128_mbs4_steps2_20260605",
+    "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_saved_dispatch_profile_4x_s4096_gbs128_mbs4_steps2_20260605/docker-run.log",
+    "profile_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_mori_saved_dispatch_profile_4x_s4096_gbs128_mbs4_steps2_20260605",
+    "node": "do-vunguyen-mi350-gpu",
+    "gpus": 4,
+    "shape": {
+      "tensor_parallel": 1,
+      "pipeline_parallel": 1,
+      "context_parallel": 1,
+      "fsdp": 4,
+      "expert_parallel": 4,
+      "micro_batch_size": 4,
+      "global_batch_size": 128,
+      "gradient_accumulation": 8,
+      "sequence_length": 4096,
+      "steps": 2
+    },
+    "runtime": {
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "activation_checkpoint_mode": "none",
+      "checkpoint_enable": false,
+      "optimizer": "AdamW",
+      "moe_comm_backend": "mori",
+      "mori_aiter_forward_mode": "aiter",
+      "mori_aiter_backward_mode": "routed",
+      "mori_aiter_local_vjp_mode": "expert_loop",
+      "mori_aiter_save_forward_dispatch": true,
+      "mori_aiter_local_vjp_swiglu_backend": "triton",
+      "mori_aiter_xgrad_mode": "compact",
+      "pytorch_alloc_conf": "expandable_segments:True",
+      "chunked_ce_num_chunks": 8
+    },
+    "measurement_note": "MORI timing synchronizes recorded backward calls; use this run for attribution, not as a throughput promotion."
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.28444,
+      "grad_norm": 11.375,
+      "tokens_per_gpu_s": 5098,
+      "tflops_per_gpu": 96.46,
+      "peak_logged_memory_gib": 86.2
+    },
+    "step_2": {
+      "loss": 8.94403,
+      "grad_norm": 20.875,
+      "tokens_per_gpu_s": 12050,
+      "tflops_per_gpu": 228.01,
+      "peak_logged_memory_gib": 112.24
+    }
+  },
+  "additive_step2": {
+    "rank_step_wall_max_ms": 10875.05,
+    "train_step_ms_max_rank": 10874.819,
+    "microbatch_forward_backward_ms_max_rank": 10575.16,
+    "forward_backward_call_ms_max_rank": 10573.938,
+    "model_forward_ms_max_rank": 2377.111,
+    "loss_ms_max_rank": 745.05,
+    "backward_ms_max_rank": 6123.988,
+    "wrapper_residual_ms_estimate": 1329.011,
+    "optimizer_step_ms_max_rank": 30.606,
+    "grad_clip_ms_max_rank": 23.998,
+    "fetch_microbatches_ms_max_rank": 50.685,
+    "accumulated_loss_reduce_ms_max_rank": 191.518
+  },
+  "mori_step2": {
+    "record_count": {
+      "total": 256,
+      "forward": 128,
+      "backward": 128
+    },
+    "forward_saved_dispatch": {
+      "calls_per_rank": 32,
+      "total_ms_max_rank": 9.7,
+      "total_ms_mean_rank": 9.336,
+      "per_call_median_ms": 0.285
+    },
+    "backward_top_level": {
+      "calls_per_rank": 32,
+      "total_ms_by_rank": {
+        "rank0": 1856.611,
+        "rank1": 1849.2,
+        "rank2": 1868.386,
+        "rank3": 1836.24
+      },
+      "total_ms_max_rank": 1868.386,
+      "stages_ms_max_rank": {
+        "backward.local_vjp.expert_loop": 1277.839,
+        "backward.combine_dx.call": 519.078,
+        "backward.dispatch_grad_output.call": 218.412,
+        "backward.align_grad_output": 40.649,
+        "backward.dispatch_topk_dummy.call": 32.013,
+        "backward.combine_dtopk.call": 9.91,
+        "backward.combine_dx.prepare_full": 9.044,
+        "backward.reuse_forward_dispatch": 0.202
+      }
+    },
+    "expert_loop_internals": {
+      "total_ms_max_rank": 1251.823,
+      "stages_ms_max_rank": {
+        "local_expert_loop_vjp.expert_loop": 1210.371,
+        "local_expert_loop_vjp.gather": 20.775,
+        "local_expert_loop_vjp.sort_counts": 16.421,
+        "local_expert_loop_vjp.route_pack": 4.255
+      }
+    },
+    "route_stats_step2": {
+      "recv_count_mean": 55249,
+      "recv_count_max": 64245,
+      "recv_count_min": 42009,
+      "local_vjp_assignments_mean": 98304,
+      "local_vjp_assignments_max": 153922,
+      "local_vjp_assignments_min": 63574,
+      "local_vjp_max_count_mean": 18638.391,
+      "local_vjp_max_count_max": 36841,
+      "local_vjp_nonempty_experts_mean": 55.188,
+      "local_vjp_nonempty_experts_max": 64,
+      "local_vjp_nonempty_experts_min": 38,
+      "padded_rows_mean": 1192857,
+      "padded_rows_max": 2357824,
+      "padded_rows_min": 480256,
+      "padding_multiplier_mean": 12.326,
+      "padding_multiplier_max": 21.264,
+      "padding_multiplier_min": 5.339
+    }
+  },
+  "forward_intermediate_reuse_read": {
+    "already_reused": [
+      "recv_count",
+      "src_pos",
+      "packed_x_local",
+      "packed_weight_local",
+      "packed_ids_local"
+    ],
+    "materialized_effect": "The retained A/B shows saved forward dispatch reuse improves late-step throughput by about 4.4% TFLOPs/GPU and about 4.7% tok/GPU/s versus rebuilding the backward dispatch input, with about +3.79 GiB peak logged memory.",
+    "not_worth_saving_blindly": [
+      "large padded activations",
+      "selected per-expert dense slabs",
+      "Python-side sorted or packed tensors that slow the AITER fused forward"
+    ],
+    "candidate_next_state": [
+      "compact per-expert token offsets/counts",
+      "packed AITER input/output rows if AITER can expose them without extra copies",
+      "gate/up hidden intermediates or compact expert outputs only if exposed by the fused forward kernel or recomputed inside a fused owner VJP"
+    ]
+  },
+  "diagnosis": [
+    "Saving compact forward dispatch state is useful and already materializes into the retained 4x canary.",
+    "The saved-dispatch overhead is negligible in the profile: forward saved-dispatch is about 9.7 ms per max rank over step 2 and backward reuse is about 0.2 ms per max rank.",
+    "The remaining MORI wall is local owner VJP math and dX return wait/skew, not forward dispatch metadata rebuilding.",
+    "Metadata/gather inside expert_loop is small compared with the per-expert math loop.",
+    "The next production kernel should preserve AITER fused forward and expose or consume compact saved forward state inside a fused grouped owner-rank training backward."
+  ],
+  "decision": "Keep saved forward dispatch reuse enabled for the retained canary. The next code target is AITER-forward-compatible fused compact grouped owner-rank VJP plus dX return overlap; avoid replacing AITER fused forward with a slower padded or Python-side saved-intermediate path."
+}

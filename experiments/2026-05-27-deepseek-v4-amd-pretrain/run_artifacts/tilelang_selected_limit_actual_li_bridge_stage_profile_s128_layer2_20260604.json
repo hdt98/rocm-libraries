@@ -1,0 +1,462 @@
+{
+  "aggregate": {
+    "by_component": {
+      "compressed_grad_logits_pack_input_b0": {
+        "enabled": true,
+        "max_ms": 0.02860100008547306,
+        "mean_ms": 0.02860100008547306,
+        "median_ms": 0.02860100008547306,
+        "min_ms": 0.02860100008547306,
+        "samples_ms": [
+          0.02860100008547306
+        ],
+        "stdev_ms": 0.0
+      },
+      "compressed_groups_device": {
+        "enabled": true,
+        "max_ms": 0.06860099732875824,
+        "mean_ms": 0.06860099732875824,
+        "median_ms": 0.06860099732875824,
+        "min_ms": 0.06860099732875824,
+        "samples_ms": [
+          0.06860099732875824
+        ],
+        "stdev_ms": 0.0
+      },
+      "compressed_probs_pack_input_b0": {
+        "enabled": true,
+        "max_ms": 0.06744100153446198,
+        "mean_ms": 0.06744100153446198,
+        "median_ms": 0.06744100153446198,
+        "min_ms": 0.06744100153446198,
+        "samples_ms": [
+          0.06744100153446198
+        ],
+        "stdev_ms": 0.0
+      },
+      "forward_with_lse": {
+        "enabled": true,
+        "max_ms": 0.2621630132198334,
+        "mean_ms": 0.2621630132198334,
+        "median_ms": 0.2621630132198334,
+        "min_ms": 0.2621630132198334,
+        "samples_ms": [
+          0.2621630132198334
+        ],
+        "stdev_ms": 0.0
+      },
+      "gather_selected_kv_fp32": {
+        "enabled": true,
+        "max_ms": 0.1758819967508316,
+        "mean_ms": 0.1758819967508316,
+        "median_ms": 0.1758819967508316,
+        "min_ms": 0.1758819967508316,
+        "samples_ms": [
+          0.1758819967508316
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_attn_sink": {
+        "enabled": true,
+        "max_ms": 0.03579999879002571,
+        "mean_ms": 0.03579999879002571,
+        "median_ms": 0.03579999879002571,
+        "min_ms": 0.03579999879002571,
+        "samples_ms": [
+          0.03579999879002571
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_kv_zero": {
+        "enabled": true,
+        "max_ms": 0.01907999999821186,
+        "mean_ms": 0.01907999999821186,
+        "median_ms": 0.01907999999821186,
+        "min_ms": 0.01907999999821186,
+        "samples_ms": [
+          0.01907999999821186
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_logits": {
+        "enabled": true,
+        "max_ms": 0.01931999996304512,
+        "mean_ms": 0.01931999996304512,
+        "median_ms": 0.01931999996304512,
+        "min_ms": 0.01931999996304512,
+        "samples_ms": [
+          0.01931999996304512
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_output_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.009359999559819698,
+        "mean_ms": 0.009359999559819698,
+        "median_ms": 0.009359999559819698,
+        "min_ms": 0.009359999559819698,
+        "samples_ms": [
+          0.009359999559819698
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_probs_do_v": {
+        "enabled": true,
+        "max_ms": 0.04608000069856644,
+        "mean_ms": 0.04608000069856644,
+        "median_ms": 0.04608000069856644,
+        "min_ms": 0.04608000069856644,
+        "samples_ms": [
+          0.04608000069856644
+        ],
+        "stdev_ms": 0.0
+      },
+      "grad_q": {
+        "enabled": true,
+        "max_ms": 0.04564100131392479,
+        "mean_ms": 0.04564100131392479,
+        "median_ms": 0.04564100131392479,
+        "min_ms": 0.04564100131392479,
+        "samples_ms": [
+          0.04564100131392479
+        ],
+        "stdev_ms": 0.0
+      },
+      "lse_layout": {
+        "enabled": true,
+        "max_ms": 0.016039999201893806,
+        "mean_ms": 0.016039999201893806,
+        "median_ms": 0.016039999201893806,
+        "min_ms": 0.016039999201893806,
+        "samples_ms": [
+          0.016039999201893806
+        ],
+        "stdev_ms": 0.0
+      },
+      "probs_exp_mask": {
+        "enabled": true,
+        "max_ms": 0.10696200281381607,
+        "mean_ms": 0.10696200281381607,
+        "median_ms": 0.10696200281381607,
+        "min_ms": 0.10696200281381607,
+        "samples_ms": [
+          0.10696200281381607
+        ],
+        "stdev_ms": 0.0
+      },
+      "q_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.009320000186562538,
+        "mean_ms": 0.009320000186562538,
+        "median_ms": 0.009320000186562538,
+        "min_ms": 0.009320000186562538,
+        "samples_ms": [
+          0.009320000186562538
+        ],
+        "stdev_ms": 0.0
+      },
+      "route_plan_b0": {
+        "enabled": true,
+        "max_ms": 1.3290790375322104,
+        "mean_ms": 1.3290790375322104,
+        "median_ms": 1.3290790375322104,
+        "min_ms": 1.3290790375322104,
+        "samples_ms": [
+          1.3290790375322104
+        ],
+        "stdev_ms": 0.0
+      },
+      "safe_indices": {
+        "enabled": true,
+        "max_ms": 0.029559999704360962,
+        "mean_ms": 0.029559999704360962,
+        "median_ms": 0.029559999704360962,
+        "min_ms": 0.029559999704360962,
+        "samples_ms": [
+          0.029559999704360962
+        ],
+        "stdev_ms": 0.0
+      },
+      "scores_qk": {
+        "enabled": true,
+        "max_ms": 0.2753239870071411,
+        "mean_ms": 0.2753239870071411,
+        "median_ms": 0.2753239870071411,
+        "min_ms": 0.2753239870071411,
+        "samples_ms": [
+          0.2753239870071411
+        ],
+        "stdev_ms": 0.0
+      },
+      "sink_probs": {
+        "enabled": true,
+        "max_ms": 0.027641000226140022,
+        "mean_ms": 0.027641000226140022,
+        "median_ms": 0.027641000226140022,
+        "min_ms": 0.027641000226140022,
+        "samples_ms": [
+          0.027641000226140022
+        ],
+        "stdev_ms": 0.0
+      },
+      "softmax_dot": {
+        "enabled": true,
+        "max_ms": 0.042761001735925674,
+        "mean_ms": 0.042761001735925674,
+        "median_ms": 0.042761001735925674,
+        "min_ms": 0.042761001735925674,
+        "samples_ms": [
+          0.042761001735925674
+        ],
+        "stdev_ms": 0.0
+      },
+      "tilelang_config": {
+        "enabled": true,
+        "max_ms": 0.039250124245882034,
+        "mean_ms": 0.039250124245882034,
+        "median_ms": 0.039250124245882034,
+        "min_ms": 0.039250124245882034,
+        "samples_ms": [
+          0.039250124245882034
+        ],
+        "stdev_ms": 0.0
+      },
+      "tilelang_dkv_source_indexed_kernel_b0": {
+        "enabled": true,
+        "max_ms": 0.16668200492858887,
+        "mean_ms": 0.16668200492858887,
+        "median_ms": 0.16668200492858887,
+        "min_ms": 0.16668200492858887,
+        "samples_ms": [
+          0.16668200492858887
+        ],
+        "stdev_ms": 0.0
+      },
+      "valid_mask": {
+        "enabled": true,
+        "max_ms": 0.093640998005867,
+        "mean_ms": 0.093640998005867,
+        "median_ms": 0.093640998005867,
+        "min_ms": 0.093640998005867,
+        "samples_ms": [
+          0.093640998005867
+        ],
+        "stdev_ms": 0.0
+      }
+    },
+    "component_event_sum": {
+      "enabled": true,
+      "max_ms": 2.9142291648313403,
+      "mean_ms": 2.9142291648313403,
+      "median_ms": 2.9142291648313403,
+      "min_ms": 2.9142291648313403,
+      "samples_ms": [
+        2.9142291648313403
+      ],
+      "stdev_ms": 0.0
+    },
+    "component_median_sum_ms": 2.9142291648313403,
+    "component_wall_sum": {
+      "enabled": true,
+      "max_ms": 3.342733019962907,
+      "mean_ms": 3.342733019962907,
+      "median_ms": 3.342733019962907,
+      "min_ms": 3.342733019962907,
+      "samples_ms": [
+        3.342733019962907
+      ],
+      "stdev_ms": 0.0
+    },
+    "last_checksums": {
+      "grad_kv_norm": 595.819580078125,
+      "grad_q_norm": 120.16646575927734,
+      "grad_sink_norm": "NaN",
+      "output_mean": -0.002537607215344906
+    },
+    "last_memory": {
+      "max_memory_allocated_bytes": 186315776,
+      "max_memory_allocated_gib": 0.17352008819580078
+    },
+    "last_plan_metadata": [
+      {
+        "active_rows": 144,
+        "block_d": 64,
+        "block_k": 32,
+        "d_blocks_per_kernel": 1,
+        "group_count": 32,
+        "group_panel_size": 32,
+        "input_layout": "bshd",
+        "max_active_groups": 32,
+        "original_topk": 32,
+        "overflow_fraction": 0.0,
+        "overflow_pairs": 0,
+        "packed_topk": 32,
+        "panel_capacity": 32,
+        "panel_count": 1,
+        "route_limit_modeled_chunk_fraction": 1.0,
+        "selected_limit_contract": "packed actual-LI groups -> route selected limits -> TileLang in-CTA active-group reduction -> final [groups,D] dKV",
+        "seq_len": 128,
+        "threads": 512,
+        "token_block": 16,
+        "valid_pairs": 2016,
+        "write_reduction_x": 14.0
+      }
+    ],
+    "ranked_by_median_ms": [
+      {
+        "component": "route_plan_b0",
+        "median_ms": 1.3290790375322104,
+        "pct_of_component_median_sum": 45.60653820816216
+      },
+      {
+        "component": "scores_qk",
+        "median_ms": 0.2753239870071411,
+        "pct_of_component_median_sum": 9.447575033896669
+      },
+      {
+        "component": "forward_with_lse",
+        "median_ms": 0.2621630132198334,
+        "pct_of_component_median_sum": 8.995964229017863
+      },
+      {
+        "component": "gather_selected_kv_fp32",
+        "median_ms": 0.1758819967508316,
+        "pct_of_component_median_sum": 6.035283665174997
+      },
+      {
+        "component": "tilelang_dkv_source_indexed_kernel_b0",
+        "median_ms": 0.16668200492858887,
+        "pct_of_component_median_sum": 5.719591545513735
+      },
+      {
+        "component": "probs_exp_mask",
+        "median_ms": 0.10696200281381607,
+        "pct_of_component_median_sum": 3.6703360224591823
+      },
+      {
+        "component": "valid_mask",
+        "median_ms": 0.093640998005867,
+        "pct_of_component_median_sum": 3.213233850512454
+      },
+      {
+        "component": "compressed_groups_device",
+        "median_ms": 0.06860099732875824,
+        "pct_of_component_median_sum": 2.3540014682657424
+      },
+      {
+        "component": "compressed_probs_pack_input_b0",
+        "median_ms": 0.06744100153446198,
+        "pct_of_component_median_sum": 2.31419691863406
+      },
+      {
+        "component": "grad_probs_do_v",
+        "median_ms": 0.04608000069856644,
+        "pct_of_component_median_sum": 1.5812071766577525
+      },
+      {
+        "component": "grad_q",
+        "median_ms": 0.04564100131392479,
+        "pct_of_component_median_sum": 1.56614317997762
+      },
+      {
+        "component": "softmax_dot",
+        "median_ms": 0.042761001735925674,
+        "pct_of_component_median_sum": 1.467317747415394
+      },
+      {
+        "component": "tilelang_config",
+        "median_ms": 0.039250124245882034,
+        "pct_of_component_median_sum": 1.3468441232950743
+      },
+      {
+        "component": "grad_attn_sink",
+        "median_ms": 0.03579999879002571,
+        "pct_of_component_median_sum": 1.228455168250216
+      },
+      {
+        "component": "safe_indices",
+        "median_ms": 0.029559999704360962,
+        "pct_of_component_median_sum": 1.0143333976987268
+      },
+      {
+        "component": "compressed_grad_logits_pack_input_b0",
+        "median_ms": 0.02860100008547306,
+        "pct_of_component_median_sum": 0.9814259094867143
+      },
+      {
+        "component": "sink_probs",
+        "median_ms": 0.027641000226140022,
+        "pct_of_component_median_sum": 0.948484098632639
+      },
+      {
+        "component": "grad_logits",
+        "median_ms": 0.01931999996304512,
+        "pct_of_component_median_sum": 0.6629540393115672
+      },
+      {
+        "component": "grad_kv_zero",
+        "median_ms": 0.01907999999821186,
+        "pct_of_component_median_sum": 0.6547185865980484
+      },
+      {
+        "component": "lse_layout",
+        "median_ms": 0.016039999201893806,
+        "pct_of_component_median_sum": 0.5504028096164536
+      },
+      {
+        "component": "grad_output_to_fp32",
+        "median_ms": 0.009359999559819698,
+        "pct_of_component_median_sum": 0.3211826877850014
+      },
+      {
+        "component": "q_to_fp32",
+        "median_ms": 0.009320000186562538,
+        "pct_of_component_median_sum": 0.3198101336379265
+      }
+    ]
+  },
+  "autograd_timing": null,
+  "backend_path": "/workspace/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "input_metadata": {
+    "actual_li_compress_ratio": 4,
+    "actual_li_topk": 32,
+    "actual_li_valid_pairs": 2016,
+    "group_panel_size": 32,
+    "input_source": "actual-li-boundary",
+    "layer_id": 2,
+    "materialized_workspace": {
+      "compressed_kv_bytes": 32768,
+      "grad_logits_bytes": 1048576,
+      "grad_output_bytes": 8388608,
+      "lse_bytes": 32768,
+      "materialized_probs_grad_logits": true,
+      "output_bytes": 8388608,
+      "probs_bytes": 1048576,
+      "q_bytes": 8388608,
+      "read": "boundary input source captures real q/dO/output/lse/compressed KV tensors. Materialized per-head probs and grad_logits are created only for materialized-input producer modes or when correctness checking needs the reference.",
+      "safe_groups_bytes": 32768,
+      "valid_bytes": 4096
+    },
+    "note": "Uses real TorchTitan layer boundary q/grad_output/compressed_kv and actual LI top_indices. The unused local KV prefix is zero-filled because this profile isolates the compressed sparse-MLA branch.",
+    "packed_topk_for_plan": 32,
+    "panel_capacity": 32
+  },
+  "read": "Manual stage attribution for explicit_tilelang_dkv. This is not autograd-equivalent wall timing because components are timed with extra synchronization, but it ranks the remaining bridge costs.",
+  "scope": "torchtitan_shared_kv_tilelang_bridge_stage_profile",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 32,
+    "dim": 512,
+    "group_count": 32,
+    "heads": 64,
+    "include_packed_control": false,
+    "input_source": "actual-li-boundary",
+    "local_count": 0,
+    "plan_on_device": true,
+    "requested_compressed_count": 512,
+    "requested_local_count": 128,
+    "selected": 32,
+    "seq_len": 128
+  },
+  "status": "ok"
+}

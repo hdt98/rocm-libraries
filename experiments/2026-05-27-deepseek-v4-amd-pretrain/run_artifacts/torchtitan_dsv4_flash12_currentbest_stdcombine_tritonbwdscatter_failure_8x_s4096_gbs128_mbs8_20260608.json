@@ -1,0 +1,46 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_currentbest_stdcombine_tritonbwdscatter_8x_s4096_gbs128_mbs8_steps6_20260608",
+  "date": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "rejected_step1_backward_gpu_memory_access_fault",
+  "promotion_status": "rejected",
+  "raw_remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_currentbest_stdcombine_tritonbwdscatter_8x_s4096_gbs128_mbs8_steps6_20260608",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "candidate_delta_vs_current_best": {
+    "standard_ep_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "note": "The retained current best uses triton_bwd only for the hot-split weighted scatter. This rejected gate also enabled triton_bwd for the normal standard-EP combine weighted scatter."
+  },
+  "retained_current_best_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "steps_2_to_20_tokens_per_gpu_s_mean": 8518.8421,
+    "steps_2_to_20_tflops_per_gpu_mean": 431.3139,
+    "peak_logged_memory_gib": 251.97
+  },
+  "failure": {
+    "phase": "step1_forward_backward_backward",
+    "first_observed_rank": 4,
+    "exit_signal": "SIGABRT",
+    "symptoms": [
+      "Memory access fault reported by all 8 GPU nodes",
+      "GPU coredump handler failed to exec",
+      "torch.distributed.elastic reported rank 4 as the first observed failure"
+    ],
+    "structured_log_last_event": "step 1 fwd_bwd_start",
+    "step_metrics_logged": false
+  },
+  "decision": "Do not promote or retry this as a throughput candidate. Keep the retained current-best path with normal standard-EP weighted scatter on its prior backend and triton_bwd only on the hot-split scatter path unless a focused correctness fix lands for normal-combine triton_bwd backward.",
+  "interpretation": "The failed run is separate from the same-scope pp_vis bubble read. It does not change the current-best schedule conclusion; it only closes this specific normal-combine scatter backend swap as unstable at the retained MBS8 shape."
+}

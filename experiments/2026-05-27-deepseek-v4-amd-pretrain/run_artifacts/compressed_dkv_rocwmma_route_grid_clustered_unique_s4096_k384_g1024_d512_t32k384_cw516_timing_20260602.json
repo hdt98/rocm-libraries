@@ -1,0 +1,113 @@
+{
+  "artifact": "compressed_dkv_rocwmma_route_grid_probe",
+  "scope": "full_grid_token_selected_d16_rocwmma_raw_grouped_atomic_and_grouped_partial_reduction",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "seq_len": 4096,
+    "topk": 384,
+    "selected_rows": 1572864,
+    "h_dim": 64,
+    "d_dim": 512,
+    "token_block": 32,
+    "selected_block": 384,
+    "d_tile": 16,
+    "group_count": 1024,
+    "group_panel": 256,
+    "route_pattern": "clustered_unique",
+    "formula": "out[g,d] = sum_{t,k:group[t,k]=g} (dL_scaled[t,k,H] @ Q[t,H,d] + P[t,k,H] @ dO[t,H,d])"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 0.5916314469650388,
+  "extension_dir": "/workspace/cache/torch_extensions_rocwmma_route_grid_clustered",
+  "write_model": {
+    "token_tiles": 128,
+    "selected_tiles": 1,
+    "d_blocks": 32,
+    "panel_tiles": 4,
+    "raw_scalar_writes": 805306368,
+    "grouped_scalar_writes": 33816576,
+    "partial_dense_scalar_writes": 67108864,
+    "group_panel_scalar_writes": 67108864,
+    "tile_group_rows": 66048,
+    "min_tile_groups": 516,
+    "max_tile_groups": 516,
+    "modeled_write_reduction_x": 23.813953488372093,
+    "partial_dense_write_reduction_x": 12.0,
+    "group_panel_write_reduction_x": 12.0,
+    "group_panel_recompute_x": 4,
+    "k16_route_tiles": 98304,
+    "k16_duplicate_route_tiles": 0,
+    "k16_unique_route_contract": true,
+    "cluster_width": 516
+  },
+  "parity": {
+    "skipped": true,
+    "raw_vs_grouped_max_abs_diff": 5.7220458984375e-05,
+    "raw_vs_grouped_direct_unique_max_abs_diff": 5.7220458984375e-05,
+    "raw_vs_partial_reduce_max_abs_diff": null,
+    "raw_vs_group_panel_max_abs_diff": null
+  },
+  "timing_ms": {
+    "raw_atomic": {
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "median_ms": 7.136580944061279,
+      "min_ms": 7.109499931335449,
+      "max_ms": 7.200460910797119,
+      "mean_ms": 7.148847262064616
+    },
+    "grouped_atomic": {
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "median_ms": 15.683365821838379,
+      "min_ms": 15.661526679992676,
+      "max_ms": 15.753326416015625,
+      "mean_ms": 15.699406305948893
+    },
+    "grouped_direct_unique": {
+      "warmup_iters": 1,
+      "timed_iters": 3,
+      "median_ms": 14.787444114685059,
+      "min_ms": 14.691548347473145,
+      "max_ms": 14.869547843933105,
+      "mean_ms": 14.782846768697103
+    },
+    "group_panel_atomic": null,
+    "grouped_partial_emit": null,
+    "grouped_partial_reduce": null,
+    "grouped_partial_emit_plus_reduce": null,
+    "grouped_vs_raw_speedup_x": 0.45504141299337114,
+    "partial_emit_vs_grouped_atomic_speedup_x": null,
+    "partial_emit_plus_reduce_vs_grouped_atomic_speedup_x": null,
+    "grouped_direct_unique_vs_grouped_atomic_speedup_x": 1.06058665041808,
+    "grouped_direct_unique_vs_raw_speedup_x": 0.48261084800814974,
+    "group_panel_vs_grouped_atomic_speedup_x": null
+  },
+  "tensor_stats": {
+    "raw_candidate": {
+      "norm": 5473.693359375,
+      "max_abs": 41.25934600830078,
+      "mean_abs": 6.031024932861328
+    },
+    "grouped_candidate": {
+      "norm": 5473.69287109375,
+      "max_abs": 41.259342193603516,
+      "mean_abs": 6.031024932861328
+    },
+    "grouped_direct_unique_candidate": {
+      "norm": 5473.693359375,
+      "max_abs": 41.259342193603516,
+      "mean_abs": 6.031024932861328
+    },
+    "partial_reduced_candidate": null,
+    "group_panel_candidate": null
+  },
+  "read": "This probe tests whether the local grouped-reduction contract keeps working when expanded from one CTA to a full token/selected/D grid. It still materializes diagnostic probabilities and grad logits, and can either use grouped global atomics or emit grouped route-tile partials for a separate reduction, so it is a schedule-pressure probe rather than the final fused sparse-MLA/LI backward kernel."
+}

@@ -1,0 +1,93 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_weighted_output_gate_20260612",
+  "date": "2026-06-12",
+  "question": "Does the existing opt-in MORI native compact weighted-output boundary improve the MBS4/no-AC native compact surface?",
+  "result": "completed_three_steps_rejected",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_weighted_output_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_weighted_output_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_weighted_output_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612",
+    "shape": "8xMI350 TP1 PP1 CP1 FSDP8 EP8 S4096 GBS128 MBS4 GA4",
+    "activation_checkpoint_mode": "none",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_source_scatter_backend": "triton_flat",
+    "standard_ep_mori_native_compact_weighted_output": true,
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_order": "owner_compact",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_bwd_score_mode": "torch",
+    "mori_shmem_heap_size": "32G",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_blocks": {
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128
+    },
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "validation": {
+    "launcher_syntax": "zsh -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh passed",
+    "token_dispatcher_py_compile": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py passed",
+    "active_path_marker": "docker log summary contains standard_ep_mori_native_compact_weighted_output=true",
+    "node_cleanup": "post-run rocm-smi shows no active training KFD processes and about 0.3 GiB VRAM used per GPU"
+  },
+  "steps": {
+    "1": {
+      "loss": 15.88553,
+      "grad_norm": 16.625,
+      "tokens_per_gpu_s": 1107,
+      "tflops_per_gpu": 54.82,
+      "memory_gib_rank_range": [160.27, 163.59]
+    },
+    "2": {
+      "loss": 10.81813,
+      "grad_norm": 47.0,
+      "tokens_per_gpu_s": 6428,
+      "tflops_per_gpu": 318.23,
+      "memory_gib_rank_range": [200.59, 203.05]
+    },
+    "3": {
+      "loss": 15.86906,
+      "grad_norm": 46.75,
+      "tokens_per_gpu_s": 6949,
+      "tflops_per_gpu": 344.02,
+      "memory_gib_rank_range": [202.24, 203.39]
+    }
+  },
+  "windows": {
+    "steps_2_to_3": {
+      "tokens_per_gpu_s_mean": 6688.5,
+      "node_tokens_s_mean": 53508.0,
+      "tflops_per_gpu_mean": 331.125,
+      "peak_logged_memory_gib": 203.39
+    }
+  },
+  "comparison_control": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_dataonly_inverse_20260611.json",
+    "run_id": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_mbs4_noac_steps6_8x_s4096_gbs128_vu_20260611",
+    "same_surface_except_weighted_output_bridge": true,
+    "steps_2_to_3": {
+      "tokens_per_gpu_s_mean": 7836.5,
+      "node_tokens_s_mean": 62692.0,
+      "tflops_per_gpu_mean": 358.91,
+      "peak_logged_memory_gib": 194.21
+    },
+    "weighted_output_delta": {
+      "tokens_per_gpu_s_abs": -1148.0,
+      "tokens_per_gpu_s_pct": -14.65,
+      "tflops_per_gpu_abs": -27.785,
+      "tflops_per_gpu_pct": -7.74,
+      "peak_logged_memory_gib_abs": 9.18
+    }
+  },
+  "read": "The existing weighted-output custom-autograd bridge is functionally valid and activates, but it is a negative result. It keeps the native compact combine plus flat-position weighted scatter inside one autograd boundary; it does not remove the underlying source-rank row materialization or final token-major scatter work. Continue the native MORI path by changing the output/return ABI itself rather than promoting this bridge."
+}

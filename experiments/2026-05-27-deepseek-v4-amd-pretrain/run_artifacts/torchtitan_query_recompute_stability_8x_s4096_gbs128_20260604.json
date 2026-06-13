@@ -1,0 +1,134 @@
+{
+  "artifact_type": "torchtitan_dsv4_materialized_e2e_run",
+  "created_at": "2026-06-04",
+  "run_id": "torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604",
+  "remote_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604",
+  "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "tensor_parallel": 1,
+    "steps": 6
+  },
+  "key_env": {
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_USE_CE2_LOSS": "1",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.24536,
+      "grad_norm": 11.25,
+      "tokens_per_gpu_per_second_range": [2411, 2446],
+      "tflops_per_gpu_range": [45.62, 46.28],
+      "peak_memory_gib_range": [42.22, 47.85]
+    },
+    {
+      "step": 2,
+      "loss": 8.96141,
+      "grad_norm": 22.875,
+      "tokens_per_gpu_per_second": 4528,
+      "tflops_per_gpu": 85.67,
+      "peak_memory_gib_range": [58.97, 84.95]
+    },
+    {
+      "step": 3,
+      "loss": 13.63116,
+      "grad_norm": 30.125,
+      "tokens_per_gpu_per_second": 3590,
+      "tflops_per_gpu": 67.93,
+      "peak_memory_gib_range": [63.97, 103.17]
+    },
+    {
+      "step": 4,
+      "loss": 12.30725,
+      "grad_norm": 54.0,
+      "tokens_per_gpu_per_second": 3426,
+      "tflops_per_gpu": 64.83,
+      "peak_memory_gib_range": [93.44, 106.96]
+    },
+    {
+      "step": 5,
+      "loss": 9.99032,
+      "grad_norm": 57.25,
+      "tokens_per_gpu_per_second": 3523,
+      "tflops_per_gpu": 66.66,
+      "peak_memory_gib_range": [102.63, 107.10]
+    },
+    {
+      "step": 6,
+      "loss": 8.23583,
+      "grad_norm": 35.5,
+      "tokens_per_gpu_per_second": 3521,
+      "tflops_per_gpu_range": [66.62, 66.63],
+      "peak_memory_gib_range": [102.63, 107.22]
+    }
+  ],
+  "summary": {
+    "late_steps": [4, 5, 6],
+    "late_mean_tokens_per_gpu_per_second": 3490.0,
+    "late_mean_tflops_per_gpu": 66.04,
+    "best_burst_step": 2,
+    "best_burst_tflops_per_gpu": 85.67,
+    "target_tflops_per_gpu": 277.0,
+    "late_mean_percent_of_target": 23.84,
+    "speedup_needed_vs_target": 4.19,
+    "comparison_vs_retained_full_ac_8x_tflops_per_gpu": {
+      "baseline": 58.71,
+      "absolute_delta": 7.33,
+      "relative_delta_percent": 12.49
+    },
+    "comparison_vs_no_ac_expandable_8x_late_tflops_per_gpu": {
+      "baseline": 64.91,
+      "absolute_delta": 1.13,
+      "relative_delta_percent": 1.74
+    }
+  },
+  "interpretation": {
+    "promote_status": "candidate_evidence_not_final_target",
+    "read": "Whole-boundary shared-KV query recompute removes the late TileLang bridge/materialization problem and is stable for six 8x steps, but the 8x sustained uplift is small versus the best no-activation-checkpoint expandable-allocator baseline.",
+    "sparse_attention_lesson": "Do not keep tuning a late dKV replacement after PyTorch selected-state/prob/grad-logit materialization. Keep the direct boundary that consumes q, kv, grad_output, output, lse, and indices, then move grouped dKV reduction into the query-major producer.",
+    "next_sparse_kernel_step": "Fuse query-recompute contribution math with group-aware local/segmented dKV reduction before global atomics or compact partial writes.",
+    "moe_parallel_track": "MORI/AITER MoE remains an independent e2e target; this run did not change the MORI owner VJP implementation."
+  },
+  "raw_outputs": {
+    "structured_jsonl_files": [
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_0.20260604-153535-O8EZU2.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_1.20260604-153535-D5Z8B6.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_2.20260604-153534-D8P5RZ.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_3.20260604-153535-JOGKYT.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_4.20260604-153535-JEAY6I.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_5.20260604-153535-RVBJ4W.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_6.20260604-153535-5GVHDC.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_stability_8x_s4096_gbs128_steps6_20260604/structured_logs/training.global_rank_7.20260604-153535-MFCHFT.jsonl"
+    ],
+    "remote_output_size": "4.3M",
+    "remote_log_size": "76K"
+  },
+  "validation": {
+    "completed_steps": 6,
+    "training_completed": true,
+    "process_group_destroyed": true,
+    "json_validated_with_jq": true
+  },
+  "dependency_pin_changes": []
+}

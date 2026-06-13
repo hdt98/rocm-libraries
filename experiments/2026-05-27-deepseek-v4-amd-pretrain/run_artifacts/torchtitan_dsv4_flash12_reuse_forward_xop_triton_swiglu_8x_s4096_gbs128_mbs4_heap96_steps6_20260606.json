@@ -1,0 +1,161 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606",
+  "date": "2026-06-06",
+  "status": "completed_six_steps_current_best_12layer_materialized_candidate",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606",
+  "remote_paths": {
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606/docker-run.log",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_reuse_forward_xop_triton_swiglu_8x_s4096_gbs128_mbs4_heap96_steps6_20260606",
+    "smoke_timing_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_reuse_forward_xop_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/mori_timing"
+  },
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "env": {
+    "CANARY_EP": 8,
+    "CANARY_DP_SHARD": 8,
+    "CANARY_MBS": 4,
+    "CANARY_GBS": 128,
+    "CANARY_SEQ_LEN": 4096,
+    "CANARY_STEPS": 6,
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "96G",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": 1,
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": 1,
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": 1,
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": 0,
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "TORCHTITAN_MORI_AITER_REUSE_FORWARD_X_OP_FOR_SAVED_BACKWARD": "default_true",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": 4096,
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.24693,
+      "grad_norm": 18.25,
+      "tokens_per_gpu_s": 1686,
+      "tflops_per_gpu": 85.35,
+      "peak_logged_memory_gib_rankmax": 124.96
+    },
+    {
+      "step": 2,
+      "loss": 8.09865,
+      "grad_norm": 85.0,
+      "tokens_per_gpu_s": 4890,
+      "tflops_per_gpu": 247.57,
+      "peak_logged_memory_gib_rankmax": 164.60
+    },
+    {
+      "step": 3,
+      "loss": 23.45158,
+      "grad_norm": 135.0,
+      "tokens_per_gpu_s": 4939,
+      "tflops_per_gpu": 250.07,
+      "peak_logged_memory_gib_rankmax": 165.95
+    },
+    {
+      "step": 4,
+      "loss": 16.94711,
+      "grad_norm": 47.25,
+      "tokens_per_gpu_s": 5115,
+      "tflops_per_gpu": 258.97,
+      "peak_logged_memory_gib_rankmax": 165.95
+    },
+    {
+      "step": 5,
+      "loss": 15.85702,
+      "grad_norm": 80.0,
+      "tokens_per_gpu_s": 4713,
+      "tflops_per_gpu": 238.62,
+      "peak_logged_memory_gib_rankmax": 165.95
+    },
+    {
+      "step": 6,
+      "loss": 7.30739,
+      "grad_norm": 36.0,
+      "tokens_per_gpu_s": 4823,
+      "tflops_per_gpu": 244.19,
+      "peak_logged_memory_gib_rankmax": 167.67
+    }
+  ],
+  "summary_metrics": {
+    "steps_2_to_6_tokens_per_gpu_s_mean": 4896.0,
+    "steps_2_to_6_node_tokens_s_mean": 39168.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 248.284,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 4883.67,
+    "steps_4_to_6_node_tokens_s_mean": 39069.33,
+    "steps_4_to_6_tflops_per_gpu_mean": 247.927,
+    "peak_logged_memory_gib": 167.67,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu": 0.4013
+  },
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "summary": "When saved forward dispatch is available, dX return mode is sync, and dTopK return mode is dense_allreduce, reuse the forward MORI x dispatch/combine op as the backward x op instead of allocating a separate backward_x MORI op.",
+    "guard": "TORCHTITAN_MORI_AITER_REUSE_FORWARD_X_OP_FOR_SAVED_BACKWARD default true",
+    "timing_evidence": {
+      "smoke_run_id": "torchtitan_dsv4_flash12_reuse_forward_xop_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+      "meta_reused_forward_x_op": true,
+      "stage": "backward.reuse_forward_dispatch",
+      "combine_dtopk_launch": []
+    }
+  },
+  "comparison": {
+    "previous_stable_8x_mbs2_dense_dtopk_artifact": "run_artifacts/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_20260606.json",
+    "previous_stable_8x_mbs2_tokens_per_gpu_s": 3358.4,
+    "previous_stable_8x_mbs2_tflops_per_gpu": 170.046,
+    "uplift_vs_previous_stable_8x_mbs2_tokens_per_gpu_pct": 45.79,
+    "uplift_vs_previous_stable_8x_mbs2_tflops_pct": 46.01,
+    "current_4x_dense_dtopk_artifact": "run_artifacts/torchtitan_dsv4_flash12_dtopk_dense_allreduce_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+    "current_4x_dense_dtopk_tokens_per_gpu_s": 4327.0,
+    "current_4x_dense_dtopk_tflops_per_gpu": 219.082,
+    "uplift_vs_current_4x_dense_dtopk_tokens_per_gpu_pct": 13.08,
+    "uplift_vs_current_4x_dense_dtopk_tflops_pct": 13.78,
+    "aggregate_node_tokens_delta_vs_current_4x_dense_dtopk_pct": 126.30
+  },
+  "paired_failure": {
+    "run_id": "torchtitan_dsv4_flash12_reuse_forward_xop_8x_s4096_gbs128_mbs4_heap96_steps6_20260606",
+    "swiglu_backend": "torch",
+    "result": "failed_before_step3",
+    "step2_tokens_per_gpu_s": 5194,
+    "step2_tflops_per_gpu": 262.96,
+    "peak_logged_memory_gib_step2": 172.94,
+    "failure": "OOM in _swiglu_backward while allocating dgate = dh_f * up_f * silu_grad",
+    "allocation_gib": 2.27,
+    "read": "Forward-x-op reuse removes the MORI op/workspace wall, but the Torch SwiGLU derivative still creates a large transient. Triton SwiGLU is required for the stable MBS4 materialization."
+  },
+  "read": "The EP8 collective/skew cost is real, but this run validates that EP8's extra memory room can pay back through larger MBS once hidden MORI workspace/op lifetime and compact owner-VJP transient memory are controlled. This is now the best materialized 12-layer canary, but it remains about 40.1% of the 12.2k tok/GPU/s target, so the next work stays on fused compact owner-rank MoE backward/dX return skew and the parallel sparse-MLA compressed-dKV kernel track."
+}

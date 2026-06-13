@@ -1,0 +1,100 @@
+{
+  "artifact": "hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq_gate_20260607",
+  "date": "2026-06-07",
+  "node": "do-vunguyen-mi350-gpu",
+  "gpu": "MI350",
+  "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "docker_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "purpose": "Gate the HipKittens route-keyed D512 row-term ART dQ path after changing the output from slice scratch to production-shaped [B,H,S,D] dQ over all q_tile x kv_tile pairs.",
+  "source_files": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq.py",
+    "makefile": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/Makefile"
+  },
+  "build": {
+    "target": "hk_sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq",
+    "gpu_target": "CDNA4",
+    "compiler_resource_report": {
+      "sgpr": 89,
+      "vgpr": 152,
+      "agpr": 128,
+      "scratch_bytes": 0,
+      "spills": 0,
+      "waves_per_simd": 1,
+      "lds_bytes": 0
+    }
+  },
+  "timed_boundary": "D512 score/row-term producer plus full-sequence ART dQ output gate: QK and dO V^T are accumulated over four D128 chunks before row terms for every q_tile x kv_tile pair; the dP page feeds ART K^T @ dP consumers and atomically accumulates BF16 transposed 16x32 dQ tiles into [B,H,S,D]. No dOriKV, dCmpKV, or production dSinks are emitted yet.",
+  "runs": [
+    {
+      "name": "h1_scaling_sanity",
+      "command": "python probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq.py --batch 4 --seq 4096 --kv-heads 1 --dim 512 --active-tiles 64 --warmup 5 --iters 30",
+      "shape": {
+        "batch": 4,
+        "seq": 4096,
+        "kv_heads": 1,
+        "dim": 512,
+        "kv_tiles": 64,
+        "active_tiles": 64,
+        "dq_out_layout": "B,H,S,D"
+      },
+      "latency_ms": {
+        "median": 1.4052319526672363,
+        "mean": 1.4051732659339904,
+        "min": 1.371772050857544,
+        "max": 1.441931962966919
+      },
+      "dq_out": {
+        "finite": true,
+        "nonfinite": 0,
+        "nonzero": 253935,
+        "abs_max": 0.00092315673828125,
+        "mean_abs": 3.4122135730285663e-06
+      },
+      "sink": {
+        "finite": true,
+        "nonzero": 256,
+        "abs_max": 1.0,
+        "mean_abs": 1.0
+      }
+    },
+    {
+      "name": "h64_c4_scale_gate",
+      "command": "python probe_hipkittens_sharedkv_routekeyed_64row_d512_rowterms_dq_fullseq.py --batch 4 --seq 4096 --kv-heads 64 --dim 512 --active-tiles 64 --warmup 2 --iters 5",
+      "shape": {
+        "batch": 4,
+        "seq": 4096,
+        "kv_heads": 64,
+        "dim": 512,
+        "kv_tiles": 64,
+        "active_tiles": 64,
+        "dq_out_layout": "B,H,S,D"
+      },
+      "latency_ms": {
+        "median": 70.47557830810547,
+        "mean": 70.4559326171875,
+        "min": 70.3446044921875,
+        "max": 70.53565979003906
+      },
+      "dq_out": {
+        "finite": true,
+        "nonfinite": 0,
+        "nonzero": 16251561,
+        "abs_max": 0.00109100341796875,
+        "mean_abs": 3.4348288409091765e-06
+      },
+      "sink": {
+        "finite": true,
+        "nonzero": 16384,
+        "abs_max": 1.0,
+        "mean_abs": 1.0
+      }
+    }
+  ],
+  "baseline_gate": {
+    "current_triton_c4_sharedkv_source_boundary_ms": 11.02,
+    "current_triton_c4_full_split_ms": 11.13
+  },
+  "decision": "Rejected as a full-boundary direction. The H=1 path proves the ART dQ output contract is finite, but the H=64 C4 scale gate is 70.48 ms before dOriKV/dCmpKV/dSinks are even attached, far above the current Triton C4 SharedKV boundary. The issue is schedule/layout, not validity: this gate launches per-head q_tile x kv_tile work with full dQ atomics and synthetic per-head K/V tensors, while the target needs a true shared-KV H64/N64-ish source-boundary owner that keeps the fast Triton head-block/query-major schedule and only adds route-aware dCmpKV epilogue.",
+  "next_step": "Do not extend this per-head fullseq owner. Rebase the HipKittens/HIP rewrite around the Triton schedule spec: one source-boundary producer for H64/N64/D128-style blocks, shared K/V source layout, dQ plus dOriKV output, dSinks folded into row terms, and route-aware compressed dCmpKV reduction before global accumulation."
+}

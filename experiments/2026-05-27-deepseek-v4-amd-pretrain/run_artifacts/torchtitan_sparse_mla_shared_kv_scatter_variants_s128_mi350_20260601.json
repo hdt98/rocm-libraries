@@ -1,0 +1,193 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "parity": {
+    "index_add_flat": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 0.0
+    },
+    "loop_local_offsets_then_csa_flat": {
+      "checksum": 0.0389924980700016,
+      "max_abs_diff_vs_index_add_flat": 2.288818359375e-05
+    },
+    "scatter_add_dim1": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 1.9073486328125e-05
+    },
+    "split_index_add": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 2.09808349609375e-05
+    }
+  },
+  "peak_memory_allocated_bytes": 85237760,
+  "peak_memory_allocated_gib": 0.07938385009765625,
+  "ranked_by_median_ms": [
+    {
+      "mean_ms": 0.3313751995563507,
+      "median_ms": 0.32768699526786804,
+      "method": "index_add_flat"
+    },
+    {
+      "mean_ms": 0.3386636018753052,
+      "median_ms": 0.3380869925022125,
+      "method": "scatter_add_dim1"
+    },
+    {
+      "mean_ms": 0.3531759977340698,
+      "median_ms": 0.3522079885005951,
+      "method": "split_index_add"
+    },
+    {
+      "mean_ms": 4.1639350891113285,
+      "median_ms": 4.148735046386719,
+      "method": "loop_local_offsets_then_csa_flat"
+    }
+  ],
+  "read": "This is a PyTorch-only bridge probe for dKV scatter-add. Passing parity here does not make the shared-KV backend production-ready; it tells us whether a cheap PyTorch replacement exists before writing the fused output-row kernel.",
+  "scope": "sparse_mla_shared_latent_kv_dkv_scatter_pytorch_variants",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "kv_len": 160,
+    "local_count": 128,
+    "selected_count": 160,
+    "seq_len": 128,
+    "values_gib": 0.0390625
+  },
+  "status": "passed",
+  "timed_iters": 5,
+  "timings": {
+    "index_add_flat": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.3524079918861389,
+        "mean_ms": 0.3313751995563507,
+        "median_ms": 0.32768699526786804,
+        "min_ms": 0.3205670118331909,
+        "samples_ms": [
+          0.3524079918861389,
+          0.3328070044517517,
+          0.32768699526786804,
+          0.32340699434280396,
+          0.3205670118331909
+        ],
+        "stdev_ms": 0.012632700478364964
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.3919979790225625,
+        "mean_ms": 0.35423298832029104,
+        "median_ms": 0.34597795456647873,
+        "min_ms": 0.3395400708541274,
+        "samples_ms": [
+          0.3919979790225625,
+          0.3528889501467347,
+          0.34597795456647873,
+          0.34075998701155186,
+          0.3395400708541274
+        ],
+        "stdev_ms": 0.02175747073745011
+      }
+    },
+    "loop_local_offsets_then_csa_flat": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 4.219456195831299,
+        "mean_ms": 4.1639350891113285,
+        "median_ms": 4.148735046386719,
+        "min_ms": 4.123094081878662,
+        "samples_ms": [
+          4.219456195831299,
+          4.135374069213867,
+          4.193016052246094,
+          4.148735046386719,
+          4.123094081878662
+        ],
+        "stdev_ms": 0.04075247457654492
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.243453964591026,
+        "mean_ms": 4.184169205836952,
+        "median_ms": 4.167745006270707,
+        "min_ms": 4.142425954341888,
+        "samples_ms": [
+          4.243453964591026,
+          4.154865047894418,
+          4.212356056086719,
+          4.167745006270707,
+          4.142425954341888
+        ],
+        "stdev_ms": 0.04236793657066782
+      }
+    },
+    "scatter_add_dim1": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.3455280065536499,
+        "mean_ms": 0.3386636018753052,
+        "median_ms": 0.3380869925022125,
+        "min_ms": 0.333407998085022,
+        "samples_ms": [
+          0.3380869925022125,
+          0.3455280065536499,
+          0.3336870074272156,
+          0.3426080048084259,
+          0.333407998085022
+        ],
+        "stdev_ms": 0.00537118953205959
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.36620907485485077,
+        "mean_ms": 0.35992260091006756,
+        "median_ms": 0.3607500111684203,
+        "min_ms": 0.3520179307088256,
+        "samples_ms": [
+          0.36620907485485077,
+          0.36548799835145473,
+          0.3551479894667864,
+          0.3607500111684203,
+          0.3520179307088256
+        ],
+        "stdev_ms": 0.006254173336648473
+      }
+    },
+    "split_index_add": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.3606489896774292,
+        "mean_ms": 0.3531759977340698,
+        "median_ms": 0.3522079885005951,
+        "min_ms": 0.34832701086997986,
+        "samples_ms": [
+          0.3606489896774292,
+          0.34832701086997986,
+          0.35548800230026245,
+          0.3522079885005951,
+          0.3492079973220825
+        ],
+        "stdev_ms": 0.005034523722591604
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.39518799167126417,
+        "mean_ms": 0.375154591165483,
+        "median_ms": 0.3714290214702487,
+        "min_ms": 0.367339001968503,
+        "samples_ms": [
+          0.39518799167126417,
+          0.367339001968503,
+          0.3737179795280099,
+          0.3714290214702487,
+          0.36809896118938923
+        ],
+        "stdev_ms": 0.011490715896230184
+      }
+    }
+  },
+  "warmup_iters": 2
+}

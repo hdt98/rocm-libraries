@@ -1,0 +1,55 @@
+{
+  "scope": "sparse_dkv_tile_segment_dblock_reducer_decision",
+  "date": "2026-06-05",
+  "artifact": "run_artifacts/compressed_dkv_segmented_hip_tile_segment_dblock_s4096_layer2_32x512_20260605.json",
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "token_block": 32,
+    "selected_block": 512,
+    "block_d": 16
+  },
+  "candidate": {
+    "label": "hip_tile_segment_dblock_headsplit_accumulator",
+    "schedule": "route_segment_major",
+    "contract": "prepacked tile-local compressed-group segments, one CTA per segment and D block, split H64 across lanes, reduce in shared memory, emit one compressed dKV D16 atomic row per segment",
+    "build_change": "file-based PyTorch extension load for this minimal path so the HIP translation unit does not include torch/extension.h; single gfx950 target is forced by environment"
+  },
+  "timing": {
+    "median_ms": 116.03520965576172,
+    "mean_ms": 116.05160776774089,
+    "min_ms": 115.93905639648438,
+    "max_ms": 116.18055725097656,
+    "samples_ms": [
+      116.03520965576172,
+      116.18055725097656,
+      115.93905639648438
+    ],
+    "build_seconds": 24.582511978922412,
+    "peak_memory_gib": 3.590822219848633
+  },
+  "gate": {
+    "threshold_ms": 8.80629825592041,
+    "threshold_label": "s4096_must_beat_sparse_atomic_wall",
+    "status": "failed",
+    "slowdown_vs_threshold_x": 13.17020896846279
+  },
+  "write_reduction": {
+    "query_major_raw_atomic_elements": 805044224,
+    "tile_segment_dblock_global_atomic_elements": 33806848,
+    "modeled_reduction_x": 23.813051840857806
+  },
+  "read": "This proves the coalesced-write model alone is insufficient. The route/group-owned D-block reducer gets the desired 23.8x modeled global-write reduction, but it moves the producer to a segment-major shape that reloads/recomputes q/dO contribution work instead of preserving the fast query-major producer. This mirrors the route-owned TileLang whole-boundary diagnosis: final dKV writes are not the dominant problem in that schedule; the producer shape is.",
+  "decision": {
+    "promote": false,
+    "closed_branch": "route_segment_major_scalar_or_dblock_segment_reducer",
+    "next_schedule": "query_major_segmented_epilogue",
+    "next_contract": "token/head/query-major CTA like the Triton fast path, sweep selected groups while q and dO are hot, then perform group-aware lane/warp/block segmented reduction in the epilogue before reduced global dKV atomics or compact partial rows",
+    "reason": "Only a query-major producer can keep the 1.9-2.8 ms recompute/contribution body; the group-aware reduction must be inside that producer's epilogue, not the outer grid owner."
+  }
+}

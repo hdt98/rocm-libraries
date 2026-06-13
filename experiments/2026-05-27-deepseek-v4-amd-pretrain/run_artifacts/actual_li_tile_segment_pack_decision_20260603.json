@@ -1,0 +1,78 @@
+{
+  "artifact": "actual_li_tile_segment_pack_decision",
+  "created_at": "2026-06-03",
+  "status": "prepacked_tile_group_segments_are_viable_next_kernel_contract",
+  "scope": "actual_li_s4096_layer2_compressed_dkv_scatteradd_rewrite",
+  "source_artifacts": {
+    "route_order": "run_artifacts/actual_li_route_order_analysis_s4096_layer2_tb16-64_sb128-512_20260603.json",
+    "segment_lengths": "run_artifacts/actual_li_tile_segment_lengths_s4096_layer2_tb16-64_sb128-512_20260603.json",
+    "segment_pack_timing": "run_artifacts/actual_li_tile_segment_lengths_pack_timing_s4096_layer2_tb16-64_sb128-512_20260603.json",
+    "sparse_atomic_gate": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "hash_tile_rejection": "run_artifacts/compressed_dkv_rocwmma_hash_tile_rewrite_decision_20260603.json",
+    "row_leader_rejection": "run_artifacts/compressed_dkv_rocwmma_row_leader_tile_decision_20260603.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512
+  },
+  "retained_tile": {
+    "token_block": 32,
+    "selected_block": 512,
+    "total_valid_pairs": 1572352,
+    "total_group_segments": 66029,
+    "modeled_global_write_reduction_x": 23.813051840857806,
+    "segment_count_p50": 23.0,
+    "segment_count_p90": 32.0,
+    "pair_share_segment_count_ge8": 0.9993226707505698,
+    "pair_share_segment_count_ge16": 0.9493561238196028,
+    "pair_share_segment_count_ge32": 0.35116818625854773,
+    "route_pack_event_median_ms": 0.5733669996261597,
+    "route_pack_event_min_ms": 0.5685660243034363,
+    "route_pack_event_max_ms": 1.0161319971084595,
+    "route_pack_peak_gib_contextual": 1.1515522003173828
+  },
+  "contrast_tile": {
+    "token_block": 32,
+    "selected_block": 256,
+    "total_valid_pairs": 1572352,
+    "total_group_segments": 127436,
+    "modeled_global_write_reduction_x": 12.338365924856399,
+    "segment_count_p50": 11.0,
+    "segment_count_p90": 19.0,
+    "pair_share_segment_count_ge16": 0.35711023994627156,
+    "route_pack_event_median_ms": 0.5879669785499573
+  },
+  "decision": {
+    "recommended_next_kernel": "prepack_tile_group_segments_then_group_owned_or_segmented_rocwmma_dkv_reducer",
+    "why": [
+      "Natural query/selected emission order cannot be used directly: retained 32x512 has 23.813x ideal reduction but about 1.000x natural-order run reduction.",
+      "The retained 32x512 segment distribution is strong enough for segmented reduction: p50 segment length is 23, p90 is 32, and 94.94% of selected pairs are in segments with at least 16 rows.",
+      "GPU route prepack by (tile_id, compressed_group) is cheap enough as a diagnostic contract: about 0.57 ms median for 1.57M valid pairs.",
+      "Previous hash-tile and K16 row-leader kernels failed because they used local atomics or reduced too small a route scope; the next branch should consume the sorted segment metadata and avoid per-contribution local atomicAdd."
+    ],
+    "implementation_contract": [
+      "Build sorted valid pair metadata: pair_pos_sorted, segment_keys, segment_starts for token_block=32 and selected_block=512.",
+      "One reducer unit owns one tile-group segment and D16 or D32 slice.",
+      "Compute selected-row contributions with MFMA-shaped H64 dot reuse, then reduce rows for the owned segment before one global dKV write.",
+      "Keep this as materialized-probs diagnostic first; fuse probability, LI, and compressor recompute only after the segment reducer beats the sparse atomic gate."
+    ],
+    "promotion_gate": {
+      "must_beat_s4096_sparse_atomic_dkv_ms": 8.80629825592041,
+      "metadata_pack_overhead_budget_ms": 1.0,
+      "first_target": "materialized-probs segmented reducer plus pack below 8.8 ms at S4096 layer2"
+    }
+  },
+  "commands": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py",
+    "rsync -a tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py --seq-len 4096 --layer-id 2 --token-blocks 16,32,64 --selected-blocks 128,256,512 --summary-path /workspace/run_artifacts/actual_li_tile_segment_lengths_s4096_layer2_tb16-64_sb128-512_20260603.json",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py --seq-len 4096 --layer-id 2 --token-blocks 16,32,64 --selected-blocks 128,256,512 --include-pack-timing --warmup-iters 1 --timed-iters 5 --summary-path /workspace/run_artifacts/actual_li_tile_segment_lengths_pack_timing_s4096_layer2_tb16-64_sb128-512_20260603.json",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_lengths_s4096_layer2_tb16-64_sb128-512_20260603.json run_artifacts/",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_lengths_pack_timing_s4096_layer2_tb16-64_sb128-512_20260603.json run_artifacts/"
+  ],
+  "dependency_pin_changes": []
+}

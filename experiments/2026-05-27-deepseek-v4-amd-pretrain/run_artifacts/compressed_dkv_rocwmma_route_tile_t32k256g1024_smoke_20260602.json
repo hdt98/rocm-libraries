@@ -1,0 +1,59 @@
+{
+  "artifact": "compressed_dkv_rocwmma_route_tile_smoke",
+  "scope": "single_cta_token_selected_d16_route_tile_with_rocwmma_and_lds_grouped_accumulation",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "token_block": 32,
+    "selected_block": 256,
+    "selected_rows": 8192,
+    "d_tile": 16,
+    "h_dim": 64,
+    "group_count": 1024,
+    "touched_groups": 1024,
+    "formula": "out[g,d] = sum_{t,k:group[t,k]=g} (dL_scaled[t,k,H] @ Q[t,H,d] + P[t,k,H] @ dO[t,H,d])"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 0.4004137380979955,
+  "extension_dir": "/workspace/cache/torch_extensions_rocwmma_route_tile_20260602a",
+  "parity": {
+    "allclose": true,
+    "atol": 0.0001,
+    "rtol": 0.0001,
+    "max_abs_diff": 3.5762786865234375e-07,
+    "mean_abs_diff": 3.5863195080310106e-08,
+    "reference_max_abs": 1.9329556226730347
+  },
+  "timing_ms": {
+    "warmup_iters": 5,
+    "timed_iters": 20,
+    "median_ms": 0.9367919862270355,
+    "min_ms": 0.9290519952774048,
+    "max_ms": 0.9456920027732849,
+    "mean_ms": 0.9369621008634568
+  },
+  "modeled_write_reduction": {
+    "selected_rows": 8192,
+    "grouped_rows": 1024,
+    "reduction_x": 8.0
+  },
+  "tensor_stats": {
+    "reference": {
+      "norm": 65.661865234375,
+      "max_abs": 1.9329556226730347,
+      "mean_abs": 0.40901750326156616
+    },
+    "candidate": {
+      "norm": 65.661865234375,
+      "max_abs": 1.9329556226730347,
+      "mean_abs": 0.40901750326156616
+    }
+  },
+  "read": "This is a single-CTA route-tile smoke for the 32x256/D16 contract. It proves token-major selected-row rocWMMA microsteps plus LDS grouped accumulation for one route tile, but it is not yet the full multi-CTA S512/S4096 layer accumulator or fused sparse-MLA backward."
+}

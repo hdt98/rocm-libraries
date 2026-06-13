@@ -1,0 +1,132 @@
+{
+  "artifact": "torchtitan_mori_aiter_routed_padded_vjp_s512_4x8x_20260602",
+  "created_utc": "2026-06-01T19:34:06Z",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/local/data/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_root_note": "/local/data path is a compatibility symlink to /scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "model": "deepseek_v4 flash_4layer",
+  "common_shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "local_batch_size": 1,
+    "seq_len": 512,
+    "steps": 2,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": "1",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded"
+  },
+  "launcher_patch": {
+    "file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "new_env": "CANARY_MORI_SHMEM_HEAP_SIZE",
+    "container_env": "MORI_SHMEM_HEAP_SIZE",
+    "why": "The first EP8 S512 run exhausted MORI static SHMEM heap at the dispatch/combine allocation site. The MORI source and tests document MORI_SHMEM_HEAP_SIZE as the intended knob."
+  },
+  "runs": {
+    "4x_s512_gbs64_noac": {
+      "status": "pass",
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s512_gbs64_noac_20260602",
+      "gpus": 4,
+      "visible_devices": "4,5,6,7",
+      "fsdp": 4,
+      "ep": 4,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 16,
+      "tokens_per_step": 32768,
+      "mori_shmem_heap_size": "default",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s512_gbs64_noac_20260602/docker-run.log",
+      "output": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s512_gbs64_noac_20260602",
+      "step_1": {
+        "loss": 12.23621,
+        "grad_norm": 9.9375,
+        "memory_gib": 73.72,
+        "tps_per_gpu": 520,
+        "tflops_per_gpu": 6.91,
+        "mfu_percent": 0.30,
+        "step_end_ms_rank0": 15350.655012996867
+      },
+      "step_2": {
+        "loss": 10.94040,
+        "grad_norm": 19.75,
+        "memory_gib_range": [90.71, 98.63],
+        "tps_per_gpu": 1376,
+        "node_tps": 5504,
+        "tflops_per_gpu": 18.29,
+        "mfu_percent": 0.79,
+        "step_end_ms_rank0": 5951.183806988411,
+        "fwd_bwd_end_ms_rank0_tail": [242.70237190648913, 241.18681205436587, 241.78240599576384, 242.21705901436508]
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "checkpoint_dir_present": false
+    },
+    "8x_s512_gbs128_noac_default_heap": {
+      "status": "fail",
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s512_gbs128_noac_20260602",
+      "gpus": 8,
+      "visible_devices": "0,1,2,3,4,5,6,7",
+      "fsdp": 8,
+      "ep": 8,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 16,
+      "tokens_per_step": 65536,
+      "mori_shmem_heap_size": "default",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s512_gbs128_noac_20260602/docker-run.log",
+      "failure": {
+        "kind": "mori_static_shmem_heap_oom",
+        "message": "Out of heap memory; requested 270270464 bytes aligned with current heap size 4294967296 bytes",
+        "source_hint": "Increase via MORI_SHMEM_HEAP_SIZE"
+      },
+      "training_completed_count": 0,
+      "process_group_destroyed_count": 0
+    },
+    "8x_s512_gbs128_noac_heap32g": {
+      "status": "pass",
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s512_gbs128_noac_heap32g_20260602",
+      "gpus": 8,
+      "visible_devices": "0,1,2,3,4,5,6,7",
+      "fsdp": 8,
+      "ep": 8,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 16,
+      "tokens_per_step": 65536,
+      "mori_shmem_heap_size": "32G",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s512_gbs128_noac_heap32g_20260602/docker-run.log",
+      "output": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s512_gbs128_noac_heap32g_20260602",
+      "step_1": {
+        "loss": 12.13692,
+        "grad_norm": 10.125,
+        "memory_gib": 39.76,
+        "tps_per_gpu_range": [470, 472],
+        "tflops_per_gpu_range": [6.24, 6.27],
+        "mfu_percent": 0.27,
+        "step_end_ms_rank0": 16960.977740003727
+      },
+      "step_2": {
+        "loss": 10.45562,
+        "grad_norm": 19.75,
+        "memory_gib": 51.45,
+        "tps_per_gpu": 1583,
+        "node_tps": 12664,
+        "tflops_per_gpu": 21.02,
+        "mfu_percent": 0.91,
+        "step_end_ms_rank0": 5176.289424998686,
+        "fwd_bwd_end_ms_rank0_tail": [151.21305198408663, 152.0368579076603, 153.55763607658446, 152.96742296777666]
+      },
+      "training_completed_count": 8,
+      "process_group_destroyed_count": 8,
+      "checkpoint_dir_present": false
+    }
+  },
+  "target_comparison": {
+    "normalized_target_tok_per_gpu_s": [2200, 2400],
+    "note": "This is short-sequence S512 evidence, so the S4096 target comparison is directional only.",
+    "4x_s512_step2_fraction_of_2200_tok_per_gpu_target": 0.6254545454545455,
+    "8x_s512_heap32g_step2_fraction_of_2200_tok_per_gpu_target": 0.7195454545454546
+  },
+  "read": "The MORI+AITER routed-backward plus padded owner-rank VJP path now survives S512 on both 4x and 8x MI350. EP8 requires increasing MORI_SHMEM_HEAP_SIZE; with 32G it completes two checkpoint-free steps. Throughput is still below the normalized target and remains short-sequence evidence, but this moves the bridge beyond S128 and identifies MORI heap sizing as a required EP8 launcher knob."
+}

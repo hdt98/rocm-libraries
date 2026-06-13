@@ -1,0 +1,80 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_compact_direct_valid_decision",
+  "created_at": "2026-06-03",
+  "status": "measured_rejected_for_latency",
+  "scope": "Actual LightningIndexer layer-2 compressed shared-KV dKV accumulation using compact per-route-tile partial rows with direct valid K16 LDS accumulation.",
+  "question": "Does replacing compact_partial's per-contribution LDS atomicAdd with direct += under the actual-LI valid K16 uniqueness contract reduce the sparse-attention backward compressed dKV wall?",
+  "source_artifacts": [
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_direct_s128_layer2_t32k32_20260603.json",
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_direct_s512_layer2_t32k128_20260603.json",
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_direct_s4096_layer2_t32k512_timing_20260603.json",
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_partial_decision_20260603.json"
+  ],
+  "implementation": {
+    "kernel": "compressed_dkv_route_grid_compact_direct_valid_partial_bf16",
+    "probe_file": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+    "benchmark_file": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "mechanism": "Use the same compact route-tile slot_lookup/tile_offsets as compact_partial, but replace local atomicAdd(group_acc[slot, d]) with direct += when valid rows are unique inside each K16 contribution tile.",
+    "contract_check": "The measured runs report k16_unique_valid_route_contract=true with zero duplicate valid K16 route tiles at S128, S512, and S4096."
+  },
+  "correctness": {
+    "s128": {
+      "status": "passed",
+      "max_abs_diff_vs_reference": 0.0000209808349609375,
+      "raw_vs_compact_direct_valid_partial_reduce_max_abs_diff": 0.000019073486328125
+    },
+    "s512": {
+      "status": "passed",
+      "max_abs_diff_vs_reference": 0.000041961669921875,
+      "raw_vs_compact_direct_valid_partial_reduce_max_abs_diff": 0.0000286102294921875
+    },
+    "s4096": {
+      "status": "timing_only_reference_skipped",
+      "raw_vs_compact_direct_valid_partial_reduce_max_abs_diff": 0.00011444091796875
+    }
+  },
+  "timing_ms": {
+    "s128_layer2_t32_k32": {
+      "raw_atomic": 0.22112199664115906,
+      "grouped_atomic": 0.13092200458049774,
+      "compact_partial_emit_plus_index_add": 0.15236100554466248,
+      "compact_direct_valid_partial_emit_plus_index_add": 0.15576200187206268
+    },
+    "s512_layer2_t32_k128": {
+      "raw_atomic": 2.7003509998321533,
+      "grouped_atomic": 0.5907670259475708,
+      "compact_partial_emit_plus_index_add": 0.7194880247116089,
+      "compact_direct_valid_partial_emit_plus_index_add": 0.7312080264091492
+    },
+    "s4096_layer2_t32_k512": {
+      "contrib_sink": 8.987262725830078,
+      "raw_atomic": 46.287288665771484,
+      "grouped_atomic": 20.897958755493164,
+      "compact_partial_emit_plus_index_add": 22.322534561157227,
+      "compact_direct_valid_partial_emit_plus_index_add": 22.613378524780273
+    }
+  },
+  "derived": {
+    "s128_direct_vs_compact_emit_reduce_speedup_x": 0.9781654300373357,
+    "s512_direct_vs_compact_emit_reduce_speedup_x": 0.9839717272318584,
+    "s4096_direct_vs_compact_emit_reduce_speedup_x": 0.9871384117457578,
+    "s4096_direct_vs_grouped_atomic_speedup_x": 0.9241413764242564,
+    "s4096_grouped_atomic_still_above_active_list_atomic_gate_ms": {
+      "grouped_atomic_ms": 20.897958755493164,
+      "active_list_atomic_gate_ms": 8.80629825592041
+    }
+  },
+  "decision": {
+    "accepted": false,
+    "why": [
+      "The actual-LI valid K16 uniqueness contract holds, so direct += is correct for this diagnostic route-grid branch.",
+      "Despite removing the local atomic, direct-valid is slower than compact_partial at S128, S512, and S4096.",
+      "S512 fails the promotion gate because it is slower than grouped_atomic: 0.731 ms versus 0.591 ms.",
+      "S4096 is still far above the retained sparse-atomic dKV gate around 8.8 ms: 22.61 ms direct-valid versus 20.90 ms grouped_atomic."
+    ],
+    "read": "The wall is not just the local atomic operation inside compact_partial. The current route-grid body still pays the same per-route-tile contribution store, compact slot lookup, large active-slot initialization/emission, and CTA ownership pattern. A production candidate needs a different segmented/group-owned accumulation schedule, not only a direct add substitution.",
+    "closed_branch": "compact active rows plus direct valid K16 local accumulation",
+    "next_branch": "Build a group-owned or route-ordered segmented accumulator where a CTA/warp owns a compressed group tile across multiple query/selected microtiles, reducing repeated route-tile initialization and writes while preserving MFMA contribution generation. Do not reuse this compact route-grid body as the production direction."
+  },
+  "dependency_pin_changes": []
+}

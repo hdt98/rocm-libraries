@@ -1,0 +1,228 @@
+{
+  "artifact": "torchtitan_direct_dsv4_4xmi350_canary_20260601",
+  "purpose": "Record the first direct TorchTitan DeepSeek-V4 Flash 4-layer 4xMI350 training canary and resume attempt.",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_cli_used": false,
+  "model": {
+    "module": "torchtitan.models.deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "model_spec": "deepseek_v4 flash_4layer",
+    "implementation_status": "structural_canary_dense_mla_fallback",
+    "attention_status": "dense_mla_fallback_missing_sparse_mla_indexer"
+  },
+  "runtime": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "visible_devices": "2,3,6,7",
+    "visibility_note": "PyTorch ROCm accepted CUDA_VISIBLE_DEVICES=2,3,6,7. Setting CUDA_VISIBLE_DEVICES, HIP_VISIBLE_DEVICES, and ROCR_VISIBLE_DEVICES together double-filtered the device set and caused invalid device ordinal.",
+    "remote_torchtitan": "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan"
+  },
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "local_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "seq_len": 4096,
+    "precision": "bf16",
+    "optimizer": "AdamW",
+    "activation_checkpoint": "full"
+  },
+  "direct_two_step_run": {
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_visible2367_20260601Tdirect02",
+    "result": "passed_two_steps_and_final_checkpoint_save",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_visible2367_20260601Tdirect02/docker-run.log",
+    "checkpoint_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/outputs/checkpoint",
+    "checkpoint_steps_created": ["step-1", "step-2"],
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.25273,
+        "grad_norm": 11.5,
+        "memory_gib": 75.64,
+        "tokens_per_gpu_s_range": [2985, 2994],
+        "reported_tflops_per_gpu_range": [56.16, 56.33],
+        "reported_mfu_pct_range": [18.0, 18.05],
+        "checkpoint_save_s": 96.83
+      },
+      {
+        "step": 2,
+        "loss": 9.27922,
+        "grad_norm": 22.75,
+        "memory_gib_range": [91.59, 92.59],
+        "tokens_per_gpu_s": 630,
+        "reported_tflops_per_gpu": 11.85,
+        "reported_mfu_pct": 3.8,
+        "note": "Step-2 throughput is checkpoint-contaminated by the preceding full-state step-1 save."
+      }
+    ],
+    "health": {
+      "finite_loss": true,
+      "finite_grad_norm": true,
+      "loss_movement": "12.25273_to_9.27922",
+      "training_completed": true,
+      "process_group_destroyed": true
+    }
+  },
+  "resume_attempt_failed_before_cleanup": {
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_visible2367_resume_step3_20260601Tdirect03",
+    "result": "loaded_step2_and_advanced_step3_but_final_step3_checkpoint_failed_no_space",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_visible2367_resume_step3_20260601Tdirect03/docker-run.log",
+    "loaded_checkpoint": "./outputs/checkpoint/step-2",
+    "checkpoint_load_s_range": [16.15, 16.30],
+    "training_start_step": 3,
+    "step_metrics": [
+      {
+        "step": 3,
+        "loss": 15.53901,
+        "grad_norm": 42.0,
+        "memory_gib": 95.82,
+        "tokens_per_gpu_s_range": [1945, 1950],
+        "reported_tflops_per_gpu_range": [36.59, 36.68],
+        "reported_mfu_pct_range": [11.73, 11.76]
+      }
+    ],
+    "health": {
+      "checkpoint_resume_load": true,
+      "advanced_one_step_after_resume": true,
+      "finite_loss": true,
+      "finite_grad_norm": true,
+      "final_checkpoint_save": false
+    },
+    "failure": {
+      "type": "remote_filesystem_full",
+      "message": "No space left on device during final step-3 DCP save",
+      "filesystem": "/dev/vda1",
+      "filesystem_use_pct_after_failure": 100,
+      "checkpoint_dir_size_after_failure": "414G",
+      "checkpoint_step_sizes": {
+        "step-1": "156G",
+        "step-2": "156G",
+        "step-3_partial": "104G"
+      }
+    }
+  },
+  "cleanup": {
+    "result": "deleted_generated_step1_and_partial_step3_preserved_step2",
+    "deleted_paths": [
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/outputs/checkpoint/step-1",
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/outputs/checkpoint/step-3"
+    ],
+    "preserved_resume_checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/outputs/checkpoint/step-2",
+    "filesystem_after_cleanup": {
+      "filesystem": "/dev/vda1",
+      "used": "1.7T",
+      "available": "259G",
+      "use_pct": 87
+    }
+  },
+  "resume_after_cleanup": {
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_resume_step3_dumpfix_20260601Tdirect04",
+    "result": "passed_loaded_step2_advanced_step3_and_saved_final_step3_checkpoint",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_resume_step3_dumpfix_20260601Tdirect04/docker-run.log",
+    "dump_folder": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_resume_step3_dumpfix_20260601Tdirect04",
+    "loaded_checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/outputs/checkpoint/step-2",
+    "saved_checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_resume_step3_dumpfix_20260601Tdirect04/checkpoint/step-3",
+    "checkpoint_load_s_range": [16.08, 16.13],
+    "training_start_step": 3,
+    "step_metrics": [
+      {
+        "step": 3,
+        "loss": 15.53901,
+        "grad_norm": 42.0,
+        "memory_gib": 95.82,
+        "tokens_per_gpu_s_range": [1961, 1964],
+        "reported_tflops_per_gpu_range": [36.90, 36.96],
+        "reported_mfu_pct_range": [11.83, 11.84]
+      }
+    ],
+    "health": {
+      "checkpoint_resume_load": true,
+      "advanced_one_step_after_resume": true,
+      "finite_loss": true,
+      "finite_grad_norm": true,
+      "final_checkpoint_save": true,
+      "training_completed": true,
+      "process_group_destroyed": true
+    },
+    "filesystem_after_run": {
+      "filesystem": "/dev/vda1",
+      "used": "1.9T",
+      "available": "107G",
+      "use_pct": 95,
+      "new_dump_folder_size": "156G"
+    }
+  },
+  "direct_process_group_probe_after_wip_patch": {
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_pg_probe_20260601Tdirect06",
+    "result": "passed_distinct_fsdp_ep_process_groups",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_pg_probe_20260601Tdirect06/docker-run.log",
+    "artifact": "run_artifacts/torchtitan_direct_fsdp_ep_pg_probe_4x_20260601.json",
+    "fsdp_group_is_ep_group_by_rank": [false, false, false, false],
+    "fsdp_group_ranks_equal_ep_group_ranks_by_rank": [true, true, true, true],
+    "collectives": "passed_fsdp_all_reduce_and_ep_all_to_all",
+    "wip_patch": "TORCHTITAN_DEVICE_MESH_EP_BACKEND_OVERRIDE=nccl forces a dedicated EP ProcessGroup in direct TorchTitan ParallelDims."
+  },
+  "direct_checkpoint_free_run_after_pg_patch": {
+    "run_id": "torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect09",
+    "result": "passed_three_steps_checkpoint_free",
+    "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_4layer_bf16_4xmi350_ckptfree_pgfix_20260601Tdirect09/docker-run.log",
+    "artifact": "run_artifacts/torchtitan_direct_dsv4_4xmi350_ckptfree_pgfix_20260601.json",
+    "checkpoint_enable": false,
+    "remote_output_size": "1.4M",
+    "checkpoint_directory_created": false,
+    "step1": {
+      "loss": 12.32516,
+      "grad_norm": 11.375,
+      "tokens_per_gpu_s_range": [3430, 3447],
+      "mfu_pct_range": [20.68, 20.78],
+      "note": "warmup step"
+    },
+    "step2": {
+      "loss": 10.13474,
+      "grad_norm": 21.875,
+      "tokens_per_gpu_s": 9193,
+      "tflops_per_gpu": 172.93,
+      "mfu_pct": 55.43
+    },
+    "step3": {
+      "loss": 13.48705,
+      "grad_norm": 36.75,
+      "tokens_per_gpu_s_range": [9531, 9532],
+      "tflops_per_gpu": 179.30,
+      "mfu_pct": 57.47
+    },
+    "caveat": "This is still the 4-layer structural dense-MLA fallback canary, not final sparse-MLA DeepSeek-V4-Flash performance."
+  },
+  "launcher_fixes_from_run": [
+    {
+      "fix": "Use only CUDA_VISIBLE_DEVICES for PyTorch ROCm visibility in this image.",
+      "reason": "Setting CUDA/HIP/ROCR visibility variables together double-filtered the noncontiguous device list and caused invalid device ordinal."
+    },
+    {
+      "fix": "Add run-scoped DUMP_FOLDER and pass --dump_folder to TorchTitan.",
+      "reason": "TorchTitan defaulted to ./outputs under the staged source tree, making checkpoint payloads land in sources/wip/torchtitan."
+    },
+    {
+      "fix": "Add CANARY_RESUME_CHECKPOINT_PATH support.",
+      "reason": "A fresh run-scoped DUMP_FOLDER needs --checkpoint.initial_load_path and --checkpoint.no_initial_load_model_only to resume full training state from a checkpoint saved in another folder."
+    },
+    {
+      "fix": "Make TorchTitan fake DeviceMesh backend opt-in and add a direct EP backend override.",
+      "reason": "The selected PyTorch image exposes DeviceMesh backend_override but does not register the c10d fake backend; EP also shared the full-world FSDP ProcessGroup until TORCHTITAN_DEVICE_MESH_EP_BACKEND_OVERRIDE=nccl forced a dedicated EP group."
+    },
+    {
+      "fix": "Add checkpoint-disable support with tyro-compatible --checkpoint.no-enable.",
+      "reason": "Boolean values such as --checkpoint.enable false are rejected by the direct TorchTitan CLI; checkpoint-free runs need the negative flag form."
+    }
+  ],
+  "remaining_before_promotion": [
+    "Free or move generated checkpoint payloads before more remote runs; /dev/vda1 is still 95% full after preserving step-2 and writing the verified step-3 resume checkpoint.",
+    "Replace dense MLA fallback with DSv4 sparse MLA/indexer or keep it explicitly labeled as a staged fallback.",
+    "Repeat checkpoint-free throughput on the final sparse-MLA path and 8xMI350 shape."
+  ],
+  "dependency_pin_changes": []
+}

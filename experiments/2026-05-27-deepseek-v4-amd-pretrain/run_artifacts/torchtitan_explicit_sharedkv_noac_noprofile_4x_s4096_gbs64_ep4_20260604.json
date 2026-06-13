@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs64_ep4_steps6_20260604",
+  "status": "completed_6_steps_clean_teardown",
+  "purpose": "Low-overhead materialized 4xMI350 e2e gate for the explicit_pytorch shared-KV backward candidate after it beat query_recompute in the aligned EP4 profile A/B.",
+  "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs64_ep4_steps6_20260604",
+  "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs64_ep4_steps6_20260604",
+  "raw_output_size": "2.2M",
+  "raw_log_size": "40K",
+  "shape": {
+    "hardware": "4xMI350",
+    "visible_devices": "0,1,2,3",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "tokens_per_step": 262144,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "moe_forward_mode": "aiter",
+    "moe_backward_mode": "routed",
+    "moe_local_vjp_mode": "padded",
+    "moe_dx_return_mode": "sync",
+    "dsv4_profile_timing": "disabled",
+    "mori_timing": "disabled",
+    "torch_profiler": "disabled",
+    "checkpointing": "disabled"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.10218,
+      "grad_norm": 13.1250,
+      "tflops_per_gpu": [47.14, 47.19, 47.16, 47.16],
+      "tps_per_gpu": [2491, 2494, 2492, 2492],
+      "memory_gib": [97.63, 95.79, 97.73, 95.77]
+    },
+    {
+      "step": 2,
+      "loss": 9.11412,
+      "grad_norm": 22.5000,
+      "tflops_per_gpu": [94.80, 94.80, 94.80, 94.80],
+      "tps_per_gpu": [5010, 5010, 5010, 5010],
+      "memory_gib": [124.96, 121.29, 123.28, 121.85]
+    },
+    {
+      "step": 3,
+      "loss": 17.11189,
+      "grad_norm": 40.7500,
+      "tflops_per_gpu": [81.58, 81.58, 81.58, 81.58],
+      "tps_per_gpu": [4311, 4311, 4311, 4311],
+      "memory_gib": [141.31, 124.96, 137.58, 126.44]
+    },
+    {
+      "step": 4,
+      "loss": 14.71074,
+      "grad_norm": 53.7500,
+      "tflops_per_gpu": [73.88, 73.88, 73.88, 73.88],
+      "tps_per_gpu": [3904, 3904, 3904, 3904],
+      "memory_gib": [146.23, 144.24, 146.50, 138.69]
+    },
+    {
+      "step": 5,
+      "loss": 11.98516,
+      "grad_norm": 34.7500,
+      "tflops_per_gpu": [73.53, 73.53, 73.53, 73.53],
+      "tps_per_gpu": [3886, 3886, 3886, 3886],
+      "memory_gib": [146.23, 147.15, 146.27, 146.50]
+    },
+    {
+      "step": 6,
+      "loss": 8.49490,
+      "grad_norm": 29.0000,
+      "tflops_per_gpu": [75.01, 75.01, 75.01, 75.01],
+      "tps_per_gpu": [3964, 3964, 3964, 3964],
+      "memory_gib": [146.23, 146.48, 147.15, 146.74]
+    }
+  ],
+  "late_step_summary": {
+    "steps": [4, 5, 6],
+    "mean_tflops_per_gpu": 74.1333,
+    "mean_tps_per_gpu": 3916.0,
+    "implied_step_time_s": 16.73,
+    "peak_memory_gib": 147.15,
+    "target_tflops_per_gpu": 277.0,
+    "ratio_to_target": 0.2676,
+    "speedup_needed_to_target": 3.74
+  },
+  "comparison": {
+    "query_recompute_4x_profile_late_mean_tflops_per_gpu": 70.8567,
+    "explicit_pytorch_4x_profile_late_mean_tflops_per_gpu": 73.73,
+    "explicit_pytorch_4x_noprofile_late_mean_tflops_per_gpu": 74.1333,
+    "read": "Disabling dsv4/MORI timing gives only a small uplift over the profiled explicit control, so the explicit_pytorch branch is a stable 4x EP4 candidate around 74 TFLOPs/GPU. Peak memory remains around 147 GiB/GPU, confirming the no-AC EP4 activation footprint dominates over the shared-KV backward-mode choice."
+  },
+  "node_availability_note": "An unrelated MORI overlap robustness sweep was active on GPUs 6,7, so this run intentionally used only the idle 0,1,2,3 slice while waiting for an 8x EP4 gate.",
+  "next_actions": [
+    "Run 8xMI350 FSDP8/EP4 GBS128 explicit_pytorch no-profile once GPUs 6,7 are free.",
+    "Use the 4x profile A/B to guide the next optimization: query-recompute needs whole-boundary fusion before it can beat explicit_pytorch; MoE/MORI still needs owner-VJP and dX-return skew work."
+  ],
+  "dependency_pin_changes": []
+}

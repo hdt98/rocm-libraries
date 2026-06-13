@@ -1,0 +1,174 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hothelper_repro_gate_20260611",
+  "created_at": "2026-06-11",
+  "purpose": "Check whether the standard-EP top-8 hot-helper path still reproduces an uplift over a plain standard-EP baseline before attributing small MORI-native balanced-MoE gains.",
+  "shared_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint": "selective attention_only",
+    "hyper_connections": false,
+    "num_mtp_modules": 0,
+    "chunked_ce_num_chunks": 8,
+    "sparse_mla_backward": "shared_kv query_recompute H64_N64_D128",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "launcher_fix": {
+    "file": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "reason": "The active docker path did not forward CANARY_DSV4_NUM_MTP_MODULES / CANARY_DSV4_MTP_LOSS_WEIGHT, while config_registry now defaults TORCHTITAN_DSV4_NUM_MTP_MODULES to 1.",
+    "validation": "bash -n passed; retry header printed dsv4_num_mtp_modules=0 and model parameter count dropped from about 87.08B to 80.44B."
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611",
+      "host": "do-vunguyen-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "off",
+      "weighted_scatter_backend": "torch",
+      "result": "failed_before_first_metric_step",
+      "failure_phase": "step_1_backward",
+      "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "failure_detail": "rank0 aborted in autograd backward with Available Free mem: 142 MB after the no-MTP model was confirmed. Follow-up no-helper triton_bwd run exposed the same memory cliff as forward MoE combine weighted-scatter materialization.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611",
+      "host": "do-vunguyen-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "off",
+      "weighted_scatter_backend": "triton_bwd",
+      "weighted_scatter_bwd_score_mode": "torch",
+      "result": "failed_before_first_metric_step",
+      "failure_phase": "step_1_forward_standard_ep_combine",
+      "failure": "torch.OutOfMemoryError",
+      "failure_detail": "The triton_bwd backend keeps torch forward semantics. It still calls deterministic_weighted_scatter_add, which materializes weighted = (src.float() * scores).to(src.dtype). On rank0 this tried to allocate 3.00 GiB with only 1.21 GiB free; PyTorch had 271.76 GiB allocated and 6.64 GiB reserved.",
+      "root_cause_read": "Plain no-helper standard EP sends all top-k routed rows through normal combine. At MBS8/S4096/topk6 the combine source is about 196608 routed rows, so the fp32 weighted slab is about 3.0 GiB. Hot-helper avoids this memory cliff by removing hot rows from the normal EP path before combine, not merely by changing the communication primitive.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_nohelper_mbs8_attention_ac_ce8_tritonfwd_scoretorch_nomtpfix_steps20_8x_20260611",
+      "host": "do-vunguyen-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "off",
+      "weighted_scatter_backend": "triton",
+      "weighted_scatter_bwd_score_mode": "torch",
+      "result": "not_launched",
+      "failure_phase": "launcher_idle_gpu_guard",
+      "failure": "node_busy_with_external_job",
+      "failure_detail": "After the no-helper triton_bwd failure, a separate nexus_titan.runtime Llama-8B fault-tolerance job occupied the node. The launcher refused to co-schedule; the process was not killed because it was not this DSv4 run.",
+      "next_action": "When an 8xMI350 node is idle, run this full Triton weighted-scatter no-helper probe to isolate whether removing the torch forward slab lets plain standard EP fit at MBS8."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611",
+      "host": "do-sonle5-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "execute",
+      "balanced_moe_hot_experts": 8,
+      "hot_weight_forward_backend": "mori_sdma",
+      "hot_weight_reduce_backend": "mori_sdma",
+      "hot_split_materialize_rows": "owner_compact",
+      "hot_split_presort_mode": "owner_compact",
+      "weighted_scatter_backend": "torch",
+      "result": "failed_before_first_metric_step",
+      "failure_phase": "step_1_forward_standard_ep_combine",
+      "failure": "torch.OutOfMemoryError",
+      "failure_detail": "deterministic_weighted_scatter_add materialized weighted = (src.float() * scores).to(src.dtype) and tried to allocate 2.72 GiB with only 1.60 GiB free on rank1.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_torchscatter_nomtpfix_steps20_8x_20260611"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611",
+      "host": "do-sonle5-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "execute",
+      "balanced_moe_hot_experts": 8,
+      "weighted_scatter_backend": "triton_bwd",
+      "weighted_scatter_bwd_score_mode": "torch",
+      "result": "not_launched",
+      "failure_phase": "local_launcher_pre_remote_exec",
+      "failure": "fork: Resource temporarily unavailable",
+      "next_action": "Rerun this retained-style hot-helper candidate when an 8xMI350 node is idle and local git hash-object workers are drained."
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611_clean",
+      "host": "do-vunguyen-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "execute",
+      "balanced_moe_hot_experts": 8,
+      "hot_weight_forward_backend": "mori_sdma",
+      "hot_weight_reduce_backend": "mori_sdma",
+      "hot_split_materialize_rows": "owner_compact",
+      "hot_split_presort_mode": "owner_compact",
+      "weighted_scatter_backend": "triton_bwd",
+      "weighted_scatter_bwd_score_mode": "torch",
+      "result": "hung_before_first_metric_step",
+      "failure_phase": "step_1_forward_hot_weight_sdma_allgather",
+      "failure": "MORI SDMA AllGather timeout waiting for peer 0",
+      "failure_detail": "The run reached Training starts at step 1, initialized AllreduceSdma on all 8 PEs, then PE 1-7 printed AllGather timeout waiting for peer 0. The run was terminated by run-id-specific pkill to release GPUs.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611_clean/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_nomtpfix_steps20_8x_20260611_clean"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_torchhot_nomtpfix_steps20_8x_20260611",
+      "host": "do-vunguyen-mi350-gpu",
+      "moe_comm_backend": "standard",
+      "balanced_moe_mode": "execute",
+      "balanced_moe_hot_experts": 8,
+      "hot_weight_forward_backend": "torch",
+      "hot_weight_reduce_backend": "torch",
+      "hot_split_materialize_rows": "owner_compact",
+      "hot_split_presort_mode": "owner_compact",
+      "weighted_scatter_backend": "triton_bwd",
+      "weighted_scatter_bwd_score_mode": "torch",
+      "result": "completed_20_steps",
+      "metrics": {
+        "steps_2_20": {
+          "n": 19,
+          "tok_per_gpu_s": 8579.53,
+          "tflops_per_gpu": 392.94,
+          "peak_memory_gib": 256.19
+        },
+        "steps_4_20": {
+          "n": 17,
+          "tok_per_gpu_s": 8605.88,
+          "tflops_per_gpu": 394.14,
+          "peak_memory_gib": 256.19
+        },
+        "steps_13_20": {
+          "n": 8,
+          "tok_per_gpu_s": 8632.88,
+          "tflops_per_gpu": 395.38,
+          "peak_memory_gib": 256.19
+        },
+        "steps_16_20": {
+          "n": 5,
+          "tok_per_gpu_s": 8640.6,
+          "tflops_per_gpu": 395.73,
+          "peak_memory_gib": 256.19
+        },
+        "loss": {
+          "step_1": 12.32349,
+          "step_20": 3.50732
+        }
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_torchhot_nomtpfix_steps20_8x_20260611/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_torchhot_nomtpfix_steps20_8x_20260611"
+    }
+  ],
+  "read": {
+    "baseline_status": "Plain standard EP without hot-helper does not fit the MBS8 attention-only-AC no-MTP surface with the current torch-forward weighted-scatter combine path.",
+    "nohelper_root_cause": "The apparent HSA out-of-resources failure is now attributed to normal EP combine memory pressure. A follow-up run with triton_bwd produced a Python OOM at deterministic_weighted_scatter_add: triton_bwd only changes backward, while forward still materializes a full fp32 weighted routed-row slab.",
+    "hothelper_status": "Top-8 hot-helper also needs the retained non-materializing weighted-scatter backend; the fair torch-scatter version fails in forward combine due to a large temporary slab.",
+    "standard_ep_hothelper_repro": "Reproduced on the corrected no-MTP surface when hot-weight transport uses torch/RCCL instead of MORI SDMA: 8579.53 tok/GPU/s and 392.94 TFLOPs/GPU over steps 2-20; 8632.88 tok/GPU/s and 395.38 TFLOPs/GPU over steps 13-20.",
+    "mori_sdma_transport_read": "The same surface with MORI SDMA hot-weight forward/reduce hangs before the first metric in the forward hot-weight AllGather path, so SDMA forward transport must be fixed or bypassed before claiming MORI improves the already-working standard-EP hot-helper baseline.",
+    "next_action": "Use the torch-transport standard-EP hot-helper run as the fair reproduced baseline. When a node frees, run the no-helper full Triton weighted-scatter probe to separate no-helper row-volume pressure from the torch forward slab, then compare MORI-native balanced-MoE against the reproduced hot-helper baseline.",
+    "node_availability": "After the follow-up failure, do-vunguyen-mi350-gpu became occupied by an unrelated nexus_titan.runtime Llama-8B job; it was left untouched."
+  }
+}

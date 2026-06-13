@@ -1,0 +1,173 @@
+{
+  "artifact": "single_layer_profile",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_profile_20260531T2118Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden": 7168,
+    "dtype": "bfloat16"
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "rmsnorm_save_policy": "saved-accum",
+    "fixed_router": false
+  },
+  "commands": {
+    "moe_probe": "RUN_TAG=retained_profile_20260531T2118Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-ops-4096",
+    "block_profile": "RUN_TAG=retained_profile_20260531T2118Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh profile-blocks-4096",
+    "rocprof": "RUN_TAG=retained_profile_20260531T2118Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-4096"
+  },
+  "raw_artifacts": {
+    "moe_probe_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z/dynamic_moe_bridge_ops_s4096/summary.json",
+    "block_profile_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z/full_layer_s4096_profile_blocks/summary.json",
+    "rocprof_torch_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z/rocprof_s4096_region_1iter/torch_summary/summary.json",
+    "rocprof_kernel_stats": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z/rocprof_s4096_region_1iter/trace_kernel_stats.csv",
+    "rocprof_domain_stats": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_20260531T2118Z/rocprof_s4096_region_1iter/trace_domain_stats.csv"
+  },
+  "isolated_dynamic_moe_probe": {
+    "check_ok": true,
+    "route_stats": {
+      "assignments": 24576,
+      "experts": 384,
+      "mean_per_expert": 64.0,
+      "min_per_expert": 40,
+      "max_per_expert": 82,
+      "padded_rows": 31488,
+      "padding_multiplier": 1.28125
+    },
+    "derived_median_sum_ms": {
+      "forward_total_isolated": 14.608431780710816,
+      "backward_dgrad_path_using_bmm_out": 13.025816664099693,
+      "backward_wgrad_gemm": 18.159096240997314,
+      "backward_router_score": 0.5417640209197998,
+      "backward_total_isolated": 31.726676926016808,
+      "train_total_isolated": 46.335108706727624
+    },
+    "selected_op_median_ms": {
+      "fwd_w1_bmm": 4.506595134735107,
+      "fwd_w2_bmm": 4.445512771606445,
+      "fwd_w3_bmm": 4.408434867858887,
+      "bwd_w1_wgrad_bmm": 6.012485027313232,
+      "bwd_w2_wgrad_bmm": 6.180167198181152,
+      "bwd_w3_wgrad_bmm": 5.96644401550293,
+      "bwd_xgrad_w1w3_baddbmm": 7.872338771820068,
+      "bwd_w2_dgrad_bmm_out": 3.861548900604248,
+      "bwd_input_reduce_including_xgrad": 8.549182891845703,
+      "output_scale_reduce": 0.9095270037651062,
+      "route_build": 0.3826430141925812
+    }
+  },
+  "full_layer_block_profile": {
+    "phase_ms": {
+      "forward": 29.86601006705314,
+      "loss": 0.1279989955946803,
+      "backward": 59.398321085609496
+    },
+    "phase_total_ms": 89.39233014825732,
+    "tokens_per_s": 45820.48586502643,
+    "estimated_tflops": 236.8560590415347,
+    "forward_subsystems": {
+      "attention_ms": 12.284476775676012,
+      "attention_share_of_forward": 0.41131964892852235,
+      "moe_ms": 16.21959893964231,
+      "moe_share_of_forward": 0.5430788680251285,
+      "boundary_ms": 0.786985969170928,
+      "boundary_share_of_forward": 0.026350555946510448
+    },
+    "backward_attribution_note": "Segmented backward attribution splits separate autograd.grad calls and is useful for attention subblocks, but the routed MoE aggregate in this run is not comparable to normal loss.backward timing.",
+    "attention_backward_segmented_ms": {
+      "attention_dgrad": 15.529292984865606,
+      "attention_wgrad": 15.956729999743402,
+      "sparse_mla_dgrad_qkv": 8.949711918830872,
+      "sparse_mla_sink_wgrad": 8.868650998920202,
+      "q_path_dgrad": 3.164367051795125,
+      "q_path_wgrad": 3.23343591298908,
+      "out_proj_dgrad": 2.2184900008141994,
+      "out_proj_wgrad": 1.4460840029641986
+    },
+    "traffic_estimate_bucket_totals_bytes": {
+      "attention_activations": 7200604160,
+      "boundary_activations": 681779328,
+      "gradient_edges": 3327164416,
+      "moe_activations": 1357103104,
+      "parameter_gradients": 51383666184
+    }
+  },
+  "rocprof_selected_region": {
+    "phase_ms": {
+      "forward": 29.663385939784348,
+      "loss": 0.1433800207450986,
+      "backward": 69.57719998899847
+    },
+    "phase_total_ms": 99.38396594952792,
+    "tokens_per_s": 41213.89160581648,
+    "estimated_tflops": 213.0435712155898,
+    "domain_stats": {
+      "kernel_dispatch_calls": 494,
+      "kernel_dispatch_total_ms": 95.951363,
+      "marker_api_calls": 18,
+      "marker_api_total_ms": 128.340095
+    },
+    "top_kernel_stats_by_total_duration": [
+      {
+        "name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32",
+        "calls": 3,
+        "total_ms": 19.749558,
+        "avg_ms": 6.583186,
+        "percentage": 20.58
+      },
+      {
+        "name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT448x128x32",
+        "calls": 3,
+        "total_ms": 12.162657,
+        "avg_ms": 4.054219,
+        "percentage": 12.68
+      },
+      {
+        "name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x96x64",
+        "calls": 3,
+        "total_ms": 11.735614,
+        "avg_ms": 3.911871333333,
+        "percentage": 12.23
+      },
+      {
+        "name_prefix": "_softmax_bwd_scores_kernel",
+        "calls": 1,
+        "total_ms": 3.218746,
+        "avg_ms": 3.218746,
+        "percentage": 3.35
+      },
+      {
+        "name_prefix": "_head_rmsnorm_backward_kernel",
+        "calls": 1,
+        "total_ms": 2.381179,
+        "avg_ms": 2.381179,
+        "percentage": 2.48
+      },
+      {
+        "name_prefix": "_masked_softmax_inplace_kernel",
+        "calls": 1,
+        "total_ms": 2.273658,
+        "avg_ms": 2.273658,
+        "percentage": 2.37
+      },
+      {
+        "name_prefix": "at::native::indexFuncLargeIndex ReduceAdd",
+        "calls": 2,
+        "total_ms": 2.130137,
+        "avg_ms": 1.0650685,
+        "percentage": 2.22
+      }
+    ]
+  },
+  "notes": [
+    "The profiling wrapper was updated during this run for the current profile_microbench.py CLI: --profile-backward-blocks plus --profile-attention-blocks/--profile-moe-blocks replaced the stale --profile-blocks action.",
+    "The rocprof wrapper was updated to launch with env PYTHONPATH=... python3 because rocprofv3 cannot exec a bare environment assignment.",
+    "The normal unprofiled 4K timing artifact from this same session remains the clean pass/fail source for the 86.6 ms target; profiler overhead makes phase_total_ms slower here."
+  ]
+}

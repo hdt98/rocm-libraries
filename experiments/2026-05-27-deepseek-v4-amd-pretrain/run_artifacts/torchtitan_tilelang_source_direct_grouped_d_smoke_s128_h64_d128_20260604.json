@@ -1,0 +1,80 @@
+{
+  "backend_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "candidate_mode": "tilelang_source_direct_dkv",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": "64",
+    "tilelang_block_k": "16",
+    "tilelang_d_blocks_per_kernel": "2",
+    "tilelang_dkv_backend": "dblocked_grouped_source",
+    "tilelang_group_panel_size": null,
+    "tilelang_head_block": null,
+    "tilelang_panel_capacity": "16",
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "TileLang compressed-dKV backend is selected by TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND; direct-source modes include full_d, dblocked_source, and dblocked_grouped_source.",
+    "explicit_tilelang_dkv still materializes selected-KV/probs/grad_logits before the TileLang compressed-dKV slice; tilelang_source_hsk_dkv moves probability/scaled-dP/dQ recompute into TileLang and feeds selected-limit dKV from BF16 HSK tensors."
+  ],
+  "parity": {
+    "dkv_compressed_candidate_max_abs": 8.4375,
+    "dkv_compressed_max_abs": 0.03125,
+    "dkv_compressed_mean_abs": 0.002268117619678378,
+    "dkv_compressed_ref_max_abs": 8.4375,
+    "dkv_compressed_vs_tilelang_bf16_ref_max_abs": null,
+    "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": null,
+    "dkv_local_max_abs": 0.015625,
+    "dkv_max_abs": 0.03125,
+    "dkv_mean_abs": 0.0016795254778116941,
+    "dq_max_abs": 0.0078125,
+    "dsink_max_abs": 0.0,
+    "enabled": true,
+    "tilelang_bf16_ref_error": "ValueError('selected-limit adapter currently requires no overflow; use a full-capacity panel or add a fused residual path first')",
+    "tilelang_bf16_ref_vs_explicit_ref_max_abs": null,
+    "tilelang_bf16_ref_vs_explicit_ref_mean_abs": null
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 64,
+    "dim": 128,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 16,
+    "selected": 80,
+    "seq_len": 128
+  },
+  "source_hsk_export_check": {
+    "enabled": false
+  },
+  "timing": {
+    "explicit_pytorch": {
+      "median_ms": 1.1272940039634705,
+      "times_ms": [
+        1.4890990257263184,
+        0.7654889822006226
+      ],
+      "wall_median_ms": 1.1608779896050692,
+      "wall_times_ms": [
+        1.5259110368788242,
+        0.7958449423313141
+      ]
+    },
+    "tilelang_source_direct_dkv": {
+      "median_ms": 18.750887870788574,
+      "times_ms": [
+        19.153032302856445,
+        18.348743438720703
+      ],
+      "wall_median_ms": 18.778770696371794,
+      "wall_times_ms": [
+        19.182103220373392,
+        18.375438172370195
+      ]
+    }
+  }
+}

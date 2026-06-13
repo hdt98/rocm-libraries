@@ -1,0 +1,287 @@
+{
+  "artifact": "torchtitan_noac_alloc_expand_lowintrusion_profile_8x_s4096_gbs128_20260604b",
+  "created_at": "2026-06-04",
+  "status": "completed_profile",
+  "purpose": "Explain the step-2 TFLOPs burst versus late-step sustained throughput for the current best no-activation-checkpoint plus expandable-allocator 8xMI350 DSv4-style TorchTitan canary, and pin the current sparse-MLA/TileLang backward boundary.",
+  "run": {
+    "run_id": "torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b",
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b",
+    "remote_docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/docker-run.log",
+    "profiling_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling",
+    "status": "completed_6_steps",
+    "process_groups_destroyed": true
+  },
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "chunked_ce_num_chunks": 2
+  },
+  "active_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "allocator": "expandable_segments:True"
+  },
+  "profile_knobs": {
+    "torch_profiler_trace": false,
+    "additive_timing": true,
+    "dsv4_stage_timing": true,
+    "sharedkv_backward_timing": true,
+    "mori_aiter_timing": true,
+    "read": "This run inserts timing synchronizations. Use it for bottleneck decomposition, not as the promoted throughput baseline."
+  },
+  "materialized_step_metrics_rank0_log": [
+    {
+      "step": 1,
+      "tflops_per_gpu_range": [
+        41.27,
+        41.36
+      ],
+      "tok_per_gpu_s_range": [
+        2181,
+        2186
+      ],
+      "peak_logged_memory_gib_range": [
+        67.56,
+        69.47
+      ]
+    },
+    {
+      "step": 2,
+      "tflops_per_gpu_range": [
+        80.21,
+        80.22
+      ],
+      "tok_per_gpu_s": 4239,
+      "peak_logged_memory_gib_range": [
+        80.56,
+        84.33
+      ]
+    },
+    {
+      "step": 3,
+      "tflops_per_gpu": 71.13,
+      "tok_per_gpu_s": 3759,
+      "peak_logged_memory_gib_range": [
+        80.6,
+        105.29
+      ]
+    },
+    {
+      "step": 4,
+      "tflops_per_gpu": 65.35,
+      "tok_per_gpu_s": 3454,
+      "peak_logged_memory_gib_range": [
+        90.31,
+        106.81
+      ]
+    },
+    {
+      "step": 5,
+      "tflops_per_gpu": 66.12,
+      "tok_per_gpu_s": 3494,
+      "peak_logged_memory_gib_range": [
+        95.81,
+        106.81
+      ]
+    },
+    {
+      "step": 6,
+      "tflops_per_gpu": 66.85,
+      "tok_per_gpu_s": 3533,
+      "peak_logged_memory_gib_range": [
+        97.75,
+        106.87
+      ]
+    }
+  ],
+  "throughput_read": {
+    "profiled_step2_tflops_per_gpu": 80.21,
+    "profiled_steps4_to6_mean_tflops_per_gpu": 66.11,
+    "retained_no_profile_steps4_to6_mean_tflops_per_gpu": 64.91,
+    "target_tflops_per_gpu": 277.0,
+    "late_profile_ratio_to_target": 0.2387,
+    "late_profile_speedup_needed_to_target": 4.19,
+    "read": "The profiled run reproduces the same late-step band as the promoted no-profile run. Step 2 remains a real burst, but the sustained late window is the right reporting surface."
+  },
+  "additive_timing_rank_max_ms": {
+    "step2": {
+      "rank_step_wall": 13869.037,
+      "train_step.microbatch_forward_backward": 13514.836,
+      "forward_backward.model_forward": 2155.357,
+      "forward_backward.loss": 468.879,
+      "forward_backward.backward": 6354.433,
+      "microbatch_forward_backward_residual": 4604.97,
+      "train_step.accumulated_loss_reduce": 287.175,
+      "train_step.optimizer_step": 16.952,
+      "train_step.grad_clip": 21.487
+    },
+    "steps4_to6_mean": {
+      "rank_step_wall": 18757.644,
+      "train_step.microbatch_forward_backward": 18388.82,
+      "forward_backward.model_forward": 2251.791,
+      "forward_backward.loss": 465.693,
+      "forward_backward.backward": 11157.331,
+      "microbatch_forward_backward_residual": 4600.717,
+      "train_step.accumulated_loss_reduce": 303.65,
+      "train_step.optimizer_step": 16.954,
+      "train_step.grad_clip": 20.572
+    },
+    "step2_to_late_delta_ms": {
+      "rank_step_wall": 4888.607,
+      "forward_backward.model_forward": 96.434,
+      "forward_backward.loss": -3.186,
+      "forward_backward.backward": 4802.898,
+      "microbatch_forward_backward_residual": -4.253
+    },
+    "read": "The step-2 burst decays because backward grows by about 4.8s on the rank critical path. Forward, loss, and the 4.6s wrapper residual are effectively steady across the step-2 versus steps-4-to-6 comparison."
+  },
+  "late_steps4_to6_dsv4_sharedkv_stage": {
+    "call_id_filter": ">144",
+    "rank_median_per_call_ms": {
+      "gather_selected_kv_fp32": 2.023,
+      "scores_qk": 1.391,
+      "probs": 0.572,
+      "grad_logits_terms": 2.335,
+      "grad_q": 1.463,
+      "dkv_math": 5.142,
+      "scatter": 12.139,
+      "grad_attn_sink": 0.697
+    },
+    "rank_median_total_ms_over_late_window": {
+      "gather_selected_kv_fp32": 194.871,
+      "scores_qk": 139.015,
+      "probs": 55.248,
+      "grad_logits_terms": 226.089,
+      "grad_q": 141.269,
+      "dkv_math": 494.982,
+      "scatter": 1164.337,
+      "grad_attn_sink": 66.966
+    },
+    "read": "The retained non-TileLang shared-KV backward still pays materialized selected-KV/probability/logit work plus a large scatter. The scatter is the largest per-call sparse-MLA stage in this profile."
+  },
+  "late_steps4_to6_loss": {
+    "call_id_filter": ">144",
+    "chunked_ce_loss_rank_median_per_call_ms": 28.488,
+    "chunked_ce_loss_rank_median_total_ms": 1368.219,
+    "rank_count": 48,
+    "read": "Loss/lm-head remains visible but does not explain the step-2 burst decay because additive loss timing is flat between step 2 and late steps."
+  },
+  "late_steps4_to6_mori_moe": {
+    "call_id_filter": ">192",
+    "rank_median_per_call_ms": {
+      "local_vjp_total": 92.614,
+      "combine_dx": 44.981,
+      "local_vjp_recompute_forward": 29.857,
+      "local_vjp_wgrad": 23.409,
+      "local_vjp_xgrad_reduce": 21.508,
+      "local_vjp_w2_dgrad_swiglu": 12.499,
+      "local_vjp_pack_scatter": 4.337,
+      "dispatch_grad_inputs": 3.142
+    },
+    "rank_median_total_ms_over_late_window": {
+      "local_vjp_total": 14056.127,
+      "combine_dx": 9734.362,
+      "local_vjp_recompute_forward": 4473.801,
+      "local_vjp_wgrad": 3597.461,
+      "local_vjp_xgrad_reduce": 3246.437,
+      "local_vjp_w2_dgrad_swiglu": 1899.345,
+      "local_vjp_pack_scatter": 702.816,
+      "dispatch_grad_inputs": 632.857
+    },
+    "rank_total_range_ms_over_late_window": {
+      "local_vjp_total": [
+        6607.288,
+        22233.317
+      ],
+      "combine_dx": [
+        1470.43,
+        17270.008
+      ]
+    },
+    "recv_count_rank_medians": {
+      "min": 3710.5,
+      "median": 26144.25,
+      "max": 32767.0
+    },
+    "read": "MoE backward has severe owner-rank imbalance: high-recv ranks spend more in local VJP while low-recv ranks wait in combine_dx. The next MoE lever is reducing/overlapping the VJP tail, not raw combine micro-optimization."
+  },
+  "tilelang_boundary_audit": {
+    "current_explicit_pytorch_path": {
+      "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "line_refs": [
+        4309,
+        4319,
+        4322,
+        4328,
+        4332,
+        4348,
+        4359,
+        4366,
+        4381,
+        4392
+      ],
+      "read": "The active explicit path materializes selected_kv, scores, probs, grad_logits, local dKV values, and then scatters. TileLang explicit dKV modes only enter after this work has already happened."
+    },
+    "current_tilelang_late_dkv_bridge": {
+      "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "line_refs": [
+        3195,
+        3209,
+        3211,
+        3434,
+        3437,
+        3445
+      ],
+      "read": "The selected-limit TileLang bridge consumes already materialized probs and grad_logits or HSK BF16 slabs, so isolated dKV wins are erased by the boundary."
+    },
+    "existing_whole_boundary_attempts": {
+      "artifact": "run_artifacts/torchtitan_tilelang_whole_backward_boundary_decision_20260604.json",
+      "source_hsk_export_read": "Correct but rejected: HSK export spent about 34.8 ms before the reducer.",
+      "direct_atomic_read": "Closest no-HSK source kernel consumed q/dO/kv/indices/lse/delta directly, but per-selected-row dKV atomics landed around 42.5 ms at S4096.",
+      "direct_group_owned_read": "Group-owned direct-source reducers avoided HSK slabs but reloaded/recomputed QK/PV too much and were slower."
+    },
+    "required_tilelang_contract": [
+      "Consume q, dO, shared/compressed KV, LI indices, output, lse, and sink/delta directly.",
+      "Recompute QK, probabilities, scaled dP, dQ, dV, and dK inside a query-major producer.",
+      "Avoid HBM HSK slabs for probs or grad_logits.",
+      "Perform grouped/segmented compressed dKV reduction in the producer epilogue before global memory.",
+      "Emit reduced compact partial rows or reduced atomics, then use the already-cheap final fold/reducer."
+    ]
+  },
+  "decision": {
+    "why_step2_bursts_then_slows": "The critical-path backward wall is much shorter on step 2. By steps 4-6, forward and loss stay flat, but backward is about 4.8s slower and dominates the step-time increase. The late-step memory footprint also rises from about 80-84 GiB at step 2 to about 90-107 GiB by steps 4-6, so the burst is not a stable steady-state reporting point.",
+    "highest_return_targets": [
+      "MORI MoE backward owner-rank VJP tail plus dX-return overlap/skew reduction.",
+      "The persistent 4.6s microbatch forward/backward wrapper residual, which is large enough to erase isolated kernel wins and still needs a narrower boundary.",
+      "Sparse-MLA backward fusion, but only as a whole-boundary TileLang/HIP kernel rather than a late compressed-dKV drop-in.",
+      "Loss/lm-head CE path as a visible but not burst-explaining subsystem."
+    ],
+    "tilelang_status": "No new TileLang e2e promotion. The updated objective is correct: TileLang must fuse the whole sparse-MLA backward boundary before another materialized TFLOPs A/B is meaningful."
+  },
+  "commands_run": [
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori RUN_ID=torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_MBS=1 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_ENABLE_PROFILING=false CANARY_ENABLE_STRUCTURED_LOGGING=false CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_AITER_BLOCK_NUM=64 CANARY_MORI_AITER_RDMA_BLOCK_NUM=32 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=true CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling/additive CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling/dsv4_stage CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling/mori MASTER_PORT=29577 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling --steady-after-call-id 16 --dsv4-steady-after-call-id 0 --pretty",
+    "ssh do-sonle5-mi350-gpu python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_noac_alloc_expand_lowintrusion_profile6_ep8_s4096_gbs128_20260604b/profiling --steady-after-call-id 16 --pretty",
+    "custom JSONL parser over profiling/additive, profiling/dsv4_stage, and profiling/mori with late-window filters"
+  ],
+  "dependency_pin_changes": []
+}

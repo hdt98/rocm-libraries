@@ -1,0 +1,111 @@
+{
+  "scope": "tilelang_sparse_mla_backward_gemm_epilogue_decision",
+  "date": "2026-06-04",
+  "source_idea": {
+    "local_pdf": "/Users/sonle5/Downloads/GEMM-plus-epilogue.pdf",
+    "paper_title": "CODA: Rewriting Transformer Blocks as GEMM-Epilogue Programs",
+    "read": "The paper's useful abstraction is GEMM mainloop plus programmable epilogue: keep tile results on chip, apply local transforms/reductions while the output tile is still resident, and avoid writing intermediate probability or gradient slabs to global memory."
+  },
+  "mapping_to_sparse_mla_backward": {
+    "gemm_mainloops": [
+      "Q @ K^T -> scores",
+      "dO @ K^T -> grad_probs",
+      "dP^T @ Q + P^T @ dO -> compressed dKV contributions"
+    ],
+    "epilogue_work": [
+      "Use scores, lse, and delta to produce P and scaled dP without materializing HSK probs or grad_logits.",
+      "Route selected slots to compressed group ids.",
+      "Reduce contributions for repeated compressed groups inside the tile before global writes.",
+      "Emit reduced atomics or compact partial rows instead of one atomic/store per selected row and D element."
+    ],
+    "target_contract": "q, dO, shared compressed KV, source indices, lse, delta -> dq, dKV, dsink with no selected_kv, probs, or grad_logits HBM materialization."
+  },
+  "implemented_probe": {
+    "name": "dblocked_grouped_source",
+    "description": "A TileLang direct-source grouped-D reducer that recomputes P/dP once per token and selected tile, then reuses it for multiple D blocks inside the same CTA before reduced dKV atomic writes.",
+    "files": [
+      "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+      "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py",
+      "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+    ],
+    "env": {
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND": "dblocked_grouped_source",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_D": "64",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_BLOCK_K": "16",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_D_BLOCKS_PER_KERNEL": "2",
+      "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_PANEL_CAPACITY": "16"
+    }
+  },
+  "remote_validation": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "artifacts": [
+      {
+        "path": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_smoke_s128_h64_d128_20260604.json",
+        "shape": {
+          "seq_len": 128,
+          "heads": 64,
+          "dim": 128,
+          "local_count": 16,
+          "compressed_count": 64,
+          "selected": 80
+        },
+        "parity_vs_explicit": {
+          "dq_max_abs": 0.0078125,
+          "dkv_max_abs": 0.03125,
+          "dkv_compressed_max_abs": 0.03125,
+          "dkv_compressed_mean_abs": 0.002268117619678378,
+          "dsink_max_abs": 0.0
+        },
+        "timing": {
+          "explicit_pytorch_median_ms": 1.1272940039634705,
+          "tilelang_source_direct_dkv_median_ms": 18.750887870788574
+        },
+        "read": "Functional smoke passed closely enough for BF16 bridge bring-up, but tiny-shape timing is already negative."
+      },
+      {
+        "path": "run_artifacts/torchtitan_tilelang_source_direct_grouped_d_timing_s512_h64_d512_20260604.json",
+        "shape": {
+          "seq_len": 512,
+          "heads": 64,
+          "dim": 512,
+          "local_count": 128,
+          "compressed_count": 128,
+          "selected": 256
+        },
+        "timing": {
+          "tilelang_source_direct_dkv_median_ms": 43.14042663574219,
+          "times_ms": [
+            43.022125244140625,
+            43.25872802734375
+          ]
+        },
+        "read": "This is too slow before attempting S4096 or e2e TFLOPs promotion."
+      }
+    ],
+    "compile_or_shape_notes": [
+      "H=16 smoke failed earlier in the existing TileLang no-dKV helper with ROCm layout inference divide-by-zero.",
+      "block_d=32 failed ROCm layout inference for the new grouped-D reducer; block_d=64 compiled.",
+      "TileLang emitted a data-race warning on group_acc for the grouped-D reducer, so the current lowering is not production-safe yet."
+    ]
+  },
+  "comparison_to_existing_gates": {
+    "older_triton_sparse_atomic_wall_s4096_ms": "about 8.0-8.8",
+    "best_clean_tilelang_hsk_bf16_source_s4096_ms": 5.105,
+    "current_grouped_d_direct_source_s512_ms": 43.14042663574219,
+    "read": "The grouped-D direct-source probe is conceptually closer to GEMM+epilogue because it avoids HSK materialization, but it is far slower than both the old Triton sparse-atomic wall and the source-fed HSK TileLang dKV body."
+  },
+  "decision": {
+    "promote_to_e2e": false,
+    "keep_concept": true,
+    "summary": "Use GEMM+epilogue as the design target, but do not promote this current TileLang grouped-D implementation. It proves wiring and the right no-HSK contract direction, yet still pays too much recompute/schedule overhead and has a TileLang race warning.",
+    "next_branch": [
+      "If staying in TileLang, rewrite the kernel so P/dP is produced once per query-major MFMA tile and consumed by an epilogue-local segmented/group reduction without per-D-group recomputation.",
+      "If TileLang cannot express the needed epilogue safely, move this sparse-MLA backward slice to HIP/rocWMMA/CK-style control where MFMA accumulators, LDS staging, and grouped reduction/writeback can be managed directly.",
+      "Do not run end-to-end TFLOPs with dblocked_grouped_source until the isolated S512/S4096 kernel beats the current sparse-atomic wall."
+    ]
+  },
+  "dependency_pin_changes": []
+}

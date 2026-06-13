@@ -1,0 +1,105 @@
+{
+  "artifact": "torchtitan_sparse_mla_shared_kv_structured_index_route_probe_20260601",
+  "date_local": "2026-06-01",
+  "scope": "structured_index_query_major_route_load_attribution_for_shared_kv_sparse_mla_backward",
+  "status": "passed",
+  "baseline_gap_context": {
+    "full_layer_current_best_ms": 68.2089,
+    "full_layer_target_ms": 24.9,
+    "required_reduction_ms": 43.3089,
+    "gap_ladder_artifact": "run_artifacts/single_layer_gap_attribution_ladder_20260601.json",
+    "read": "This artifact only tests whether loading the synthetic route-index tensor is a meaningful part of the compressed top-k sparse-MLA backward wall."
+  },
+  "code_change": {
+    "backend_file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "summary": [
+      "Aligned structured-index constexpr arguments across the forward, dQ-only, and query-major dQ+dKV recompute kernel call boundaries.",
+      "Added a structured query-major branch that computes local-window and prefix-compressed indices in the Triton tile instead of loading the synthetic [B,S,K] route tensor."
+    ]
+  },
+  "remote": {
+    "single_gpu_node": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "remote_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_runtime_probe_structured_20260601",
+    "staged_paths": [
+      "tools/dsv4_runtime_probe/",
+      "sources/wip/torchtitan/torchtitan/models/deepseek_v4/"
+    ],
+    "notes": "GPU use was idle before the retained runs. Raw container-side summaries were copied back from profiles/*.json into /tmp before being summarized here."
+  },
+  "validation": {
+    "local_py_compile": {
+      "status": "passed",
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_backward_combined.py"
+    },
+    "s128_smoke": {
+      "status": "passed",
+      "shape": {
+        "batch": 1,
+        "sequence": 128,
+        "heads": 64,
+        "latent_dim": 512,
+        "local_count": 128,
+        "csa_count": 32,
+        "selected_keys": 160
+      },
+      "generic_query_major_ms": 0.2895120084285736,
+      "structured_query_major_ms": 0.25702399015426636,
+      "dq_max_abs_diff": 0.011420518159866333,
+      "dkv_max_abs_diff": 0.04753907024860382,
+      "summary_path": "profiles/structured_s128_smoke.json"
+    }
+  },
+  "s4096_compressed512_only": {
+    "status": "passed",
+    "shape": {
+      "batch": 1,
+      "sequence": 4096,
+      "heads": 64,
+      "latent_dim": 512,
+      "local_count": 0,
+      "csa_count": 512,
+      "selected_keys": 512,
+      "kv_bank_len": 5120,
+      "block_h": 64,
+      "block_n": 64
+    },
+    "generic_query_major_ms": 10.970503807067871,
+    "structured_query_major_ms": 10.90822696685791,
+    "median_delta_ms": 0.06227684020996094,
+    "relative_delta": 0.005676758375371024,
+    "dq_max_abs_diff": 0.013092041015625,
+    "dkv_max_abs_diff": 0.11115646362304688,
+    "dkv_atol": 0.12,
+    "summary_path": "profiles/structured_compressed512_s4096_h64n64_atol012.json",
+    "read": "Eliminating the compressed route-index tensor load saves only about 0.06 ms, so it is not the 11 ms compressed-route wall."
+  },
+  "s4096_full_local128_compressed512": {
+    "status": "passed",
+    "shape": {
+      "batch": 1,
+      "sequence": 4096,
+      "heads": 64,
+      "latent_dim": 512,
+      "local_count": 128,
+      "csa_count": 512,
+      "selected_keys": 640,
+      "kv_bank_len": 5120,
+      "block_h": 64,
+      "block_n": 64
+    },
+    "generic_query_major_ms": 14.337350845336914,
+    "structured_query_major_ms": 14.309947967529297,
+    "median_delta_ms": 0.027402877807617188,
+    "relative_delta": 0.0019112917132875678,
+    "dq_max_abs_diff": 0.013144493103027344,
+    "dkv_max_abs_diff": 0.045244693756103516,
+    "dkv_atol": 0.12,
+    "summary_path": "profiles/structured_full640_s4096_h64n64_atol012.json",
+    "read": "Eliminating the full synthetic route-index tensor load saves only about 0.03 ms on the full local+compressed route."
+  },
+  "decision": {
+    "route_index_load_is_wall": false,
+    "read": "Do not spend the next optimization rung on route tensor load elimination. The wall remains the compressed top-k QK/probability/PV/dKV accumulation path, selected-group reuse, LI/compressor fusion, and then compact-native MoE training GEMMs."
+  }
+}

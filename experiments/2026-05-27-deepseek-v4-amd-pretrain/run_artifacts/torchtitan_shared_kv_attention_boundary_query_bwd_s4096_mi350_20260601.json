@@ -1,0 +1,163 @@
+{
+  "attention_dims": {
+    "compress_ratio": 4,
+    "dsa_indexer_topk": 512,
+    "kv_lora_rank": 512,
+    "n_heads": 64,
+    "qk_head_dim": 512,
+    "qk_nope_head_dim": 448,
+    "qk_rope_head_dim": 64,
+    "v_head_dim": 512,
+    "window_size": 128
+  },
+  "backend": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_path": "sparse_mla_shared_kv_triton_forward_backend.py",
+    "module": null
+  },
+  "backward": {
+    "attn_sink_grad_norm": 8.562428774894215e-06,
+    "enabled": true,
+    "input_grad_norm": 2.2255813746596687e-05,
+    "loss": 0.0009755899664014578
+  },
+  "backward_timing": {
+    "attn_sink_grad_norm": 8.562428774894215e-06,
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "backward_mode_value": "query_recompute",
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 23.451900482177734,
+      "mean_ms": 23.290526072184246,
+      "median_ms": 23.216537475585938,
+      "min_ms": 23.203140258789062,
+      "samples_ms": [
+        23.203140258789062,
+        23.451900482177734,
+        23.216537475585938
+      ],
+      "stdev_ms": 0.13991478301107346
+    },
+    "enabled": true,
+    "input_grad_norm": 2.2255813746596687e-05,
+    "loss": 0.0009755899664014578,
+    "peak_memory_allocated_bytes": 3975725056,
+    "peak_memory_allocated_gib": 3.7026824951171875,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 23.493468994274735,
+      "mean_ms": 23.341128990675013,
+      "median_ms": 23.274309001863003,
+      "min_ms": 23.2556089758873,
+      "samples_ms": [
+        23.274309001863003,
+        23.493468994274735,
+        23.2556089758873
+      ],
+      "stdev_ms": 0.13226121980930675
+    },
+    "warmup_iters": 1
+  },
+  "batch": 1,
+  "boundary": {
+    "aux_loss": null,
+    "compressed_x_shape": [
+      1,
+      1024,
+      4096
+    ],
+    "index_scores_shape": [
+      1,
+      4096,
+      1024
+    ],
+    "indices_shape": [
+      1,
+      4096,
+      640
+    ],
+    "kv_bank_shape": [
+      1,
+      5120,
+      512
+    ],
+    "kv_compressed_shape": [
+      1,
+      1024,
+      512
+    ],
+    "kv_shared_shape": [
+      1,
+      4096,
+      512
+    ],
+    "q_shape": [
+      1,
+      4096,
+      64,
+      512
+    ],
+    "selected_count": 640,
+    "stage_records": [],
+    "stage_total_wall_ms": null,
+    "top_scores_shape": [
+      1,
+      4096,
+      512
+    ],
+    "topk": 512,
+    "window": 128
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "model_dim": 4096,
+  "output_checksum": 0.00012211676221340895,
+  "output_shape": [
+    1,
+    4096,
+    4096
+  ],
+  "projection_mode": "Self-contained TorchTitan-shape q path plus shared kv_norm(wkv_a(x)[:kv_lora_rank]) with the final qk_rope_head_dim positions replaced by rotated k_pe; wkv_b is intentionally bypassed because it expands to per-head K/V.",
+  "promotion_read": "This is a boundary/integration probe, not a production model path. It measures the TorchTitan-shape q/wkv_a/RoPE/LightningIndexer/compression/shared-KV sparse MLA/wo overhead without importing the full TorchTitan package stack in the older SGLang image. The real model still needs an explicit shared latent-KV projection contract, attn_sink parameter, and fused backward.",
+  "scope": "torchtitan_dsv4_sparse_mla_shared_kv_attention_boundary_probe",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 4.502601146697998,
+      "mean_ms": 4.290546417236328,
+      "median_ms": 4.30511999130249,
+      "min_ms": 4.063918113708496,
+      "samples_ms": [
+        4.502601146697998,
+        4.30511999130249,
+        4.063918113708496
+      ],
+      "stdev_ms": 0.21970433007570322
+    },
+    "enabled": true,
+    "peak_memory_allocated_bytes": 3875060224,
+    "peak_memory_allocated_gib": 3.608931064605713,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 4.550407989881933,
+      "mean_ms": 4.326751998936136,
+      "median_ms": 4.327859031036496,
+      "min_ms": 4.101988975889981,
+      "samples_ms": [
+        4.550407989881933,
+        4.327859031036496,
+        4.101988975889981
+      ],
+      "stdev_ms": 0.22421155672139653
+    },
+    "warmup_iters": 1
+  }
+}

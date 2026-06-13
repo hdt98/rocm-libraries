@@ -1,0 +1,248 @@
+{
+  "artifact": "sparse_mla_source_boundary_hip_coop_probe",
+  "status": "correctness_failed",
+  "scope": "source-boundary compressed sparse-MLA backward producer: q,dO,output,lse,kv,forward-known union LI sidecar to dKV without materialized probs/grad_logits",
+  "arch": "gfx950",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip": "7.2.26015-fc0010cf6a",
+  "device": "AMD Instinct MI350X VF",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "build_seconds": 27.41011053114198,
+  "extension_dir": "/tmp/dsv4_sparse_mla_source_boundary_union_gather_mfma_20260605",
+  "build_carrier": {
+    "hip_build_mode": "prebuilt_object",
+    "kernel_source_flavor": "source_boundary_union_gather",
+    "external_hip_source_path": "tools/dsv4_runtime_probe/source_boundary_union_gather_dkv_mfma.hip",
+    "hipcc": "/opt/rocm-7.2.0/bin/hipcc",
+    "hip_defines": [],
+    "read": "prebuilt_object bypasses PyTorch hipify by compiling raw HIP with hipcc and linking the object into the Torch C++ wrapper."
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 512,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 128,
+    "compressed_groups": 128,
+    "kv_len": 640,
+    "valid_pairs": 32640
+  },
+  "tile": {
+    "seq_chunk": 1,
+    "selected_block": 512,
+    "block_d": 512,
+    "threads": 256,
+    "k_tile": 16,
+    "h_tile": 16,
+    "forward_group_sidecar_ordered_by_group": false,
+    "schedule_read": "Union-gather source-boundary compressed-dKV rung. A CTA owns one (token tile, selected window, union-group block, D block), consumes the forward-known active_groups plus token x union-group selected-slot sidecar, recomputes QK, dO.V, softmax probability, and scaled-dP from q/dO/output/lse/kv without materialized P or grad_logits, accumulates dKV[group,D] across the token tile inside the CTA, then emits one global atomic stream per reduced union group. block_d=512 is the preferred gate because it avoids replaying the source-boundary score producer once per D64 tile."
+  },
+  "union_sidecar": {
+    "active_groups_shape": [
+      1,
+      512,
+      1,
+      128
+    ],
+    "active_counts_shape": [
+      1,
+      512,
+      1
+    ],
+    "union_route_slots_shape": [
+      1,
+      512,
+      1,
+      1,
+      128
+    ],
+    "stats": {
+      "covered_selected_pairs": 32640,
+      "duplicate_token_group_hits": 0,
+      "nonempty_union_memberships": 32640,
+      "max_members_per_group": 1,
+      "members_per_group_hist": {
+        "1": 32640
+      },
+      "workspace_bytes": 524288,
+      "workspace_mib": 0.5,
+      "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness."
+    }
+  },
+  "contract": {
+    "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]",
+    "source_boundary": true,
+    "emits_dq": false,
+    "emits_dkv": true,
+    "emits_valid_dkv": true,
+    "forward_sidecar_contract": "group_ids[B,S,K] carried from forward in original selected-slot order",
+    "materialized_probs_grad_logits": false,
+    "materialized_scaled_dp_page": false,
+    "hip_source_includes_torch_extension": false,
+    "hip_source_headers": "external_source_see_path",
+    "cpp_source_includes": [
+      "torch/extension.h"
+    ]
+  },
+  "route_stats": {
+    "token_block": 1,
+    "selected_block": 512,
+    "d_block": 512,
+    "d_blocks_per_full_dim": 1,
+    "tiles": 512,
+    "nonempty_tiles": 509,
+    "baseline_valid_pairs": 32640,
+    "coalesced_unique_groups": 32640,
+    "baseline_atomic_add_elements": 16711680,
+    "coalesced_atomic_add_elements": 16711680,
+    "route_atomic_reduction_x": 1.0,
+    "valid_pairs_per_tile": {
+      "mean": 63.75,
+      "p50": 64.0,
+      "p90": 115.0,
+      "p99": 126.0,
+      "max": 128
+    },
+    "unique_groups_per_tile": {
+      "mean": 63.75,
+      "p50": 64.0,
+      "p90": 115.0,
+      "p99": 126.0,
+      "max": 128
+    },
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block."
+  },
+  "boundary_route_fanin": {
+    "topk": 128,
+    "compressed_groups": 128,
+    "compress_ratio": 4,
+    "actual_compressed": {
+      "rows": 128,
+      "nonzero_rows": 128,
+      "zero_rows": 0,
+      "total_selections": 32640,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "p50_all_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p50_nonzero_rows": 255.0,
+      "p90_nonzero_rows": 458.2,
+      "p99_nonzero_rows": 503.92,
+      "gini": 0.33462009803921566,
+      "top1_share": 0.01559436274509804,
+      "top8_share": 0.1213235294117647,
+      "top16_share": 0.23480392156862745,
+      "top64_share": 0.7509803921568627
+    },
+    "prefix_compressed_same_topk": {
+      "rows": 128,
+      "nonzero_rows": 128,
+      "zero_rows": 0,
+      "total_selections": 32640,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "p50_all_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p50_nonzero_rows": 255.0,
+      "p90_nonzero_rows": 458.2,
+      "p99_nonzero_rows": 503.92,
+      "gini": 0.33462009803921566,
+      "top1_share": 0.01559436274509804,
+      "top8_share": 0.1213235294117647,
+      "top16_share": 0.23480392156862745,
+      "top64_share": 0.7509803921568627
+    },
+    "valid_selected_per_query": {
+      "rows": 512,
+      "nonzero_rows": 509,
+      "zero_rows": 3,
+      "total_selections": 32640,
+      "min": 0,
+      "min_nonzero": 1,
+      "max": 128,
+      "mean_all_rows": 63.75,
+      "mean_nonzero_rows": 64.12573673870334,
+      "p50_all_rows": 64.0,
+      "p90_all_rows": 115.0,
+      "p99_all_rows": 126.0,
+      "p50_nonzero_rows": 64.0,
+      "p90_nonzero_rows": 115.0,
+      "p99_nonzero_rows": 126.0,
+      "gini": 0.33464307598039217,
+      "top1_share": 0.00392156862745098,
+      "top8_share": 0.031066176470588236,
+      "top16_share": 0.0616421568627451,
+      "top64_share": 0.23480392156862745
+    },
+    "atomic_estimates": {
+      "block_h_16": {
+        "head_blocks": 4,
+        "actual_atomic_add_elements": 66846720,
+        "prefix_atomic_add_elements": 66846720
+      },
+      "block_h_64": {
+        "head_blocks": 1,
+        "actual_atomic_add_elements": 16711680,
+        "prefix_atomic_add_elements": 16711680
+      }
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology."
+  },
+  "correctness": {
+    "passed": false,
+    "dq_atol": 0.75,
+    "dkv_atol": 1.0,
+    "max_abs_diff": 32.96058654785156,
+    "mean_abs_diff": 0.2961159944534302,
+    "reference_norm": 756.6400756835938,
+    "candidate_norm": 1374.851806640625
+  },
+  "timing_ms": {
+    "source_boundary_union_gather_dkv": {
+      "label": "source_boundary_union_gather_dkv",
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          2.0485089626163244
+        ],
+        "mean_ms": 2.0485089626163244,
+        "median_ms": 2.0485089626163244,
+        "min_ms": 2.0485089626163244,
+        "max_ms": 2.0485089626163244,
+        "stdev_ms": 0.0
+      },
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          1.995784044265747
+        ],
+        "mean_ms": 1.995784044265747,
+        "median_ms": 1.995784044265747,
+        "min_ms": 1.995784044265747,
+        "max_ms": 1.995784044265747,
+        "stdev_ms": 0.0
+      },
+      "peak_memory_allocated_bytes": 595205120,
+      "peak_memory_allocated_gib": 0.5543279647827148,
+      "checksum_norm": 1374.851806640625
+    }
+  },
+  "gate": {
+    "candidate_event_median_ms": 1.995784044265747,
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "passes_triton_full_boundary_gate": true,
+    "read": "This union-gather source-boundary dKV probe removes the materialized probability/grad-logit bridge and performs the token-tile union-group reduction before global atomics. Passing promotes the operand reformulation into the full sparse-attention backward owner; failing attributes the wall to source-boundary QK/dO.V replay or CTA reduction shape."
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "date": "2026-06-12",
+  "purpose": "Integration smoke for the MORI owner-compact needed hot-weight exchange path before running the full 8x 20-step gate.",
+  "decision": "integration_pass_not_perf_promotion",
+  "host": "do-sonle5-mi350-gpu",
+  "resource_caveat": "GPUs 0-3 were occupied by an external job, so these smokes used GPUs 4-7 only and are not throughput baselines.",
+  "shared_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "visible_devices": "4,5,6,7",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_split_weight_layout": "needed",
+    "standard_ep_needed_weight_exchange_impl": "mori",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "checkpoint_enable": false,
+    "weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_bwd_score_mode": "torch"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_mori_exchange_4x_smoke_gpus4567_20260612",
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 8,
+      "standard_ep_needed_weight_max_density": 0.5,
+      "status": "failed_after_one_metric_step",
+      "read": "This run exposed the launcher pass-through bug: max_density stayed at the default 0.5. The pass-through was fixed before the MBS2 rerun.",
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 15.81210,
+          "grad_norm": 15.0625,
+          "tokens_per_gpu_s_range": [3357, 3359],
+          "tflops_per_gpu_range": [166.21, 166.32],
+          "peak_logged_memory_gib": 209.97
+        }
+      ],
+      "failure": {
+        "phase": "next_backward_fsdp_reduce_after_step1",
+        "message": "HSA_STATUS_ERROR_OUT_OF_RESOURCES with Available Free mem : 0 MB"
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_needed_mori_exchange_4x_smoke_gpus4567_20260612/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_needed_mori_exchange_4x_mbs2_smoke_gpus4567_20260612",
+      "micro_batch_size": 2,
+      "gradient_accumulation_steps": 16,
+      "standard_ep_needed_weight_max_density": 1.0,
+      "status": "completed_two_steps",
+      "read": "Real forward/backward integration smoke through the MORI needed-row exchange path. Not a throughput baseline because the node was shared.",
+      "step_metrics": [
+        {
+          "step": 1,
+          "loss": 15.85748,
+          "grad_norm": 15.0625,
+          "tokens_per_gpu_s_range": [2703, 2704],
+          "tflops_per_gpu_range": [133.80, 133.86],
+          "peak_logged_memory_gib": 223.99
+        },
+        {
+          "step": 2,
+          "loss": 11.69570,
+          "grad_norm": 37.5,
+          "tokens_per_gpu_s_range": [4490, 4490],
+          "tflops_per_gpu_range": [222.27, 222.27],
+          "peak_logged_memory_gib": 250.54
+        }
+      ],
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_needed_mori_exchange_4x_mbs2_smoke_gpus4567_20260612/docker-run.log"
+    }
+  ],
+  "next_gate": {
+    "shape": "8xMI350, S4096, GBS128, MBS8, GA2, FSDP8, EP8",
+    "steps": 20,
+    "baseline": "retained selected-layout standard-EP hot-helper top-8",
+    "candidate_env": {
+      "TORCHTITAN_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "needed",
+      "TORCHTITAN_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL": "mori",
+      "TORCHTITAN_STANDARD_EP_NEEDED_WEIGHT_MAX_DENSITY": "1.0"
+    },
+    "promotion_rule": "Compare late-window tok/GPU/s, TFLOPs/GPU, peak memory, and loss health; no promotion from short bursts."
+  }
+}

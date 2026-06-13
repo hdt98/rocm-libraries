@@ -1,0 +1,88 @@
+{
+  "artifact": "single_layer_attention_sweep",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_attention_sweep_20260531T2215Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_attention_sweep_20260531T2215Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad"
+  },
+  "commands": {
+    "correctness": "RUN_TAG=retained_attention_sweep_20260531T2215Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-attn-sweep",
+    "timing": "RUN_TAG=retained_attention_sweep_20260531T2215Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-attn-sweep-2048"
+  },
+  "raw_artifacts": {
+    "correctness_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_attention_sweep_20260531T2215Z/attention_impl_checks",
+    "timing_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_attention_sweep_20260531T2215Z/attention_impl_s2048_sweep"
+  },
+  "correctness_gate": {
+    "check": "attention_sparse_gather_match",
+    "seqlen": 16,
+    "reference": "dense-mask",
+    "dtype": "bfloat16",
+    "thresholds": {
+      "output_atol": 0.005,
+      "grad_rtol": 0.05
+    },
+    "all_variants_passed": true,
+    "max_grad_rel_l2_by_variant": {
+      "bf16_contract": 0.004440596141255565,
+      "sinkgrad": 6.928063390388276e-08,
+      "qnorm": 0.0,
+      "triton_rope": 0.0,
+      "fast_rope": 0.0,
+      "fwd_bwd": 0.0
+    }
+  },
+  "timing_sweep": {
+    "note": "Quick ranking run uses warmup=1 and iters=3. Use the retained bench action with warmup=2 and iters=5 for canonical pass/fail timing.",
+    "target_ms": 43.3,
+    "variants": {
+      "bf16_contract": {
+        "avg_ms": 53.54428302962333,
+        "min_ms": 53.21174603886902,
+        "tokens_per_s": 38248.714598847946,
+        "estimated_tflops": 181.83367930678017
+      },
+      "sinkgrad": {
+        "avg_ms": 61.548913324562214,
+        "min_ms": 61.18652201257646,
+        "tokens_per_s": 33274.34863391338,
+        "estimated_tflops": 158.1856358337136
+      },
+      "qnorm": {
+        "avg_ms": 60.211955026413,
+        "min_ms": 59.77524700574577,
+        "tokens_per_s": 34013.17892936062,
+        "estimated_tflops": 161.69802134557946
+      },
+      "triton_rope": {
+        "avg_ms": 61.62596094266822,
+        "min_ms": 61.382491956464946,
+        "tokens_per_s": 33232.74750888335,
+        "estimated_tflops": 157.9878648574377
+      },
+      "fast_rope": {
+        "avg_ms": 63.066230000307165,
+        "min_ms": 62.8289170563221,
+        "tokens_per_s": 32473.797783536847,
+        "estimated_tflops": 154.37983194924732
+      },
+      "fwd_bwd": {
+        "avg_ms": 63.663174669879176,
+        "min_ms": 63.251856015995145,
+        "tokens_per_s": 32169.303692751066,
+        "estimated_tflops": 152.93227269306203
+      }
+    },
+    "best_variant_by_avg_ms": "bf16_contract",
+    "best_avg_ms": 53.54428302962333,
+    "best_gap_to_target_ms": 10.244283029623325
+  },
+  "conclusion": "The retained bf16-contract attention selector remains the fastest existing option at B=1 S=2048. Other correct variants are 6.7-10.1 ms slower, so the remaining development-target gap is unlikely to be solved by selecting one of the current attention variants. Next useful work is a deeper attention backward/block profile or launch-count reduction, plus continued MoE kernel replacement work rather than another selector swap."
+}

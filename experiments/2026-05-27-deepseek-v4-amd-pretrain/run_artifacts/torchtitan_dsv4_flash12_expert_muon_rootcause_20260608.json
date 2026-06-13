@@ -1,0 +1,150 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_rootcause_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": "8xMI350_S4096_GBS128_MBS4_TP1_PP1_CP1_FSDP8_EP8_flash12_standard_ep_top8",
+  "baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "optimizer": "AdamW",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+    "peak_logged_memory_gib": 193.8,
+    "result": "retained"
+  },
+  "muon_question": {
+    "claim": "Muon removes AdamW's second moment state, so persistent optimizer state should be smaller.",
+    "profiled_answer": "The persistent expert optimizer state is smaller, but stock native Muon is much slower and still has a param-sized transient/update path. In the full training graph this loses throughput and raises peak logged memory versus the retained AdamW baseline."
+  },
+  "isolated_expert_optimizer_probe": {
+    "script": "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+    "command": "HIP_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONPATH=/workspace/sources/wip/torchtitan python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 12 --modes muon_per_expert --repeat 2",
+    "shape": "12_layers_3_expert_tensors_per_layer_each_rank32",
+    "muon_per_expert": {
+      "param_bytes_gib": 18.0,
+      "param_plus_grad_bytes_gib": 36.0,
+      "state_after_step_gib": 18.0,
+      "mem_after_step_gib": 54.074,
+      "step_peak_allocated_gib": 72.074,
+      "native_rank2_param_count": 1152,
+      "step1_gpu_ms": 8752.0,
+      "step2_gpu_ms": 871.4
+    },
+    "adamw_reference_from_same_probe_family": {
+      "state_after_step_gib": 36.0,
+      "step_peak_allocated_gib": 72.0,
+      "step_gpu_ms": 74.07
+    },
+    "read": "Muon halves persistent expert optimizer state relative to AdamW, but native Muon is about 11.8x slower than fused AdamW on this isolated expert slice and still peaks near the same memory because it materializes update/orthogonalization temporaries."
+  },
+  "fixes_applied": {
+    "local_dtensor_bridge": "NativeMuonWithBatchedParams now uses param.to_local() for sharded DTensor rank-3 expert tensors in per_expert mode, avoiding accidental global expert-bank indexing/redistribute during optimizer construction.",
+    "batched_view_default": "NativeMuonWithBatchedParams now defaults to per_expert instead of flatten. The old flatten mode remains opt-in diagnostic only.",
+    "reference_muon_stable_path": "The local reference Muon path now uses local DTensor shards, keeps BF16 momentum state by default, uses bounded matrix chunking, and matches native Muon's smaller-Gram orientation. This fixes the old reference-path orientation bug but remains a diagnostic path, not a promoted optimizer.",
+    "optimizer_profile_gate": "In-backward optimizer profiling is gated behind TORCHTITAN_OPTIMIZER_PROFILE_IN_BACKWARD because sync-heavy profiling in the post-accumulate hook hung the GPU run.",
+    "preflight_tools": [
+      "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+      "tools/dsv4_optimizer_preflight/probe_dtensor_muon_local_bridge.py"
+    ]
+  },
+  "stable_reference_muon_followup": {
+    "host": "do-sonle5-mi350-gpu",
+    "command": "HIP_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True TORCHTITAN_OPTIMIZER_MUON_BATCHED_VIEW_MODE=per_expert TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES=1 TORCHTITAN_OPTIMIZER_MUON_STATE_DTYPE=bfloat16 PYTHONPATH=. python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 1 --modes adamw muon_per_expert muon_reference --repeat 2",
+    "one_layer_expert_slice": {
+      "adamw": {
+        "state_after_step_gib": 3.0,
+        "step2_gpu_ms": 3.504,
+        "step_peak_allocated_gib": 6.0
+      },
+      "native_muon_per_expert": {
+        "state_after_step_gib": 1.5,
+        "step2_gpu_ms": 73.866,
+        "step_peak_allocated_gib": 6.074,
+        "native_rank2_param_count": 96
+      },
+      "stable_reference_muon": {
+        "state_after_step_gib": 1.5,
+        "step2_gpu_ms": 500.282,
+        "step_peak_allocated_gib": 9.074
+      }
+    },
+    "chunk_sweep": {
+      "chunk_matrices": [1, 2, 4, 8, 16, 32],
+      "step2_gpu_ms_range": [494.279, 506.722],
+      "peak_allocated_gib_range": [9.074, 12.074],
+      "read": "Increasing chunk size does not improve the reference Muon optimizer step; it only increases peak memory."
+    },
+    "decision": "Stable reference Muon is rejected for e2e. It avoids the stock native BF16-norm failure mode but is much slower and higher peak than native Muon, which was already slower than AdamW."
+  },
+  "local_dtensor_smoke": {
+    "script": "tools/dsv4_optimizer_preflight/probe_dtensor_muon_local_bridge.py",
+    "command": "torchrun --standalone --nproc_per_node=2 /workspace/tools/dsv4_optimizer_preflight/probe_dtensor_muon_local_bridge.py",
+    "result": "passed",
+    "rank_records": {
+      "global_shape": [4, 8, 16],
+      "local_shape": [2, 8, 16],
+      "native_rank2_params": 2,
+      "dtensor_local_source_params": 1,
+      "local_changed": true
+    }
+  },
+  "e2e_corrected_muon_run": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_perexpert_localdtensor_profile_8x_s4096_gbs128_mbs4_steps3_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_perexpert_localdtensor_profile_8x_s4096_gbs128_mbs4_steps3_20260608/docker-run.log",
+    "optimizer": "native Muon for expert params, per_expert, local DTensor source",
+    "constructor_log": "NativeMuonWithBatchedParams initialized (batched_view_mode=per_expert, source_params=36, batched_source_params=36, dtensor_local_source_params=36, native_rank2_params=1152)",
+    "step_metrics": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s": 1676,
+        "tflops_per_gpu": 84.86,
+        "peak_logged_memory_gib": 193.36,
+        "loss": 12.29381,
+        "grad_norm": 12.9375
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s": 5940,
+        "tflops_per_gpu": 300.75,
+        "peak_logged_memory_gib": 209.31,
+        "loss": 8.88277,
+        "grad_norm": 66.0
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s": 5914,
+        "tflops_per_gpu": 299.42,
+        "peak_logged_memory_gib": 209.31,
+        "loss": 9.41858,
+        "grad_norm": 83.5
+      }
+    ],
+    "comparison_vs_retained_baseline": {
+      "tokens_per_gpu_s_step3_vs_baseline_pct": -26.39,
+      "tflops_per_gpu_step3_vs_baseline_pct": -26.34,
+      "peak_logged_memory_gib_delta": 15.51
+    },
+    "result": "not_promoted",
+    "shutdown_issue": "Training completed, then Python crashed during shutdown with segfault/abort. Metrics are useful but the run is not stable."
+  },
+  "native_muon_stability_failure": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_perexpert_localdtensor_noprofile_8x_s4096_gbs128_mbs4_steps2_20260608",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_perexpert_localdtensor_noprofile_8x_s4096_gbs128_mbs4_steps2_20260608/docker-run.log",
+    "failure": "Fatal Python error: Floating point exception",
+    "stack": "torch/optim/_muon.py:_zeropower_via_newtonschulz -> ortho_grad.norm().clamp(min=eps)",
+    "read": "The retained PyTorch native Muon implementation casts the update to BF16 before Newton-Schulz normalization. On the real distributed DSv4 expert gradients this path is not robust enough."
+  },
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": "AdamW standard-EP top8 SDMA hot-weight run",
+    "root_causes": [
+      "Old bridge shape was wrong for expert banks: flattening [E,out,in] to [E*out,in] changes the orthogonalization problem and is very expensive.",
+      "Indexing sharded DTensor expert banks can trigger global/redistributed views; using to_local() fixes that construction-side issue.",
+      "Even after the local per-expert fix, native Muon performs expensive Newton-Schulz orthogonalization over 1152 rank-2 expert matrices per rank.",
+      "The stable local reference Muon path is numerically safer but much slower: 500 ms for one layer's expert slice versus 73.9 ms for native Muon and 3.5 ms for AdamW.",
+      "Muon reduces persistent optimizer state but not peak training memory, because gradients, params, momentum/update buffers, and orthogonalization temporaries still coexist during the step.",
+      "Native PyTorch Muon is numerically/runtime unstable on this ROCm image and DSv4 expert-gradient shape."
+    ],
+    "next_action": "Do not spend more e2e promotion time on stock native Muon. If Muon remains required, build a fused/distributed expert-Muon update with local-shard semantics, stable FP32 normalization, bounded temporary workspace, and optimizer-in-backward or swap/offload integration. Otherwise keep the retained AdamW baseline and continue MoE/EP plus sparse-MLA performance work."
+  }
+}

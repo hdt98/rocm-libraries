@@ -1,0 +1,100 @@
+{
+  "artifact": "torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_failure_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Longer durability check for the 8xMI350 target-shape TorchTitan DSv4 canary without activation checkpointing, following the earlier two-step provisional no-AC uplift.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_20260603",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_20260603",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_20260603/docker-run.log",
+  "remote_structured_logs_glob": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_20260603/structured_logs/training.global_rank_*.jsonl",
+  "shape": {
+    "gpu": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "none",
+    "requested_steps": 10,
+    "completed_logged_steps": 3,
+    "entered_step_in_structured_logs": 4,
+    "tokens_per_step": 524288
+  },
+  "settings": {
+    "checkpoint_enable": false,
+    "profiling": false,
+    "chunked_ce_num_chunks": 2,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_tuple": [
+      64,
+      32,
+      8
+    ],
+    "mori_shmem_heap_size": "32G"
+  },
+  "result": {
+    "status": "failed",
+    "failure_phase": "step_4_backward_after_step_3_metric_print",
+    "root_observed_failure": "rank0 SIGABRT after GPU memory access fault",
+    "gpu_fault": "Memory access fault by GPU node-2 on address (nil). Reason: Unknown.",
+    "stack_focus": [
+      "torchtitan/models/common/mori_aiter_moe.py:1473 in _compute_mori_routed_vjp",
+      "torchtitan/models/common/mori_aiter_moe.py:1984 in backward",
+      "torchtitan/trainer.py:742 in forward_backward_step"
+    ],
+    "structured_log_counts_per_rank": 597,
+    "process_groups_destroyed_cleanly": false,
+    "checkpoint_dir_created": false
+  },
+  "step_metrics": {
+    "step1": {
+      "loss": 12.39985,
+      "grad_norm": 11.3125,
+      "tok_per_gpu_s_range": [
+        2462,
+        2467
+      ],
+      "tflops_per_gpu_range": [
+        46.59,
+        46.69
+      ],
+      "mfu_percent": 2.02,
+      "peak_logged_memory_gib": 71.94
+    },
+    "step2": {
+      "loss": 8.99694,
+      "grad_norm": 21.875,
+      "tok_per_gpu_s": 4279,
+      "tflops_per_gpu": 80.97,
+      "mfu_percent": 3.51,
+      "peak_logged_memory_gib": 169.63
+    },
+    "step3": {
+      "loss": 13.14254,
+      "grad_norm": 24.25,
+      "tok_per_gpu_s": 3549,
+      "tflops_per_gpu": 67.16,
+      "mfu_percent": 2.91,
+      "peak_logged_memory_gib": 239.52,
+      "cuda_allocation_retries": 1
+    }
+  },
+  "comparison": {
+    "two_step_smoke_artifact": "run_artifacts/torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_20260603.json",
+    "two_step_smoke_step2_tflops_per_gpu": 89.09,
+    "target_tflops_per_gpu": 277.0,
+    "step2_ratio_to_target": 0.2923104693140794,
+    "step3_ratio_to_target": 0.2424548736462094,
+    "read": "The longer run invalidates promoting the no-activation-checkpoint setting as a robust candidate. It does not hold the earlier 89.09 TFLOPs/GPU smoke value, throughput decays by step 3, memory rises to 239.52 GiB with allocation retries, and the job aborts in the MORI routed VJP backward path while entering step 4."
+  },
+  "command": "env TARGET_HOST=do-sonle5-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_GBS=128 CANARY_MBS=1 CANARY_SEQ_LEN=4096 CANARY_STEPS=10 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_BLOCK_NUM=64 CANARY_MORI_AITER_RDMA_BLOCK_NUM=32 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_REQUIRE_IDLE_GPUS=true CANARY_ENABLE_PROFILING=false RUN_ID=torchtitan_dsv4_ce2_noac_8x_s4096_gbs128_steps10_20260603 MASTER_PORT=29549 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "dependency_pin_changes": []
+}

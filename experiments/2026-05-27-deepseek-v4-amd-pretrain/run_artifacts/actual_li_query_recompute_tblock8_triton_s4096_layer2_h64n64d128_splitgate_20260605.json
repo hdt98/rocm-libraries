@@ -1,0 +1,239 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": null,
+    "checked": false,
+    "dkv_atol": 1.0,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": null,
+    "candidate_full_ms": null,
+    "candidate_vs_retained_speedup_x": null,
+    "dkv_only_full_ms": 19.40089988708496,
+    "dkv_only_global_accum_ms": 3.126068115234375,
+    "dkv_only_sink_ms": 16.274831771850586,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "retained_single_token_full_ms": 11.1347,
+    "split_schedule_beats_matched_single_token": false,
+    "split_schedule_candidate_ms": 21.391191840171814,
+    "split_schedule_vs_matched_single_token_speedup_x": 0.5178179954792493
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "known_limitations": [
+      "BLOCK_T=4 and BLOCK_T=8 currently implement dKV-only timing modes",
+      "route reduction is dense N-by-N inside the epilogue",
+      "does not reduce duplicates within a token because LI topk is expected unique",
+      "the measured epilogue reduction is within the active N64 selected window, not a selected512 route cache"
+    ],
+    "local_grouping": "exact adjacent-token group-id sidecar reduction inside each selected window; later-token rows whose group appears in an earlier token in the tile are folded before global dKV atomic_add",
+    "token_block": 8
+  },
+  "read": "Actual LI source-boundary Triton BLOCK_T=8 gate. This keeps the H64/N64/D128 query-recompute math and uses the forward-known compressed group ids as an epilogue sidecar to fold adjacent-token duplicate dKV destinations before final global atomics.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_query_recompute_token8_profile",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "not_checked",
+  "tile_write_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 541678592,
+    "coalesced_unique_groups": 1057966,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 3200,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 1.4862027702213492,
+    "selected_block": 64,
+    "tiles": 4096,
+    "token_block": 8,
+    "unique_groups_per_tile": {
+      "max": 428,
+      "mean": 258.29248046875,
+      "p50": 334.0,
+      "p90": 403.0,
+      "p99": 419.0
+    },
+    "valid_pairs_per_tile": {
+      "max": 512,
+      "mean": 383.875,
+      "p50": 512.0,
+      "p90": 512.0,
+      "p99": 512.0
+    }
+  },
+  "timing": {
+    "dkv_only_full": {
+      "checksum_norm": 960.2550048828125,
+      "event": {
+        "enabled": true,
+        "max_ms": 19.455461502075195,
+        "mean_ms": 19.395046869913738,
+        "median_ms": 19.40089988708496,
+        "min_ms": 19.328779220581055,
+        "samples_ms": [
+          19.455461502075195,
+          19.328779220581055,
+          19.40089988708496
+        ],
+        "stdev_ms": 0.06354363436761508
+      },
+      "label": "query_recompute_token8_dkv_only_full",
+      "peak_memory_allocated_bytes": 1679824384,
+      "peak_memory_allocated_gib": 1.5644583702087402,
+      "wall": {
+        "enabled": true,
+        "max_ms": 19.550892058759928,
+        "mean_ms": 19.43917277579506,
+        "median_ms": 19.41836322657764,
+        "min_ms": 19.34826304204762,
+        "samples_ms": [
+          19.550892058759928,
+          19.34826304204762,
+          19.41836322657764
+        ],
+        "stdev_ms": 0.1029048473465825
+      }
+    },
+    "dkv_only_sink": {
+      "checksum_norm": 5645.3515625,
+      "event": {
+        "enabled": true,
+        "max_ms": 16.99648094177246,
+        "mean_ms": 16.45302136739095,
+        "median_ms": 16.274831771850586,
+        "min_ms": 16.087751388549805,
+        "samples_ms": [
+          16.274831771850586,
+          16.99648094177246,
+          16.087751388549805
+        ],
+        "stdev_ms": 0.479855185648953
+      },
+      "label": "query_recompute_token8_dkv_only_sink",
+      "peak_memory_allocated_bytes": 1669402624,
+      "peak_memory_allocated_gib": 1.5547523498535156,
+      "wall": {
+        "enabled": true,
+        "max_ms": 17.10629090666771,
+        "mean_ms": 16.533382547398407,
+        "median_ms": 16.36761287227273,
+        "min_ms": 16.126243863254786,
+        "samples_ms": [
+          16.36761287227273,
+          17.10629090666771,
+          16.126243863254786
+        ],
+        "stdev_ms": 0.5106199572275432
+      }
+    }
+  },
+  "timing_deltas": {
+    "enabled": false
+  }
+}

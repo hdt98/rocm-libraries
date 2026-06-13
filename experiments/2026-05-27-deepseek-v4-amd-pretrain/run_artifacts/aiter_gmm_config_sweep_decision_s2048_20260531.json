@@ -1,0 +1,54 @@
+{
+  "artifact": "aiter_gmm_config_sweep_decision_s2048_20260531",
+  "date": "2026-05-31",
+  "decision": {
+    "demote": "tuned_aiter_gmm_bwd_w2_dgrad",
+    "promote": null,
+    "reason": "The tuned AITER compact GMM is correct and much faster than AITER's gfx950 default, but it is still slower than the retained padded torch.bmm(out=) baseline and misses the first-kernel isolated latency gate."
+  },
+  "first_kernel_gate": {
+    "operator": "bwd_w2_dgrad",
+    "target_latency_ms": 3.0,
+    "gate_source": "compact_moe_tile_kernel_manifest_20260531.json"
+  },
+  "refined_best": {
+    "artifact": "aiter_gmm_config_sweep_refine_s2048_20260531.json",
+    "median_ms": 4.226398944854736,
+    "min_ms": 4.194478988647461,
+    "compact_tflops_median": 128.04420177958383,
+    "speedup_vs_aiter_default": 1.7158126998880001,
+    "speedup_vs_torch_padded_bmm_out": 0.8968457480373504,
+    "correctness_ok": true,
+    "config": {
+      "BLOCK_SIZE_M": 64,
+      "BLOCK_SIZE_K": 64,
+      "BLOCK_SIZE_N": 256,
+      "GROUP_SIZE": 1,
+      "GRID_DIM": 256,
+      "num_warps": 8,
+      "num_stages": 1
+    }
+  },
+  "baselines": {
+    "aiter_default_median_ms": 7.251708984375,
+    "torch_padded_bmm_out_median_ms": 3.7904279232025146
+  },
+  "shape": {
+    "tokens": 2048,
+    "assignments": 12288,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF"
+  },
+  "route_stats": {
+    "max_per_expert": 47,
+    "mean_per_expert": 32.0,
+    "min_per_expert": 15,
+    "padded_rows_global_max": 18048,
+    "padding_multiplier_global_max": 1.46875
+  },
+  "read": "Do not integrate this AITER config into the full layer. The result proves the default M tile was mismatched to DSv4 learned-router row counts, but even the tuned compact library path is not a promotion candidate. Continue with a compact-native TileLang/CK kernel for bwd_w2_dgrad or a route-aware library kernel that beats the padded torch.bmm(out=) baseline."
+}

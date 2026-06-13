@@ -1,0 +1,80 @@
+{
+  "artifact": "muon_prealloc_fp32_ns5_gate_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "question": "Can the expert-Muon preallocated chunk workspace also make the higher-fidelity NS5/FP32 compute path fast enough to reduce the NS1 quality risk?",
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "summary": "BatchedMuonExpertParams prealloc workspace now supports compute_dtype != gradient dtype by carrying a source-dtype update buffer. This preserves the old BF16 Nesterov blend rounding before casting into FP32 Newton-Schulz compute.",
+    "env": {
+      "TORCHTITAN_OPTIMIZER_MUON_WORKSPACE_MODE": "prealloc",
+      "TORCHTITAN_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "float32",
+      "TORCHTITAN_OPTIMIZER_MUON_NS_STEPS": "5"
+    }
+  },
+  "correctness": {
+    "command": "python tools/dsv4_optimizer_preflight/probe_muon_correctness.py --device cuda --dtype bf16 --layers 1 --experts 4 --hidden 32 --intermediate 64 --steps 2 --chunk-matrices 4 --parity-ns-steps 1 2 5 --ns-compute-dtype float32 --parity-atol 5e-4 --parity-rtol 1e-2",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "ns_compute_dtype": "float32",
+    "prealloc_vs_none_parity_passed": true,
+    "ns_steps_checked": [
+      1,
+      2,
+      5
+    ],
+    "param_max_abs_by_ns": {
+      "1": 0.0,
+      "2": 0.0,
+      "5": 0.0
+    },
+    "momentum_buffer_max_abs_by_ns": {
+      "1": 0.0,
+      "2": 0.0,
+      "5": 0.0
+    },
+    "prealloc_workspace_bytes": 114688,
+    "ns1_vs_ns5_algorithmic_distance": {
+      "update_delta_cosine": 0.8766075968742371,
+      "update_delta_max_abs": 0.0009765625,
+      "read": "Nonzero by design. This is optimizer-semantics distance between NS1 and NS5, not an implementation parity failure."
+    }
+  },
+  "optimizer_slice_perf": {
+    "command_shape": "probe_muon_optimizer_step.py --layers 12 --dtype bf16 --repeat 2 --muon-ns-steps 5 --muon-ns-compute-dtype float32 --modes muon_batched",
+    "shape": "12_layer_expert_bank_bf16_ns5_fp32_compute_chunk4",
+    "workspace_none": {
+      "step2_gpu_ms": 4138.64404296875,
+      "step2_wall_ms": 4138.709824066609,
+      "step_peak_allocated_gib": 58.07421922683716,
+      "resident_workspace_gib": 0.0,
+      "mem_after_step_gib": 54.07421875
+    },
+    "workspace_prealloc": {
+      "step2_gpu_ms": 4171.20166015625,
+      "step2_wall_ms": 4171.2509440258145,
+      "step_peak_allocated_gib": 58.07421922683716,
+      "resident_workspace_gib": 3.5,
+      "mem_after_step_gib": 57.57421875
+    },
+    "delta_prealloc_minus_none": {
+      "step2_gpu_ms": 32.5576171875,
+      "step2_speedup_pct": -0.7866843707550997,
+      "peak_allocated_gib": 0.0,
+      "resident_workspace_gib": 3.5
+    }
+  },
+  "decision": {
+    "status": "rejected_for_perf",
+    "read": "The FP32 NS5 prealloc extension is correctness-safe and preserves old rounding order, but it does not reduce the 12-layer expert-bank optimizer slice. Higher-fidelity Muon still needs a fused/lower-level update rather than another PyTorch workspace reuse pass.",
+    "retained_muon_branch": "NS1/BF16 prealloc remains the best lower-memory Muon branch; AdamW remains the quality-safe throughput baseline."
+  },
+  "validation": [
+    "python3 -m py_compile sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "MI350 BF16 correctness probe with FP32 NS compute",
+    "MI350 12-layer expert-bank NS5/FP32 optimizer-slice A/B"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,60 @@
+{
+  "artifact": "compressed_dkv_tile_segment_dblock_hip_min_decision_20260605",
+  "status": "rejected_as_sparse_mla_backward_reducer",
+  "question": "Can a split-source HIP tile-segment D-block reducer make compressed dKV group-aware enough to fold into the no-HSK sparse-MLA backward boundary?",
+  "source_artifact": "run_artifacts/compressed_dkv_tile_segment_dblock_hip_min_s4096_layer2_20260605.json",
+  "compile_result": {
+    "file_based_cpp_extension_load": "passed",
+    "reason": "Using torch.utils.cpp_extension.load with separate binding.cpp and kernel.hip prevents load_inline from injecting torch/types.h into the HIP translation unit.",
+    "old_failure": "load_inline prepended torch/types.h to hip.hip, triggering ROCm 7.2 Thrust type_traits/type_traits_hip duplicate definitions.",
+    "hip_source_headers": [
+      "hip/hip_runtime.h",
+      "cstdint"
+    ]
+  },
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "selected": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "contract": {
+    "rung": "32x512_d16_primary",
+    "seq_chunk": 32,
+    "selected_block": 512,
+    "block_d": 16,
+    "threads": 256
+  },
+  "route_pack": {
+    "valid_pairs": 1572352,
+    "segment_count": 66029,
+    "raw_atomic_elements_model": 805044224,
+    "reduced_atomic_elements_model": 33806848,
+    "modeled_write_reduction_x": 23.813051840857806
+  },
+  "timing": {
+    "candidate": "hip_tile_segment_dblock_headsplit_accumulator",
+    "event_median_ms": 116.04402160644531,
+    "wall_median_ms": 116.13688408397138,
+    "peak_memory_gib": 3.5571303367614746,
+    "s4096_sparse_atomic_wall_ms": 8.80629825592041,
+    "ratio_vs_sparse_atomic_wall": 13.171696217692557,
+    "passed_sparse_atomic_wall_gate": false
+  },
+  "read": "The file-based split HIP build is a useful compile fix, but this scalar tile-segment D-block reducer is not a viable sparse-MLA backward path. It reduces modeled global writes by 23.8x, yet serializes too much contribution work inside each segment/D-block CTA and lands around 116 ms, about 13.2x slower than the existing sparse atomic wall.",
+  "decision": {
+    "do_not_promote_to_e2e": true,
+    "do_not_fold_this_scalar_body_into_tilelang_boundary": true,
+    "keep_compile_lesson": "For HIP custom probes in this image, prefer file-based load() or a real extension build over load_inline() when the HIP translation unit must avoid Torch/Thrust headers.",
+    "next_sparse_mla_path": "Port the whole sparse-MLA backward boundary with query-major recompute and a group-aware epilogue. Keep q/dO reuse hot, avoid HSK P/scaled-dP slabs, and reduce by compressed group inside the producer epilogue without making group/segment ownership serialize the MFMA contribution loop."
+  },
+  "materialized_e2e_tflops": {
+    "measured": false,
+    "reason": "The isolated reducer failed the S4096 sparse-atomic latency gate by a large margin, so an e2e TorchTitan A/B would chase a known-negative branch."
+  }
+}

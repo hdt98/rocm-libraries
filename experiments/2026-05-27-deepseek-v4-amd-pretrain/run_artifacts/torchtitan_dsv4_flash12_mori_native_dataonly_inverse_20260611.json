@@ -1,0 +1,264 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_20260611",
+  "created_at": "2026-06-11",
+  "status": "six_step_gate_passed_not_promoted_over_standard_ep_hot_helper",
+  "purpose": "Validate and measure native MORI compact data-only inverse collectives for the standard-EP hot-helper layout.",
+  "code_change_under_test": {
+    "summary": "Native compact autograd inverse dispatch/combine calls no longer carry or return ignored flat-position sidecars.",
+    "changeset": "changesets/mori_native_compact_data_only_inverse_20260611.md",
+    "mori_files": [
+      "sources/references/mori/python/mori/ops/dispatch_combine.py",
+      "sources/references/mori/src/ops/dispatch_combine/launch.cpp",
+      "sources/references/mori/src/ops/dispatch_combine/intranode.hpp"
+    ],
+    "torchtitan_files": [
+      "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py"
+    ],
+    "mechanism": [
+      "dispatch_standard_ep_compact_native(..., return_flat_positions=False) passes null flat-position pointers for inverse dispatch.",
+      "combine_standard_ep_compact_native(..., return_flat_positions=False) passes null flat-position pointers for inverse combine.",
+      "MORI intranode kernels guard flat-position reads/writes with emitFlatPositions.",
+      "Forward native compact dispatch/combine still returns flat positions for downstream weighted scatter semantics."
+    ]
+  },
+  "build_validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/dispatch_combine.py",
+      "result": "passed"
+    },
+    "remote_mori_rebuild": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "remote_mori_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori",
+      "method": "launcher direct CMake rebuild with GPU_TARGETS=gfx950, then copy libmori_*.so into python/mori",
+      "import_check": {
+        "rebuilt_mori": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori/python/mori/__init__.py",
+        "has_compact_combine": true
+      }
+    }
+  },
+  "shared_shape": {
+    "host": "do-vunguyen-mi350-gpu",
+    "gpus": 8,
+    "gpu_type": "MI350",
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "optimizer": "AdamW/default",
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "mtp_modules": 0,
+    "hyper_connections": false,
+    "dataset": "tests/assets/c4_test re-looped"
+  },
+  "shared_key_env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND": "triton_flat",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+    "CANARY_MORI_IMPORT_MODE": "remote",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "contaminated_attempt": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_smoke_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+    "host": "do-sonle5-mi350-gpu",
+    "result": "invalid_contaminated_failure",
+    "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES before first metric step.",
+    "contamination": "A separate nexus_titan.runtime Qwen job started during the run and held about 100 GiB chunks on GPU1.",
+    "decision": "Do not use for native MORI correctness or performance."
+  },
+  "smoke_run": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_smoke_mbs4_noac_steps2_8x_s4096_gbs128_vu_20260611",
+    "host": "do-vunguyen-mi350-gpu",
+    "result": "completed_two_steps",
+    "steps": {
+      "1": {
+        "loss": 12.3113,
+        "grad_norm": 12.25,
+        "tokens_per_gpu_s": 1146,
+        "tflops_per_gpu": 52.5,
+        "memory_gib_rank_range": [154.12, 156.46]
+      },
+      "2": {
+        "loss": 9.78764,
+        "grad_norm": 28.25,
+        "tokens_per_gpu_s": 7498,
+        "node_tokens_s": 59984,
+        "tflops_per_gpu": 343.42,
+        "memory_gib_rank_range": [192.8, 194.66]
+      }
+    },
+    "read": "ABI/autograd smoke passed; data-only inverse survived full forward/backward and optimizer step."
+  },
+  "six_step_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_mbs4_noac_steps6_8x_s4096_gbs128_vu_20260611",
+    "host": "do-vunguyen-mi350-gpu",
+    "result": "completed_six_steps",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_dataonly_inverse_mbs4_noac_steps6_8x_s4096_gbs128_vu_20260611/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_dataonly_inverse_mbs4_noac_steps6_8x_s4096_gbs128_vu_20260611",
+    "steps": {
+      "1": {
+        "loss": 12.25805,
+        "grad_norm": 12.3125,
+        "tokens_per_gpu_s": 1768,
+        "tflops_per_gpu": 80.95,
+        "memory_gib_rank_range": [154.26, 156.02]
+      },
+      "2": {
+        "loss": 10.04182,
+        "grad_norm": 31.125,
+        "tokens_per_gpu_s": 7548,
+        "tflops_per_gpu": 345.72,
+        "memory_gib_rank_range": [193.02, 194.21]
+      },
+      "3": {
+        "loss": 13.85707,
+        "grad_norm": 43.0,
+        "tokens_per_gpu_s": 8125,
+        "tflops_per_gpu": 372.1,
+        "memory_gib_rank_range": [193.02, 194.21]
+      },
+      "4": {
+        "loss": 14.86242,
+        "grad_norm": 22.0,
+        "tokens_per_gpu_s": 8224,
+        "tflops_per_gpu": 376.65,
+        "memory_gib_rank_range": [193.02, 194.21]
+      },
+      "5": {
+        "loss": 15.62961,
+        "grad_norm": 45.25,
+        "tokens_per_gpu_s": 8381,
+        "tflops_per_gpu": 383.84,
+        "memory_gib_rank_range": [193.02, 194.21]
+      },
+      "6": {
+        "loss": 12.46902,
+        "grad_norm": 53.25,
+        "tokens_per_gpu_s": 8535,
+        "tflops_per_gpu": 390.88,
+        "memory_gib_rank_range": [193.02, 194.21]
+      }
+    },
+    "windows": {
+      "steps_2_to_6": {
+        "tokens_per_gpu_s_mean": 8162.6,
+        "node_tokens_s_mean": 65300.8,
+        "tflops_per_gpu_mean": 373.838,
+        "peak_logged_memory_gib": 194.21
+      },
+      "steps_4_to_6": {
+        "tokens_per_gpu_s_mean": 8380.0,
+        "node_tokens_s_mean": 67040.0,
+        "tflops_per_gpu_mean": 383.79,
+        "peak_logged_memory_gib": 194.21
+      }
+    },
+    "post_run_node_state": "rocm-smi shows only gpuagent; no leaked training VRAM."
+  },
+  "timing_profile": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_dataonly_inverse_timing_mbs4_noac_steps2_8x_s4096_gbs128_vu_20260611",
+    "host": "do-vunguyen-mi350-gpu",
+    "result": "completed_two_step_low_intrusion_profile",
+    "step_2_metric": {
+      "tokens_per_gpu_s": 7428,
+      "tflops_per_gpu": 340.2,
+      "peak_logged_memory_gib": 195.59
+    },
+    "profile_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_dataonly_inverse_timing_mbs4_noac_steps2_8x_s4096_gbs128_vu_20260611",
+    "local_parse_filter": "rank-local call_id >= 859, inferred step 2 from rank0 call sequence; cold step-1 handle/JIT records excluded",
+    "filtered_records": 2288,
+    "step_2_rankmax_ms": {
+      "native_forward_dispatch_launch": 99.32,
+      "native_forward_combine_launch": 214.541,
+      "native_backward_combine_inverse_dispatch": 98.036,
+      "native_backward_dispatch_inverse_combine": 299.507,
+      "normal_combine_weighted_scatter": 46.882,
+      "hot_split_broadcast_hot_weights": 77.198,
+      "hot_split_grouped_compute": 88.834,
+      "hot_split_weighted_scatter_tokens": 43.918,
+      "hot_weight_forward_allreduce": 66.699,
+      "hot_weight_backward_reduce": 161.352,
+      "hot_weight_backward_owner_scatter": 1.149,
+      "sparse_sharedkv_query_recompute": 751.203,
+      "sparse_sharedkv_sink": 98.978
+    },
+    "step_2_stage_median_ms": {
+      "standard_ep.dispatch.mori_native_compact.launch": 4.623,
+      "standard_ep.combine.mori_native_compact.launch": 8.359,
+      "standard_ep.combine.mori_native_compact.backward_dispatch": 4.449,
+      "standard_ep.dispatch.mori_native_compact.backward_combine": 11.499,
+      "standard_ep.combine.weighted_scatter_add": 1.526,
+      "sharedkv_bwd.query_recompute": 37.467
+    },
+    "read": [
+      "The data-only inverse path is stable enough to profile, and cold handle/JIT spikes are isolated to step 1.",
+      "The native compact path still pays material rank-max launch/body cost in both directions: forward dispatch+combine launch is about 313.9 ms and inverse backward dispatch+combine is about 397.5 ms in the parsed step-2 window.",
+      "The old flat-position sidecar is no longer the dominant native issue. The remaining native target is the output/return ABI: avoid staging rows into MORI compact outputs only to feed a separate TorchTitan weighted scatter/final layout path.",
+      "Sparse SharedKV query recompute remains the largest non-MORI profiled bucket at about 751.2 ms rank-max in the same step window."
+    ]
+  },
+  "comparisons": {
+    "vs_prior_native_countaware_steps_2_to_6": {
+      "prior_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_countcombine_mbs4_noac_6step_20260611.json",
+      "prior_tokens_per_gpu_s": 7360.8,
+      "new_tokens_per_gpu_s": 8162.6,
+      "delta_tokens_per_gpu_s": 801.8,
+      "delta_pct": 10.8928,
+      "prior_tflops_per_gpu": 372.684,
+      "new_tflops_per_gpu": 373.838,
+      "delta_tflops_per_gpu": 1.154,
+      "prior_peak_memory_gib": 195.29,
+      "new_peak_memory_gib": 194.21,
+      "delta_memory_gib": -1.08,
+      "caveat": "Prior run was on do-sonle5-mi350-gpu; new uncontaminated run is on do-vunguyen-mi350-gpu. Use a same-node profile/A-B before claiming the whole delta is from this patch."
+    },
+    "vs_prior_native_countaware_steps_4_to_6": {
+      "prior_tokens_per_gpu_s": 7678.33,
+      "new_tokens_per_gpu_s": 8380.0,
+      "delta_tokens_per_gpu_s": 701.67,
+      "delta_pct": 9.1383,
+      "prior_tflops_per_gpu": 388.76,
+      "new_tflops_per_gpu": 383.79,
+      "delta_tflops_per_gpu": -4.97,
+      "caveat": "TFLOPs/token accounting differs slightly in logs; throughput is the primary comparison for this native-compact gate."
+    },
+    "vs_standard_ep_hot_helper_current_best": {
+      "standard_ep_reference": "torchtitan_dsv4_flash12_standard_ep_top8_hothelper_mbs8_attention_ac_ce8_tritonbwd_scoretorch_torchhot_nomtpfix_steps20_8x_20260611",
+      "standard_ep_steps_2_to_20_tokens_per_gpu_s": 8579.53,
+      "new_native_mbs4_steps_2_to_6_tokens_per_gpu_s": 8162.6,
+      "delta_pct": -4.8584,
+      "read": "Native compact is now much closer, but it still does not promote over the reproduced standard-EP hot-helper baseline. Shapes differ: native gate is MBS4/no-AC/GA4; retained standard-EP hot-helper baseline is MBS8/attention-AC/GA2."
+    }
+  },
+  "read": [
+    "The data-only inverse ABI is validated through a real 8xMI350 TorchTitan training run.",
+    "It materially improves the native count-aware compact line while slightly reducing peak logged memory.",
+    "It is still not the final promotion over the reproduced standard-EP hot-helper baseline.",
+    "The follow-up timing profile confirms the next MORI source target is native output/return ABI collapse, not another flat-position sidecar or route-mask knob."
+  ]
+}

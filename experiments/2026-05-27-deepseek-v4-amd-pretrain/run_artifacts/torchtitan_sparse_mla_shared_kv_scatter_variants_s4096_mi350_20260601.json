@@ -1,0 +1,140 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "parity": {
+    "index_add_flat": {
+      "checksum": 0.008165060542523861,
+      "max_abs_diff_vs_index_add_flat": 0.0
+    },
+    "scatter_add_dim1": {
+      "checksum": 0.008165071718394756,
+      "max_abs_diff_vs_index_add_flat": 0.0007476806640625
+    },
+    "split_index_add": {
+      "checksum": 0.008165051229298115,
+      "max_abs_diff_vs_index_add_flat": 0.0006866455078125
+    }
+  },
+  "peak_memory_allocated_bytes": 10816061440,
+  "peak_memory_allocated_gib": 10.0732421875,
+  "ranked_by_median_ms": [
+    {
+      "mean_ms": 20.44221305847168,
+      "median_ms": 20.27106475830078,
+      "method": "split_index_add"
+    },
+    {
+      "mean_ms": 20.4514217376709,
+      "median_ms": 20.459888458251953,
+      "method": "scatter_add_dim1"
+    },
+    {
+      "mean_ms": 21.012086868286133,
+      "median_ms": 21.211811065673828,
+      "method": "index_add_flat"
+    }
+  ],
+  "read": "This is a PyTorch-only bridge probe for dKV scatter-add. Passing parity here does not make the shared-KV backend production-ready; it tells us whether a cheap PyTorch replacement exists before writing the fused output-row kernel.",
+  "scope": "sparse_mla_shared_latent_kv_dkv_scatter_pytorch_variants",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "kv_len": 5120,
+    "local_count": 128,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "values_gib": 5.0
+  },
+  "status": "passed",
+  "timed_iters": 3,
+  "timings": {
+    "index_add_flat": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 21.24291229248047,
+        "mean_ms": 21.012086868286133,
+        "median_ms": 21.211811065673828,
+        "min_ms": 20.5815372467041,
+        "samples_ms": [
+          20.5815372467041,
+          21.24291229248047,
+          21.211811065673828
+        ],
+        "stdev_ms": 0.37319104231015815
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 21.269493037834764,
+        "mean_ms": 21.046805001484852,
+        "median_ms": 21.23390499036759,
+        "min_ms": 20.637016976252198,
+        "samples_ms": [
+          20.637016976252198,
+          21.269493037834764,
+          21.23390499036759
+        ],
+        "stdev_ms": 0.35533265611070625
+      }
+    },
+    "scatter_add_dim1": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 20.4954891204834,
+        "mean_ms": 20.4514217376709,
+        "median_ms": 20.459888458251953,
+        "min_ms": 20.398887634277344,
+        "samples_ms": [
+          20.4954891204834,
+          20.459888458251953,
+          20.398887634277344
+        ],
+        "stdev_ms": 0.04885412779236658
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 20.524895982816815,
+        "mean_ms": 20.477543701417744,
+        "median_ms": 20.48165805172175,
+        "min_ms": 20.426077069714665,
+        "samples_ms": [
+          20.524895982816815,
+          20.48165805172175,
+          20.426077069714665
+        ],
+        "stdev_ms": 0.04953776645641819
+      }
+    },
+    "split_index_add": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 20.83786964416504,
+        "mean_ms": 20.44221305847168,
+        "median_ms": 20.27106475830078,
+        "min_ms": 20.21770477294922,
+        "samples_ms": [
+          20.27106475830078,
+          20.83786964416504,
+          20.21770477294922
+        ],
+        "stdev_ms": 0.3436857901646135
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 20.86310600861907,
+        "mean_ms": 20.472177032691736,
+        "median_ms": 20.313607063144445,
+        "min_ms": 20.239818026311696,
+        "samples_ms": [
+          20.313607063144445,
+          20.86310600861907,
+          20.239818026311696
+        ],
+        "stdev_ms": 0.34055881085925704
+      }
+    }
+  },
+  "warmup_iters": 1
+}

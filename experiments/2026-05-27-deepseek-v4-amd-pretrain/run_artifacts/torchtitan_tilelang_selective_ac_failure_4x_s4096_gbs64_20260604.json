@@ -1,0 +1,87 @@
+{
+  "status": "failed_pre_step",
+  "scope": "TorchTitan DeepSeek-V4 Flash 4-layer 4xMI350 S4096 TileLang shared-KV selective activation-checkpoint probe",
+  "date": "2026-06-04",
+  "host": "do-sonle5-mi350-gpu",
+  "run": {
+    "run_id": "torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604",
+    "exit": "torch_elastic_failure_exitcode_1",
+    "process_cleanup": "Two orphaned remote multiprocessing children from the aborted run were killed; rocm-smi then showed all GPUs at 0 percent VRAM except the resident gpuagent process with 0 DRM devices."
+  },
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "activation_checkpointing": "selective",
+    "checkpoint_enable": false
+  },
+  "active_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered"
+  },
+  "observed": {
+    "selective_ac_applied_log_lines": 4,
+    "step_metric_lines": 0,
+    "profile_timing_records_per_rank": 3,
+    "mori_timing_records_per_rank": 3,
+    "tilelang_compile_lines": 8,
+    "tilelang_data_race_warning_lines": 8,
+    "failure_log_lines": {
+      "selective_ac_applied": [122, 123, 124, 128],
+      "tilelang_first_compile_start": 193,
+      "tilelang_second_compile_start": 267,
+      "memory_access_faults": [349, 350, 351],
+      "checkpoint_recompute_fn_stack": [364, 408, 446],
+      "checkpoint_unpack_hook_stack": [368, 412, 450],
+      "torch_elastic_root_cause": 524
+    },
+    "root_cause_summary": "Ranks hit GPU memory access faults immediately after first-use TileLang compiles and before any train-step metric. Torch elastic reported rank 1 as the first observed failure with SIGABRT; rank 0 received SIGTERM. Python stacks point through torch.utils.checkpoint selective recompute_fn and unpack_hook during loss.backward()."
+  },
+  "partial_timing_read": {
+    "validity": "not steady_state_performance",
+    "why": "The timing files contain only three records per rank and include first-use TileLang compile/warmup. The run failed before step 1 completed.",
+    "rank0_examples": {
+      "layer3_compress_ratio_128_topk32_compressed_tilelang_gpu_ms": 2878.654,
+      "layer2_compress_ratio_4_topk512_compressed_tilelang_gpu_ms": 3028.643,
+      "mori_backward_first_call_local_vjp_padded_gpu_ms": 774.427,
+      "mori_backward_later_call_local_vjp_padded_gpu_ms": 39.614
+    },
+    "interpretation": "The multi-second TileLang numbers here are compile/warmup polluted and should not be compared with the warmed full-AC TileLang profile where the layer-2 inner dKV body is about 8.2 ms per call."
+  },
+  "decision": {
+    "selective_ac": "reject_as_drop_in_for_current_tilelang_sharedkv_path",
+    "retained_profile_path": "full_activation_checkpoint_low_intrusion_profile",
+    "retained_profile_artifact": "run_artifacts/torchtitan_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_20260604.json",
+    "deep_attribution_artifact": "run_artifacts/torchtitan_tilelang_deep_bottleneck_profile_4x_s4096_gbs64_20260604.json",
+    "read": "TileLang remains promising for sparse attention, but this selective activation-checkpoint branch is currently a stability bug, not a throughput lever. The current composed bottleneck remains MoE routed backward, owner-rank VJP math, dX return skew, and full-AC recompute."
+  },
+  "next_actions": [
+    "Keep using full activation checkpointing for the promoted TileLang/MORI profile until selective AC is isolated on a smaller smoke.",
+    "If selective AC is needed, test it first on a dense or guarded baseline, then on shared-KV without TileLang, then on shared-KV TileLang at S512/S1024 before returning to S4096.",
+    "For bottleneck closure, prioritize MoE backward decomposition and overlap work; keep TileLang attention work focused on prewarm/cache and reducing selected-state bridge overhead."
+  ],
+  "commands": [
+    "ssh do-sonle5-mi350-gpu 'pgrep -af torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604 || true'",
+    "ssh do-sonle5-mi350-gpu 'rocm-smi --showuse --showmemuse --showpidgpus 2>/dev/null || rocm-smi'",
+    "ssh do-sonle5-mi350-gpu 'find /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604 -maxdepth 3 -type f | sort | head -120'",
+    "ssh do-sonle5-mi350-gpu 'grep -n \"Applied selective activation checkpointing\\|TileLang begins to compile\\|Data race detected\\|Memory access fault\\|Root Cause\\|recompute_fn\\|unpack_hook\\|step:\" /scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/docker-run.log | tail -120'",
+    "ssh do-sonle5-mi350-gpu 'wc -l /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/profile_timing/*.jsonl /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_selective_ac_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/mori_timing/*.jsonl 2>/dev/null'",
+    "ssh do-sonle5-mi350-gpu 'kill 1819946 1819947 2>/dev/null || true'",
+    "ssh do-sonle5-mi350-gpu 'rocm-smi --showuse --showmemuse --showpidgpus 2>/dev/null || rocm-smi'"
+  ],
+  "dependency_pin_changes": "none"
+}

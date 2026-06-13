@@ -1,0 +1,159 @@
+{
+  "artifact": "tilelang_hsk_e2e_noprofile_materialization_gap_8x_s4096_gbs128_20260604",
+  "created_at": "2026-06-04",
+  "status": "completed_training_not_promoted",
+  "scope": "Check whether the best isolated TileLang HSK BF16 sparse compressed-dKV path materializes as end-to-end TorchTitan TFLOPs on the 8xMI350 S4096 target shape.",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run": {
+    "run_id": "torchtitan_dsv4_tilelang_hsk_e2e_noprofile_8x_s4096_gbs128_steps3_20260604",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_hsk_e2e_noprofile_8x_s4096_gbs128_steps3_20260604/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_hsk_e2e_noprofile_8x_s4096_gbs128_steps3_20260604",
+    "status": "completed_3_steps",
+    "process_groups_destroyed": true,
+    "local_launcher_note": "The local SSH launcher wrapper stayed open after the remote training log showed Training completed and all process groups destroyed; it was killed locally after verifying no live pt_elastic/train process for this run."
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash 4-layer BF16 canary",
+    "accelerator": "MI350",
+    "gpus": 8,
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "checkpoint_enable": false
+  },
+  "runtime": {
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "jit_cache": "CANARY_PERSIST_JIT_CACHE=auto",
+    "raw_logs_outside_repo": true
+  },
+  "backend_config": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "sharedkv_profile_backward": false,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_shmem_heap_size": "32G",
+    "chunked_cross_entropy_chunks": 2
+  },
+  "tilelang_entry_evidence": {
+    "entered_kernel": "mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim",
+    "compile_lines": "present before step 1 only in the retained log excerpt",
+    "data_race_checker_warning": "present during initial TileLang compile; this run is performance evidence only, not a new correctness promotion"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "read": "compile and warmup polluted",
+      "loss": 12.1983,
+      "grad_norm": 12.9375,
+      "tokens_per_gpu_s_range": [
+        1530,
+        1539
+      ],
+      "tflops_per_gpu_range": [
+        28.95,
+        29.12
+      ],
+      "mfu_percent_range": [
+        1.25,
+        1.26
+      ],
+      "logged_memory_gib_range": [
+        48.52,
+        49.81
+      ]
+    },
+    {
+      "step": 2,
+      "loss": 8.68337,
+      "grad_norm": 25.75,
+      "tokens_per_gpu_s": 3172,
+      "node_tokens_s": 25376,
+      "implied_step_time_s": 20.66,
+      "tflops_per_gpu": 60.02,
+      "mfu_percent_mi350x_bf16_peak": 2.6,
+      "logged_memory_gib_range": [
+        61.68,
+        72.93
+      ]
+    },
+    {
+      "step": 3,
+      "loss": 21.4335,
+      "grad_norm": 25.125,
+      "tokens_per_gpu_s": 2655,
+      "node_tokens_s": 21240,
+      "implied_step_time_s": 24.68,
+      "tflops_per_gpu": 50.23,
+      "mfu_percent_mi350x_bf16_peak_range": [
+        2.17,
+        2.18
+      ],
+      "logged_memory_gib_range": [
+        65.32,
+        104.54
+      ]
+    }
+  ],
+  "comparison": {
+    "retained_8x_anchor_artifact": "run_artifacts/torchtitan_current_8x_performance_scoreboard_20260603.json",
+    "retained_8x_anchor_tflops_per_gpu": 58.71,
+    "retained_8x_anchor_tokens_per_gpu_s": 3103,
+    "target_tflops_per_gpu": 277.0,
+    "target_tokens_per_gpu_s": 14640.28,
+    "step2_delta_vs_retained_tflops_pct": 2.23,
+    "step2_ratio_to_target_tflops": 0.2167,
+    "step2_speedup_needed_to_target": 4.62,
+    "step3_delta_vs_retained_tflops_pct": -14.45,
+    "step3_ratio_to_target_tflops": 0.1813,
+    "step3_speedup_needed_to_target": 5.51,
+    "prior_static_route_artifact": "run_artifacts/tilelang_static_route_e2e_tflops_8x_s4096_gbs128_20260604.json",
+    "read": "The no-profile HSK rerun removes the earlier repeated-JIT failure mode and reaches a step-2 number slightly above the retained non-TileLang anchor, but it does not create a robust promoted baseline: step 3 falls below the anchor and the run remains far from the 277 TFLOPs/GPU target."
+  },
+  "source_audit_root_cause": {
+    "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "line_ranges": {
+      "tilelang_bridge_docstring": "3027-3035",
+      "hsk_bf16_backend": "3231-3263",
+      "explicit_backward_materialization": "3408-3480"
+    },
+    "findings": [
+      "The HSK BF16 TileLang path consumes already materialized probs and grad_logits; source-fed currently means source HSK layout, not full backward recompute from q, kv, output, and lse.",
+      "The explicit backward still gathers selected_kv, computes scores, probs, grad_logits, grad_q, local dKV, and local scatter in PyTorch before calling TileLang for compressed dKV only.",
+      "The 4x stage profile shows this bridge around TileLang is material: plan, selected-KV gather, grad-logit terms, dQ, local dKV math, and local scatter add per-call latency around the useful TileLang body."
+    ]
+  },
+  "decision": {
+    "promote_to_retained_baseline": false,
+    "continue_bridge_only_kernel_tuning": false,
+    "next_aligned_branch": "port_or_fuse_the_sparse_MLA_backward_boundary_in_TileLang",
+    "required_contract": [
+      "Consume q, grad_output, kv, indices, output, lse, attn_sink, scale, and local_count directly.",
+      "Recompute QK, softmax probabilities, grad_probs, grad_logits, dQ, dSink, local dKV, and compressed dKV inside the fused or adjacent TileLang boundary.",
+      "Avoid materializing selected_kv, probs, grad_logits, and grad_selected HBM slabs in the TorchTitan backward bridge.",
+      "Keep route metadata static or cached so the TileLang kernel does not specialize per dynamic route content."
+    ],
+    "read": "The current TileLang kernel is still useful evidence for compressed dKV, but the bridge is too late in the backward path. The next step is not another final dKV-store microtune; it is moving the sparse attention backward boundary itself."
+  },
+  "commands": [
+    "TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_hsk_e2e_noprofile_8x_s4096_gbs128_steps3_20260604 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PERSIST_JIT_CACHE=auto experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu tail -n 160 /scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_hsk_e2e_noprofile_8x_s4096_gbs128_steps3_20260604/docker-run.log",
+    "ssh do-sonle5-mi350-gpu pgrep -af pt_elastic",
+    "kill 64515"
+  ],
+  "dependency_pin_changes": []
+}

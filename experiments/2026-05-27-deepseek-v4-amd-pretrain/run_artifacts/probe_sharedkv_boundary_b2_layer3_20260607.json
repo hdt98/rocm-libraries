@@ -1,0 +1,353 @@
+{
+  "attention_dims": {
+    "compress_ratio": 128,
+    "dsa_indexer_topk": 512,
+    "kv_lora_rank": 512,
+    "n_heads": 64,
+    "qk_head_dim": 512,
+    "qk_nope_head_dim": 448,
+    "qk_rope_head_dim": 64,
+    "v_head_dim": 512,
+    "window_size": 128
+  },
+  "attribution_timing": {
+    "captured_shapes": {
+      "attn_sink": [
+        64
+      ],
+      "indices": [
+        2,
+        4096,
+        160
+      ],
+      "kv_bank": [
+        2,
+        4128,
+        512
+      ],
+      "kv_compressed": [
+        2,
+        32,
+        512
+      ],
+      "q": [
+        2,
+        4096,
+        64,
+        512
+      ],
+      "shared_out": [
+        2,
+        4096,
+        64,
+        512
+      ],
+      "top_indices": [
+        2,
+        4096,
+        32
+      ]
+    },
+    "combined_shared_kv_plus_output_projection_median_ms": 44.66989779472351,
+    "derived_from_full_boundary": {
+      "full_boundary_fwd_bwd_median_ms": 54.08688926696777,
+      "full_minus_shared_kv_and_output_projection_median_ms": 9.416991472244263,
+      "full_minus_shared_kv_median_ms": 15.949117660522461
+    },
+    "enabled": true,
+    "loss_contract": "square_mean_loss_on_component_output",
+    "output_projection_fwd_bwd": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 6.538946151733398,
+        "mean_ms": 6.532126188278198,
+        "median_ms": 6.532126188278198,
+        "min_ms": 6.525306224822998,
+        "samples_ms": [
+          6.538946151733398,
+          6.525306224822998
+        ],
+        "stdev_ms": 0.00964488481323299
+      },
+      "enabled": true,
+      "loss": 0.0030788735020905733,
+      "peak_memory_allocated_bytes": 5609178112,
+      "peak_memory_allocated_gib": 5.223954200744629,
+      "timed_iters": 2,
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.576361949555576,
+        "mean_ms": 6.560401991009712,
+        "median_ms": 6.560401991009712,
+        "min_ms": 6.544442032463849,
+        "samples_ms": [
+          6.576361949555576,
+          6.544442032463849
+        ],
+        "stdev_ms": 0.022570789830472723
+      },
+      "warmup_iters": 1
+    },
+    "selected_count": 160,
+    "shared_kv_fwd_bwd": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 38.192626953125,
+        "mean_ms": 38.13777160644531,
+        "median_ms": 38.13777160644531,
+        "min_ms": 38.082916259765625,
+        "samples_ms": [
+          38.082916259765625,
+          38.192626953125
+        ],
+        "stdev_ms": 0.07757717524309199
+      },
+      "enabled": true,
+      "loss": 0.009238168597221375,
+      "peak_memory_allocated_bytes": 10300441088,
+      "peak_memory_allocated_gib": 9.59303331375122,
+      "timed_iters": 2,
+      "wall": {
+        "enabled": true,
+        "max_ms": 38.29165897332132,
+        "mean_ms": 38.22034498443827,
+        "median_ms": 38.22034498443827,
+        "min_ms": 38.14903099555522,
+        "samples_ms": [
+          38.14903099555522,
+          38.29165897332132
+        ],
+        "stdev_ms": 0.10085321026533102
+      },
+      "warmup_iters": 1
+    },
+    "timed_iters": 2,
+    "warmup_iters": 1
+  },
+  "backend": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "module": null
+  },
+  "backward": {
+    "enabled": false
+  },
+  "backward_timing": {
+    "attn_sink_grad_norm": 1.2934080587001517e-05,
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "backward_mode_value": "query_recompute",
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 55.437644958496094,
+      "mean_ms": 54.08688926696777,
+      "median_ms": 54.08688926696777,
+      "min_ms": 52.73613357543945,
+      "samples_ms": [
+        55.437644958496094,
+        52.73613357543945
+      ],
+      "stdev_ms": 1.9102570184119994
+    },
+    "enabled": true,
+    "input_grad_norm": 2.267140371259302e-05,
+    "loss": 0.0030788735020905733,
+    "peak_memory_allocated_bytes": 8189794304,
+    "peak_memory_allocated_gib": 7.627340316772461,
+    "timed_iters": 2,
+    "wall": {
+      "enabled": true,
+      "max_ms": 55.52350799553096,
+      "mean_ms": 54.17865747585893,
+      "median_ms": 54.17865747585893,
+      "min_ms": 52.83380695618689,
+      "samples_ms": [
+        55.52350799553096,
+        52.83380695618689
+      ],
+      "stdev_ms": 1.9019058442846983
+    },
+    "warmup_iters": 1
+  },
+  "batch": 2,
+  "boundary": {
+    "aux_loss": null,
+    "compressed_x_shape": [
+      2,
+      32,
+      4096
+    ],
+    "index_scores_shape": [
+      2,
+      4096,
+      32
+    ],
+    "indices_shape": [
+      2,
+      4096,
+      160
+    ],
+    "kv_bank_shape": [
+      2,
+      4128,
+      512
+    ],
+    "kv_compressed_shape": [
+      2,
+      32,
+      512
+    ],
+    "kv_shared_shape": [
+      2,
+      4096,
+      512
+    ],
+    "q_shape": [
+      2,
+      4096,
+      64,
+      512
+    ],
+    "route_fanin": {
+      "actual_compressed": {
+        "gini": 0.34357682619647356,
+        "max": 7938,
+        "mean_all_rows": 3970.0,
+        "mean_nonzero_rows": 3970.0,
+        "min": 2,
+        "min_nonzero": 2,
+        "nonzero_rows": 32,
+        "p50_all_rows": 3970.0,
+        "p50_nonzero_rows": 3970.0,
+        "p90_all_rows": 7144.400000000001,
+        "p90_nonzero_rows": 7144.400000000001,
+        "p99_all_rows": 7858.64,
+        "p99_nonzero_rows": 7858.64,
+        "rows": 32,
+        "top16_share": 0.7579345088161209,
+        "top1_share": 0.06248425692695214,
+        "top64_share": 1.0,
+        "top8_share": 0.4434508816120907,
+        "total_selections": 127040,
+        "zero_rows": 0
+      },
+      "actual_vs_prefix_total_selection_ratio": 2.0,
+      "atomic_estimates": {
+        "block_h_16": {
+          "actual_atomic_add_elements": 260177920,
+          "head_blocks": 4,
+          "prefix_atomic_add_elements": 130088960
+        },
+        "block_h_64": {
+          "actual_atomic_add_elements": 65044480,
+          "head_blocks": 1,
+          "prefix_atomic_add_elements": 32522240
+        }
+      },
+      "compress_ratio": 128,
+      "compressed_groups": 32,
+      "prefix_compressed_same_topk": {
+        "gini": 0.34357682619647356,
+        "max": 3969,
+        "mean_all_rows": 1985.0,
+        "mean_nonzero_rows": 1985.0,
+        "min": 1,
+        "min_nonzero": 1,
+        "nonzero_rows": 32,
+        "p50_all_rows": 1985.0,
+        "p50_nonzero_rows": 1985.0,
+        "p90_all_rows": 3572.2000000000003,
+        "p90_nonzero_rows": 3572.2000000000003,
+        "p99_all_rows": 3929.32,
+        "p99_nonzero_rows": 3929.32,
+        "rows": 32,
+        "top16_share": 0.7579345088161209,
+        "top1_share": 0.06248425692695214,
+        "top64_share": 1.0,
+        "top8_share": 0.4434508816120907,
+        "total_selections": 63520,
+        "zero_rows": 0
+      },
+      "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+      "topk": 32,
+      "valid_selected_per_query": {
+        "gini": 0.3435924462767632,
+        "max": 32,
+        "mean_all_rows": 15.5078125,
+        "mean_nonzero_rows": 16.00403124212648,
+        "min": 0,
+        "min_nonzero": 1,
+        "nonzero_rows": 7938,
+        "p50_all_rows": 16.0,
+        "p50_nonzero_rows": 16.0,
+        "p90_all_rows": 28.0,
+        "p90_nonzero_rows": 28.0,
+        "p99_all_rows": 31.0,
+        "p99_nonzero_rows": 31.0,
+        "rows": 8192,
+        "top16_share": 0.003920025188916877,
+        "top1_share": 0.00025188916876574307,
+        "top64_share": 0.01563287153652393,
+        "top8_share": 0.001967884130982368,
+        "total_selections": 127040,
+        "zero_rows": 254
+      }
+    },
+    "selected_count": 160,
+    "stage_records": [],
+    "stage_total_wall_ms": null,
+    "top_scores_shape": [
+      2,
+      4096,
+      32
+    ],
+    "topk": 32,
+    "window": 128
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flavor": "flash_4layer",
+  "layer_id": 3,
+  "model_dim": 4096,
+  "output_checksum": 4.421902121976018e-05,
+  "output_shape": [
+    2,
+    4096,
+    4096
+  ],
+  "projection_mode": "Self-contained TorchTitan-shape q path plus shared kv_norm(wkv_a(x)[:kv_lora_rank]) with the final qk_rope_head_dim positions replaced by rotated k_pe; wkv_b is intentionally bypassed because it expands to per-head K/V.",
+  "promotion_read": "This is a boundary/integration probe, not a production model path. It measures the TorchTitan-shape q/wkv_a/RoPE/LightningIndexer/compression/shared-KV sparse MLA/wo overhead without importing the full TorchTitan package stack in the older SGLang image. The real model still needs an explicit shared latent-KV projection contract, attn_sink parameter, and fused backward.",
+  "scope": "torchtitan_dsv4_sparse_mla_shared_kv_attention_boundary_probe",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 7.944559097290039,
+      "mean_ms": 7.944559097290039,
+      "median_ms": 7.944559097290039,
+      "min_ms": 7.944559097290039,
+      "samples_ms": [
+        7.944559097290039
+      ],
+      "stdev_ms": 0.0
+    },
+    "enabled": true,
+    "peak_memory_allocated_bytes": 3108999680,
+    "peak_memory_allocated_gib": 2.895481586456299,
+    "timed_iters": 1,
+    "wall": {
+      "enabled": true,
+      "max_ms": 8.021267014555633,
+      "mean_ms": 8.021267014555633,
+      "median_ms": 8.021267014555633,
+      "min_ms": 8.021267014555633,
+      "samples_ms": [
+        8.021267014555633
+      ],
+      "stdev_ms": 0.0
+    },
+    "warmup_iters": 0
+  }
+}

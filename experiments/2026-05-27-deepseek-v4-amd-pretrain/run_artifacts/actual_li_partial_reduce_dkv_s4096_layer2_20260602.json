@@ -1,0 +1,252 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "dkv_atol": 0.75,
+    "max_abs_diff_index_add": null,
+    "max_abs_diff_segment": null,
+    "max_abs_diff_sort_index_add": null,
+    "mean_abs_diff_segment": null,
+    "passed": null,
+    "reference_norm": null,
+    "segment_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "math_dtype": "bfloat16",
+  "read": "This diagnostic tests the branch implied by the bucket-reduce negative result: keep query-major selected-gradient production, materialize compact dKV partials, then compare flat index_add against sort+segment_reduce and sort+index_add. It is a floor, not a production kernel, because it materializes selected K/V, probabilities, and compact [valid_pairs,D] partials.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_dkv_partial_reduce_floor",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compact_values_fp32_gib": 2.9990234375,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "max_pairs_per_group": 3499,
+    "nonzero_groups": 1024,
+    "p50_pairs_per_nonzero_group": 1420.5,
+    "p99_pairs_per_nonzero_group": 3413.16015625,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "not_checked",
+  "timing": {
+    "produce_compact_selected_dkv_partials": {
+      "checksum_norm": 962.3037109375,
+      "event": {
+        "enabled": true,
+        "max_ms": 16.67567253112793,
+        "mean_ms": 15.961921056111654,
+        "median_ms": 15.836029052734375,
+        "min_ms": 15.374061584472656,
+        "samples_ms": [
+          15.836029052734375,
+          16.67567253112793,
+          15.374061584472656
+        ],
+        "stdev_ms": 0.6598745043559175
+      },
+      "label": "produce_compact_selected_dkv_partials",
+      "peak_memory_allocated_bytes": 19694358016,
+      "peak_memory_allocated_gib": 18.341800212860107,
+      "wall": {
+        "enabled": true,
+        "max_ms": 16.756966011598706,
+        "mean_ms": 16.016215978500743,
+        "median_ms": 15.893219970166683,
+        "min_ms": 15.398461953736842,
+        "samples_ms": [
+          15.893219970166683,
+          16.756966011598706,
+          15.398461953736842
+        ],
+        "stdev_ms": 0.6875531487502419
+      }
+    },
+    "reduce_index_add": {
+      "checksum_norm": 960.252197265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.7824249267578125,
+        "mean_ms": 2.771371920903524,
+        "median_ms": 2.7721059322357178,
+        "min_ms": 2.759584903717041,
+        "samples_ms": [
+          2.7824249267578125,
+          2.7721059322357178,
+          2.759584903717041
+        ],
+        "stdev_ms": 0.011437689565755183
+      },
+      "label": "reduce_index_add",
+      "peak_memory_allocated_bytes": 4929360896,
+      "peak_memory_allocated_gib": 4.590825080871582,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.8130010468885303,
+        "mean_ms": 2.7919150112817683,
+        "median_ms": 2.787961973808706,
+        "min_ms": 2.7747820131480694,
+        "samples_ms": [
+          2.8130010468885303,
+          2.787961973808706,
+          2.7747820131480694
+        ],
+        "stdev_ms": 0.019413745490275695
+      }
+    },
+    "reduce_sort_index_add": {
+      "checksum_norm": 960.252197265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 4.808524131774902,
+        "mean_ms": 4.581802686055501,
+        "median_ms": 4.475401878356934,
+        "min_ms": 4.461482048034668,
+        "samples_ms": [
+          4.808524131774902,
+          4.475401878356934,
+          4.461482048034668
+        ],
+        "stdev_ms": 0.1964698472561926
+      },
+      "label": "reduce_sort_index_add",
+      "peak_memory_allocated_bytes": 8150584832,
+      "peak_memory_allocated_gib": 7.590823650360107,
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.838383989408612,
+        "mean_ms": 4.602435355385144,
+        "median_ms": 4.4917360646650195,
+        "min_ms": 4.477186012081802,
+        "samples_ms": [
+          4.838383989408612,
+          4.4917360646650195,
+          4.477186012081802
+        ],
+        "stdev_ms": 0.20446697638175906
+      }
+    },
+    "reduce_sort_segment": {
+      "checksum_norm": 960.2521362304688,
+      "event": {
+        "enabled": true,
+        "max_ms": 3.5322329998016357,
+        "mean_ms": 3.17677632967631,
+        "median_ms": 3.0108280181884766,
+        "min_ms": 2.9872679710388184,
+        "samples_ms": [
+          3.5322329998016357,
+          3.0108280181884766,
+          2.9872679710388184
+        ],
+        "stdev_ms": 0.30805981920377395
+      },
+      "label": "reduce_sort_segment",
+      "peak_memory_allocated_bytes": 8150595072,
+      "peak_memory_allocated_gib": 7.5908331871032715,
+      "wall": {
+        "enabled": true,
+        "max_ms": 3.5861380165442824,
+        "mean_ms": 3.2082833349704742,
+        "median_ms": 3.031861037015915,
+        "min_ms": 3.0068509513512254,
+        "samples_ms": [
+          3.5861380165442824,
+          3.031861037015915,
+          3.0068509513512254
+        ],
+        "stdev_ms": 0.32747060385120336
+      }
+    }
+  }
+}

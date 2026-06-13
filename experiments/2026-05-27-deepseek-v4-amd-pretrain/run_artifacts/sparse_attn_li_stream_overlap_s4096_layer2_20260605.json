@@ -1,0 +1,441 @@
+{
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "artifact_budget_serial_baseline_ms": 15.3062,
+    "best_candidate_ms": 16.914947509765625,
+    "measured_fused_local_ms": 16.99547004699707,
+    "measured_fused_vs_serial_speedup_x": 1.0423600370842514,
+    "measured_serial_ms": 17.71539878845215,
+    "measured_three_branch_ms": 16.914947509765625,
+    "measured_three_vs_serial_speedup_x": 1.047322126079575,
+    "source_contract_lower_bound_fused_local_ms": 12.2984,
+    "source_contract_lower_bound_three_branch_ms": 12.5525
+  },
+  "kernel_shape": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "li_kl_backend": "triton_tl_dot",
+    "route_model_selected_block": 512,
+    "token_block": 4
+  },
+  "read": "This is the direct same-process S4096 measurement requested after source inspection showed LI/KL does not wait on SparseAttnSharedkvGrad dKV. It measures real MI350 stream contention between sparse-attention branches and the public SparseLightningIndexerGradKLLoss wrapper.",
+  "scope": "sparse_attn_sharedkv_grad_plus_sparse_li_kl_stream_overlap",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_compressed_pairs": 1572352,
+    "window": 128
+  },
+  "source_contract": {
+    "artifact": "run_artifacts/sparse_attn_li_source_dependency_audit_20260605.json",
+    "li_depends_on_sparse_attn_dkv_output": false
+  },
+  "status": "passed",
+  "tile_write_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "timing": {
+    "candidate_fused_local_sparse_attn_plus_independent_li": {
+      "checksum_norm": 1591.436066890305,
+      "compressed_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 12.91795539855957,
+        "mean_ms": 12.036920547485352,
+        "median_ms": 11.667143821716309,
+        "min_ms": 11.525662422180176,
+        "samples_ms": [
+          12.91795539855957,
+          11.667143821716309,
+          11.525662422180176
+        ],
+        "stdev_ms": 0.7662708745666925
+      },
+      "dq_branch_event": {
+        "enabled": false
+      },
+      "fused_dq_local_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 16.118383407592773,
+        "mean_ms": 14.225112915039062,
+        "median_ms": 13.384958267211914,
+        "min_ms": 13.1719970703125,
+        "samples_ms": [
+          16.118383407592773,
+          13.384958267211914,
+          13.1719970703125
+        ],
+        "stdev_ms": 1.643074248574037
+      },
+      "label": "fused_local_sparse_attn_branches_plus_independent_li",
+      "li_kl_branch_event": {
+        "enabled": true,
+        "max_ms": 17.38679313659668,
+        "mean_ms": 16.878855387369793,
+        "median_ms": 16.749147415161133,
+        "min_ms": 16.500625610351562,
+        "samples_ms": [
+          17.38679313659668,
+          16.500625610351562,
+          16.749147415161133
+        ],
+        "stdev_ms": 0.45710101693576366
+      },
+      "local_dkv_branch_event": {
+        "enabled": false
+      },
+      "makespan_event": {
+        "enabled": true,
+        "max_ms": 21.44127082824707,
+        "mean_ms": 18.407522837320965,
+        "median_ms": 16.99547004699707,
+        "min_ms": 16.78582763671875,
+        "samples_ms": [
+          21.44127082824707,
+          16.78582763671875,
+          16.99547004699707
+        ],
+        "stdev_ms": 2.629393017291817
+      },
+      "max_branch_event": {
+        "enabled": true,
+        "max_ms": 17.38679313659668,
+        "mean_ms": 16.878855387369793,
+        "median_ms": 16.749147415161133,
+        "min_ms": 16.500625610351562,
+        "samples_ms": [
+          17.38679313659668,
+          16.500625610351562,
+          16.749147415161133
+        ],
+        "stdev_ms": 0.45710101693576366
+      },
+      "peak_memory_allocated_bytes": 2663871488,
+      "peak_memory_allocated_gib": 2.480923652648926,
+      "read": "SparseLightningIndexerGradKLLoss is launched as an independent side-stream branch because source inspection shows it consumes only forward q/compressed_k/index tensors and returns LI projection grads. The parent-stream wait is for measurement; production can keep downstream branch consumers on their dependency streams until the first shared attention-input gradient dependency.",
+      "schedule": "fused_local"
+    },
+    "candidate_three_branch_sparse_attn_plus_independent_li": {
+      "checksum_norm": 1591.436066890305,
+      "compressed_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 11.15353775024414,
+        "mean_ms": 10.732400894165039,
+        "median_ms": 10.735774040222168,
+        "min_ms": 10.307890892028809,
+        "samples_ms": [
+          11.15353775024414,
+          10.307890892028809,
+          10.735774040222168
+        ],
+        "stdev_ms": 0.42283352018035125
+      },
+      "dq_branch_event": {
+        "enabled": true,
+        "max_ms": 14.869491577148438,
+        "mean_ms": 12.83099333445231,
+        "median_ms": 11.893864631652832,
+        "min_ms": 11.729623794555664,
+        "samples_ms": [
+          14.869491577148438,
+          11.729623794555664,
+          11.893864631652832
+        ],
+        "stdev_ms": 1.767300222726459
+      },
+      "fused_dq_local_dkv_branch_event": {
+        "enabled": false
+      },
+      "label": "three_branch_sparse_attn_branches_plus_independent_li",
+      "li_kl_branch_event": {
+        "enabled": true,
+        "max_ms": 16.5487060546875,
+        "mean_ms": 16.46173159281413,
+        "median_ms": 16.525184631347656,
+        "min_ms": 16.311304092407227,
+        "samples_ms": [
+          16.525184631347656,
+          16.5487060546875,
+          16.311304092407227
+        ],
+        "stdev_ms": 0.1308038187438891
+      },
+      "local_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 3.8323140144348145,
+        "mean_ms": 2.72875706354777,
+        "median_ms": 2.3427810668945312,
+        "min_ms": 2.011176109313965,
+        "samples_ms": [
+          2.011176109313965,
+          2.3427810668945312,
+          3.8323140144348145
+        ],
+        "stdev_ms": 0.9699839791776641
+      },
+      "makespan_event": {
+        "enabled": true,
+        "max_ms": 65.4737777709961,
+        "mean_ms": 33.00071716308594,
+        "median_ms": 16.914947509765625,
+        "min_ms": 16.613426208496094,
+        "samples_ms": [
+          65.4737777709961,
+          16.914947509765625,
+          16.613426208496094
+        ],
+        "stdev_ms": 28.122899525254052
+      },
+      "max_branch_event": {
+        "enabled": true,
+        "max_ms": 16.5487060546875,
+        "mean_ms": 16.46173159281413,
+        "median_ms": 16.525184631347656,
+        "min_ms": 16.311304092407227,
+        "samples_ms": [
+          16.525184631347656,
+          16.5487060546875,
+          16.311304092407227
+        ],
+        "stdev_ms": 0.1308038187438891
+      },
+      "peak_memory_allocated_bytes": 2663871488,
+      "peak_memory_allocated_gib": 2.480923652648926,
+      "read": "SparseLightningIndexerGradKLLoss is launched as an independent side-stream branch because source inspection shows it consumes only forward q/compressed_k/index tensors and returns LI projection grads. The parent-stream wait is for measurement; production can keep downstream branch consumers on their dependency streams until the first shared attention-input gradient dependency.",
+      "schedule": "three_branch"
+    },
+    "li_public_wrapper": {
+      "checksum_norm": 1.2164769538358655e-06,
+      "event": {
+        "enabled": true,
+        "max_ms": 6.204215049743652,
+        "mean_ms": 5.067111651102702,
+        "median_ms": 4.606161117553711,
+        "min_ms": 4.390958786010742,
+        "samples_ms": [
+          6.204215049743652,
+          4.606161117553711,
+          4.390958786010742
+        ],
+        "stdev_ms": 0.9906215802595777
+      },
+      "label": "sparse_lightning_indexer_grad_kl_loss_public_wrapper",
+      "peak_memory_allocated_bytes": 2106028544,
+      "peak_memory_allocated_gib": 1.9613919258117676,
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.280546076595783,
+        "mean_ms": 5.11263341953357,
+        "median_ms": 4.641558043658733,
+        "min_ms": 4.415796138346195,
+        "samples_ms": [
+          6.280546076595783,
+          4.641558043658733,
+          4.415796138346195
+        ],
+        "stdev_ms": 1.0177215190646087
+      }
+    },
+    "serial_sparse_attn_then_li": {
+      "checksum_norm": 1288.9984143024144,
+      "event": {
+        "enabled": true,
+        "max_ms": 20.607824325561523,
+        "mean_ms": 18.61605962117513,
+        "median_ms": 17.71539878845215,
+        "min_ms": 17.52495574951172,
+        "samples_ms": [
+          20.607824325561523,
+          17.71539878845215,
+          17.52495574951172
+        ],
+        "stdev_ms": 1.7275451125802124
+      },
+      "label": "serialized_sparse_attn_sharedkv_grad_then_li_kl",
+      "peak_memory_allocated_bytes": 2653385216,
+      "peak_memory_allocated_gib": 2.4711575508117676,
+      "wall": {
+        "enabled": true,
+        "max_ms": 20.643689902499318,
+        "mean_ms": 18.643458529065054,
+        "median_ms": 17.737412825226784,
+        "min_ms": 17.549272859469056,
+        "samples_ms": [
+          20.643689902499318,
+          17.737412825226784,
+          17.549272859469056
+        ],
+        "stdev_ms": 1.7348035399237216
+      }
+    },
+    "sparse_attn_retained": {
+      "checksum_norm": 1288.9984130859375,
+      "event": {
+        "enabled": true,
+        "max_ms": 15.649820327758789,
+        "mean_ms": 14.257060686747232,
+        "median_ms": 13.710641860961914,
+        "min_ms": 13.410719871520996,
+        "samples_ms": [
+          15.649820327758789,
+          13.710641860961914,
+          13.410719871520996
+        ],
+        "stdev_ms": 1.215451711570858
+      },
+      "label": "retained_sparse_attn_sharedkv_grad_full",
+      "peak_memory_allocated_bytes": 2316272128,
+      "peak_memory_allocated_gib": 2.157196521759033,
+      "wall": {
+        "enabled": true,
+        "max_ms": 15.718461945652962,
+        "mean_ms": 14.337800287952026,
+        "median_ms": 13.85341095738113,
+        "min_ms": 13.441527960821986,
+        "samples_ms": [
+          15.718461945652962,
+          13.85341095738113,
+          13.441527960821986
+        ],
+        "stdev_ms": 1.2132938063378371
+      }
+    },
+    "timed_iters": 3,
+    "warmup_iters": 1
+  },
+  "union_route_stats": {
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "max_members_per_group": 4,
+    "members_per_group_hist": {
+      "1": 48504,
+      "2": 107203,
+      "3": 130890,
+      "4": 229193
+    },
+    "nonempty_union_memberships": 515790,
+    "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness.",
+    "workspace_bytes": 31883264,
+    "workspace_mib": 30.40625
+  }
+}

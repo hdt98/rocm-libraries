@@ -1,0 +1,99 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_hot_execute_compact_dispatch_smoke_8x_s4096_gbs128_mbs1_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "none"
+  },
+  "model": {
+    "config": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "layers": 12,
+    "compress_ratio_allowlist": [4, 128],
+    "parameter_count_total": 81244314368,
+    "parameter_count_active": 5746842368
+  },
+  "env": {
+    "CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE": "false",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": "1",
+    "CANARY_MORI_AITER_REUSE_FORWARD_ROUTE_METADATA": "1",
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": "1",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_stage1_recompute",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_STAGE1_SHUFFLE_CACHE_SIZE": "12",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": "0",
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "2",
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "compact_dispatch",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_aiter_hot_execute_compact_smoke_8x_s4096_gbs128_mbs1_steps2_20260607",
+      "mori_shmem_heap_size": "default",
+      "result": "failed_before_step1_mori_static_heap_oom",
+      "failure": {
+        "phase": "first_forward_mori_dispatch_setup",
+        "site": "/opt/mori/src/ops/dispatch_combine/dispatch_combine.cpp:184",
+        "error": "hip failed with invalid argument / Out of static heap memory",
+        "requested_bytes_aligned_range": [1480657664, 1549604864],
+        "current_heap_size_bytes": 4294967296
+      },
+      "step_metrics": null
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mori_aiter_hot_execute_compact_heap96_smoke_8x_s4096_gbs128_mbs1_steps2_20260607",
+      "mori_shmem_heap_size": "96G",
+      "result": "rejected_controlled_stop_no_step_metric",
+      "controlled_stop": true,
+      "remote_container_stopped": "06a11e47b932d66f9a019121203f0dea06f8723a4e03e2abb49d3e599c93d135",
+      "observed": {
+        "training_start_utc": "2026-06-06T17:08:40Z",
+        "controlled_stop_utc": "2026-06-06T17:13:24Z",
+        "elapsed_after_training_start_s": 284,
+        "reached_structured_event": "step1_fwd_bwd_start",
+        "step_metric_logged": false,
+        "loss_logged": false,
+        "tflops_logged": false,
+        "mori_timing_files": 0,
+        "gpu_use_during_run_pct": [100, 100, 100, 100, 100, 100, 100, 100],
+        "vram_allocated_during_run_pct_range": [45, 46],
+        "vram_allocated_after_stop_pct": [0, 0, 0, 0, 0, 0, 0, 0]
+      },
+      "step_metrics": null
+    }
+  ],
+  "comparison_context": {
+    "current_best_12layer_standard_ep_helper_execute_artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_8x_s4096_gbs128_mbs4_steps6_20260606.json",
+    "current_best_12layer_standard_ep_helper_execute_tokens_per_gpu_s_steps2_to6": 7592.8,
+    "current_best_12layer_standard_ep_helper_execute_tflops_per_gpu_steps2_to6": 385.44,
+    "current_mori_aiter_anchor_artifact": "torchtitan_dsv4_flash12_stage1_recompute_cached12_8x_s4096_gbs128_mbs4_heap96_steps6_20260606.json",
+    "current_mori_aiter_anchor_tokens_per_gpu_s_steps2_to6": 7211.2,
+    "current_mori_aiter_anchor_tflops_per_gpu_steps2_to6": 363.916
+  },
+  "read": "Rejected. The compact-dispatch MORI/AITER hot-execute branch fixes the dummy-zero-gate shape/correctness issue in principle, but the implementation flattens normal routed assignments into a separate top-k=1 MORI/AITER dispatch. That duplicates token rows for normal expert slots and creates a new massive fwd/bwd body: even MBS1/GA16 stayed in step-1 fwd/bwd for about 284 seconds with all 8 GPUs at 100% before controlled stop, with no loss or TFLOPs metric. This is not a materializable path to the 12-layer e2e target.",
+  "next_action": "Do not keep tuning compact_dispatch. The MORI/AITER helper-execute port needs a no-expansion route filter inside the MORI dispatch/permute contract, or a fused AITER/MORI owner that can skip remote-hot rows without flattening normal top-k assignments into another dispatch."
+}

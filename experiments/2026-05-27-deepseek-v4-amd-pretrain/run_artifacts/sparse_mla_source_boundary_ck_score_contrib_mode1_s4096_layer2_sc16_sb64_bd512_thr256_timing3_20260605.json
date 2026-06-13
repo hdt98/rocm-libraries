@@ -1,0 +1,222 @@
+{
+  "artifact": "sparse_mla_source_boundary_hip_coop_probe",
+  "status": "timed",
+  "scope": "source-boundary compressed sparse-MLA backward producer: q,dO,output,lse,kv,LI route to dKV without materialized probs/grad_logits",
+  "arch": "gfx950",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip": "7.2.26015-fc0010cf6a",
+  "device": "AMD Instinct MI350X VF",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "build_seconds": 27.630285679828376,
+  "extension_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/torch_extensions/source_boundary_ck_score_contrib_mode1_s4096_20260605",
+  "build_carrier": {
+    "hip_build_mode": "prebuilt_object",
+    "kernel_source_flavor": "rocwmma_score_page_d512",
+    "external_hip_source_path": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+    "hipcc": "/opt/rocm/bin/hipcc",
+    "hip_defines": [
+      "SCORE_PAGE_MODE=1",
+      "SCORE_PAGE_MULTI_WAVE=1",
+      "SCORE_PAGE_THREADS=256",
+      "SCORE_PAGE_SCORE_CK=1",
+      "SCORE_PAGE_CONTRIB_CK=1"
+    ],
+    "read": "prebuilt_object bypasses PyTorch hipify by compiling raw HIP with hipcc and linking the object into the Torch C++ wrapper."
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 16,
+    "selected_block": 64,
+    "block_d": 512,
+    "threads": 256,
+    "k_tile": 16,
+    "h_tile": 16,
+    "schedule_read": "D512 score-page plus contribution-sink rocWMMA rung. One CTA computes the score/prob/scaled-dP page, sweeps D16 contribution fragments with rocWMMA, then sinks a checksum without global dKV atomics. A 4-wave CTA variant maps the first four wavefronts to the H16 head blocks during score-page production, then maps wavefronts to consecutive D16 contribution consumers so the score page is consumed inside the same workgroup. The score-page producer also uses CK Tile BF16 M16N16K32 MFMA directly from source q/grad_output/kv tensors, avoiding the rocWMMA K16xH16 score fragment path. The contribution consumer uses CK Tile BF16 M16N16K32 MFMA with the validated contiguous C-fragment row mapping."
+  },
+  "contract": {
+    "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]",
+    "source_boundary": true,
+    "emits_dq": false,
+    "emits_dkv": true,
+    "materialized_probs_grad_logits": false,
+    "hip_source_includes_torch_extension": false,
+    "hip_source_headers": "external_source_see_path",
+    "cpp_source_includes": [
+      "torch/extension.h"
+    ]
+  },
+  "route_stats": {
+    "token_block": 16,
+    "selected_block": 64,
+    "d_block": 512,
+    "d_blocks_per_full_dim": 1,
+    "tiles": 2048,
+    "nonempty_tiles": 1600,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_unique_groups": 754460,
+    "baseline_atomic_add_elements": 805044224,
+    "coalesced_atomic_add_elements": 386283520,
+    "route_atomic_reduction_x": 2.084076027887496,
+    "valid_pairs_per_tile": {
+      "mean": 767.75,
+      "p50": 1024.0,
+      "p90": 1024.0,
+      "p99": 1024.0,
+      "max": 1024
+    },
+    "unique_groups_per_tile": {
+      "mean": 368.388671875,
+      "p50": 450.0,
+      "p90": 628.0,
+      "p99": 662.0,
+      "max": 679
+    },
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block."
+  },
+  "boundary_route_fanin": {
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "actual_compressed": {
+      "rows": 1024,
+      "nonzero_rows": 1024,
+      "zero_rows": 0,
+      "total_selections": 1572352,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "p50_all_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p50_nonzero_rows": 1420.5,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_nonzero_rows": 3413.16,
+      "gini": 0.38915823461643767,
+      "top1_share": 0.002225328679583198,
+      "top8_share": 0.017700871051774668,
+      "top16_share": 0.035047495726147834,
+      "top64_share": 0.13582136824324326
+    },
+    "prefix_compressed_same_topk": {
+      "rows": 1024,
+      "nonzero_rows": 512,
+      "zero_rows": 512,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 2049,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "p50_all_rows": 1024.5,
+      "p90_all_rows": 3683.8,
+      "p99_all_rows": 4052.08,
+      "p50_nonzero_rows": 3071.0,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_nonzero_rows": 4072.56,
+      "gini": 0.5555734339384565,
+      "top1_share": 0.0026031066834907197,
+      "top8_share": 0.020753622598502115,
+      "top16_share": 0.04134443178117877,
+      "top64_share": 0.16147020514490393
+    },
+    "valid_selected_per_query": {
+      "rows": 4096,
+      "nonzero_rows": 4093,
+      "zero_rows": 3,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 1,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "p50_all_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "gini": 0.22245742365577173,
+      "top1_share": 0.00032562683165092806,
+      "top8_share": 0.0026050146532074245,
+      "top16_share": 0.005210029306414849,
+      "top64_share": 0.020840117225659396
+    },
+    "atomic_estimates": {
+      "block_h_16": {
+        "head_blocks": 4,
+        "actual_atomic_add_elements": 3220176896,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "head_blocks": 1,
+        "actual_atomic_add_elements": 805044224,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology."
+  },
+  "correctness": {
+    "passed": null,
+    "dq_atol": 0.75,
+    "dkv_atol": 0.75,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "reference_norm": null,
+    "candidate_norm": null
+  },
+  "timing_ms": {
+    "source_boundary_row_leader_dkv": {
+      "label": "source_boundary_row_leader_dkv",
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          54.282617988064885,
+          54.37912791967392,
+          54.31756586767733
+        ],
+        "mean_ms": 54.32643725847205,
+        "median_ms": 54.31756586767733,
+        "min_ms": 54.282617988064885,
+        "max_ms": 54.37912791967392,
+        "stdev_ms": 0.04886274558157306
+      },
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          54.191162109375,
+          54.28645324707031,
+          54.294490814208984
+        ],
+        "mean_ms": 54.25736872355143,
+        "median_ms": 54.28645324707031,
+        "min_ms": 54.191162109375,
+        "max_ms": 54.294490814208984,
+        "stdev_ms": 0.05747727761391791
+      },
+      "peak_memory_allocated_bytes": 1681921536,
+      "peak_memory_allocated_gib": 1.5664114952087402,
+      "checksum_norm": 5252.7080078125
+    }
+  },
+  "gate": {
+    "candidate_event_median_ms": 54.28645324707031,
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "passes_triton_full_boundary_gate": false,
+    "read": "This is not a promoted full sparse-attention backward because it only returns dKV. Passing would justify adding dQ and a shared score-tile cooperative schedule; failing still proves the source-boundary HIP build path and rejects D16 replay."
+  }
+}

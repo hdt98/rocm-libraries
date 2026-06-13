@@ -1,0 +1,187 @@
+{
+  "accum_mode": "dense_route_bmm",
+  "active_seq_chunk": 128,
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "bmm_input_dtype": "bfloat16",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 4128768,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 4128768
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 1032192,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 1032192
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "prefix_compressed_same_topk": {
+      "gini": 0.3382936507936508,
+      "max": 125,
+      "mean_all_rows": 63.0,
+      "mean_nonzero_rows": 63.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 32,
+      "p50_all_rows": 63.0,
+      "p50_nonzero_rows": 63.0,
+      "p90_all_rows": 112.60000000000001,
+      "p90_nonzero_rows": 112.60000000000001,
+      "p99_all_rows": 123.76,
+      "p99_nonzero_rows": 123.76,
+      "rows": 32,
+      "top16_share": 0.753968253968254,
+      "top1_share": 0.062003968253968256,
+      "top64_share": 1.0,
+      "top8_share": 0.44047619047619047,
+      "total_selections": 2016,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 32,
+    "valid_selected_per_query": {
+      "gini": 0.3386656746031746,
+      "max": 32,
+      "mean_all_rows": 15.75,
+      "mean_nonzero_rows": 16.128,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 125,
+      "p50_all_rows": 16.0,
+      "p50_nonzero_rows": 16.0,
+      "p90_all_rows": 28.299999999999997,
+      "p90_nonzero_rows": 28.60000000000001,
+      "p99_all_rows": 31.0,
+      "p99_nonzero_rows": 31.0,
+      "rows": 128,
+      "top16_share": 0.2361111111111111,
+      "top1_share": 0.015873015873015872,
+      "top64_share": 0.753968253968254,
+      "top8_share": 0.12202380952380952,
+      "total_selections": 2016,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": 595.8563842773438,
+    "dkv_atol": 0.25,
+    "max_abs_diff": 0.10123348236083984,
+    "mean_abs_diff": 0.0014393575256690383,
+    "passed": true,
+    "reference_norm": 595.8150024414062
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "math_dtype": "bfloat16",
+  "read": "This is a diagnostic floor for actual LightningIndexer dynamic routes, not a production sparse MLA backward. It materializes selected [H,S,K] probabilities and then builds dense [H,S,G] route-weight matrices so compressed dKV accumulation becomes MFMA-backed GxS @ SxD math. It tests whether the layer-2 dynamic route can be made GEMM-shaped; a production kernel would need to stream or bucket the same accumulation without materializing dense route matrices.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_dkv_dense_route_floor_probe",
+  "seed": 1234,
+  "seq_chunk": 0,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "dense_route_bf16_gib_per_active_chunk": 0.00048828125,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "selected_probs_fp32_gib_per_active_chunk": 0.0009765625,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_compressed_selections": 2016
+  },
+  "status": "passed",
+  "timing": {
+    "actual_li_dkv_dense_route_bmm_floor": {
+      "checksum_norm": 595.8563842773438,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.0226880311965942,
+        "mean_ms": 0.6934320131937662,
+        "median_ms": 0.5296040177345276,
+        "min_ms": 0.528003990650177,
+        "samples_ms": [
+          1.0226880311965942,
+          0.5296040177345276,
+          0.528003990650177
+        ],
+        "stdev_ms": 0.2851451982148333
+      },
+      "label": "actual_li_dkv_dense_route_bmm_floor",
+      "peak_memory_allocated_bytes": 558337536,
+      "peak_memory_allocated_gib": 0.5199923515319824,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.0871259728446603,
+        "mean_ms": 0.7412380073219538,
+        "median_ms": 0.5687089869752526,
+        "min_ms": 0.5678790621459484,
+        "samples_ms": [
+          1.0871259728446603,
+          0.5678790621459484,
+          0.5687089869752526
+        ],
+        "stdev_ms": 0.2995480524287937
+      }
+    },
+    "pytorch_reference_dkv": {
+      "checksum_norm": 595.8150024414062,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.5771799087524414,
+        "mean_ms": 1.13427530725797,
+        "median_ms": 0.43184301257133484,
+        "min_ms": 0.3938030004501343,
+        "samples_ms": [
+          2.5771799087524414,
+          0.43184301257133484,
+          0.3938030004501343
+        ],
+        "stdev_ms": 1.2497367832431694
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 562966016,
+      "peak_memory_allocated_gib": 0.5243029594421387,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.60335102211684,
+        "mean_ms": 1.1613293706128995,
+        "median_ms": 0.4600189859047532,
+        "min_ms": 0.4206181038171053,
+        "samples_ms": [
+          2.60335102211684,
+          0.4600189859047532,
+          0.4206181038171053
+        ],
+        "stdev_ms": 1.2489827620635663
+      }
+    }
+  }
+}

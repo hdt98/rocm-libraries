@@ -1,0 +1,269 @@
+{
+  "id": "torchtitan_direct_dsv4_s512_manual_sparse_backward_20260601",
+  "date_utc": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "model": "deepseek_v4 flash_4layer",
+  "summary": {
+    "result": "manual_sparse_mla_backward_bridge_passed_s512_on_1x_4x_and_8x_mi350_with_li_aux_and_activation_checkpointing",
+    "read": "The earlier 8xMI350 S4096 204.9 TFLOPs/GPU result was guarded dense-fallback systems evidence, not final sparse-MLA/LightningIndexer performance. This artifact records a correctness bridge: sparse MLA with LightningIndexer can now enter full-model backward at S512 by using a manual PyTorch backward instead of autograd through materialized selected K/V tensors. It is still not the final fused sparse-MLA/LightningIndexer kernel path.",
+    "final_path_pending": [
+      "fused sparse MLA forward/backward without selected-state materialization",
+      "training-safe LightningIndexer integration at S4096",
+      "MORI EP dispatch/combine overlap"
+    ]
+  },
+  "source_change": {
+    "torchtitan_base_snapshot": "7fcd9beacde733f3ceca4a4da7e2f0518d64f68e",
+    "files": [
+      "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+      "sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+      "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+    ],
+    "knobs": {
+      "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE": "manual|autograd",
+      "CANARY_SPARSE_MLA_BACKWARD_MODE": "launcher alias",
+      "default_mode": "manual"
+    },
+    "manual_backward": [
+      "Computes grad_probs, grad_scores, grad_q, grad_selected_k, and grad_selected_v from saved q, selected K/V, and softmax probabilities.",
+      "Scatter-adds local selected-state gradients back into dense K/V.",
+      "Scatter-adds compressed selected-state gradients back into compressed K/V so gradients flow through compression into original K/V.",
+      "Leaves LightningIndexer auxiliary loss and selected-index generation outside the custom Function."
+    ]
+  },
+  "validation": [
+    {
+      "name": "local_py_compile",
+      "result": "passed",
+      "command": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py tools/dsv4_runtime_probe/verify_torchtitan_dsv4_sparse_li_flash_layers.py tools/dsv4_runtime_probe/smoke_torchtitan_dsv4_sparse_mla.py"
+    },
+    {
+      "name": "launcher_check_config_manual_backward_mode",
+      "result": "passed",
+      "command": "env GPUS_PER_NODE=1 CANARY_EP=1 CANARY_DP_SHARD=1 CANARY_MBS=1 CANARY_GBS=1 CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_SPARSE_MLA_BACKWARD_MODE=manual experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "details": {
+        "attention_sparse_backward_mode_by_layer": ["manual", "manual", "manual", "manual"]
+      }
+    },
+    {
+      "name": "remote_cpu_sparse_mla_smoke",
+      "result": "passed",
+      "details": {
+        "device": "cpu",
+        "dtype": "float32",
+        "seq_len": 32,
+        "sparse_used": true,
+        "selected_keys": 40,
+        "compressed_groups": 8,
+        "output_shape": [1, 32, 64],
+        "input_grad": "nonzero",
+        "lightning_indexer_gradients": "present_nonzero"
+      }
+    },
+    {
+      "name": "mi350_flash_layer_probe_s128",
+      "result": "passed",
+      "details": {
+        "device": "cuda",
+        "dtype": "bf16",
+        "seq_len": 128,
+        "layers": [2, 3],
+        "sparse_used": true
+      }
+    },
+    {
+      "name": "mi350_flash_layer_probe_s256",
+      "result": "passed",
+      "details": {
+        "device": "cuda",
+        "dtype": "bf16",
+        "seq_len": 256,
+        "layers": [2, 3],
+        "sparse_used": true,
+        "lightning_indexer_gradients": "present_nonzero_for_both_layers"
+      }
+    }
+  ],
+  "full_model_runs": [
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_layer3only_1xmi350_noac_nofsdp_noaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP_skipped_EP1_MBS1_GBS1_S512",
+      "sparse_selection": "layer2_dense_layer3_sparse_via_4.5B_selected_state_threshold",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0,
+      "step_1": {
+        "loss": 12.22123,
+        "grad_norm": 13.125,
+        "memory_gib": 207.05,
+        "tps": 56,
+        "tflops_per_gpu": 0.75,
+        "mfu_percent": 0.03
+      }
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_1xmi350_noac_nofsdp_noaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP_skipped_EP1_MBS1_GBS1_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0,
+      "step_1": {
+        "loss": 12.40989,
+        "grad_norm": 13.0625,
+        "memory_gib": 207.98,
+        "tps": 55,
+        "tflops_per_gpu": 0.73,
+        "mfu_percent": 0.03
+      }
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_1xmi350_noac_fsdp_noaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0,
+      "step_1": {
+        "loss": 12.18346,
+        "grad_norm": 13.1875,
+        "memory_gib": 261.54,
+        "allocation_retries": 1,
+        "tps": 35,
+        "tflops_per_gpu": 0.46,
+        "mfu_percent": 0.02
+      }
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_noaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0,
+      "gradient_accumulation_steps": 16,
+      "log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_noaux_20260601T000000",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_noaux_20260601T000000",
+      "checkpoint_dir": "not_created",
+      "step_1": {
+        "loss": 12.35096,
+        "grad_norm": 10.1875,
+        "memory_gib": 165.47,
+        "tps_per_rank_logged": [399, 400],
+        "tflops_per_gpu": [5.31, 5.32],
+        "mfu_percent": 0.23
+      },
+      "completion": [
+        "Training completed",
+        "Process group destroyed"
+      ]
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_liaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": "default_1e-3",
+      "gradient_accumulation_steps": 16,
+      "log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_liaux_20260601T000000",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_noac_liaux_20260601T000000",
+      "checkpoint_dir": "not_created",
+      "remote_sizes": {
+        "log_dir": "20K",
+        "output_dir": "828K"
+      },
+      "step_1": {
+        "loss": 12.15306,
+        "grad_norm": 10.0625,
+        "memory_gib": 165.47,
+        "tps_per_rank_logged": [397, 398],
+        "tflops_per_gpu": [5.28, 5.29],
+        "mfu_percent": 0.23
+      },
+      "completion": [
+        "Training completed",
+        "Process group destroyed"
+      ]
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_fullac_liaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "full",
+      "dsa_indexer_loss_coeff": "default_1e-3",
+      "gradient_accumulation_steps": 16,
+      "log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_fullac_liaux_20260601T000000",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_sparse_all_4xmi350_fullac_liaux_20260601T000000",
+      "checkpoint_dir": "not_created",
+      "remote_sizes": {
+        "log_dir": "20K",
+        "output_dir": "828K"
+      },
+      "step_1": {
+        "loss": 12.312,
+        "grad_norm": 10.4375,
+        "memory_gib": 148.96,
+        "tps_per_rank_logged": [357, 358],
+        "tflops_per_gpu": [4.75],
+        "mfu_percent": 0.21
+      },
+      "completion": [
+        "Training completed",
+        "Process group destroyed"
+      ],
+      "read": "Full activation checkpointing lowered logged memory versus the no-AC LI-aux run, from 165.47 GiB to 148.96 GiB, while preserving finite loss/gradients and clean teardown."
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_s512_manual_sparse_all_8xmi350_fullac_liaux_20260601T000000",
+      "result": "passed",
+      "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S512",
+      "sparse_selection": "all_compressed_layers_sparse_selected_state_guard_disabled",
+      "checkpoint_enable": false,
+      "activation_checkpoint_mode": "full",
+      "dsa_indexer_loss_coeff": "default_1e-3",
+      "gradient_accumulation_steps": 16,
+      "log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_manual_sparse_all_8xmi350_fullac_liaux_20260601T000000",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_manual_sparse_all_8xmi350_fullac_liaux_20260601T000000",
+      "checkpoint_dir": "not_created",
+      "remote_sizes": {
+        "log_dir": "32K",
+        "output_dir": "1.7M"
+      },
+      "step_1": {
+        "loss": 12.21498,
+        "grad_norm": 10.0,
+        "memory_gib": 124.3,
+        "tps_per_rank_logged": [249, 250],
+        "tflops_per_gpu": [3.31, 3.32],
+        "mfu_percent": 0.14
+      },
+      "completion": [
+        "Training completed",
+        "Process group destroyed"
+      ],
+      "read": "This is the first 8xMI350 sparse-MLA/LightningIndexer full-model correctness baseline. It is not the S4096 performance path; it is an S512 manual-backward bridge proving FSDP8/EP8 integration with LI aux loss and full activation checkpointing."
+    }
+  ],
+  "interpretation": {
+    "what_this_proves": [
+      "Direct TorchTitan sparse MLA plus LightningIndexer can run full-model S512 backward on MI350 when the attention backward is expressed manually.",
+      "The previous S512 fault was specific to the old autograd-through-materialized-selected-state backward path, not Primus, FSDP, multi-rank EP, or LI aux loss.",
+      "LightningIndexer auxiliary-loss gradients and full activation checkpointing are both compatible with the manual sparse-MLA backward bridge at the S512 4xMI350 and 8xMI350 canary shapes."
+    ],
+    "what_this_does_not_prove": [
+      "It does not validate final S4096 sparse-MLA/LightningIndexer performance.",
+      "It does not remove the need for a fused sparse MLA kernel.",
+      "It does not address MORI EP overlap."
+    ]
+  },
+  "raw_output_policy": "Raw logs, checkpoints, and traces remain outside the repo under /local/data/sonle5/dsv4_pretrain_canary_20260527/."
+}

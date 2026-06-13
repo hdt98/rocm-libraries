@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "torch_version": "2.10.0a0+git449b176",
+  "source_under_test": "sources/wip/torchtitan",
+  "run_id": "torchtitan_mixed_muon_adamw_native_state_20260531",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_mixed_muon_adamw_native_state_20260531",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_native_state_20260531",
+  "commands": [
+    "RUN_ID=torchtitan_mixed_muon_adamw_native_state_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh all"
+  ],
+  "toy_smoke_result": {
+    "status": "passed",
+    "mode": "toy",
+    "optimizer_types": [
+      "AdamW",
+      "Muon"
+    ],
+    "muon_params": [
+      "expert_weight",
+      "proj.weight"
+    ],
+    "state_dict_keys": 2
+  },
+  "deepseek_debugmodel_smoke_result": {
+    "status": "passed",
+    "mode": "deepseek-v3-debugmodel",
+    "optimizer_types": [
+      "AdamW",
+      "Muon"
+    ],
+    "param_counts": {
+      "AdamW": 21,
+      "Muon": 62
+    },
+    "muon_sample": [
+      "layers.0.attention.wkv_a.weight",
+      "layers.0.attention.wkv_b.weight",
+      "layers.0.attention.wo.weight",
+      "layers.0.attention.wq.weight",
+      "layers.0.feed_forward.w1.weight",
+      "layers.0.feed_forward.w2.weight",
+      "layers.0.feed_forward.w3.weight",
+      "layers.1.attention.wkv_a.weight"
+    ],
+    "stepped_params": [
+      "tok_embeddings.weight",
+      "layers.1.moe.router.gate.weight",
+      "layers.1.moe.experts.w1"
+    ],
+    "state_dict_keys": 2
+  },
+  "muon_shard_contract": {
+    "status": "passed",
+    "matrix_case": {
+      "row_sharded_vs_full_rel_l2": 0.46550610661506653,
+      "column_sharded_vs_full_rel_l2": 0.7442668676376343
+    },
+    "batched_expert_case": {
+      "expert_axis_sharded_vs_full_rel_l2": 0.0,
+      "row_axis_sharded_vs_full_rel_l2": 0.46919289231300354,
+      "column_axis_sharded_vs_full_rel_l2": 0.7377979159355164
+    },
+    "conclusion": "Reference Muon is checkpointable for bring-up, but FSDP local-shard orthogonalization is not equivalent when the shard cuts a matrix axis. Sharding only the independent expert axis of a rank-3 expert tensor is equivalent in this reference."
+  },
+  "unit_result": {
+    "tests_run": 15,
+    "status": "OK",
+    "new_regression_case": "mixed optimizer state_dict with two model parts uses native optimizer_0..optimizer_3 keys"
+  },
+  "caveats": [
+    "Muon remains a slow PyTorch bring-up reference.",
+    "The state_dict format is native per-inner-optimizer for mixed or Muon-containing containers; it is checkpointable for canary work but not a final reshardable distributed optimizer state format.",
+    "A faithful FSDP Muon path still needs coordinated matrix-level orthogonalization when FSDP cuts the last two matrix dimensions."
+  ]
+}

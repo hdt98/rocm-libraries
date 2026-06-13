@@ -1,0 +1,136 @@
+{
+  "date": "2026-06-03",
+  "purpose": "Holistic EP4/EP8 full-run profile breakdown for the latest retained TorchTitan DSv4 canary candidate at MBS=1, S=4096.",
+  "candidate": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "model": "DeepSeek-V4-style 4-layer canary",
+    "seq_len": 4096,
+    "micro_batch_size": 1,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "full",
+    "chunked_ce_num_chunks": 2,
+    "moe_comm_backend": "mori",
+    "mori_backward_mode": "routed",
+    "mori_local_vjp_mode": "padded",
+    "mori_local_vjp_swiglu_backend": "triton",
+    "mori_backward_combine_input_mode": "registered",
+    "sparse_mla_backward_mode": "default",
+    "sharedkv_backward_mode": "default",
+    "note": "This is the latest best retained systems canary path, not the final sparse-MLA/LightningIndexer override."
+  },
+  "artifacts": {
+    "filtered_profile_summary": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_full_profile_breakdown_step2_filtered_20260603.json",
+    "unfiltered_profile_summary": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_full_profile_breakdown_20260603.json",
+    "remote_ep4_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_profile_latest_ce2_ep4_s4096_gbs64_20260603",
+    "remote_ep8_output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_profile_latest_ce2_ep8_s4096_gbs128_20260603"
+  },
+  "step2_filter": {
+    "mori_call_id_gt": 64,
+    "dsv4_profile_call_id_gt": 592,
+    "reason": "Each run records two training steps. Step 2 has 64 MORI records per rank and 592 DSv4 timing records per rank."
+  },
+  "runs": {
+    "ep4": {
+      "gpus": 4,
+      "ep": 4,
+      "dp_shard": 4,
+      "global_batch_size": 64,
+      "global_valid_tokens": 262144,
+      "profiled_step_end_ms_rank0": 19216.52,
+      "kineto_step_export_ms_rank0": 1939.43,
+      "mori_step2_median_rank_total_ms": {
+        "local_vjp_padded": 2519.19,
+        "combine_dx_call": 1251.47,
+        "dispatch_x_call": 81.76,
+        "dispatch_grad_output_call": 45.64,
+        "align_grad_output": 37.12
+      },
+      "mori_step2_median_call_ms": {
+        "local_vjp_padded": 41.35,
+        "combine_dx_call": 14.20,
+        "dispatch_grad_inputs": 1.93,
+        "local_vjp_recompute_forward": 12.62,
+        "local_vjp_wgrad": 10.83,
+        "local_vjp_xgrad_reduce": 8.42,
+        "local_vjp_w2_dgrad_swiglu": 4.99
+      },
+      "dsv4_step2_median_rank_total_ms": {
+        "loss_chunked_ce_total": 583.68,
+        "loss_chunk_backward": 395.86,
+        "loss_lm_head_forward": 153.90,
+        "loss_cross_entropy_forward": 33.83,
+        "attention_projection_total": 242.59,
+        "attention_projection_wo": 131.67,
+        "attention_projection_wkv_b": 46.19,
+        "attention_projection_wq_b": 42.50,
+        "shared_expert_linears_total": 56.55,
+        "router_gate_total": 12.70
+      },
+      "trace_kernel_family_median_rank_ms": {
+        "other": 5318.64,
+        "gemm_cijk": 3020.70,
+        "copy": 1758.07,
+        "rccl_nccl": 1609.92,
+        "fill": 149.35,
+        "triton": 107.99
+      }
+    },
+    "ep8": {
+      "gpus": 8,
+      "ep": 8,
+      "dp_shard": 8,
+      "global_batch_size": 128,
+      "global_valid_tokens": 524288,
+      "profiled_step_end_ms_rank0": 24307.97,
+      "kineto_step_export_ms_rank0": 1989.27,
+      "retained_no_profiler_anchor": {
+        "step2_tok_per_gpu_s": 3103,
+        "implied_step_s": 21.12,
+        "source": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603"
+      },
+      "mori_step2_median_rank_total_ms": {
+        "local_vjp_padded": 2008.17,
+        "combine_dx_call": 1777.44,
+        "dispatch_x_call": 182.00,
+        "dispatch_grad_output_call": 41.62,
+        "align_grad_output": 49.70
+      },
+      "mori_step2_median_call_ms": {
+        "local_vjp_padded": 30.78,
+        "combine_dx_call": 23.81,
+        "dispatch_grad_inputs": 3.04,
+        "local_vjp_recompute_forward": 9.24,
+        "local_vjp_wgrad": 7.57,
+        "local_vjp_xgrad_reduce": 6.24,
+        "local_vjp_w2_dgrad_swiglu": 3.59
+      },
+      "dsv4_step2_median_rank_total_ms": {
+        "loss_chunked_ce_total": 459.41,
+        "loss_chunk_backward": 312.57,
+        "loss_lm_head_forward": 113.86,
+        "loss_cross_entropy_forward": 33.36,
+        "attention_projection_total": 235.18,
+        "attention_projection_wo": 125.89,
+        "attention_projection_wkv_b": 44.41,
+        "attention_projection_wq_b": 41.31,
+        "shared_expert_linears_total": 60.54,
+        "router_gate_total": 13.50
+      },
+      "trace_kernel_family_median_rank_ms": {
+        "other": 5601.62,
+        "gemm_cijk": 2501.78,
+        "copy": 1204.52,
+        "rccl_nccl": 1191.25,
+        "fill": 146.08,
+        "triton": 84.01
+      }
+    }
+  },
+  "read": [
+    "EP8 reduces local owner-rank MoE VJP from EP4, but dX combine/arrival wait grows and becomes comparable to local VJP.",
+    "The highest-return MoE work is a real overlap/skew plan plus a more fused/less padded owner-rank VJP contract, not another blind MORI launch tuple sweep.",
+    "Attention projection linears are a mid-sized bucket; the final sparse MLA/LI backward remains necessary, but this guarded canary profile does not exercise the final sparse override.",
+    "Chunked CE/lm-head is visible but smaller than the MoE backward path; keep CE2 for this canary while avoiding loss-only tuning as the main ladder.",
+    "Profiler kernel-family totals are cumulative GPU event time across streams/ranges and should be used for ranking, not as additive wall time."
+  ]
+}

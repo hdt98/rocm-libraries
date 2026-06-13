@@ -1,0 +1,265 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "fused": false,
+    "index_logits": {
+      "block_d": 64,
+      "block_h": 16,
+      "block_k": 128
+    },
+    "li_grads": {
+      "block_d": 64,
+      "block_h": 64,
+      "block_k": 64,
+      "dot_block_d": 64,
+      "mode": "full"
+    },
+    "target": {
+      "block_d": 64,
+      "block_h": 16,
+      "block_k": 32,
+      "num_warps": 8
+    },
+    "uses_tl_dot": true
+  },
+  "max_abs_diff": {
+    "d_index_logits": 3.0309996645883075e-07,
+    "index_k": 5.988633347442374e-06,
+    "index_logits": 0.4304656982421875,
+    "index_q": 3.471970558166504e-06,
+    "target_probs": 5.960464477539063e-08,
+    "weights": 8.463859558105469e-06
+  },
+  "promotion_read": "This is the unfused diagnostic floor for the LI auxiliary-loss pipeline. It avoids selected main-K, selected index-K, and per-head logit materialization, but still writes target_probs, index_logits, d_index_logits, and final gradients as separate intermediate tensors. Production should fuse these slices with the sparse MLA/compressor backward path.",
+  "reference": {
+    "loss": 0.016716502606868744,
+    "matmul_dtype": "input",
+    "norms": {
+      "d_index_logits": 1.541239362268243e-05,
+      "index_k": 0.000930636131670326,
+      "index_logits": 2882.64697265625,
+      "index_q": 0.0009363611461594701,
+      "target_probs": 4.036548137664795,
+      "weights": 0.0007774329278618097
+    },
+    "row_count": 125.0,
+    "workspace": {
+      "d_index_logits_bytes": 16384,
+      "head_logits_bytes": 1048576,
+      "index_logits_bytes": 16384,
+      "selected_index_k_bytes": 1048576,
+      "target": {
+        "per_head_probs_bytes": 1048576,
+        "selected_main_k_bytes": 4194304,
+        "target_logits_bytes": 1048576
+      }
+    }
+  },
+  "scope": "triton_sparse_li_full_pipeline_tl_dot_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 32,
+    "index_head_dim": 128,
+    "index_heads": 64,
+    "index_pattern": "shifted",
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_edges": 2016
+  },
+  "status": "passed",
+  "timing": {
+    "logical_flops": 433586176,
+    "logical_tflops_at_pipeline_event_median": 1.460072959675311,
+    "peak_memory_allocated_bytes": 187138048,
+    "peak_memory_allocated_gib": 0.174285888671875,
+    "pipeline": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.7414469718933105,
+        "mean_ms": 0.38637959361076357,
+        "median_ms": 0.2969619929790497,
+        "min_ms": 0.2724030017852783,
+        "samples_ms": [
+          0.7414469718933105,
+          0.33632299304008484,
+          0.2969619929790497,
+          0.2724030017852783,
+          0.28476300835609436
+        ],
+        "stdev_ms": 0.19993161803904305
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.8047979790717363,
+        "mean_ms": 0.4207724006846547,
+        "median_ms": 0.32421899959445,
+        "min_ms": 0.2973380032926798,
+        "samples_ms": [
+          0.8047979790717363,
+          0.3651779843494296,
+          0.32421899959445,
+          0.2973380032926798,
+          0.31232903711497784
+        ],
+        "stdev_ms": 0.21615096391590413
+      }
+    },
+    "stages": {
+      "index_logits": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.09380099922418594,
+          "mean_ms": 0.08377433319886525,
+          "median_ms": 0.07980100065469742,
+          "min_ms": 0.0777209997177124,
+          "samples_ms": [
+            0.09380099922418594,
+            0.07980100065469742,
+            0.0777209997177124
+          ],
+          "stdev_ms": 0.008745405917506333
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.1234590308740735,
+          "mean_ms": 0.11539633851498365,
+          "median_ms": 0.11502997949719429,
+          "min_ms": 0.10770000517368317,
+          "samples_ms": [
+            0.1234590308740735,
+            0.10770000517368317,
+            0.11502997949719429
+          ],
+          "stdev_ms": 0.007885897980181298
+        }
+      },
+      "kl_derivative": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.06456000357866287,
+          "mean_ms": 0.05609366794427236,
+          "median_ms": 0.05560100078582764,
+          "min_ms": 0.04811999946832657,
+          "samples_ms": [
+            0.06456000357866287,
+            0.05560100078582764,
+            0.04811999946832657
+          ],
+          "stdev_ms": 0.008231067639360408
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.082580023445189,
+          "mean_ms": 0.07333330965290467,
+          "median_ms": 0.0713499030098319,
+          "min_ms": 0.0660700025036931,
+          "samples_ms": [
+            0.082580023445189,
+            0.0713499030098319,
+            0.0660700025036931
+          ],
+          "stdev_ms": 0.00843182212253064
+        }
+      },
+      "li_grads": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.12184099853038788,
+          "mean_ms": 0.11909433205922444,
+          "median_ms": 0.11840099841356277,
+          "min_ms": 0.11704099923372269,
+          "samples_ms": [
+            0.12184099853038788,
+            0.11704099923372269,
+            0.11840099841356277
+          ],
+          "stdev_ms": 0.002473970891128564
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.14203996397554874,
+          "mean_ms": 0.13932298558453718,
+          "median_ms": 0.13818999286741018,
+          "min_ms": 0.13773899991065264,
+          "samples_ms": [
+            0.14203996397554874,
+            0.13773899991065264,
+            0.13818999286741018
+          ],
+          "stdev_ms": 0.0023637528095549745
+        }
+      },
+      "target_probs": {
+        "cuda_event": {
+          "enabled": true,
+          "max_ms": 0.041600000113248825,
+          "mean_ms": 0.03514700010418892,
+          "median_ms": 0.03316099941730499,
+          "min_ms": 0.03068000078201294,
+          "samples_ms": [
+            0.041600000113248825,
+            0.03316099941730499,
+            0.03068000078201294
+          ],
+          "stdev_ms": 0.005724486474328996
+        },
+        "wall": {
+          "enabled": true,
+          "max_ms": 0.06618001498281956,
+          "mean_ms": 0.053386359165112175,
+          "median_ms": 0.048430985771119595,
+          "min_ms": 0.04554807674139738,
+          "samples_ms": [
+            0.06618001498281956,
+            0.048430985771119595,
+            0.04554807674139738
+          ],
+          "stdev_ms": 0.01117300375927986
+        }
+      }
+    },
+    "timed_iters": 5,
+    "warmup_iters": 1
+  },
+  "triton_norms": {
+    "d_index_logits": 1.540842276881449e-05,
+    "index_k": 0.0009306718711741269,
+    "index_logits": 2882.65966796875,
+    "index_q": 0.0009359763935208321,
+    "target_probs": 4.036548137664795,
+    "weights": 0.0007773264078423381
+  },
+  "workspace": {
+    "derivative": {
+      "d_index_logits_bytes": 16384,
+      "index_logits_bytes": 16384,
+      "row_count": 125,
+      "target_probs_bytes": 16384
+    },
+    "grads": {
+      "d_index_k_bytes": 16384,
+      "d_index_q_bytes": 4194304,
+      "d_weights_bytes": 32768,
+      "head_logits_materialized_bytes": 0,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 2016
+    },
+    "logits": {
+      "head_logits_bytes": 0,
+      "index_logits_bytes": 16384,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 2016
+    },
+    "target": {
+      "per_head_probs_bytes": 0,
+      "selected_main_k_bytes": 0,
+      "target_logits_bytes": 0,
+      "target_probs_bytes": 16384
+    }
+  }
+}

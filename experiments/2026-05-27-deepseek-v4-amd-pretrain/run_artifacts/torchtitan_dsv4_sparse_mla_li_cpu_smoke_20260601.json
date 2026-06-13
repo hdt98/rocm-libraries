@@ -1,0 +1,26 @@
+{
+  "batch": 1,
+  "compress_ratio": 4,
+  "device": "cpu",
+  "dtype": "float32",
+  "implementation_status": "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+  "indexer_all_grads_present": true,
+  "indexer_any_grad_nonzero": true,
+  "indexer_grad_norms": {
+    "weights_proj.weight": 6.1303997433981294e-09,
+    "wk.weight": 7.118420519702795e-09,
+    "wq.weight": 7.544095126377215e-09
+  },
+  "input_grad_norm": 3.5843434034177335e-06,
+  "last_indexer_loss": 1.7687100672958422e-09,
+  "loss": 1.300841904594563e-05,
+  "output_shape": [
+    1,
+    32,
+    64
+  ],
+  "pytorch_sparse_mla_max_seq_len": 512,
+  "seq_len": 32,
+  "sparse_used": true,
+  "status": "passed"
+}

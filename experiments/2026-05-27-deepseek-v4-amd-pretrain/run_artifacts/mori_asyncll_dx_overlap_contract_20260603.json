@@ -1,0 +1,120 @@
+{
+  "artifact": "mori_asyncll_dx_overlap_contract_20260603",
+  "date_utc": "2026-06-03",
+  "status": "current_independent_handle_runtime_rejected_shared_route_metadata_needed",
+  "node_status": {
+    "latest_runtime_gate": "torchtitan_dsv4_asyncll_srcpos_dx_4x_s4096_gbs4_smoke_20260603",
+    "reason": "Independent AsyncLL x/grad/top-k handles fail both route-key and source-position alignment at S4096 with real TorchTitan router output."
+  },
+  "target_shape": {
+    "gpu": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "hidden": 4096,
+    "experts": 256,
+    "topk": 6,
+    "local_experts_per_rank": 32
+  },
+  "why_this_branch": {
+    "holistic_rank": 1,
+    "current_wall": "MoE backward dX return skew plus owner-rank VJP math",
+    "ep8_sidecar_combine_dx_s_per_step": 2.718,
+    "barrier_diag_pre_barrier_ms_per_call": 32.61,
+    "barrier_diag_raw_registered_combine_ms_per_call": 0.62,
+    "standalone_asyncll_external_total_ms_rank_median": 0.1641015033237636,
+    "read": "Raw combine bandwidth is not the wall; arrival skew is. AsyncLL is attractive only if TorchTitan can launch dX return earlier and overlap it with remaining owner-rank VJP work."
+  },
+  "mori_reference_contract": {
+    "source_snapshot": "sources/references/mori",
+    "kernel_family": "AsyncLL",
+    "jit_source": "ep_async_ll.hip",
+    "python_api": {
+      "file": "sources/references/mori/python/mori/ops/dispatch_combine.py",
+      "send_api": "EpDispatchCombineOp.combine_send(input, weights, indices, block_num=-1, warp_per_block=-1)",
+      "recv_api": "EpDispatchCombineOp.combine_recv(block_num=-1, warp_per_block=-1)",
+      "recv_constraint": "combine_recv requires a prior combine/combine_send call and only supports EpDispatchCombineKernelType.AsyncLL.",
+      "output_lifetime": "combine_send returns the output tensor view before receive completion; the tensor and op state must stay live until combine_recv finishes."
+    },
+    "cpp_launch_api": {
+      "file": "sources/references/mori/src/ops/dispatch_combine/launch.cpp",
+      "combine_recv": "LaunchCombineRecv launches EpCombineLowLatencyAsyncRecvTransfer_* then EpCombineLowLatencyAsyncRecvCopy_* and throws unless kernelType is AsyncLL."
+    },
+    "tuning_caveat": "The shipped gfx950_mi355x AsyncLL tuning config is ep16/hidden7168 oriented, so it is not a direct promotion table for EP8 hidden4096."
+  },
+  "current_torchtitan_path": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "current_dx_return": "_compute_mori_routed_vjp computes the full local VJP, prepares dpacked_x, then calls grad_op.combine(...) synchronously.",
+    "current_padded_vjp_order": [
+      "route_pack",
+      "sort_counts",
+      "gather_scale_scatter",
+      "w13_forward_gemm",
+      "swiglu_forward",
+      "w2_forward_gemm",
+      "dtopk_weight",
+      "w2_dgrad_gemm",
+      "swiglu_backward",
+      "w2_wgrad_gemm",
+      "w13_wgrad_gemm",
+      "w13_xgrad_gemm_reduce",
+      "scatter_outputs"
+    ],
+    "dependency_read": "After swiglu_backward, xgrad/reduce and wgrads are independent consumers of the same saved intermediates. dX can be computed before w2/w13 wgrad, enabling a staged dX send while wgrad is still running."
+  },
+  "proposed_impl_steps": [
+    {
+      "step": 1,
+      "item": "Add a separate backward dX AsyncLL MORI op role",
+      "details": "Do not repurpose the existing grad_op until correctness is proven. Create an opt-in op role such as backward_dx_asyncll with EpDispatchCombineKernelType.AsyncLL and isolated cached state."
+    },
+    {
+      "step": 2,
+      "item": "Split padded owner-rank VJP into early-dX and late-wgrad phases",
+      "details": "Compute w2_dgrad, swiglu_backward, w13_xgrad_gemm_reduce, scatter_outputs first. Keep hidden, scaled_dy_padded, x_padded, dgate, and dup alive for late w2_wgrad and w13_wgrad."
+    },
+    {
+      "step": 3,
+      "item": "Launch AsyncLL combine_send as soon as dpacked_x is ready",
+      "details": "Use the same dpacked_x order currently fed to combine_dx. Keep the returned dx_full view alive and do not slice/read it before combine_recv."
+    },
+    {
+      "step": 4,
+      "item": "Overlap late owner-rank work",
+      "details": "Run w2_wgrad_gemm and w13_wgrad_gemm while AsyncLL transfer is in flight. combine_dtopk can remain synchronous initially because it is small."
+    },
+    {
+      "step": 5,
+      "item": "Finish dX receive and return",
+      "details": "Call combine_recv, then slice dx_full[:x.shape[0]].contiguous() and return the same gradients as the current synchronous path."
+    }
+  ],
+  "correctness_gates": [
+    "Unit/probe parity against current synchronous registered combine on 4x and 8x small shapes.",
+    "Integrated TorchTitan S128/S512 smoke with finite loss, finite grad norm, and clean process-group teardown.",
+    "S4096 GBS8 diagnostic with MORI timing sidecar: raw combine_recv/send timings finite, no source-position mismatch, no hidden-dim/state reuse fault.",
+    "S4096 GBS128 no-profile two-step run only after the above gates pass."
+  ],
+  "performance_gates": [
+    "dX arrival skew should move from combine_dx wait into overlapped wgrad work; barrier pre-wait should shrink rather than just relabel.",
+    "No-profile EP8 step-2 throughput should beat the retained registered-combine CE8 baseline and the CE2 candidate once loss chunks are matched.",
+    "MORI timing sidecar should show combine_dx call/recv no longer dominates the non-overlapped critical path."
+  ],
+  "risks": [
+    "AsyncLL output and handle state are split across send/recv; reading dx_full before combine_recv would be incorrect.",
+    "AsyncLL shipped tuning is not target-shape tuned for EP8 hidden4096.",
+    "The current dispatch order alignment assumptions must be preserved when the dX op role changes.",
+    "If wgrad remains the new tail, the real speedup depends on how much of dX transfer can hide behind late wgrad."
+  ],
+  "runtime_validation_update": {
+    "artifact": "run_artifacts/mori_asyncll_align_mode_srcpos_retry_20260603.json",
+    "s128_staged_asyncll": "passed one integrated 4x S128 step",
+    "s4096_route_key": "failed grad_output MORI route-key set mismatch",
+    "s4096_src_pos": "failed grad_output MORI source-position set mismatch",
+    "read": "The compute/overlap split is smokeable, but the current split-handle route metadata contract is not production-safe at long sequence."
+  },
+  "next_action": "Build a shared route/order metadata contract for AsyncLL staged dX, then rerun the seeded S4096 parity gate before any target-shape throughput claim."
+}

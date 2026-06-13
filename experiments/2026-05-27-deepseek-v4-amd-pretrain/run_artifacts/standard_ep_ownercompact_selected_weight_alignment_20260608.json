@@ -1,0 +1,49 @@
+{
+  "artifact": "standard_ep_ownercompact_selected_weight_alignment_20260608",
+  "created_at": "2026-06-08",
+  "scope": "standard EP hot-helper compact-row materialization gate",
+  "problem": {
+    "old_contract": "helper execution chose expected row grouping from hot_split_weight_layout_effective",
+    "bad_gate": {
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected"
+    },
+    "failure_mode": "dispatcher could materialize owner_compact helper rows, but helper execution expected selected row groups and would not consume the owner_compact materialized path with selected hot weights."
+  },
+  "patch": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "new_helper": "_standard_ep_hot_to_owner_compact_order",
+    "behavior": "decouple hot_split_row_group_layout from hot_split_weight_layout_effective; when row_group_layout is owner_compact and weight layout is selected, reorder selected hot weights into compact owner order before grouped_mm.",
+    "keeps_retained_transport": true,
+    "gradient_contract": "index_select routes grouped_mm gradients back to selected-hot order, then existing _StandardEPHotWeightBroadcast backward reduces hot-weight grads."
+  },
+  "example_mapping": {
+    "selected_global_experts": [195, 176, 206, 182, 241, 97, 174, 218],
+    "num_local_experts": 32,
+    "ep_size": 8,
+    "max_owned_per_rank": 3,
+    "owner_shard_active_offsets": [9, 15, 16, 17, 18, 19, 20, 21],
+    "compact_to_hot_order": [5, 1, 3, 7, 0, 2, 6, 4]
+  },
+  "validation": {
+    "py_compile": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "py_compile_result": "passed",
+    "local_import_smoke": "not_run",
+    "local_import_smoke_reason": "local macOS Python environment does not have torch installed; remote/container e2e gate still required."
+  },
+  "next_e2e_gate": {
+    "shape": "8xMI350 S4096 GBS128 MBS4 FSDP8 EP8 flash12 standard-EP top8 SDMA hot-weight, no activation checkpointing",
+    "env_delta": {
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected"
+    },
+    "status": "not_run",
+    "reason": "do-sonle5-mi350-gpu and do-vunguyen-mi350-gpu were occupied by an external two-node TorchTitan FT workload using all GPUs."
+  },
+  "decision": {
+    "promote": false,
+    "read": "This fixes the compact-row materialization gate so a future e2e A/B is meaningful. It is not itself a promoted performance result."
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "artifact": "compressed_dkv_tile_segment_dblock_latency_sweep_decision_20260605",
+  "date": "2026-06-05",
+  "status": "rejected_as_sparse_attention_backward_epilogue",
+  "source_artifact": "run_artifacts/compressed_dkv_tile_segment_dblock_latency_sweep_s4096_layer2_20260605.json",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "selected_topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "latency_gate": {
+    "baseline_sparse_atomic_wall_ms": 8.80629825592041,
+    "best_token_block": 8,
+    "best_event_median_ms": 114.69290924072266,
+    "best_modeled_write_reduction_x": 5.992058108427399,
+    "passed": false
+  },
+  "realized_sweep_summary": [
+    {
+      "token_block": 4,
+      "modeled_write_reduction_x": 3.04843444037302,
+      "event_median_ms": 115.23489379882812
+    },
+    {
+      "token_block": 8,
+      "modeled_write_reduction_x": 5.992058108427399,
+      "event_median_ms": 114.69290924072266
+    },
+    {
+      "token_block": 16,
+      "modeled_write_reduction_x": 11.952959063438367,
+      "event_median_ms": 114.73709106445312
+    },
+    {
+      "token_block": 32,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "event_median_ms": 115.91092681884766
+    },
+    {
+      "token_block": 64,
+      "modeled_write_reduction_x": 47.254673318506946,
+      "event_median_ms": 146.04322814941406
+    },
+    {
+      "token_block": 128,
+      "modeled_write_reduction_x": 93.07162306144193,
+      "event_median_ms": 186.2482452392578
+    }
+  ],
+  "read": {
+    "why_it_failed": "The route-owned scalar reducer improves the modeled number of final dKV writes, but the realized kernel stays around 115 ms for token_block 4-32 and gets worse for 64-128. The owner has become serialized around route segments and does not preserve the fast query-major MFMA producer.",
+    "why_the_dkv_slice_does_not_materialize_e2e": "A late dKV reducer is called after TorchTitan has already paid for selected state, probability or scaled-dP materialization, bridge tensors, and a separate producer. Its local win can be erased by those upstream costs. A real speedup requires moving the reduction into the sparse-attention backward producer itself.",
+    "required_fused_owner_contract": "q,dO,compressed/shared KV,indices,lse/sink -> recompute qk/probs/scaled-dP -> produce dQ -> group-aware dKV epilogue before global memory",
+    "promotion_gate": "Only a full sparse-attention backward S4096 timing that consumes source tensors directly and avoids HSK/prob/scaled-dP slabs should be promoted toward e2e TFLOPs."
+  },
+  "next_kernel_direction": {
+    "owner": "query_major_token_tile_sparse_attention_backward",
+    "preserve": [
+      "query-major Q/dO reuse",
+      "MFMA-shaped qk, dprob, dQ, and dKV contribution math",
+      "no selected_kv materialization",
+      "no HSK probability slab",
+      "no scaled-dP slab",
+      "no O(S*K*D) partial slab"
+    ],
+    "replace": [
+      "per-selected global dKV atomic_add",
+      "route-owned scalar grouped reducer",
+      "late post-producer dKV-only bridge"
+    ],
+    "first_gate": {
+      "shape": "S4096,H64,D512,selected_topk512,compressed_groups1024",
+      "metric": "full sparse-attention backward source-boundary latency",
+      "must_beat_ms": 8.80629825592041
+    }
+  }
+}

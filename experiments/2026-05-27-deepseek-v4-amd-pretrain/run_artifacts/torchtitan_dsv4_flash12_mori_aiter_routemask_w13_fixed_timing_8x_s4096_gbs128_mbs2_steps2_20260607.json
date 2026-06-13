@@ -1,0 +1,86 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_routemask_w13_fixed_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "status": "completed_two_step_timing_only_not_promoted",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "purpose": "Verify the MORI/AITER hot-split W13 launcher plumbing and measure the fused route-mask helper path with true W13 hot-weight broadcast enabled.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "off"
+  },
+  "environment": {
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "2",
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "route_mask",
+    "CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS": "512",
+    "CANARY_MORI_AITER_HOT_SPLIT_W13": "true",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "TORCHTITAN_MORI_AITER_TIMING_PATH": "/tmp/dsv4_w13_fixed_timing_20260607/mori_timing.jsonl"
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.17579,
+      "grad_norm": 17.375,
+      "tokens_per_gpu_s": 1446.0,
+      "tflops_per_gpu": 73.2,
+      "peak_logged_memory_gib": 112.31
+    },
+    "step_2": {
+      "loss": 9.61613,
+      "grad_norm": 83.0,
+      "tokens_per_gpu_s": 4109.0,
+      "tflops_per_gpu": 208.04,
+      "peak_logged_memory_gib": 152.74
+    }
+  },
+  "hot_split_w13_validation": {
+    "requested_true_records": 1536,
+    "actual_true_records": 1536,
+    "read": "The launcher now really passes TORCHTITAN_MORI_AITER_HOT_SPLIT_W13=true into the container; the previous W13 timing attempt was not a valid W13 comparison."
+  },
+  "hot_execute_last_half_rankmax_ms": {
+    "plan": 121.905,
+    "remote_mask": 37.219,
+    "broadcast_w13": 120.527,
+    "broadcast_w2": 39.883,
+    "gather_remote": 3.661,
+    "sort_counts": 20.167,
+    "grouped_rows": 92.146,
+    "scatter_tokens": 16.292
+  },
+  "mori_timing_last_half_rankmax_ms": {
+    "backward.local_vjp.aiter_stage1_recompute": 2968.866,
+    "backward.combine_dx.call": 1410.639,
+    "backward.dispatch_grad_output.call": 339.181,
+    "local_aiter_stage1_recompute_vjp.stage1_forward": 581.387,
+    "local_aiter_stage1_saved_vjp.wgrad": 604.918,
+    "local_aiter_stage1_saved_vjp.xgrad": 377.195,
+    "local_aiter_stage1_saved_vjp.prepare_ops": 352.841
+  },
+  "comparison": {
+    "route_mask_minhelper512_six_step_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_aiter_hot_execute_routemask_minhelper512_8x_s4096_gbs128_mbs2_steps6_20260607.json",
+    "route_mask_minhelper512_steps_2_to_6_tokens_per_gpu_s_mean": 4120.4,
+    "gpu_counts_timing_step_2_tokens_per_gpu_s": 4146.0,
+    "w13_fixed_step_2_tokens_per_gpu_s": 4109.0,
+    "read": "True W13 hot split is not promoted. It replaces W1/W3 hot-weight broadcasts with W13, but broadcast_w13 is itself large and the fused MORI/AITER route-mask path remains dominated by owner local VJP, combine_dx wait, repeated helper planning/mask/broadcast/sort, and tiny helper AITER calls."
+  },
+  "raw_evidence": {
+    "local_timing_sidecar": "/tmp/dsv4_w13_fixed_timing_20260607/mori_timing.jsonl",
+    "local_docker_log": "/tmp/dsv4_w13_fixed_timing_20260607/docker-run.log"
+  }
+}

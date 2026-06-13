@@ -1,0 +1,76 @@
+{
+  "artifact": "grouped_bmm_s4096_probe_plan_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Prepared direct grouped-BMM probes for the S4096 routed-MoE bottleneck identified after the M=12288 one-expert GEMM floor passed target.",
+  "why": {
+    "prior_direct_large_gemm": "M=12288 one-expert BF16 GEMMs are 0.40-0.60 ms, under the 1.3 ms/expert target.",
+    "prior_integrated_profile": "S4096 routed MoE backward is still around 31 ms for dgrad and 31 ms for wgrad, dominated by grouped/ragged batched GEMMs in the rocprof block summary.",
+    "next_question": "Measure the actual grouped batched shape used by routed MoE: 384 experts with small rows per expert, current-like transposed operands, and copy-cost timing."
+  },
+  "launcher_update": {
+    "file": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+    "new_actions": {
+      "probe-grouped-bmm-s4096-balanced": {
+        "tokens": 4096,
+        "experts": 384,
+        "topk": 6,
+        "rows_per_expert": 64,
+        "read": "Balanced S4096/topk6 cyclic proxy, no global-max learned-route padding."
+      },
+      "probe-grouped-bmm-s4096-padded88": {
+        "tokens": 5632,
+        "experts": 384,
+        "topk": 6,
+        "rows_per_expert": 88,
+        "read": "Proxy for the learned-router S4096 max-padded route where 384 experts x 88 rows = 33,792 padded assignments."
+      }
+    },
+    "defaults": {
+      "GROUPED_BMM_LAYOUT": "actual",
+      "GROUPED_BMM_BLAS_BACKEND": "current",
+      "GROUPED_BMM_ITERS": 5,
+      "measure_copy_cost": true
+    }
+  },
+  "commands_ready": {
+    "balanced_actual": "RUN_TAG=grouped_bmm_s4096_20260531 GROUPED_BMM_LAYOUT=actual TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=300 WAIT_IDLE_INTERVAL_SECONDS=15 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "padded88_actual": "RUN_TAG=grouped_bmm_s4096_20260531 GROUPED_BMM_LAYOUT=actual TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=300 WAIT_IDLE_INTERVAL_SECONDS=15 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-padded88",
+    "balanced_materialized_transpose": "RUN_TAG=grouped_bmm_s4096_mattrans_20260531 GROUPED_BMM_LAYOUT=materialized-transpose TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=300 WAIT_IDLE_INTERVAL_SECONDS=15 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-balanced",
+    "padded88_materialized_transpose": "RUN_TAG=grouped_bmm_s4096_mattrans_20260531 GROUPED_BMM_LAYOUT=materialized-transpose TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 WAIT_IDLE_SECONDS=300 WAIT_IDLE_INTERVAL_SECONDS=15 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-grouped-bmm-s4096-padded88"
+  },
+  "run_attempts_this_turn": [
+    {
+      "command": "probe-grouped-bmm-s4096-balanced with GROUPED_BMM_LAYOUT=actual",
+      "result": "not_started",
+      "reason": "Idle guard found active external Python KFD processes."
+    },
+    {
+      "command": "probe-grouped-bmm-s4096-balanced with WAIT_IDLE_SECONDS=300",
+      "result": "not_completed",
+      "reason": "The launcher observed no active KFD processes, then SSH reset during the stage/run boundary before a summary artifact was produced."
+    }
+  ],
+  "blocking_external_processes_observed": [
+    {
+      "pid": 3461679,
+      "cwd": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/coda_tilelang",
+      "command": "python3 tools/bench_coda_tilelang_stage1_absmax.py --preset dsv4-flash-routed --topk 6 --block-m 96 --stage2-block-m 48 --block-i 64 --block-k 64 --stage2-block-h 128 --full-path --include-a2-fused-combine-fp32-stage2 --stage1-impl interleaved-lds --warmups 2 --iters 5 --det-iters 2 --output-json /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/artifacts/coda_tilelang_a2_fused_combine_fp32_stage2_20260531T132059Z/flash_bm48.json"
+    },
+    {
+      "pid": 3461831,
+      "cwd": "/exp",
+      "command": "python3 tools/dsv4_coda_tilelang_qfp8_value_segment_attention_probe.py --active-m 512 --padded-m 512 --n 8192 --k 512 --dpe 64 --dpe-block 32 --dv 512 --block-m 16 --block-n 256 --block-k 64 --block-v 64 --warmup 5 --rep 20 --json-output /exp/artifacts/dsv4_coda_qfp8_value_segment_kpe_copytouch_20260531/m512_n8192_dv512_bm16_bn256_bv64_rep20.json"
+    }
+  ],
+  "expected_read_after_probe": {
+    "if_grouped_bmm_matches_rocprof_6ms": "The problem is small-M grouped batched GEMM library efficiency/scheduling. Focus on compact-native grouped kernels, AITER/CK/Triton small-M grouped GEMM alternatives, or bucketing by row count.",
+    "if_grouped_bmm_is_fast_but_integrated_remains_slow": "The bottleneck is likely dispatch/gather/reduce materialization or autograd wrapper overhead around the GEMMs, so focus on fusion and saved compact tensors.",
+    "if_materialized_transpose_is_much_faster": "Consider materializing wgrad lhs or changing saved activation layout, but only if full-layer timing beats the current compact-reduce path after copy cost."
+  },
+  "validation_completed": {
+    "launcher_bash_n": true,
+    "node_idle_before_attempt": "intermittent; external jobs repeatedly started on do-sonle-kernel",
+    "gpu_run_completed": false
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,84 @@
+{
+  "artifact": "actual_li_prepacked_route_consumption_decision_20260603",
+  "date": "2026-06-03",
+  "scope": "Decision gate for the prepacked group-owned compressed-dKV speedup candidate.",
+  "source_artifacts": {
+    "metadata": "run_artifacts/actual_li_prepacked_route_consumption_metadata_s4096_layer2_20260603.json",
+    "scalar_input": "run_artifacts/actual_li_prepacked_route_consumption_scalar_s4096_layer2_20260603.json",
+    "route_pack": "run_artifacts/actual_li_group_panel_route_pack_s4096_layer2_20260603.json",
+    "schedule_plan": "run_artifacts/actual_li_group_owned_sparse_dkv_schedule_plan_s4096_layer2_20260603.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "valid_pairs": 1572352
+  },
+  "current_gate": {
+    "retained_sparse_atomic_dkv_wall_ms": "8.0-8.8",
+    "raw_atomic_elements": 805044224
+  },
+  "best_metadata_only": {
+    "token_block": 64,
+    "group_panel": 512,
+    "route_pair_metadata_ms": 0.020060000009834766,
+    "route_segment_metadata_ms": 0.019180000759661198,
+    "modeled_write_reduction_x": 47.254673318506946,
+    "k16_fill_x": 0.971489580449998
+  },
+  "scalar_input_rows": [
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "route_pair_metadata_ms": 0.023521000519394875,
+      "route_segment_metadata_ms": 0.02436099946498871,
+      "one_d_lane_scalar_input_ms": 0.6656079888343811,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "k16_fill_x": 0.9579007905176867
+    },
+    {
+      "token_block": 32,
+      "group_panel": 512,
+      "route_pair_metadata_ms": 0.02168099954724312,
+      "route_segment_metadata_ms": 0.023920999839901924,
+      "one_d_lane_scalar_input_ms": 0.6047679781913757,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "k16_fill_x": 0.971489580449998
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "route_pair_metadata_ms": 0.019680999219417572,
+      "route_segment_metadata_ms": 0.02027999982237816,
+      "one_d_lane_scalar_input_ms": 0.6827279925346375,
+      "modeled_write_reduction_x": 47.254673318506946,
+      "k16_fill_x": 0.9579007905176867
+    },
+    {
+      "token_block": 64,
+      "group_panel": 512,
+      "route_pair_metadata_ms": 0.020360000431537628,
+      "route_segment_metadata_ms": 0.01947999931871891,
+      "one_d_lane_scalar_input_ms": 0.5798069834709167,
+      "modeled_write_reduction_x": 47.254673318506946,
+      "k16_fill_x": 0.971489580449998
+    }
+  ],
+  "decision": {
+    "status": "promote_to_real_kernel_candidate",
+    "read": "The prepacked route-list format is not the wall. Torch sort-based packing is about 0.52-0.54 ms, pair/segment route traversal is about 0.02 ms, and a one-D-lane q/dO/probs/grad_logits scalar input walk is about 0.58-0.68 ms, all below the 8.0-8.8 ms sparse-atomic dKV wall.",
+    "speedup_candidate": "Prepack actual LI routes, keep query-major contribution production, perform tile-local grouped/segmented D16 reduction, then emit reduced dKV atomics or compact partial rows.",
+    "first_bringup_shape": "token_block=32, group_panel=256 for S128/S512 parity and S4096 timing because it has 23.81x modeled write reduction with high K16 fill and lower scheduling risk.",
+    "followup_shape": "token_block=64, group_panel=512 for the higher 47.25x write-reduction envelope once the accumulator body is stable.",
+    "remaining_risk": "The unproven part is the full D16 MFMA accumulator plus in-tile grouped/segmented reduction. Previous route-grid pair-slot reducers failed because local-table initialization and per-contribution LDS accumulation dominated; the new kernel must avoid that topology."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --group-panels 256,512 --warmup-iters 3 --timed-iters 10 --summary-path run_artifacts/actual_li_prepacked_route_consumption_metadata_s4096_layer2_20260603.json",
+    "python3 tools/dsv4_runtime_probe/benchmark_sparse_dkv_prepacked_route_consumption.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --group-panels 256,512 --include-scalar-input-sink --allow-large-materialization --warmup-iters 2 --timed-iters 5 --summary-path run_artifacts/actual_li_prepacked_route_consumption_scalar_s4096_layer2_20260603.json"
+  ]
+}

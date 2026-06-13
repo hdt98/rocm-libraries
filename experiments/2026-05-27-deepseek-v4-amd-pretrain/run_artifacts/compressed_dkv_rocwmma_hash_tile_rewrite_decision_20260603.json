@@ -1,0 +1,65 @@
+{
+  "artifact": "compressed_dkv_rocwmma_hash_tile_rewrite_decision",
+  "created_at": "2026-06-03",
+  "scope": "actual_li_materialized_probs_sparse_attention_backward_dkv_scatteradd_kernel_rewrite",
+  "status": "implemented_correct_small_scale_rejected_s4096_latency",
+  "code_path": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py",
+  "retained_kernel_mode": "hash_tile",
+  "retained_kernel_summary": {
+    "producer": "query-major rocWMMA K16xD16 contribution tile over H64",
+    "accumulator": "LDS open-addressed hash table keyed by compressed group",
+    "slot_resolution": "one hash lookup per selected K row, then D16 local atomicAdd into the resolved slot",
+    "global_emit": "one global atomicAdd row per occupied hash slot and D16 block after local accumulation",
+    "diagnostic_contract": "consumes materialized probs and grad_logits_scaled; does not yet fuse probability, LI, or compressor recompute"
+  },
+  "retained_results": {
+    "s128_layer2_sc32_sb64_hs2048": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_hash_tile_retained_s128_layer2_sc32_sb64_hs2048_20260603.json",
+      "correctness": "passed",
+      "median_ms": 0.321
+    },
+    "s512_layer2_sc32_sb64_hs256": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_hash_tile_retained_s512_layer2_sc32_sb64_hs256_20260603.json",
+      "correctness": "passed",
+      "median_ms": 1.538
+    },
+    "s4096_layer2_sc32_sb64_hs1024": {
+      "artifact": "run_artifacts/compressed_dkv_rocwmma_hash_tile_retained_s4096_layer2_sc32_sb64_hs1024_20260603.json",
+      "correctness": "timing_only_skipped_reference",
+      "median_ms": 131.916,
+      "passes_sparse_atomic_gate": false
+    }
+  },
+  "baseline_gate": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "kernel": "dot_k_atomic",
+    "s4096_layer2_median_ms": 8.80629825592041
+  },
+  "rejected_branches": [
+    {
+      "branch": "hash_slots_2048_s4096",
+      "result": "145.721 ms at S4096 selected_block=64",
+      "read": "Over-conservative hash table increased slot init/emit cost and did not approach the sparse atomic gate."
+    },
+    {
+      "branch": "selected_block_256_s4096",
+      "result": "144.57 ms at S4096 hash_slots=2048",
+      "read": "Widening selected tiles did not reduce runtime, so CTA count was not the primary wall."
+    },
+    {
+      "branch": "active_slot_first_store",
+      "result": "S128 parity failed before a fixed emit-index bug; the safer sentinel variant then developed a spin/performance cliff at S512",
+      "read": "Active slot emission alone is not enough, and sentinel reservation adds too much synchronization risk for this path."
+    }
+  ],
+  "diagnosis": {
+    "root_cause": "Moving the many-to-one dKV accumulation from global atomics into LDS atomics does not solve the S4096 wall; the local atomic/add and hash-table management become slower than the current sparse global atomic path.",
+    "what_changed": "The rewrite reduced global writes but introduced per-selected-row hash lookup plus D16 local atomics and table initialization/scanning. That is acceptable at S128/S512 but explodes at S4096 layer-2 actual LI fan-in.",
+    "next_kernel_requirement": "Do not use local atomics as the main coalescing mechanism. The next rewrite needs warp/block segmented reduction or group-owned MFMA accumulation that produces one coalesced group row without per-contribution atomicAdd, ideally fused with probability/LI/compressor recompute so selected partials are not materialized."
+  },
+  "commands": {
+    "s128": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode hash_tile --seq-len 128 --layer-id 2 --seq-chunk 32 --selected-block 64 --hash-slots 2048 --extension-dir /workspace/torch_extensions/rocwmma_hash_tile_v2retained",
+    "s512": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode hash_tile --seq-len 512 --layer-id 2 --seq-chunk 32 --selected-block 64 --hash-slots 256 --extension-dir /workspace/torch_extensions/rocwmma_hash_tile_v2retained",
+    "s4096": "docker run ... python3 tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py --kernel-mode hash_tile --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 64 --hash-slots 1024 --skip-correctness --skip-reference-timing --allow-large-materialization --extension-dir /workspace/torch_extensions/rocwmma_hash_tile_v2retained"
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "artifact": "mori_auto_launch_config_ab_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Focused MORI_EP_LAUNCH_CONFIG_MODE=AUTO follow-up for the routed backward combine_dx wall at target S4096 EP4/EP8 shapes.",
+  "status": "complete",
+  "common_knobs": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "module": "deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "sequence_length": 4096,
+    "mbs": 1,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpointing": "full",
+    "checkpoint_enabled": false,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot",
+    "mori_backward": "routed padded VJP",
+    "local_vjp_swiglu_backend": "triton runtime n_elements",
+    "mori_op_cache_mode": "backward",
+    "assume_identical_dispatch_order": 1,
+    "mori_shmem_heap_size": "32G",
+    "manual_env_defaults_still_exported": {
+      "TORCHTITAN_MORI_AITER_BLOCK_NUM": "64",
+      "TORCHTITAN_MORI_AITER_RDMA_BLOCK_NUM": "32",
+      "TORCHTITAN_MORI_AITER_WARP_NUM_PER_BLOCK": "8"
+    }
+  },
+  "baseline_context": {
+    "manual_external_ep4_step2_steady_combine_dx_median_ms": 4.55927586555481,
+    "manual_registered_ep8_step2_steady_combine_dx_median_ms": 28.145153999328613,
+    "manual_registered_ep8_no_timing_target_run": {
+      "artifact": "torchtitan_dsv4_mori_registered_neltsruntime_8x_s4096_gbs128_20260603.json",
+      "step2_tokens_per_gpu_s": 3026,
+      "step2_implied_step_s": 21.65,
+      "read": "retained 8x target-shape canary setting before this AUTO follow-up"
+    }
+  },
+  "runs": {
+    "ep4_external_auto": {
+      "shape": "EP4/FSDP4 MBS1 S4096 GBS4",
+      "run_id": "torchtitan_dsv4_mori_eventtiming_ep4_external_auto_s4096_gbs4_mbs1_20260603",
+      "result": {
+        "passed": true,
+        "step2_loss": 8.01872,
+        "step2_grad_norm": 41.75,
+        "step2_tokens_per_gpu_s": 2635,
+        "read": "event timing perturbs throughput; use only the stage timings for this diagnostic"
+      },
+      "mode": {
+        "MORI_EP_LAUNCH_CONFIG_MODE": "AUTO",
+        "TORCHTITAN_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE": "external"
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          256,
+          0,
+          16
+        ],
+        "combine_dtopk_launch": [
+          128,
+          32,
+          16
+        ],
+        "note": "tuple order is block_num, rdma_block_num, warp_num_per_block"
+      },
+      "timing": {
+        "records": 32,
+        "ranks": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "call_ids": [
+          1,
+          8
+        ],
+        "step2_exclude_call5": {
+          "backward.combine_dx.call": {
+            "n": 12,
+            "median_ms": 22.554593086242676,
+            "p90_ms": 59.983821868896484,
+            "min_ms": 0.6136459708213806,
+            "max_ms": 88.55548095703125,
+            "ratio_vs_manual_external_ep4_step2_steady": 4.946181610952918
+          },
+          "backward.combine_dtopk.call": {
+            "n": 12,
+            "median_ms": 0.033239999786019325,
+            "p90_ms": 0.03548000007867813,
+            "min_ms": 0.032281000167131424,
+            "max_ms": 0.03571999818086624
+          },
+          "backward.local_vjp.padded": {
+            "n": 12,
+            "median_ms": 40.47729682922363,
+            "p90_ms": 56.636863708496094,
+            "min_ms": 22.88964080810547,
+            "max_ms": 115.9290771484375
+          }
+        }
+      },
+      "raw_timing": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_eventtiming_ep4_external_auto_s4096_gbs4_mbs1_20260603/mori_timing",
+        "local_copy": "/tmp/torchtitan_dsv4_mori_eventtiming_ep4_external_auto_s4096_gbs4_mbs1_20260603_copy/mori_timing"
+      }
+    },
+    "ep8_registered_auto": {
+      "shape": "EP8/FSDP8 MBS1 S4096 GBS8",
+      "run_id": "torchtitan_dsv4_mori_eventtiming_ep8_registered_auto_s4096_gbs8_mbs1_20260603",
+      "result": {
+        "passed": false,
+        "status": "hung_before_step_output",
+        "action": "stopped only the TorchTitan diagnostic container after the run made no step progress for more than 3 minutes",
+        "read": "not a retained target setting; no steady step2 sample exists"
+      },
+      "mode": {
+        "MORI_EP_LAUNCH_CONFIG_MODE": "AUTO",
+        "TORCHTITAN_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE": "registered"
+      },
+      "actual_launch_config": {
+        "combine_dx_launch": [
+          128,
+          0,
+          4
+        ],
+        "combine_dtopk_launch": [
+          128,
+          32,
+          16
+        ],
+        "note": "tuple order is block_num, rdma_block_num, warp_num_per_block"
+      },
+      "timing": {
+        "records": 8,
+        "ranks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "call_ids": [
+          1,
+          1
+        ],
+        "first_call_only": {
+          "backward.combine_dx.call": {
+            "n": 8,
+            "median_ms": 42.57631492614746,
+            "p90_ms": 118.83331298828125,
+            "min_ms": 0.4252049922943115,
+            "max_ms": 130.24746704101562
+          },
+          "backward.combine_dtopk.call": {
+            "n": 8,
+            "median_ms": 0.023460499942302704,
+            "p90_ms": 0.024160999804735184,
+            "min_ms": 0.022721000015735626,
+            "max_ms": 0.024640999734401703
+          },
+          "backward.local_vjp.padded": {
+            "n": 8,
+            "median_ms": 2041.0765991210938,
+            "p90_ms": 2065.359375,
+            "min_ms": 1953.410888671875,
+            "max_ms": 2083.270263671875,
+            "read": "blocked/hung first-call timing, not a local VJP math latency"
+          }
+        }
+      },
+      "raw_timing": {
+        "remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_mori_eventtiming_ep8_registered_auto_s4096_gbs8_mbs1_20260603/mori_timing",
+        "local_copy": "/tmp/torchtitan_dsv4_mori_eventtiming_ep8_registered_auto_s4096_gbs8_mbs1_20260603_copy/mori_timing"
+      }
+    }
+  },
+  "read": [
+    "AUTO loads non-default MORI launch tuples for the same TorchTitan bridge shape: EP4 external combine_dx uses [256, 0, 16] and EP8 registered combine_dx uses [128, 0, 4].",
+    "EP4 external AUTO is a clear negative result for the combine_dx wall: the step2-excluding-call5 median rises to 22.55 ms from the manual external baseline 4.56 ms.",
+    "EP8 registered AUTO is not usable as a retained canary setting: the run only emitted first-call timing and hung before step output.",
+    "Keep manual registered combine as the retained 8x target-shape setting. The next combine branch should be explicit manual geometry micro-sweeps or split/overlapped backward combine, not blanket MORI AUTO."
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "batch": 1,
+  "candidate": {
+    "compressed_groups": 1024,
+    "estimated_selected_state_elements": 171798691840,
+    "output_checksum": -0.000279459374723956,
+    "selected_keys": 640,
+    "sparse_skip_reason": null,
+    "sparse_used": true
+  },
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_mode": "fused",
+  "candidate_vs_target_forward_ratio": 27.43013721042209,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "layer_id": 2,
+  "max_output_abs_diff": 0.00390625,
+  "output_atol": 0.01,
+  "reference": {
+    "compressed_groups": 1024,
+    "estimated_selected_state_elements": 171798691840,
+    "output_checksum": -0.0002794596366584301,
+    "selected_keys": 640,
+    "sparse_skip_reason": null,
+    "sparse_used": true
+  },
+  "reference_kernel_module": null,
+  "reference_mode": "manual_stream",
+  "scope": "forward_only_training_graph",
+  "seed": 1234,
+  "seq_len": 4096,
+  "status": "passed",
+  "target_forward_ms": 3.6,
+  "timing": {
+    "candidate": {
+      "compressed_groups": 1024,
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 99.0080795288086,
+        "mean_ms": 98.74849395751953,
+        "median_ms": 98.68481826782227,
+        "min_ms": 98.5164794921875,
+        "samples_ms": [
+          98.94951629638672,
+          98.91000366210938,
+          98.6873550415039,
+          98.67494201660156,
+          98.58448028564453,
+          99.0080795288086,
+          98.67552185058594,
+          98.79627990722656,
+          98.68228149414062,
+          98.5164794921875
+        ],
+        "stdev_ms": 0.16184752826789037
+      },
+      "enabled": true,
+      "estimated_selected_state_elements": 171798691840,
+      "iters": 10,
+      "last_output_checksum": -0.000279459374723956,
+      "peak_memory_allocated_bytes": 12176920064,
+      "peak_memory_allocated_gib": 11.340640544891357,
+      "requires_grad": true,
+      "selected_keys": 640,
+      "sparse_skip_reason": null,
+      "sparse_used": true,
+      "wall": {
+        "enabled": true,
+        "max_ms": 99.02924904599786,
+        "mean_ms": 98.77421980490908,
+        "median_ms": 98.70704147033393,
+        "min_ms": 98.53873599786311,
+        "samples_ms": [
+          99.01098906993866,
+          98.93135691527277,
+          98.71023695450276,
+          98.69681601412594,
+          98.60606491565704,
+          99.02924904599786,
+          98.69717608671635,
+          98.81772706285119,
+          98.7038459861651,
+          98.53873599786311
+        ],
+        "stdev_ms": 0.1674603112619595
+      },
+      "warmup_iters": 3
+    },
+    "reference": {
+      "enabled": false
+    }
+  }
+}

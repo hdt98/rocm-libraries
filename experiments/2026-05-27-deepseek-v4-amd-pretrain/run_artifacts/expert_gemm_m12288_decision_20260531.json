@@ -1,0 +1,175 @@
+{
+  "artifact": "expert_gemm_m12288_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "Direct one-MI350 BF16 M=12288 expert GEMM floor for the updated DeepSeek V4-Pro MoE target.",
+  "target": {
+    "moe_expert_gemm_m12288_ms": 1.3,
+    "shape_read": "One expert, M=12288, H=7168, I=3072, BF16. This isolates the large dense GEMM floor and does not include learned routing, topk, scatter/gather, per-expert ragged groups, grouped-GEMM launch overhead, SwiGLU, or output/input reductions."
+  },
+  "source_artifacts": {
+    "contiguous": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/expert_gemm_m12288_20260531.json",
+    "actual_layout": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/expert_gemm_m12288_actual_layout_20260531.json",
+    "s4096_target_gap": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_s4096_updated_target_gap_20260531.json"
+  },
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "blas_backend_effective": "Cublaslt",
+    "dtype": "bfloat16",
+    "warmup": 2,
+    "iters": 5
+  },
+  "contiguous_layout": {
+    "read": "Ideal contiguous operands. All single GEMMs are much faster than the 1.3 ms target; the fused pair-style W1/W3 xgrad takes about 1.03 ms total for two GEMMs.",
+    "ops": {
+      "fwd_w1": {
+        "median_ms": 0.4062429964542389,
+        "min_ms": 0.3919230103492737,
+        "tflops_median": 1332.123591100381,
+        "median_over_target": 0.3124946126571068
+      },
+      "w2_dgrad": {
+        "median_ms": 0.41560301184654236,
+        "min_ms": 0.4078829884529114,
+        "tflops_median": 1302.1221306640111,
+        "median_over_target": 0.31969462449734025
+      },
+      "w1w3_xgrad_pair": {
+        "median_ms": 1.0338879823684692,
+        "min_ms": 1.0212470293045044,
+        "tflops_median": 1046.8559235136422,
+        "median_over_target_for_pair": 0.7952984479757454,
+        "per_gemm_equivalent_ms": 0.5169439911842346,
+        "per_gemm_equivalent_over_target": 0.3976492239878727
+      },
+      "w2_wgrad": {
+        "median_ms": 0.4000830054283142,
+        "min_ms": 0.3953230082988739,
+        "tflops_median": 1352.634008326966,
+        "median_over_target": 0.30775615802178014
+      },
+      "w1_wgrad": {
+        "median_ms": 0.4178830087184906,
+        "min_ms": 0.4120030105113983,
+        "tflops_median": 1295.0176676375938,
+        "median_over_target": 0.32144846824499274
+      },
+      "w3_wgrad": {
+        "median_ms": 0.41400301456451416,
+        "min_ms": 0.4050830006599426,
+        "tflops_median": 1307.154441532865,
+        "median_over_target": 0.31846385735731855
+      }
+    }
+  },
+  "actual_layout": {
+    "read": "Current-path-like transposed views hurt wgrad, but still leave large dense M=12288 GEMMs well below 1.3 ms. Layout alone does not explain the multi-ms integrated routed MoE attribution.",
+    "ops": {
+      "fwd_w1": {
+        "median_ms": 0.4499239921569824,
+        "min_ms": 0.39252299070358276,
+        "tflops_median": 1202.7940023860351,
+        "median_over_target": 0.34609537858229417,
+        "over_contiguous": 1.1075243046255543,
+        "a_contiguous": true,
+        "b_contiguous": false
+      },
+      "w2_dgrad": {
+        "median_ms": 0.4354439973831177,
+        "min_ms": 0.411202996969223,
+        "tflops_median": 1242.7909961975313,
+        "median_over_target": 0.33495692106393665,
+        "over_contiguous": 1.0477402352028706,
+        "a_contiguous": true,
+        "b_contiguous": true
+      },
+      "w1w3_xgrad_pair": {
+        "median_ms": 1.0615299940109253,
+        "min_ms": 1.018090009689331,
+        "tflops_median": 1019.5960214958002,
+        "median_over_target_for_pair": 0.8165615338545579,
+        "per_gemm_equivalent_ms": 0.5307649970054626,
+        "per_gemm_equivalent_over_target": 0.40828076692727894,
+        "over_contiguous": 1.0267359831179512,
+        "a_contiguous": true,
+        "b_contiguous": true
+      },
+      "w2_wgrad": {
+        "median_ms": 0.5990449786186218,
+        "min_ms": 0.5684840083122253,
+        "tflops_median": 903.3810458505317,
+        "median_over_target": 0.46080382970663214,
+        "over_contiguous": 1.4973017361167495,
+        "a_contiguous": false,
+        "b_contiguous": true
+      },
+      "w1_wgrad": {
+        "median_ms": 0.5628849864006042,
+        "min_ms": 0.5597649812698364,
+        "tflops_median": 961.4146626231974,
+        "median_over_target": 0.43298845107738787,
+        "over_contiguous": 1.3469918007118473,
+        "a_contiguous": false,
+        "b_contiguous": true
+      },
+      "w3_wgrad": {
+        "median_ms": 0.5473250150680542,
+        "min_ms": 0.5462039709091187,
+        "tflops_median": 988.7468403553812,
+        "median_over_target": 0.4210192423600417,
+        "over_contiguous": 1.3220314727509417,
+        "a_contiguous": false,
+        "b_contiguous": true
+      }
+    }
+  },
+  "comparison_to_integrated_s4096_profile": {
+    "read": "The integrated S4096 routed-MoE attribution is several times slower than the one-expert large GEMM floor. That points at grouped/ragged expert batching, padding, dispatch/reduce materialization, and grouped-GEMM scheduling rather than raw dense BF16 GEMM capability.",
+    "integrated_normalized_m12288_vs_actual_layout": {
+      "routed_w1_wgrad": {
+        "integrated_proxy_ms": 3.4056730219163,
+        "actual_one_expert_ms": 0.5628849864006042,
+        "integrated_over_actual": 6.049499052880059
+      },
+      "routed_w2_wgrad": {
+        "integrated_proxy_ms": 3.3766840351745486,
+        "actual_one_expert_ms": 0.5990449786186218,
+        "integrated_over_actual": 5.636777074342024
+      },
+      "routed_w3_wgrad": {
+        "integrated_proxy_ms": 3.2170845079235733,
+        "actual_one_expert_ms": 0.5473250150680542,
+        "integrated_over_actual": 5.877830557094591
+      },
+      "routed_w2_dgrad": {
+        "integrated_proxy_ms": 1.5977795119397342,
+        "actual_one_expert_ms": 0.4354439973831177,
+        "integrated_over_actual": 3.669310683272445
+      },
+      "routed_w1w3_dgrad_per_gemm": {
+        "integrated_proxy_ms": 1.813210517866537,
+        "actual_one_expert_per_gemm_ms": 0.5307649970054626,
+        "integrated_over_actual": 3.416222011286956
+      }
+    }
+  },
+  "decision": {
+    "large_dense_gemm_floor_status": "passes_1p3_ms_target",
+    "do_not_focus_next": [
+      "Plain single-expert BF16 GEMM replacement for M=12288",
+      "Contiguous-vs-transposed layout as the sole explanation"
+    ],
+    "focus_next": [
+      "Grouped/ragged MoE GEMM scheduling at learned-router expert counts",
+      "Compact-native grouped kernels that consume group_sizes/group_offsets without padding every expert to the global max",
+      "Dispatch/gather/reduce fusion around routed MoE backward",
+      "A profile pass that separates grouped GEMM launch count, padding factor, and memory traffic for routed dgrad/wgrad"
+    ],
+    "next_command": "RUN_TAG=retained_compact_reduce_s4096_blocks_after_m12288_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-blocks-4096"
+  },
+  "commands": {
+    "contiguous_probe": "RUN_TAG=expert_gemm_m12288_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-expert-gemm-12288",
+    "actual_layout_probe": "RUN_TAG=expert_gemm_m12288_actual_20260531 EXPERT_GEMM_LAYOUT=actual TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-expert-gemm-12288"
+  },
+  "dependency_pin_changes": []
+}

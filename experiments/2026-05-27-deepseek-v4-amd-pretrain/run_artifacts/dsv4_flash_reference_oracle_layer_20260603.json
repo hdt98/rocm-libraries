@@ -1,0 +1,208 @@
+{
+  "artifact": "dsv4_flash_reference_oracle",
+  "date_utc": "2026-06-03",
+  "status": "passed",
+  "scope": "Verify that the local Flash preset matches the HF Flash config contract, and optionally run a deterministic tiny full-layer PyTorch oracle on a torch/MI350 environment.",
+  "inputs": {
+    "hf_contract_artifact": "run_artifacts/deepseek_v4_flash_hf_config_contract_20260531.json",
+    "reference_layer_source": "tools/dsv4_layer_microbench/reference_layer.py"
+  },
+  "static_flash_preset": {
+    "hidden_size": 4096,
+    "num_heads": 64,
+    "kv_dim": 512,
+    "rope_dim": 64,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "moe_intermediate": 2048,
+    "num_experts": 256,
+    "routed_top_k": 6,
+    "shared_experts": 1,
+    "window_size": 128,
+    "csa_ratio": 4,
+    "hca_ratio": 128,
+    "dsa_indexer_n_heads": 64,
+    "dsa_indexer_head_dim": 128,
+    "dsa_indexer_topk": 512
+  },
+  "hf_config_compare": {
+    "status": "passed",
+    "comparisons": [
+      {
+        "local_key": "hidden_size",
+        "hf_key": "hidden_size",
+        "local_value": 4096,
+        "hf_value": 4096,
+        "passed": true
+      },
+      {
+        "local_key": "num_heads",
+        "hf_key": "num_attention_heads",
+        "local_value": 64,
+        "hf_value": 64,
+        "passed": true
+      },
+      {
+        "local_key": "kv_dim",
+        "hf_key": "head_dim",
+        "local_value": 512,
+        "hf_value": 512,
+        "passed": true
+      },
+      {
+        "local_key": "rope_dim",
+        "hf_key": "qk_rope_head_dim",
+        "local_value": 64,
+        "hf_value": 64,
+        "passed": true
+      },
+      {
+        "local_key": "q_lora_rank",
+        "hf_key": "q_lora_rank",
+        "local_value": 1024,
+        "hf_value": 1024,
+        "passed": true
+      },
+      {
+        "local_key": "o_lora_rank",
+        "hf_key": "o_lora_rank",
+        "local_value": 1024,
+        "hf_value": 1024,
+        "passed": true
+      },
+      {
+        "local_key": "o_groups",
+        "hf_key": "o_groups",
+        "local_value": 8,
+        "hf_value": 8,
+        "passed": true
+      },
+      {
+        "local_key": "moe_intermediate",
+        "hf_key": "moe_intermediate_size",
+        "local_value": 2048,
+        "hf_value": 2048,
+        "passed": true
+      },
+      {
+        "local_key": "num_experts",
+        "hf_key": "n_routed_experts",
+        "local_value": 256,
+        "hf_value": 256,
+        "passed": true
+      },
+      {
+        "local_key": "routed_top_k",
+        "hf_key": "num_experts_per_tok",
+        "local_value": 6,
+        "hf_value": 6,
+        "passed": true
+      },
+      {
+        "local_key": "shared_experts",
+        "hf_key": "n_shared_experts",
+        "local_value": 1,
+        "hf_value": 1,
+        "passed": true
+      },
+      {
+        "local_key": "window_size",
+        "hf_key": "sliding_window",
+        "local_value": 128,
+        "hf_value": 128,
+        "passed": true
+      },
+      {
+        "local_key": "dsa_indexer_n_heads",
+        "hf_key": "index_n_heads",
+        "local_value": 64,
+        "hf_value": 64,
+        "passed": true
+      },
+      {
+        "local_key": "dsa_indexer_head_dim",
+        "hf_key": "index_head_dim",
+        "local_value": 128,
+        "hf_value": 128,
+        "passed": true
+      },
+      {
+        "local_key": "dsa_indexer_topk",
+        "hf_key": "index_topk",
+        "local_value": 512,
+        "hf_value": 512,
+        "passed": true
+      }
+    ],
+    "ratio_check": {
+      "local_csa_ratio": 4,
+      "local_hca_ratio": 128,
+      "hf_nonzero_ratios": [
+        4,
+        128
+      ],
+      "passed": true
+    },
+    "mismatches": []
+  },
+  "layer_oracle_requested": true,
+  "layer_oracle": {
+    "status": "passed",
+    "device": "cuda",
+    "results": [
+      {
+        "dtype": "float32",
+        "device": "cuda",
+        "batch": 1,
+        "seqlen": 1,
+        "router": "balanced",
+        "attention_impl": "dense-mask",
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "output_shape": [
+          1,
+          1,
+          4096
+        ],
+        "loss": 1.011378526687622,
+        "elapsed_ms": 4642.875922028907,
+        "input_grad_finite": true,
+        "input_grad_norm": 0.03188798949122429,
+        "param_grad_count": 24,
+        "finite_param_grad_count": 24,
+        "nonzero_param_grad_count": 20,
+        "max_param_grad_norm": 0.6165196299552917,
+        "peak_memory_allocated_gib": 63.19935369491577
+      },
+      {
+        "dtype": "bfloat16",
+        "device": "cuda",
+        "batch": 1,
+        "seqlen": 1,
+        "router": "balanced",
+        "attention_impl": "dense-mask",
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "output_shape": [
+          1,
+          1,
+          4096
+        ],
+        "loss": 1.011452555656433,
+        "elapsed_ms": 7351.992707001045,
+        "input_grad_finite": true,
+        "input_grad_norm": 0.031891487538814545,
+        "param_grad_count": 24,
+        "finite_param_grad_count": 24,
+        "nonzero_param_grad_count": 20,
+        "max_param_grad_norm": 0.6164149045944214,
+        "peak_memory_allocated_gib": 34.67390298843384
+      }
+    ],
+    "read": "Full Flash-dimension local PyTorch layer smoke. This is not HF numerical parity and does not prove the production fused sparse MLA/LI path."
+  },
+  "commands": {
+    "config_only": "python3 tools/dsv4_layer_microbench/verify_flash_reference_oracle.py --summary-path run_artifacts/dsv4_flash_reference_oracle_config_20260603.json",
+    "mi350_fp32_bf16_layer_gate": "PYTHONPATH=tools python3 tools/dsv4_layer_microbench/verify_flash_reference_oracle.py --run-layer --device cuda --dtypes float32,bfloat16 --batch 1 --seqlen 1 --router balanced --moe-impl grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad --summary-path run_artifacts/dsv4_flash_reference_oracle_layer_20260603.json"
+  },
+  "bottom_line": "Config parity is the cheap local gate. The optional full-layer smoke is the next PyTorch-oracle step on MI350, but HF numerical parity still requires a separate HF-vs-local matched-weight comparison."
+}

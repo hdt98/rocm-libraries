@@ -1,0 +1,135 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_aiter_compact_streamed_vjp_ab_4x_s4096_gbs128_mbs2_20260606",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "question": "Can the AITER compact owner-rank VJP branch be made memory-survivable at the active 12-layer MBS2 shape, and does it materialize an e2e TFLOPs uplift over expert_loop?",
+  "shape": {
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": "disabled",
+    "mori_shmem_heap_size": "40G"
+  },
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "summary": "Added bounded compact dTopK writer and streamed compact xgrad helper for AITER compact/stage1-saved owner VJP paths.",
+    "new_helpers": [
+      "_compute_dtopk_weight_from_compact_out",
+      "_compute_compact_xgrad_streamed"
+    ],
+    "read": "This is a memory-survival patch, not the final fused grouped owner-rank backward. It avoids full FP32 dTopK materialization and avoids allocating a second full compact xgrad grouped-GMM output."
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_aiter_compact_nptgmm_dtopkchunk_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_nptgmm_dtopkchunk_4x_s4096_gbs128_mbs2_heap40_steps4_20260606/docker-run.log",
+      "local_vjp_mode": "aiter_compact",
+      "wgrad_op": "nptgmm",
+      "transpose_cache_size": 4,
+      "patch_variant": "bounded_dtopk_only",
+      "status": "failed_not_promoted",
+      "logged_steps": 1,
+      "step1_tokens_per_gpu_s_mean": 2402.5,
+      "step1_tflops_per_gpu_mean": 121.6375,
+      "step1_peak_logged_memory_gib": 189.85,
+      "failure": "OOM moved past dTopK and into compact xgrad second grouped_gmm output allocation.",
+      "failure_site": "mori_aiter_moe.py grouped_gmm(dup, w3_local) in local_aiter_compact_vjp.xgrad",
+      "oom_allocation_gib": 1.5,
+      "oom_free_mib": 682.0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_aiter_compact_nptgmm_dtopk_xgrad_stream_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_nptgmm_dtopk_xgrad_stream_4x_s4096_gbs128_mbs2_heap40_steps4_20260606/docker-run.log",
+      "local_vjp_mode": "aiter_compact",
+      "wgrad_op": "nptgmm",
+      "transpose_cache_size": 4,
+      "patch_variant": "bounded_dtopk_plus_streamed_xgrad",
+      "status": "failed_not_promoted",
+      "logged_steps": 1,
+      "step1_tokens_per_gpu_s_mean": 2422.25,
+      "step1_tflops_per_gpu_mean": 122.665,
+      "step1_peak_logged_memory_gib": 190.06,
+      "failure": "MORI owner VJP completed, then FSDP post-backward reduce failed with HSA out-of-resources.",
+      "failure_site": "torch.distributed.fsdp._fully_shard._fsdp_collectives.foreach_reduce_scatter_copy_in",
+      "available_free_mem_mib": 256.0
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_aiter_compact_nptgmm_stream_cache0_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_nptgmm_stream_cache0_4x_s4096_gbs128_mbs2_heap40_steps4_20260606/docker-run.log",
+      "local_vjp_mode": "aiter_compact",
+      "wgrad_op": "nptgmm",
+      "transpose_cache_size": 0,
+      "patch_variant": "bounded_dtopk_plus_streamed_xgrad_plus_no_transpose_cache",
+      "status": "completed_not_promoted_numerically_invalid",
+      "step_metrics": {
+        "1": {
+          "loss": 12.29937,
+          "grad_norm": "nan",
+          "tokens_per_gpu_s_mean": 2399.25,
+          "node_tokens_s_mean": 9597.0,
+          "tflops_per_gpu_mean": 121.48,
+          "peak_logged_memory_gib": 173.76
+        },
+        "2": {
+          "loss": "nan",
+          "grad_norm": "nan",
+          "tokens_per_gpu_s_mean": 2432.0,
+          "node_tokens_s_mean": 9728.0,
+          "tflops_per_gpu_mean": 123.12,
+          "peak_logged_memory_gib": 231.96
+        },
+        "3": {
+          "loss": "nan",
+          "grad_norm": "nan",
+          "tokens_per_gpu_s_mean": 2447.0,
+          "node_tokens_s_mean": 9788.0,
+          "tflops_per_gpu_mean": 123.9,
+          "peak_logged_memory_gib": 231.96
+        },
+        "4": {
+          "loss": "nan",
+          "grad_norm": "nan",
+          "tokens_per_gpu_s_mean": 2449.0,
+          "node_tokens_s_mean": 9796.0,
+          "tflops_per_gpu_mean": 123.97,
+          "peak_logged_memory_gib": 231.96
+        }
+      },
+      "steps_2_to_4_mean": {
+        "tokens_per_gpu_s": 2442.67,
+        "node_tokens_s": 9770.67,
+        "tflops_per_gpu": 123.66
+      },
+      "target_ratio_tokens_per_gpu": 0.2002
+    }
+  ],
+  "baseline_comparison": {
+    "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_mbs2_heap_sweep_4x_s4096_gbs128_20260606.json",
+    "baseline_local_vjp_mode": "expert_loop",
+    "baseline_steps_2_to_4_tokens_per_gpu_s_mean": 3696.0,
+    "baseline_steps_2_to_4_tflops_per_gpu_mean": 187.12,
+    "baseline_peak_logged_memory_gib": 225.73,
+    "cache0_streamed_steps_2_to_4_tokens_per_gpu_s_delta_percent": -33.91,
+    "cache0_streamed_steps_2_to_4_tflops_delta_percent": -33.91,
+    "cache0_streamed_peak_memory_delta_gib": 6.23,
+    "read": "The bounded-memory compact adapter is now executable at MBS2 only with transpose cache disabled, but it is numerically invalid and slower than retained expert_loop."
+  },
+  "decision": "Do not promote the current AITER compact owner-VJP adapter for flash_12layer_ceiling_probe. Keep expert_loop as the retained MBS2 12-layer candidate. The next real MoE path is a fused compact grouped training backward or AITER forward exposing correct saved intermediates, not more memory patching around this Python adapter.",
+  "validation": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "4xMI350 dTopK-only patched run failed at compact xgrad OOM, proving dTopK transient was removed.",
+    "4xMI350 dTopK+xgrad streamed run failed at FSDP post-backward HSA out-of-resources with cache size 4, proving owner VJP finished but headroom was insufficient.",
+    "4xMI350 cache-disabled streamed run completed 4 steps but had NaN loss/grad from step 2 onward and lower throughput than expert_loop."
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hothelper_mbs1_mbs2_ce8_ladder_20step_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Extend the standard-EP hot-helper MBS ladder with robust 20-step MBS1 and MBS2 rows, using the same CE8, attention-only activation-checkpointed surface as the existing MBS4/MBS8 ladder.",
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": {
+    "gpu_count": 8,
+    "gpu": "AMD Instinct MI350X VF",
+    "logged_capacity_gib": 287.69
+  },
+  "shared_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mtp": false,
+    "mhc": false,
+    "dataset": "tests/assets/c4_test via tokenizer.json"
+  },
+  "shared_checkpointing": {
+    "CANARY_CHECKPOINT_ENABLE": false,
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_CHUNKED_CE_NUM_CHUNKS": 8,
+    "note": "CANARY_CHECKPOINT_ENABLE=false disables disk training checkpoints. Attention-only activation recompute remains enabled."
+  },
+  "shared_sparse_attention_knobs": {
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "shared_standard_ep_knobs": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch"
+  },
+  "hot_helper_top8_knobs": {
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612",
+      "mode": "standard_ep_no_hot_helper",
+      "mbs": 1,
+      "gradient_accumulation_steps": 16,
+      "steps_requested": 20,
+      "status": "pass",
+      "summary": {
+        "steps_2_to_20_tok_per_gpu_s_mean": 3811.2632,
+        "steps_2_to_20_node_tok_s_mean": 30490.1053,
+        "steps_2_to_20_tflops_per_gpu_mean": 188.6839,
+        "steps_13_to_20_tok_per_gpu_s_mean": 3822.375,
+        "steps_13_to_20_node_tok_s_mean": 30579.0,
+        "steps_13_to_20_tflops_per_gpu_mean": 189.2406,
+        "peak_logged_memory_gib": 139.67,
+        "loss_step2_to_step20": [
+          11.58497,
+          4.27425
+        ]
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612"
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612",
+      "mode": "standard_ep_hot_helper_top8_owner_compact",
+      "mbs": 1,
+      "gradient_accumulation_steps": 16,
+      "steps_requested": 20,
+      "status": "pass",
+      "summary": {
+        "steps_2_to_20_tok_per_gpu_s_mean": 4162.6776,
+        "steps_2_to_20_node_tok_s_mean": 33301.4211,
+        "steps_2_to_20_tflops_per_gpu_mean": 206.0864,
+        "steps_13_to_20_tok_per_gpu_s_mean": 4202.7188,
+        "steps_13_to_20_node_tok_s_mean": 33621.75,
+        "steps_13_to_20_tflops_per_gpu_mean": 208.0692,
+        "peak_logged_memory_gib": 129.32,
+        "loss_step2_to_step20": [
+          11.24061,
+          4.26943
+        ],
+        "relative_to_no_hot_helper_mbs1": {
+          "steps_2_to_20_tok_per_gpu_s_uplift": 0.0922,
+          "steps_13_to_20_tok_per_gpu_s_uplift": 0.0995,
+          "steps_13_to_20_tflops_per_gpu_uplift": 0.0995,
+          "peak_memory_delta_gib": -10.35
+        }
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs1_ce8_attention_ac_nockpt_steps20_8x_20260612"
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612",
+      "mode": "standard_ep_no_hot_helper",
+      "mbs": 2,
+      "gradient_accumulation_steps": 8,
+      "steps_requested": 20,
+      "status": "pass",
+      "summary": {
+        "steps_2_to_20_tok_per_gpu_s_mean": 4308.0592,
+        "steps_2_to_20_node_tok_s_mean": 34464.4737,
+        "steps_2_to_20_tflops_per_gpu_mean": 213.2822,
+        "steps_13_to_20_tok_per_gpu_s_mean": 4321.6406,
+        "steps_13_to_20_node_tok_s_mean": 34573.125,
+        "steps_13_to_20_tflops_per_gpu_mean": 213.9523,
+        "peak_logged_memory_gib": 174.01,
+        "loss_step2_to_step20": [
+          11.39725,
+          4.31892
+        ]
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mbs_ladder_nohelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612"
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612",
+      "mode": "standard_ep_hot_helper_top8_owner_compact",
+      "mbs": 2,
+      "gradient_accumulation_steps": 8,
+      "steps_requested": 20,
+      "status": "pass",
+      "summary": {
+        "steps_2_to_20_tok_per_gpu_s_mean": 5200.5789,
+        "steps_2_to_20_node_tok_s_mean": 41604.6316,
+        "steps_2_to_20_tflops_per_gpu_mean": 257.4637,
+        "steps_13_to_20_tok_per_gpu_s_mean": 5254.375,
+        "steps_13_to_20_node_tok_s_mean": 42035.0,
+        "steps_13_to_20_tflops_per_gpu_mean": 260.1255,
+        "peak_logged_memory_gib": 149.03,
+        "loss_step2_to_step20": [
+          11.22025,
+          4.38761
+        ],
+        "relative_to_no_hot_helper_mbs2": {
+          "steps_2_to_20_tok_per_gpu_s_uplift": 0.2072,
+          "steps_13_to_20_tok_per_gpu_s_uplift": 0.2158,
+          "steps_13_to_20_tflops_per_gpu_uplift": 0.2158,
+          "peak_memory_delta_gib": -24.98
+        }
+      },
+      "remote_logs": {
+        "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612/docker-run.log",
+        "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mbs_ladder_hothelper_mbs2_ce8_attention_ac_nockpt_steps20_8x_20260612"
+      }
+    }
+  ],
+  "combined_ladder_read": [
+    {
+      "mbs": 1,
+      "no_helper_late_tok_per_gpu_s": 3822.375,
+      "hot_helper_late_tok_per_gpu_s": 4202.7188,
+      "late_tok_per_gpu_s_uplift_pct": 9.95,
+      "peak_memory_delta_gib": -10.35,
+      "status": "both completed 20 steps"
+    },
+    {
+      "mbs": 2,
+      "no_helper_late_tok_per_gpu_s": 4321.6406,
+      "hot_helper_late_tok_per_gpu_s": 5254.375,
+      "late_tok_per_gpu_s_uplift_pct": 21.58,
+      "peak_memory_delta_gib": -24.98,
+      "status": "both completed 20 steps"
+    },
+    {
+      "mbs": 4,
+      "no_helper_late_tok_per_gpu_s": 5058.125,
+      "hot_helper_late_tok_per_gpu_s": 6550.0,
+      "late_tok_per_gpu_s_uplift_pct": 29.49,
+      "peak_memory_delta_gib": -48.87,
+      "status": "both completed 20 steps",
+      "source_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json"
+    },
+    {
+      "mbs": 8,
+      "no_helper_late_tok_per_gpu_s": null,
+      "hot_helper_late_tok_per_gpu_s": 8632.7813,
+      "late_tok_per_gpu_s_uplift_pct": null,
+      "peak_memory_delta_gib": null,
+      "status": "no-helper fails before first metric; hot-helper completes 20 steps",
+      "source_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json"
+    }
+  ],
+  "discarded_run_note": "An earlier MBS1 no-helper launch was aborted after step 3 because the launcher auto-selected CE2. It is intentionally excluded; all retained MBS1/MBS2 rows here pin CANARY_CHUNKED_CE_NUM_CHUNKS=8.",
+  "decision_read": {
+    "hot_helper_feature": "The hot-helper feature is now robustly reproduced below the fit cliff. It improves late tok/GPU/s at MBS1, MBS2, and MBS4, reduces peak logged memory at each of those comparable MBS values, and is the only path that reaches a completed MBS8 20-step run on this surface.",
+    "recommended_mainline": "Continue the native MORI balanced-MoE push, but use this standard-EP hot/cold/helper owner-compact layout as the truth contract. The main target is to make MORI consume that partition natively instead of re-deriving raw top-k route state or adding dense selected-order adapters.",
+    "primus_turbo_position": "Try Primus-Turbo TurboEPBackend only as a bounded raw top-k/no-helper EP side branch. It may be useful as a better raw EP baseline, but it does not natively consume the winning hot/cold/helper owner-compact partition, so it should not replace the MORI-native balanced-MoE work."
+  },
+  "validation": {
+    "log_parser": "ANSI-stripped rank records grouped by step; tps/tflops averaged across rank records, memory reported as rank-max.",
+    "commands": [
+      "Four 20-step torchrun launcher invocations on do-vunguyen-mi350-gpu for MBS1/MBS2, no-helper and top-8 hot-helper, all with CANARY_CHUNKED_CE_NUM_CHUNKS=8.",
+      "ssh do-vunguyen-mi350-gpu 'python3 - <<PY ... parse step/loss/grad_norm/memory/tps/tflops ... PY'",
+      "python3 -m json.tool experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json"
+    ],
+    "dependency_pin_changes": "none"
+  }
+}

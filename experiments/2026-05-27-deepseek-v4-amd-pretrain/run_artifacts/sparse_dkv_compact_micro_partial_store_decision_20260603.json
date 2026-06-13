@@ -1,0 +1,74 @@
+{
+  "status": "rejected_latency_promotion",
+  "scope": "actual_li_sparse_mla_dkv_selected_tile_compact_partial_store",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+  "new_kernel_mode": "dot_k_compact_micro_partial_store",
+  "question": "Does splitting compact partial rows by (seq tile, selected-key tile) preserve the fast query-major tl.dot producer while reducing enough writeback work to beat the sparse-atomic dKV wall?",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "node": "son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1",
+    "gpu_scope": "1xMI350 via HIP_VISIBLE_DEVICES=0",
+    "workdir": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "entrypoint_override": "bash",
+    "pythonpath": "/workspace/sources/wip/torchtitan:/workspace/tools/dsv4_runtime_probe"
+  },
+  "artifacts": {
+    "s128_smoke": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s128_layer2_sc16_sb32_d16h64k32_20260603.json",
+    "s4096_selected_block_128": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb128_d16h64k64_timing10_20260603.json",
+    "s4096_selected_block_256": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb256_d16h64k64_timing10_20260603.json",
+    "s4096_sparse_atomic_gate": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+    "s4096_seq_tile_compact_partial_gate": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_s4096_layer2_sc32_d16h64k64_timing10_20260603.json"
+  },
+  "commands": [
+    "python tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_compact_micro_partial_store --seq-len 128 --layer-id 2 --seq-chunk 16 --selected-block 32 --block-d 16 --block-h 64 --block-k 32 --num-warps 8 --warmup-iters 1 --timed-iters 3 --dkv-atol 0.1 --summary-path run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s128_layer2_sc16_sb32_d16h64k32_20260603.json --json",
+    "python tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_compact_micro_partial_store --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 128 --block-d 16 --block-h 64 --block-k 64 --num-warps 8 --warmup-iters 2 --timed-iters 10 --skip-correctness --skip-reference-timing --allow-large-materialization --summary-path run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb128_d16h64k64_timing10_20260603.json --json",
+    "python tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_compact_micro_partial_store --seq-len 4096 --layer-id 2 --seq-chunk 32 --selected-block 256 --block-d 16 --block-h 64 --block-k 64 --num-warps 8 --warmup-iters 2 --timed-iters 10 --skip-correctness --skip-reference-timing --allow-large-materialization --summary-path run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb256_d16h64k64_timing10_20260603.json --json"
+  ],
+  "results": {
+    "s128_smoke": {
+      "status": "ok",
+      "max_abs_diff": 0.06965756416320801,
+      "dkv_atol": 0.1,
+      "full_event_median_ms": 0.17652200162410736,
+      "emit_only_event_median_ms": 0.0973609983921051,
+      "modeled_reduction_x": 14.0
+    },
+    "s4096_selected_block_128": {
+      "selected_block": 128,
+      "block_k": 64,
+      "active_group_shape": [1, 128, 4, 1015],
+      "unique_groups_total": 246905,
+      "modeled_reduction_x": 6.368246896579656,
+      "compact_partial_slab_elements": 126415360,
+      "full_event_median_ms": 9.346345901489258,
+      "emit_only_event_median_ms": 8.823959350585938
+    },
+    "s4096_selected_block_256": {
+      "selected_block": 256,
+      "block_k": 64,
+      "active_group_shape": [1, 128, 2, 1024],
+      "unique_groups_total": 127436,
+      "modeled_reduction_x": 12.338365924856399,
+      "compact_partial_slab_elements": 65247232,
+      "full_event_median_ms": 8.643817901611328,
+      "emit_only_event_median_ms": 8.327693462371826
+    },
+    "baselines": {
+      "s4096_sparse_atomic_full_event_median_ms": 8.006924390792847,
+      "s4096_seq_tile_compact_partial_full_event_median_ms": 8.54106616973877,
+      "s4096_seq_tile_compact_partial_emit_event_median_ms": 8.273122787475586,
+      "seq_tile_compact_modeled_reduction_x": 23.813051840857806
+    }
+  },
+  "decision": {
+    "promote": false,
+    "read": "The selected-tile split is correct at S128 and usable as a diagnostic, but it is not a speedup candidate at the hard S4096 layer-2 route. K128 is slower than both the sparse-atomic gate and the seq-tile compact partial store. K256 reduces the partial stream versus K128 but still loses to sparse atomics, and only roughly ties the older compact-partial rung once final fold is counted.",
+    "why": "This mode still performs one global partial load/store update per valid selected KxD contribution before final index_add. Splitting by selected tile changes where partial rows live, but it does not perform the needed register/warp/block segmented reduction before global memory.",
+    "next": "Keep the query-major tl.dot contribution producer, but implement real in-producer segmented accumulation before global writes: lane/warp/block grouped reduction or a CK/rocPRIM-style compact reducer that emits fewer already-reduced rows, instead of another global compact partial slab."
+  },
+  "validation": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+    "jq empty run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s128_layer2_sc16_sb32_d16h64k32_20260603.json run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb128_d16h64k64_timing10_20260603.json run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb256_d16h64k64_timing10_20260603.json"
+  ]
+}

@@ -1,0 +1,326 @@
+{
+  "aiter_default": {
+    "compact_tflops_median": 147.29021332124697,
+    "median_ms": 7.348293781280518,
+    "timing_ms": {
+      "aiter_default_ms_max": 8.012457847595215,
+      "aiter_default_ms_mean": 7.517654895782471,
+      "aiter_default_ms_median": 7.348293781280518,
+      "aiter_default_ms_min": 7.19221305847168
+    }
+  },
+  "best": {
+    "compact_tflops_median": 217.0111893430113,
+    "config": {
+      "BLOCK_SIZE_K": 64,
+      "BLOCK_SIZE_M": 64,
+      "BLOCK_SIZE_N": 256,
+      "GRID_DIM": 512,
+      "GROUP_SIZE": 1,
+      "num_stages": 1,
+      "num_warps": 8
+    },
+    "config_index": 17,
+    "median_ms": 4.9874467849731445,
+    "min_ms": 4.972167015075684,
+    "speedup_vs_aiter_default": 1.473357831790898,
+    "speedup_vs_torch_padded_bmm_out": 0.8539511793850413,
+    "timing_ms": {
+      "aiter_cfg_017_ms_max": 5.372049808502197,
+      "aiter_cfg_017_ms_mean": 5.110554536183675,
+      "aiter_cfg_017_ms_median": 4.9874467849731445,
+      "aiter_cfg_017_ms_min": 4.972167015075684
+    }
+  },
+  "check": {
+    "atol": 0.5,
+    "max_abs": 0.0,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.0,
+    "rtol": 0.025
+  },
+  "decision_read": "Promote an AITER config only if it is correct and beats torch.bmm(out=) for the same padded baseline. Beating AITER's large-M default alone is not enough.",
+  "default_config": {
+    "BLOCK_SIZE_K": 64,
+    "BLOCK_SIZE_M": 256,
+    "BLOCK_SIZE_N": 256,
+    "GRID_DIM": 256,
+    "GROUP_SIZE": 1,
+    "num_stages": 1,
+    "num_warps": 8
+  },
+  "failure_count": 0,
+  "failures": [],
+  "flops": {
+    "compact": 1082331758592.0,
+    "compact_vs_padded_flop_ratio": 0.7272727272727273,
+    "padded_global_max": 1488206168064.0
+  },
+  "op": "bwd_w2_dgrad",
+  "probe": "aiter_gmm_config_sweep",
+  "route_stats": {
+    "assignments": 24576,
+    "experts": 384,
+    "max_per_expert": 88,
+    "mean_per_expert": 64.0,
+    "min_per_expert": 45,
+    "padded_rows_global_max": 33792,
+    "padding_multiplier_global_max": 1.375,
+    "touched_experts": 384
+  },
+  "shape": {
+    "assignments": 24576,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tokens": 4096,
+    "topk": 6
+  },
+  "sweep_count": 36,
+  "top_results": [
+    {
+      "compact_tflops_median": 217.0111893430113,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 17,
+      "median_ms": 4.9874467849731445,
+      "min_ms": 4.972167015075684,
+      "speedup_vs_aiter_default": 1.473357831790898,
+      "speedup_vs_torch_padded_bmm_out": 0.8539511793850413,
+      "timing_ms": {
+        "aiter_cfg_017_ms_max": 5.372049808502197,
+        "aiter_cfg_017_ms_mean": 5.110554536183675,
+        "aiter_cfg_017_ms_median": 4.9874467849731445,
+        "aiter_cfg_017_ms_min": 4.972167015075684
+      }
+    },
+    {
+      "compact_tflops_median": 212.8677368126768,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 14,
+      "median_ms": 5.084527015686035,
+      "min_ms": 4.908924102783203,
+      "speedup_vs_aiter_default": 1.44522661765994,
+      "speedup_vs_torch_padded_bmm_out": 0.8376464617079618,
+      "timing_ms": {
+        "aiter_cfg_014_ms_max": 5.1366868019104,
+        "aiter_cfg_014_ms_mean": 5.043379306793213,
+        "aiter_cfg_014_ms_median": 5.084527015686035,
+        "aiter_cfg_014_ms_min": 4.908924102783203
+      }
+    },
+    {
+      "compact_tflops_median": 211.94239178869182,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 35,
+      "median_ms": 5.106726169586182,
+      "min_ms": 5.104925155639648,
+      "speedup_vs_aiter_default": 1.4389441566388077,
+      "speedup_vs_torch_padded_bmm_out": 0.8340051772333577,
+      "timing_ms": {
+        "aiter_cfg_035_ms_max": 5.28892707824707,
+        "aiter_cfg_035_ms_mean": 5.1668594678243,
+        "aiter_cfg_035_ms_median": 5.106726169586182,
+        "aiter_cfg_035_ms_min": 5.104925155639648
+      }
+    },
+    {
+      "compact_tflops_median": 209.3660717841949,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 34,
+      "median_ms": 5.1695661544799805,
+      "min_ms": 5.105525016784668,
+      "speedup_vs_aiter_default": 1.421452702546893,
+      "speedup_vs_torch_padded_bmm_out": 0.823867213780994,
+      "timing_ms": {
+        "aiter_cfg_034_ms_max": 5.306646823883057,
+        "aiter_cfg_034_ms_mean": 5.193912665049235,
+        "aiter_cfg_034_ms_median": 5.1695661544799805,
+        "aiter_cfg_034_ms_min": 5.105525016784668
+      }
+    },
+    {
+      "compact_tflops_median": 199.73896399808498,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 26,
+      "median_ms": 5.418731212615967,
+      "min_ms": 5.353370189666748,
+      "speedup_vs_aiter_default": 1.3560912126757858,
+      "speedup_vs_torch_padded_bmm_out": 0.7859840056712909,
+      "timing_ms": {
+        "aiter_cfg_026_ms_max": 5.478850841522217,
+        "aiter_cfg_026_ms_mean": 5.4169840812683105,
+        "aiter_cfg_026_ms_median": 5.418731212615967,
+        "aiter_cfg_026_ms_min": 5.353370189666748
+      }
+    },
+    {
+      "compact_tflops_median": 199.00304571427907,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 28,
+      "median_ms": 5.438769817352295,
+      "min_ms": 5.3848490715026855,
+      "speedup_vs_aiter_default": 1.351094829907293,
+      "speedup_vs_torch_padded_bmm_out": 0.783088126024303,
+      "timing_ms": {
+        "aiter_cfg_028_ms_max": 5.602451801300049,
+        "aiter_cfg_028_ms_mean": 5.475356896718343,
+        "aiter_cfg_028_ms_median": 5.438769817352295,
+        "aiter_cfg_028_ms_min": 5.3848490715026855
+      }
+    },
+    {
+      "compact_tflops_median": 198.25064095614678,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 29,
+      "median_ms": 5.459411144256592,
+      "min_ms": 5.453609943389893,
+      "speedup_vs_aiter_default": 1.3459865152327037,
+      "speedup_vs_torch_padded_bmm_out": 0.7801273711778494,
+      "timing_ms": {
+        "aiter_cfg_029_ms_max": 5.566771030426025,
+        "aiter_cfg_029_ms_mean": 5.493264039357503,
+        "aiter_cfg_029_ms_median": 5.459411144256592,
+        "aiter_cfg_029_ms_min": 5.453609943389893
+      }
+    },
+    {
+      "compact_tflops_median": 198.17365083945023,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 25,
+      "median_ms": 5.461532115936279,
+      "min_ms": 5.455811023712158,
+      "speedup_vs_aiter_default": 1.3454638048980487,
+      "speedup_vs_torch_padded_bmm_out": 0.7798244107583748,
+      "timing_ms": {
+        "aiter_cfg_025_ms_max": 5.480250835418701,
+        "aiter_cfg_025_ms_mean": 5.465864658355713,
+        "aiter_cfg_025_ms_median": 5.461532115936279,
+        "aiter_cfg_025_ms_min": 5.455811023712158
+      }
+    },
+    {
+      "compact_tflops_median": 196.63564497263553,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 32,
+      "median_ms": 5.5042500495910645,
+      "min_ms": 5.498050212860107,
+      "speedup_vs_aiter_default": 1.3350217949903012,
+      "speedup_vs_torch_padded_bmm_out": 0.773772271567563,
+      "timing_ms": {
+        "aiter_cfg_032_ms_max": 5.567570209503174,
+        "aiter_cfg_032_ms_mean": 5.523290157318115,
+        "aiter_cfg_032_ms_median": 5.5042500495910645,
+        "aiter_cfg_032_ms_min": 5.498050212860107
+      }
+    },
+    {
+      "compact_tflops_median": 193.1683618956329,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 20,
+      "median_ms": 5.603048801422119,
+      "min_ms": 5.499368190765381,
+      "speedup_vs_aiter_default": 1.3114813098567757,
+      "speedup_vs_torch_padded_bmm_out": 0.7601283185445317,
+      "timing_ms": {
+        "aiter_cfg_020_ms_max": 5.690529823303223,
+        "aiter_cfg_020_ms_mean": 5.597648938496907,
+        "aiter_cfg_020_ms_median": 5.603048801422119,
+        "aiter_cfg_020_ms_min": 5.499368190765381
+      }
+    }
+  ],
+  "torch_padded_bmm_out": {
+    "compact_equivalent_tflops_median": 254.12599055052337,
+    "median_ms": 4.259036064147949,
+    "padded_tflops_median": 349.42323700696966,
+    "timing_ms": {
+      "torch_padded_bmm_out_ms_max": 4.717198848724365,
+      "torch_padded_bmm_out_ms_mean": 4.400997002919515,
+      "torch_padded_bmm_out_ms_median": 4.259036064147949,
+      "torch_padded_bmm_out_ms_min": 4.2267560958862305
+    }
+  }
+}

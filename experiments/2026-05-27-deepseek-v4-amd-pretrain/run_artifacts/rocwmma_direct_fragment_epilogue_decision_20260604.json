@@ -1,0 +1,68 @@
+{
+  "artifact": "rocwmma_direct_fragment_epilogue_decision",
+  "created_at": "2026-06-04",
+  "scope": "compressed_sparse_mla_dkv_producer_rocwmma_direct_fragment_gate",
+  "question": "Can direct rocWMMA accumulator-fragment access remove enough producer overhead to materially reduce the sparse dKV many-to-one accumulation wall?",
+  "source_artifacts": {
+    "h64_tile_checksum": "run_artifacts/rocwmma_direct_fragment_checksum_h64_20260604.json",
+    "h512_tile_checksum": "run_artifacts/rocwmma_direct_fragment_checksum_h512_20260604.json",
+    "s4096_route_grid": "run_artifacts/rocwmma_direct_fragment_route_grid_s4096_layer2_20260604.json"
+  },
+  "code_artifacts": {
+    "tile_probe": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_contrib_tile.py",
+    "route_grid_probe": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py"
+  },
+  "environment": {
+    "node": "do-sonle5-mi350-gpu",
+    "device": "AMD Instinct MI350X VF",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "torch": "2.13.0a0+gitccf72d7",
+    "rocm": "7.2.53211",
+    "arch": "gfx950"
+  },
+  "tile_gate": {
+    "h64": {
+      "direct_fragment_checksum_abs_diff_vs_store": 0.0,
+      "store_matrix_sync_tile_median_ms": 0.007660500006750226,
+      "direct_fragment_checksum_median_ms": 0.00774000003002584
+    },
+    "h512": {
+      "direct_fragment_checksum_abs_diff_vs_store": 4.76837158203125e-7,
+      "store_matrix_sync_tile_median_ms": 0.009740000125020742,
+      "direct_fragment_checksum_median_ms": 0.0118410000577569
+    },
+    "read": "Direct c_frag[] access compiles and gives an order-insensitive checksum matching store_matrix_sync/reference. This proves direct fragment access can feed scalar epilogues, but rocWMMA documents fragment element order as not geometrically stable, so this alone does not provide a row/group mapping for route-aware dKV reduction."
+  },
+  "s4096_route_grid_gate": {
+    "shape": {
+      "seq_len": 4096,
+      "topk": 512,
+      "h_dim": 64,
+      "d_dim": 512,
+      "group_count": 1024,
+      "token_block": 32,
+      "selected_block": 256,
+      "route_pattern": "clustered_unique",
+      "cluster_width": 688
+    },
+    "write_model": {
+      "raw_scalar_writes": 1073741824,
+      "grouped_scalar_writes": 57933824,
+      "modeled_write_reduction_x": 18.533936651583712,
+      "k16_unique_route_contract": true
+    },
+    "timing_ms": {
+      "raw_atomic_median": 10.02101993560791,
+      "contrib_sink_store_matrix_sync_median": 9.620397090911865,
+      "contrib_sink_direct_fragment_median": 9.549795627593994,
+      "raw_minus_contrib_sink_ms": 0.4006228446960449,
+      "contrib_sink_minus_direct_fragment_ms": 0.0706014633178711
+    },
+    "read": "The accumulator LDS spill is not a meaningful part of the S4096 producer wall in this rocWMMA route-grid schedule. Removing store_matrix_sync from the timing sink saves only about 0.07 ms, while the no-dKV-write contribution sink remains about 9.55 ms."
+  },
+  "decision": {
+    "promote": false,
+    "reason": "Direct fragment access is valid as a diagnostic, but it does not materially reduce S4096 producer latency and does not solve row/group-aware segmented reduction. The bottleneck is not the accumulator spill; it is the contribution-production schedule plus route-aware write/reduction behavior.",
+    "next_branch": "Do not spend more time on store_matrix_sync removal in rocWMMA. The next viable branch is a lower-level MFMA/CK-Tile/TileLang producer that preserves query-major reuse and performs lightweight segmented/grouped reduction before global writes, or a fused sparse-MLA backward boundary that avoids diagnostic P/dP/materialized partial traffic entirely."
+  }
+}

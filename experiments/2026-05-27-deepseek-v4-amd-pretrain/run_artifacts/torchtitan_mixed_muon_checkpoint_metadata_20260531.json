@@ -1,0 +1,80 @@
+{
+  "status": "passed_metadata_inspection_restore_pending",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+  "metadata_file": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1/.metadata",
+  "inspection_command": "ssh do-sonle5-mi350-gpu \"docker run --rm --network=none --volume /local/data/sonle5/dsv4_pretrain_canary_20260527:/data rocm/primus:v26.2 python3 -c '<pickle torch.distributed.checkpoint metadata summary>'\"",
+  "metadata": {
+    "type": "torch.distributed.checkpoint.metadata.Metadata",
+    "key_count": 912,
+    "optimizer_key_count": 519,
+    "non_optimizer_key_count": 393,
+    "optimizer_prefix_counts": {
+      "optimizer_0": 210,
+      "optimizer_1": 309
+    },
+    "optimizer_state_suffix_counts": {
+      "amsgrad": 3,
+      "betas": 3,
+      "capturable": 3,
+      "decoupled_weight_decay": 3,
+      "differentiable": 3,
+      "eps": 5,
+      "exp_avg": 57,
+      "exp_avg_sq": 57,
+      "foreach": 3,
+      "fused": 3,
+      "initial_lr": 5,
+      "lr": 5,
+      "maximize": 3,
+      "momentum": 2,
+      "momentum_buffer": 293,
+      "nesterov": 2,
+      "ns_steps": 2,
+      "params": 5,
+      "step": 57,
+      "weight_decay": 5
+    },
+    "optimizer_samples": {
+      "optimizer_0": [
+        "optimizer.optimizer_0.state.0.exp_avg",
+        "optimizer.optimizer_0.state.0.exp_avg_sq",
+        "optimizer.optimizer_0.state.1.exp_avg",
+        "optimizer.optimizer_0.state.1.exp_avg_sq",
+        "optimizer.optimizer_0.state.2.exp_avg"
+      ],
+      "optimizer_1": [
+        "optimizer.optimizer_1.state.0.momentum_buffer",
+        "optimizer.optimizer_1.state.1.momentum_buffer",
+        "optimizer.optimizer_1.state.2.momentum_buffer",
+        "optimizer.optimizer_1.state.3.momentum_buffer",
+        "optimizer.optimizer_1.state.4.momentum_buffer"
+      ]
+    },
+    "non_optimizer_samples": [
+      "train_state.step",
+      "dataloader.dp_rank_0",
+      "tok_embeddings.weight",
+      "layers.0.attention.wq.weight",
+      "layers.0.attention.wk.weight",
+      "layers.0.attention.wv.weight",
+      "layers.0.attention.wo.weight",
+      "layers.0.attention_norm.weight",
+      "layers.0.ffn_norm.weight",
+      "layers.0.feed_forward.w1.weight"
+    ]
+  },
+  "interpretation": [
+    "The saved full-state checkpoint contains optimizer state entries, not model-only state.",
+    "AdamW moment tensors are present as exp_avg and exp_avg_sq under optimizer.optimizer_0.",
+    "Muon state tensors are present as momentum_buffer under optimizer.optimizer_1.",
+    "The real proof still requires a successful load_step=1 resume through step 2 on an idle 8xMI350 node."
+  ],
+  "caveats": [
+    "This inspection used a CPU-only Docker invocation with no GPU devices mounted.",
+    "Metadata presence proves the state was written and addressable, but does not prove TorchTitan can restore and continue training."
+  ]
+}

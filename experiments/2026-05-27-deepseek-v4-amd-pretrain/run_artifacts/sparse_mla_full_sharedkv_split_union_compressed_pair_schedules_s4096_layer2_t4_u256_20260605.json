@@ -1,0 +1,532 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "checked": false,
+    "dkv_atol": 1.0,
+    "passed": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": false,
+    "best_pair_schedule": "dq_compressed_then_local",
+    "best_pair_schedule_beats_retained_gate": false,
+    "best_pair_schedule_ms": 12.713193893432617,
+    "best_pair_schedule_vs_retained_speedup_x": 0.8758381326782064,
+    "compressed_union_dkv_only_full_ms": 7.5265889167785645,
+    "full_dq_no_dkv_ms": 4.156396865844727,
+    "full_split_boundary_ms": 13.28424072265625,
+    "full_split_vs_retained_speedup_x": 0.838188665236229,
+    "local_dkv_only_full_ms": 2.0921380519866943,
+    "pair_schedule_makespans_ms": {
+      "compressed_local_then_dq": 13.006196975708008,
+      "dq_compressed_then_local": 12.713193893432617,
+      "dq_local_then_compressed": 12.809675216674805
+    },
+    "parallel_branch_events_beats_retained_gate": false,
+    "parallel_branch_events_compressed_dkv_ms": 10.311332702636719,
+    "parallel_branch_events_dq_ms": 11.661825180053711,
+    "parallel_branch_events_local_dkv_ms": 11.70594596862793,
+    "parallel_branch_events_makespan_ms": 11.853266716003418,
+    "parallel_branch_events_makespan_over_max_branch_ms": 0.11128044128417969,
+    "parallel_branch_events_max_branch_ms": 11.741986274719238,
+    "parallel_branch_events_vs_retained_speedup_x": 0.9393781703204855,
+    "retained_sparse_attention_backward_gate_ms": 11.1347
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "contract": "dQ/no-dKV uses full local+compressed indices; local dKV uses the old selected-slot query-major path; compressed dKV uses the token4 compressed-group union path.",
+    "route_model_selected_block": 512,
+    "token_block": 4
+  },
+  "read": "This is the first materialization check for the compressed-only union split against the actual full shared-KV attention index contract. It is still a multi-launch diagnostic path and includes an extra local+compressed dKV tensor add, so it is not a final production fused owner. When parallel branch events are enabled, dQ, local dKV, and compressed dKV stay as separate outputs and join only through explicit timing/dependency events.",
+  "route_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "scope": "sparse_mla_actual_full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "selected_keys_full": 640,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_compressed_pairs": 1572352,
+    "window": 128
+  },
+  "status": "not_checked",
+  "timing": {
+    "compressed_union_dkv_only_full": {
+      "checksum_norm": 463.215087890625,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.589508056640625,
+        "mean_ms": 7.52795639038086,
+        "median_ms": 7.5265889167785645,
+        "min_ms": 7.4711480140686035,
+        "samples_ms": [
+          7.589508056640625,
+          7.521829128265381,
+          7.5265889167785645,
+          7.530707836151123,
+          7.4711480140686035
+        ],
+        "stdev_ms": 0.04202018270277955
+      },
+      "label": "full_sharedkv_compressed_union_dkv_only_full",
+      "peak_memory_allocated_bytes": 1719891968,
+      "peak_memory_allocated_gib": 1.6017742156982422,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.678082911297679,
+        "mean_ms": 7.558288984000683,
+        "median_ms": 7.54170399159193,
+        "min_ms": 7.486572954803705,
+        "samples_ms": [
+          7.678082911297679,
+          7.538903038948774,
+          7.54170399159193,
+          7.546182023361325,
+          7.486572954803705
+        ],
+        "stdev_ms": 0.07122364283666043
+      }
+    },
+    "full_dq_no_dkv": {
+      "checksum_norm": 541.3256225585938,
+      "event": {
+        "enabled": true,
+        "max_ms": 4.546360969543457,
+        "mean_ms": 4.236166095733642,
+        "median_ms": 4.156396865844727,
+        "min_ms": 4.010117053985596,
+        "samples_ms": [
+          4.156396865844727,
+          4.546360969543457,
+          4.338318824768066,
+          4.129636764526367,
+          4.010117053985596
+        ],
+        "stdev_ms": 0.20944321277306738
+      },
+      "label": "full_sharedkv_selected_dq_no_dkv",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.588093142956495,
+        "mean_ms": 4.282352374866605,
+        "median_ms": 4.246704978868365,
+        "min_ms": 4.029214847832918,
+        "samples_ms": [
+          4.246704978868365,
+          4.588093142956495,
+          4.401593003422022,
+          4.146155901253223,
+          4.029214847832918
+        ],
+        "stdev_ms": 0.2188575841896925
+      }
+    },
+    "full_split_boundary": {
+      "checksum_norm": 1288.9986572265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 13.595602989196777,
+        "mean_ms": 13.342168998718261,
+        "median_ms": 13.28424072265625,
+        "min_ms": 13.255240440368652,
+        "samples_ms": [
+          13.595602989196777,
+          13.310240745544434,
+          13.255240440368652,
+          13.28424072265625,
+          13.265520095825195
+        ],
+        "stdev_ms": 0.14320921288412736
+      },
+      "label": "full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+      "peak_memory_allocated_bytes": 2804117504,
+      "peak_memory_allocated_gib": 2.6115379333496094,
+      "wall": {
+        "enabled": true,
+        "max_ms": 13.667822116985917,
+        "mean_ms": 13.375228410586715,
+        "median_ms": 13.30519188195467,
+        "min_ms": 13.276862911880016,
+        "samples_ms": [
+          13.667822116985917,
+          13.332012109458447,
+          13.276862911880016,
+          13.30519188195467,
+          13.294253032654524
+        ],
+        "stdev_ms": 0.16478518153761404
+      }
+    },
+    "local_dkv_only_full": {
+      "checksum_norm": 586.8958740234375,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.1410179138183594,
+        "mean_ms": 2.0899141788482667,
+        "median_ms": 2.0921380519866943,
+        "min_ms": 2.040018081665039,
+        "samples_ms": [
+          2.1410179138183594,
+          2.040018081665039,
+          2.0921380519866943,
+          2.069377899169922,
+          2.1070189476013184
+        ],
+        "stdev_ms": 0.03814600159541613
+      },
+      "label": "full_sharedkv_local_window_dkv_only_full",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.2227619774639606,
+        "mean_ms": 2.1194592118263245,
+        "median_ms": 2.1084039472043514,
+        "min_ms": 2.0581730641424656,
+        "samples_ms": [
+          2.2227619774639606,
+          2.0581730641424656,
+          2.1084039472043514,
+          2.085322979837656,
+          2.1226340904831886
+        ],
+        "stdev_ms": 0.06269974950317585
+      }
+    },
+    "pair_schedule_events": {
+      "compressed_local_then_dq": {
+        "checksum_norm": 1591.4365844726562,
+        "compressed_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 8.61607837677002,
+          "mean_ms": 8.345499515533447,
+          "median_ms": 8.45119571685791,
+          "min_ms": 7.740749835968018,
+          "samples_ms": [
+            7.740749835968018,
+            8.61607837677002,
+            8.45119571685791,
+            8.472637176513672,
+            8.446836471557617
+          ],
+          "stdev_ms": 0.3451593637556276
+        },
+        "dq_branch_event": {
+          "enabled": true,
+          "max_ms": 4.041835784912109,
+          "mean_ms": 3.937419319152832,
+          "median_ms": 3.931274890899658,
+          "min_ms": 3.8869550228118896,
+          "samples_ms": [
+            4.041835784912109,
+            3.8899149894714355,
+            3.931274890899658,
+            3.9371159076690674,
+            3.8869550228118896
+          ],
+          "stdev_ms": 0.06273745078183061
+        },
+        "label": "pair_schedule_events_full_sharedkv_compressed_local_then_dq",
+        "local_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 9.06532096862793,
+          "mean_ms": 8.486524772644042,
+          "median_ms": 8.914880752563477,
+          "min_ms": 6.675459861755371,
+          "samples_ms": [
+            6.675459861755371,
+            9.06532096862793,
+            8.925161361694336,
+            8.914880752563477,
+            8.851800918579102
+          ],
+          "stdev_ms": 1.0154160124689282
+        },
+        "makespan_event": {
+          "enabled": true,
+          "max_ms": 16.78367042541504,
+          "mean_ms": 13.755780029296876,
+          "median_ms": 13.006196975708008,
+          "min_ms": 12.879356384277344,
+          "samples_ms": [
+            16.78367042541504,
+            13.111598014831543,
+            13.006196975708008,
+            12.998078346252441,
+            12.879356384277344
+          ],
+          "stdev_ms": 1.694638288760357
+        },
+        "read": "This is a two-phase event schedule that avoids launching all three branches at once. It tests whether local-window dKV should be kept out of the first overlap group to reduce MI350 resource contention.",
+        "schedule": "compressed_local_then_dq"
+      },
+      "dq_compressed_then_local": {
+        "checksum_norm": 1591.4365844726562,
+        "compressed_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 10.176490783691406,
+          "mean_ms": 9.83122444152832,
+          "median_ms": 10.06317138671875,
+          "min_ms": 8.700517654418945,
+          "samples_ms": [
+            8.700517654418945,
+            10.17545223236084,
+            10.176490783691406,
+            10.04049015045166,
+            10.06317138671875
+          ],
+          "stdev_ms": 0.6351753654979229
+        },
+        "dq_branch_event": {
+          "enabled": true,
+          "max_ms": 10.582575798034668,
+          "mean_ms": 9.572237968444824,
+          "median_ms": 10.464054107666016,
+          "min_ms": 5.781171798706055,
+          "samples_ms": [
+            5.781171798706055,
+            10.582575798034668,
+            10.58089542388916,
+            10.452492713928223,
+            10.464054107666016
+          ],
+          "stdev_ms": 2.120173314777767
+        },
+        "label": "pair_schedule_events_full_sharedkv_dq_compressed_then_local",
+        "local_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 2.144218921661377,
+          "mean_ms": 2.102410984039307,
+          "median_ms": 2.106658935546875,
+          "min_ms": 2.0704588890075684,
+          "samples_ms": [
+            2.106658935546875,
+            2.119939088821411,
+            2.0707790851593018,
+            2.144218921661377,
+            2.0704588890075684
+          ],
+          "stdev_ms": 0.03199490819312542
+        },
+        "makespan_event": {
+          "enabled": true,
+          "max_ms": 16.690589904785156,
+          "mean_ms": 13.486185073852539,
+          "median_ms": 12.713193893432617,
+          "min_ms": 12.5963134765625,
+          "samples_ms": [
+            16.690589904785156,
+            12.77011489868164,
+            12.713193893432617,
+            12.660713195800781,
+            12.5963134765625
+          ],
+          "stdev_ms": 1.792467395965571
+        },
+        "read": "This is a two-phase event schedule that avoids launching all three branches at once. It tests whether local-window dKV should be kept out of the first overlap group to reduce MI350 resource contention.",
+        "schedule": "dq_compressed_then_local"
+      },
+      "dq_local_then_compressed": {
+        "checksum_norm": 1591.4365844726562,
+        "compressed_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 7.370706081390381,
+          "mean_ms": 7.339145851135254,
+          "median_ms": 7.346345901489258,
+          "min_ms": 7.287146091461182,
+          "samples_ms": [
+            7.287146091461182,
+            7.370706081390381,
+            7.346345901489258,
+            7.357666015625,
+            7.333865165710449
+          ],
+          "stdev_ms": 0.03210430655029435
+        },
+        "dq_branch_event": {
+          "enabled": true,
+          "max_ms": 5.293848037719727,
+          "mean_ms": 5.032021331787109,
+          "median_ms": 5.222806930541992,
+          "min_ms": 4.304318904876709,
+          "samples_ms": [
+            4.304318904876709,
+            5.222806930541992,
+            5.242766857147217,
+            5.293848037719727,
+            5.096365928649902
+          ],
+          "stdev_ms": 0.41323634108334845
+        },
+        "label": "pair_schedule_events_full_sharedkv_dq_local_then_compressed",
+        "local_dkv_branch_event": {
+          "enabled": true,
+          "max_ms": 5.326007843017578,
+          "mean_ms": 4.8839715957641605,
+          "median_ms": 5.286366939544678,
+          "min_ms": 3.2144289016723633,
+          "samples_ms": [
+            3.2144289016723633,
+            5.283767223358154,
+            5.326007843017578,
+            5.309287071228027,
+            5.286366939544678
+          ],
+          "stdev_ms": 0.9334640675314921
+        },
+        "makespan_event": {
+          "enabled": true,
+          "max_ms": 16.254106521606445,
+          "mean_ms": 13.486345100402833,
+          "median_ms": 12.809675216674805,
+          "min_ms": 12.75239372253418,
+          "samples_ms": [
+            16.254106521606445,
+            12.809675216674805,
+            12.815435409545898,
+            12.800114631652832,
+            12.75239372253418
+          ],
+          "stdev_ms": 1.5474254514232206
+        },
+        "read": "This is a two-phase event schedule that avoids launching all three branches at once. It tests whether local-window dKV should be kept out of the first overlap group to reduce MI350 resource contention.",
+        "schedule": "dq_local_then_compressed"
+      }
+    },
+    "parallel_branch_events": {
+      "checksum_norm": 1591.4365844726562,
+      "compressed_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 11.224781036376953,
+        "mean_ms": 10.402437973022462,
+        "median_ms": 10.311332702636719,
+        "min_ms": 10.0076904296875,
+        "samples_ms": [
+          11.224781036376953,
+          10.311332702636719,
+          10.0076904296875,
+          10.113492012023926,
+          10.354893684387207
+        ],
+        "stdev_ms": 0.48117671776268844
+      },
+      "dq_branch_event": {
+        "enabled": true,
+        "max_ms": 12.911396026611328,
+        "mean_ms": 11.911739540100097,
+        "median_ms": 11.661825180053711,
+        "min_ms": 11.535024642944336,
+        "samples_ms": [
+          12.911396026611328,
+          11.796266555786133,
+          11.535024642944336,
+          11.661825180053711,
+          11.65418529510498
+        ],
+        "stdev_ms": 0.5664257655116482
+      },
+      "label": "parallel_branch_events_full_sharedkv_dq_local_dkv_compressed_union_dkv",
+      "local_dkv_branch_event": {
+        "enabled": true,
+        "max_ms": 12.60771369934082,
+        "mean_ms": 11.851627349853516,
+        "median_ms": 11.70594596862793,
+        "min_ms": 11.59638500213623,
+        "samples_ms": [
+          12.60771369934082,
+          11.70594596862793,
+          11.741986274719238,
+          11.60610580444336,
+          11.59638500213623
+        ],
+        "stdev_ms": 0.4272997435648237
+      },
+      "makespan_event": {
+        "enabled": true,
+        "max_ms": 53.24483871459961,
+        "mean_ms": 20.089109230041505,
+        "median_ms": 11.853266716003418,
+        "min_ms": 11.730945587158203,
+        "samples_ms": [
+          53.24483871459961,
+          11.853266716003418,
+          11.875548362731934,
+          11.740946769714355,
+          11.730945587158203
+        ],
+        "stdev_ms": 18.53472954776697
+      },
+      "max_branch_event": {
+        "enabled": true,
+        "max_ms": 12.911396026611328,
+        "mean_ms": 11.953131866455077,
+        "median_ms": 11.741986274719238,
+        "min_ms": 11.65418529510498,
+        "samples_ms": [
+          12.911396026611328,
+          11.796266555786133,
+          11.741986274719238,
+          11.661825180053711,
+          11.65418529510498
+        ],
+        "stdev_ms": 0.5389081613097053
+      },
+      "read": "This keeps dQ, local-window dKV, and compressed-union dKV as separate side-stream outputs. The parent-stream wait is only the measurement/dependency join; a production custom backward can keep the downstream branch consumers on these streams and join later at the first shared gradient dependency."
+    }
+  },
+  "union_route_stats": {
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "max_members_per_group": 4,
+    "members_per_group_hist": {
+      "1": 48504,
+      "2": 107203,
+      "3": 130890,
+      "4": 229193
+    },
+    "nonempty_union_memberships": 515790,
+    "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness.",
+    "workspace_bytes": 31883264,
+    "workspace_mib": 30.40625
+  }
+}

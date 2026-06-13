@@ -1,0 +1,149 @@
+{
+  "schema": "torchtitan_dsv4_pretrain_run_artifact_v1",
+  "created_at": "2026-06-06",
+  "run_id": "torchtitan_dsv4_flash12_allcompressed_h64n64d128_8x_s4096_gbs128_mbs2_heap96_steps6_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "log_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_allcompressed_h64n64d128_8x_s4096_gbs128_mbs2_heap96_steps6_20260606/docker-run.log",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "model": {
+    "probe": "flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "env": {
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": "true",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": "0",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "96G",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_CHUNKED_CE_NUM_CHUNKS": "8",
+    "CANARY_PERSIST_JIT_CACHE": "auto",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "result": {
+    "status": "completed_six_steps_not_promoted",
+    "reason": "8x EP8/FSDP8 required a 96G MORI heap to pass initialization but sustained materially lower per-GPU throughput than the retained 4x EP4/FSDP4 12-layer candidate.",
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.2376,
+        "grad_norm": 18.75,
+        "tokens_per_gpu_s": 1320.0,
+        "tflops_per_gpu": 66.85,
+        "max_logged_memory_gib": 91.07
+      },
+      {
+        "step": 2,
+        "loss": 8.39587,
+        "grad_norm": 62.25,
+        "tokens_per_gpu_s": 2923.0,
+        "tflops_per_gpu": 147.97,
+        "max_logged_memory_gib": 130.61
+      },
+      {
+        "step": 3,
+        "loss": 21.1041,
+        "grad_norm": 109.0,
+        "tokens_per_gpu_s": 2944.0,
+        "tflops_per_gpu": 149.04,
+        "max_logged_memory_gib": 130.61
+      },
+      {
+        "step": 4,
+        "loss": 17.3746,
+        "grad_norm": 51.5,
+        "tokens_per_gpu_s": 2824.0,
+        "tflops_per_gpu": 142.97,
+        "max_logged_memory_gib": 130.61
+      },
+      {
+        "step": 5,
+        "loss": 7.86148,
+        "grad_norm": 31.5,
+        "tokens_per_gpu_s": 2757.0,
+        "tflops_per_gpu": 139.61,
+        "max_logged_memory_gib": 130.61
+      },
+      {
+        "step": 6,
+        "loss": 6.84665,
+        "grad_norm": 37.25,
+        "tokens_per_gpu_s": 2841.0,
+        "tflops_per_gpu": 143.84,
+        "max_logged_memory_gib": 130.61
+      }
+    ],
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 2857.8,
+      "node_tokens_s_mean": 22862.4,
+      "tflops_per_gpu_mean": 144.686,
+      "derived_flops_per_token_gflop": 50.63,
+      "peak_logged_memory_gib": 130.61
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s_mean": 2807.33,
+      "node_tokens_s_mean": 22458.67,
+      "tflops_per_gpu_mean": 142.14,
+      "derived_flops_per_token_gflop": 50.63,
+      "peak_logged_memory_gib": 130.61
+    },
+    "comparison_to_current_4x_12layer_candidate": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+      "gpus": 4,
+      "tokens_per_gpu_s_mean_steps_2_to_6": 4034.4,
+      "node_tokens_s_mean_steps_2_to_6": 16137.6,
+      "tflops_per_gpu_mean_steps_2_to_6": 204.272,
+      "peak_logged_memory_gib": 223.2,
+      "tokens_per_gpu_delta_pct": -29.16,
+      "tflops_per_gpu_delta_pct": -29.17,
+      "node_tokens_delta_pct": 30.64
+    },
+    "target_read": {
+      "target_tokens_per_gpu_s": 12200.0,
+      "target_node_tokens_s_for_4x": 48800.0,
+      "target_node_tokens_s_for_8x_same_per_gpu": 97600.0,
+      "target_ratio_tokens_per_gpu_steps_2_to_6": 0.2342
+    },
+    "heap_read": {
+      "heap40_result": "failed_before_step1_mori_static_heap_exhausted",
+      "heap64_result": "failed_before_step1_mori_static_heap_exhausted",
+      "heap96_result": "completed_six_steps"
+    }
+  },
+  "decision": {
+    "promote": false,
+    "next_action": "Do not pursue blind 8x heap increases. Inspect MORI EP8 allocation/launch config and owner-VJP skew if 8x remains important; current optimization should stay on the 4x 12-layer EP4 candidate, fused compact MoE owner backward, and sparse MLA C4 dKV accumulation."
+  }
+}

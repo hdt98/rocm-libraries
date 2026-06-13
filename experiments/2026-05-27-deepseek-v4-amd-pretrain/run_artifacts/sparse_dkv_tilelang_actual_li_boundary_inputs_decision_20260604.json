@@ -1,0 +1,77 @@
+{
+  "status": "actual_li_tilelang_selected_limit_boundary_inputs_validated",
+  "scope": "sparse_mla_backward_compressed_dkv_actual_li_tilelang_boundary_inputs",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "new_flag": "--actual-li-input-source boundary",
+    "new_contract": "For actual_li and actual_li_panel routes, the probe can now feed real TorchTitan sparse-MLA boundary q/dO plus materialized per-head probs and scaled grad_logits into the selected-limit TileLang dKV producer.",
+    "kernel": "mfma_panel_atomic_final_limited"
+  },
+  "s512_correctness": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_panel_atomic_final_limited_s512_tb128_cap128_20260604.json",
+    "shape": {
+      "seq_len": 512,
+      "compressed_groups": 128,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 128,
+      "token_block": 128,
+      "selected_window": 128,
+      "group_panel_size": 128,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "max_abs_diff": 9.5367431640625e-6,
+    "mean_abs_diff": 2.8347204761303146e-7,
+    "median_ms": 1.998175024986267,
+    "read": "Correctness is checked against a PyTorch final-dKV oracle using the real boundary probabilities and scaled grad-logits after BF16 packing into the TileLang input contract."
+  },
+  "s4096_timing": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 512,
+      "token_block": 16,
+      "selected_window": 512,
+      "group_panel_size": 512,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "median_ms": 6.910138130187988,
+    "min_ms": 6.896576881408691,
+    "max_ms": 6.968297958374023,
+    "route_limit_modeled_chunk_fraction": 0.431396484375,
+    "route_limit_zero_count": 128,
+    "materialized_probs_bytes": 536870912,
+    "materialized_grad_logits_bytes": 536870912,
+    "read": "The timed TileLang producer excludes boundary materialization. The materialized per-head prob and grad-logit tensors are included as diagnostic input-contract evidence, not as fused sparse-MLA backward."
+  },
+  "comparison": {
+    "prior_actual_route_artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb32_cap512_k64d64_thr512_timing10_20260604.json",
+    "prior_actual_route_median_ms": 12.735137939453125,
+    "speedup_vs_prior_actual_route": 1.842964308313569,
+    "random_input_selected_limit_artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+    "random_input_selected_limit_median_ms": 6.912532806396484,
+    "boundary_vs_random_speedup": 1.000346545345893,
+    "current_triton_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "read": "Real sparse-MLA boundary probabilities do not regress the selected-limit TileLang dKV producer. This de-risks the promoted candidate: the earlier 6.9 ms result was not a random-weight artifact."
+  },
+  "decision": {
+    "promote_boundary_input_contract": true,
+    "retained_tilelang_candidate": "actual_li_panel cap512 token_block=16 mfma_panel_atomic_final_limited",
+    "not_yet_complete_sparse_mla_backward": true,
+    "next_work": [
+      "Move per-head probability and grad-logit recompute into or adjacent to the TileLang producer instead of materializing two 512 MiB S4096 tensors.",
+      "Connect the output final dKV to the compressor/LI backward consumer and keep the no-selected-state saved-tensor contract.",
+      "Rerun the full sparse-MLA/LI backward boundary once the materialized-prob bridge is replaced by fused production."
+    ]
+  }
+}

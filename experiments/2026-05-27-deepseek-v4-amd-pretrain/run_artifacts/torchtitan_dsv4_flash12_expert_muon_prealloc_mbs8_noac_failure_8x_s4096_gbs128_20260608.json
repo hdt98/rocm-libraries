@@ -1,0 +1,81 @@
+{
+  "artifact_type": "run_summary",
+  "created_at": "2026-06-08",
+  "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_noac_8x_s4096_gbs128_steps6_dovunguyen_20260608",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_noac_8x_s4096_gbs128_steps6_dovunguyen_20260608",
+  "remote_outer_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_mbs8_noac_8x_s4096_gbs128_steps6_dovunguyen_20260608/docker-run.log",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "gpus": 8,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "optimizer": {
+    "dense": "AdamW",
+    "experts": "Muon",
+    "muon_impl": "batched",
+    "muon_workspace_mode": "prealloc",
+    "muon_chunk_matrices": 4,
+    "muon_ns_steps": 1,
+    "muon_state_dtype": "bfloat16",
+    "muon_ns_compute_dtype": "bfloat16"
+  },
+  "moe_ep": {
+    "backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "hot_weight_forward_backend": "mori_sdma",
+    "hot_weight_reduce_backend": "mori_sdma",
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact",
+    "hot_split_weight_layout": "selected",
+    "moe_force_load_balance": false
+  },
+  "attention": {
+    "activation_checkpoint_mode": "none",
+    "activation_checkpoint_scope": "",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "result": {
+    "status": "failed_after_step1_not_promoted",
+    "completed_logged_steps": 1,
+    "step1_loss": 12.27132,
+    "step1_grad_norm": 19.375,
+    "step1_tokens_per_gpu_s_range": [
+      1628.0,
+      1631.0
+    ],
+    "step1_tflops_per_gpu_range": [
+      82.44,
+      82.56
+    ],
+    "step1_memory_gib_range": [
+      250.86,
+      258.43
+    ],
+    "failure_phase": "after_step1_next_backward",
+    "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "failure_detail": "ROCm abort reported Available Free mem : 0 MB; root cause rank 4 exited with SIGABRT while other ranks were terminated.",
+    "gpu_cleanup_observation": "After process exit and a short settle, rocm-smi returned all 8 GPUs to 0% VRAM."
+  },
+  "decision": {
+    "promoted": false,
+    "read": "Preallocated expert-Muon workspace does not provide enough headroom to remove attention-only activation checkpointing at MBS8. The run logs one slow warmup step at 250.86-258.43 GiB, then aborts during the next backward with no free HBM. Keep MBS8 Muon on attention-only AC, and treat further no-AC/batch-size gains as blocked on sparse-attention/LightningIndexer activation-memory reduction rather than optimizer-state savings."
+  }
+}

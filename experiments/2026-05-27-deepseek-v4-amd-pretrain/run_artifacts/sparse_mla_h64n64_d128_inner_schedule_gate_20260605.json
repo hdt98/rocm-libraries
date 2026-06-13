@@ -1,0 +1,86 @@
+{
+  "artifact": "sparse_mla_h64n64_d128_inner_schedule_gate",
+  "created_at": "2026-06-05",
+  "status": "implemented_measured_not_promoted",
+  "scope": "HIP/CK source-boundary sparse-MLA backward owner made closer to Triton's query-major inner schedule while keeping the final global atomic dKV add.",
+  "source": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip",
+    "python_probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352,
+    "dtype": "bf16_source_fp32_accum"
+  },
+  "baseline": {
+    "triton_actual_li_query_recompute_artifact": "actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+    "triton_no_dkv_dq_recompute_ms": 1.974266,
+    "triton_dkv_reduce_sink_ms": 2.79503,
+    "triton_full_dq_dkv_atomic_ms": 11.08092,
+    "prior_hip_h64n64_direct_global_kv_mode0_ms": 23.012451171875,
+    "prior_hip_h64n64_direct_global_kv_mode1_ms": 45.60773849487305,
+    "prior_hip_h64n64_direct_global_kv_mode2_ms": 46.52796936035156
+  },
+  "implemented_changes": {
+    "producer": "Still one CTA per query token and H64/N64 selected window, but now stages selected KV as N64 x D128 in LDS before the 16 H/N waves consume four K32 MFMA chunks. This removes the old repeated global KV load per H16 wave.",
+    "epilogue": "Still computes dKV contribution in the same CTA and still ends with global atomicAdd to compressed dKV. It now stages Q and grad_output as H64 x D64 in LDS per D sweep so N16 contribution waves reuse them instead of reloading per selected-column block.",
+    "group_awareness": "The epilogue is compressed-group addressed and head-reduced inside the CTA before the final global atomic. With the current one-token CTA, LI top-k groups are effectively unique within a token, so the next meaningful group-aware reduction must be across multiple query tokens or via a block-level/persistent producer-consumer design."
+  },
+  "results_ms": {
+    "d128_kv_stage_1024_threads": {
+      "mode0_producer_only": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_s4096_layer2_mode0_20260605.json",
+        "event_median_ms": 12.194915771484375,
+        "delta_vs_prior_mode0_ms": -10.817535400390625
+      },
+      "mode1_contribution_sink": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_s4096_layer2_mode1_20260605.json",
+        "event_median_ms": 36.01382827758789,
+        "delta_vs_mode0_ms": 23.818912506103516
+      },
+      "mode2_full_atomic": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_s4096_layer2_mode2_20260605.json",
+        "event_median_ms": 37.73662185668945,
+        "delta_vs_mode1_ms": 1.7227935791015625
+      }
+    },
+    "d128_kv_stage_plus_qgo_stage_1024_threads": {
+      "mode1_contribution_sink": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_qgo_stage_s4096_layer2_mode1_20260605.json",
+        "event_median_ms": 29.29522705078125,
+        "delta_vs_unstaged_qgo_mode1_ms": -6.718601226806641
+      },
+      "mode2_full_atomic": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_qgo_stage_s4096_layer2_mode2_20260605.json",
+        "event_median_ms": 30.67487907409668,
+        "delta_vs_mode1_ms": 1.3796520233154297
+      }
+    },
+    "d128_kv_stage_512_threads": {
+      "mode0_producer_only": {
+        "artifact": "sparse_mla_source_boundary_triton_qm_h64n64_d128_thr512_s4096_layer2_mode0_20260605.json",
+        "event_median_ms": 14.172165870666504,
+        "read": "Rejected versus the 1024-thread D128 producer because the two N phases cancel the occupancy benefit."
+      }
+    }
+  },
+  "decision": {
+    "promoted": false,
+    "best_current_hip_variant_ms": 30.67487907409668,
+    "passes_triton_full_boundary_gate": false,
+    "read": "The D128 shared-KV producer is the right direction and cuts producer-only latency about 47%, but the warp-level contribution epilogue remains the wall. Final global atomics are no longer the dominant delta in this HIP owner.",
+    "next_required_step": "Replace the warp-fragment contribution path with CK block GEMM or an FMHA-style block pipeline so the CTA computes N64 x D64/128 dKV contribution as a block tile, then attach the compressed-group final atomic epilogue. Cross-token group-aware reduction cannot materialize in this one-token CTA except for rare duplicate selected groups."
+  },
+  "dependency_pin_changes": []
+}

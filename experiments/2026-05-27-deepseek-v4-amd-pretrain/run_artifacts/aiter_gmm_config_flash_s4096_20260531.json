@@ -1,0 +1,639 @@
+{
+  "aiter_default": {
+    "compact_tflops_median": 177.09470935753205,
+    "median_ms": 2.328227996826172,
+    "timing_ms": {
+      "aiter_default_ms_max": 2.7246720790863037,
+      "aiter_default_ms_mean": 2.425495704015096,
+      "aiter_default_ms_median": 2.328227996826172,
+      "aiter_default_ms_min": 2.2235870361328125
+    }
+  },
+  "best": {
+    "compact_tflops_median": 278.24392349360284,
+    "config": {
+      "BLOCK_SIZE_K": 64,
+      "BLOCK_SIZE_M": 128,
+      "BLOCK_SIZE_N": 256,
+      "GRID_DIM": 256,
+      "GROUP_SIZE": 1,
+      "num_stages": 1,
+      "num_warps": 8
+    },
+    "config_index": 106,
+    "median_ms": 1.48185396194458,
+    "min_ms": 1.4781739711761475,
+    "speedup_vs_aiter_default": 1.571158870318724,
+    "speedup_vs_torch_padded_bmm_out": 0.7212114176748969,
+    "timing_ms": {
+      "aiter_cfg_106_ms_max": 1.5681350231170654,
+      "aiter_cfg_106_ms_mean": 1.5093876520792644,
+      "aiter_cfg_106_ms_median": 1.48185396194458,
+      "aiter_cfg_106_ms_min": 1.4781739711761475
+    }
+  },
+  "check": {
+    "atol": 0.5,
+    "max_abs": 0.0,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.0,
+    "rtol": 0.025
+  },
+  "decision_read": "Promote an AITER config only if it is correct and beats torch.bmm(out=) for the same padded baseline. Beating AITER's large-M default alone is not enough.",
+  "default_config": {
+    "BLOCK_SIZE_K": 64,
+    "BLOCK_SIZE_M": 256,
+    "BLOCK_SIZE_N": 256,
+    "GRID_DIM": 256,
+    "GROUP_SIZE": 1,
+    "num_stages": 1,
+    "num_warps": 8
+  },
+  "failure_count": 24,
+  "failures": [
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 72,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 73,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 74,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 75,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 76,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 77,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 78,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 79,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 80,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 81,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 82,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 83,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 84,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 85,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 86,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 64,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 87,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 88,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 89,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 90,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 91,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 92,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 93,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 94,
+      "error": "AssertionError: Invalid GMM kernel config."
+    },
+    {
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 96,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 95,
+      "error": "AssertionError: Invalid GMM kernel config."
+    }
+  ],
+  "flops": {
+    "compact": 412316860416.0,
+    "compact_vs_padded_flop_ratio": 0.7384615384615385,
+    "padded_global_max": 558345748480.0
+  },
+  "op": "bwd_w2_dgrad",
+  "probe": "aiter_gmm_config_sweep",
+  "route_stats": {
+    "assignments": 24576,
+    "experts": 256,
+    "max_per_expert": 130,
+    "mean_per_expert": 96.0,
+    "min_per_expert": 73,
+    "padded_rows_global_max": 33280,
+    "padding_multiplier_global_max": 1.3541666666666667,
+    "touched_experts": 256
+  },
+  "shape": {
+    "assignments": 24576,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 256,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "tokens": 4096,
+    "topk": 6
+  },
+  "sweep_count": 96,
+  "top_results": [
+    {
+      "compact_tflops_median": 278.24392349360284,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 106,
+      "median_ms": 1.48185396194458,
+      "min_ms": 1.4781739711761475,
+      "speedup_vs_aiter_default": 1.571158870318724,
+      "speedup_vs_torch_padded_bmm_out": 0.7212114176748969,
+      "timing_ms": {
+        "aiter_cfg_106_ms_max": 1.5681350231170654,
+        "aiter_cfg_106_ms_mean": 1.5093876520792644,
+        "aiter_cfg_106_ms_median": 1.48185396194458,
+        "aiter_cfg_106_ms_min": 1.4781739711761475
+      }
+    },
+    {
+      "compact_tflops_median": 277.4948630126265,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 119,
+      "median_ms": 1.4858540296554565,
+      "min_ms": 1.4834539890289307,
+      "speedup_vs_aiter_default": 1.5669291534418406,
+      "speedup_vs_torch_padded_bmm_out": 0.7192698443796885,
+      "timing_ms": {
+        "aiter_cfg_119_ms_max": 1.5861749649047852,
+        "aiter_cfg_119_ms_mean": 1.5184943278630574,
+        "aiter_cfg_119_ms_median": 1.4858540296554565,
+        "aiter_cfg_119_ms_min": 1.4834539890289307
+      }
+    },
+    {
+      "compact_tflops_median": 267.8399651265923,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 118,
+      "median_ms": 1.5394150018692017,
+      "min_ms": 1.4890539646148682,
+      "speedup_vs_aiter_default": 1.5124108794569178,
+      "speedup_vs_torch_padded_bmm_out": 0.694244239132093,
+      "timing_ms": {
+        "aiter_cfg_118_ms_max": 1.5490150451660156,
+        "aiter_cfg_118_ms_mean": 1.5258280038833618,
+        "aiter_cfg_118_ms_median": 1.5394150018692017,
+        "aiter_cfg_118_ms_min": 1.4890539646148682
+      }
+    },
+    {
+      "compact_tflops_median": 263.18292792265294,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 107,
+      "median_ms": 1.5666550397872925,
+      "min_ms": 1.527614951133728,
+      "speedup_vs_aiter_default": 1.486114005762417,
+      "speedup_vs_torch_padded_bmm_out": 0.682173145676228,
+      "timing_ms": {
+        "aiter_cfg_107_ms_max": 1.6268559694290161,
+        "aiter_cfg_107_ms_mean": 1.5737086534500122,
+        "aiter_cfg_107_ms_median": 1.5666550397872925,
+        "aiter_cfg_107_ms_min": 1.527614951133728
+      }
+    },
+    {
+      "compact_tflops_median": 256.93750747561813,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 105,
+      "median_ms": 1.6047359704971313,
+      "min_ms": 1.5551350116729736,
+      "speedup_vs_aiter_default": 1.450848014645618,
+      "speedup_vs_torch_padded_bmm_out": 0.665984944769532,
+      "timing_ms": {
+        "aiter_cfg_105_ms_max": 1.6770960092544556,
+        "aiter_cfg_105_ms_mean": 1.6123223304748535,
+        "aiter_cfg_105_ms_median": 1.6047359704971313,
+        "aiter_cfg_105_ms_min": 1.5551350116729736
+      }
+    },
+    {
+      "compact_tflops_median": 255.7900011041755,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 256,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 104,
+      "median_ms": 1.611935019493103,
+      "min_ms": 1.5854549407958984,
+      "speedup_vs_aiter_default": 1.4443683949234616,
+      "speedup_vs_torch_padded_bmm_out": 0.6630105951896816,
+      "timing_ms": {
+        "aiter_cfg_104_ms_max": 1.614016056060791,
+        "aiter_cfg_104_ms_mean": 1.603802005449931,
+        "aiter_cfg_104_ms_median": 1.611935019493103,
+        "aiter_cfg_104_ms_min": 1.5854549407958984
+      }
+    },
+    {
+      "compact_tflops_median": 246.45712564116286,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 57,
+      "median_ms": 1.672976016998291,
+      "min_ms": 1.6644560098648071,
+      "speedup_vs_aiter_default": 1.3916684836902538,
+      "speedup_vs_torch_padded_bmm_out": 0.6388196757289827,
+      "timing_ms": {
+        "aiter_cfg_057_ms_max": 1.7268160581588745,
+        "aiter_cfg_057_ms_mean": 1.6880826950073242,
+        "aiter_cfg_057_ms_median": 1.672976016998291,
+        "aiter_cfg_057_ms_min": 1.6644560098648071
+      }
+    },
+    {
+      "compact_tflops_median": 246.28635303550908,
+      "config": {
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 8
+      },
+      "config_index": 59,
+      "median_ms": 1.6741360425949097,
+      "min_ms": 1.6553759574890137,
+      "speedup_vs_aiter_default": 1.3907041826884152,
+      "speedup_vs_torch_padded_bmm_out": 0.6383770311907763,
+      "timing_ms": {
+        "aiter_cfg_059_ms_max": 1.71977698802948,
+        "aiter_cfg_059_ms_mean": 1.6830963293711345,
+        "aiter_cfg_059_ms_median": 1.6741360425949097,
+        "aiter_cfg_059_ms_min": 1.6553759574890137
+      }
+    },
+    {
+      "compact_tflops_median": 245.0334844384317,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 128,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 113,
+      "median_ms": 1.682695984840393,
+      "min_ms": 1.5928549766540527,
+      "speedup_vs_aiter_default": 1.3836296145004523,
+      "speedup_vs_torch_padded_bmm_out": 0.6351295815224665,
+      "timing_ms": {
+        "aiter_cfg_113_ms_max": 1.7518969774246216,
+        "aiter_cfg_113_ms_mean": 1.6758159796396892,
+        "aiter_cfg_113_ms_median": 1.682695984840393,
+        "aiter_cfg_113_ms_min": 1.5928549766540527
+      }
+    },
+    {
+      "compact_tflops_median": 240.38771248259718,
+      "config": {
+        "BLOCK_SIZE_K": 128,
+        "BLOCK_SIZE_M": 128,
+        "BLOCK_SIZE_N": 256,
+        "GRID_DIM": 512,
+        "GROUP_SIZE": 1,
+        "num_stages": 1,
+        "num_warps": 4
+      },
+      "config_index": 117,
+      "median_ms": 1.715216040611267,
+      "min_ms": 1.660735011100769,
+      "speedup_vs_aiter_default": 1.357396352238194,
+      "speedup_vs_torch_padded_bmm_out": 0.6230876877179509,
+      "timing_ms": {
+        "aiter_cfg_117_ms_max": 1.744057059288025,
+        "aiter_cfg_117_ms_mean": 1.7066693703333538,
+        "aiter_cfg_117_ms_median": 1.715216040611267,
+        "aiter_cfg_117_ms_min": 1.660735011100769
+      }
+    }
+  ],
+  "torch_padded_bmm_out": {
+    "compact_equivalent_tflops_median": 385.80077446725596,
+    "median_ms": 1.0687299966812134,
+    "padded_tflops_median": 522.4385487577424,
+    "timing_ms": {
+      "torch_padded_bmm_out_ms_max": 1.4492930173873901,
+      "torch_padded_bmm_out_ms_mean": 1.1939173539479573,
+      "torch_padded_bmm_out_ms_median": 1.0687299966812134,
+      "torch_padded_bmm_out_ms_min": 1.0637290477752686
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "artifact": "actual_li_ck_route_grid_materialization_decision",
+  "updated_at": "2026-06-05",
+  "status": "ck_actual_li_dkv_slice_promoted_source_boundary_integration_pending",
+  "question": "Does the CK direct-fragment dKV producer win survive real TorchTitan LightningIndexer routes, or was it only a clustered synthetic proxy result?",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "valid_compressed_selections": 1572352,
+    "invalid_pairs": 524800
+  },
+  "code_changes": {
+    "adapter": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "change": "Added --kernel-backend ck to feed real actual-LI materialized probs/grad_logits into probe_compressed_dkv_ck_route_grid_raw_atomic.py. CK backend supports raw_atomic and contrib_sink only."
+  },
+  "source_artifacts": {
+    "actual_li_ck_t8_3sample": "run_artifacts/actual_li_compressed_dkv_ck_route_grid_s4096_layer2_t8k512_20260605.json",
+    "actual_li_ck_t16_3sample": "run_artifacts/actual_li_compressed_dkv_ck_route_grid_s4096_layer2_t16k512_20260605.json",
+    "actual_li_ck_t8_timing10": "run_artifacts/actual_li_compressed_dkv_ck_route_grid_s4096_layer2_t8k512_timing10_20260605.json",
+    "synthetic_ck_decision": "run_artifacts/compressed_dkv_ck_route_grid_direct_fragment_decision_20260605.json"
+  },
+  "timing": {
+    "actual_li_ck_raw_t8_timing10_median_ms": 5.66092586517334,
+    "actual_li_ck_raw_t8_timing10_min_ms": 5.587545871734619,
+    "actual_li_ck_raw_t8_timing10_max_ms": 5.712027072906494,
+    "actual_li_ck_raw_t8_3sample_median_ms": 5.437747955322266,
+    "actual_li_ck_raw_t16_3sample_median_ms": 6.1468729972839355,
+    "actual_li_ck_contrib_sink_t16_median_ms": 4.483092784881592,
+    "prior_actual_li_triton_atomic_wall_ms": 8.80629825592041,
+    "prior_triton_full_sparse_attention_boundary_ms": 11.13
+  },
+  "memory": {
+    "t8_timing10_peak_memory_allocated_gib": 3.586432933807373,
+    "diagnostic_probs_gib": 0.25,
+    "diagnostic_grad_logits_scaled_gib": 0.25,
+    "read": "Peak includes diagnostic materialized P/scaled-dP and route metadata. This is why the result is not an e2e promotion even though the kernel slice is fast."
+  },
+  "route_model": {
+    "t8_modeled_write_reduction_if_coalesced_x": 5.992058108427399,
+    "t16_modeled_write_reduction_if_coalesced_x": 11.952959063438367,
+    "k16_unique_valid_route_contract": true,
+    "read": "Real LI route density is lower than full synthetic topk because about 0.525M selected slots are invalid/zeroed. The CK direct-fragment raw atomic path is already fast enough that local dKV write reduction is not the next isolated wall unless it is fused with source-boundary recompute."
+  },
+  "decision": {
+    "promote": "Use CK direct-fragment MFMA as the dKV contribution owner for the next source-boundary sparse-MLA backward rewrite.",
+    "demote": "Do not spend another branch on late dKV-only reducers that still consume materialized P/scaled-dP; the actual-LI CK raw dKV slice is 5.66 ms, while the bridge/materialization problem remains outside this slice.",
+    "next_kernel_contract": "Move CK direct-fragment contribution math into the no-HSK source-boundary owner: q,dO,kv,indices,lse/output -> recompute QK/probs/scaled-dP inside the kernel -> produce dQ and dKV contributions -> optionally add sparse segmented dKV epilogue before global writes. The first gate should measure the full sparse-attention backward boundary, not just late dKV.",
+    "e2e_tflops_measured": false,
+    "e2e_reason": "This is still an isolated diagnostic route-grid kernel with materialized probability and grad-logit tensors. It is not wired into TorchTitan, so there is no materialized TFLOPs uplift to report yet."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_compressed_dkv_ck_route_grid_raw_atomic.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "docker run ... python3 tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --kernel-backend ck --seq-len 4096 --layer-id 2 --token-block 8 --selected-block 512 --allow-large-materialization --include-contrib-sink --skip-reference --warmup-iters 3 --timed-iters 10 ..."
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,188 @@
+{
+  "artifact": "torchtitan_mori_aiter_8x_s4096_gbs128_acfull_20260602",
+  "created_date": "2026-06-02",
+  "status": "target_shape_8x_s4096_gbs128_two_step_passed",
+  "purpose": "Record the intended 8xMI350 DeepSeek-V4 Flash TorchTitan canary using MORI dispatch/combine, AITER fused-MoE forward, and safe-default routed padded backward.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "preflight": {
+    "gpu_availability": {
+      "result": "idle",
+      "gpus": 8,
+      "gpu_use_percent": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "vram_allocated_percent": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "pid_note": "rocm-smi reported PID 4593 using 0 DRM devices; no GPU-resident workload was present."
+    },
+    "check_config": {
+      "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "pass",
+      "observed": {
+        "model_spec": "deepseek_v4 flash_4layer",
+        "shape": "1 128 4096 2",
+        "parallelism": "-1 8",
+        "moe_comm_backend": "mori",
+        "mori_aiter_backward_mode": "routed",
+        "mori_aiter_local_vjp_mode": "padded",
+        "mori_aiter_op_cache_mode": "backward",
+        "mori_shmem_heap_size": "32G",
+        "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+        "attention_status_by_layer": [
+          "dense_mla_for_uncompressed_dsv4_layer",
+          "dense_mla_for_uncompressed_dsv4_layer",
+          "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold",
+          "pytorch_sparse_mla_lightning_indexer_shortseq_dense_fallback_over_seq_threshold"
+        ],
+        "attention_compress_ratio_by_layer": [
+          0,
+          0,
+          4,
+          128
+        ],
+        "attention_sparse_backward_mode_by_layer": [
+          "manual",
+          "manual",
+          "manual",
+          "manual"
+        ]
+      }
+    }
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s4096_gbs128_steps2_acfull_bwdcachedefault_20260602",
+    "status": "pass",
+    "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s4096_gbs128_steps2_acfull_bwdcachedefault_20260602 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=8 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_REQUIRE_IDLE_GPUS=true MASTER_PORT=29564 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "gpus": 8,
+    "fsdp": 8,
+    "ep": 8,
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 524288,
+    "steps": 2,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "jit_cache": {
+      "policy": "auto",
+      "mori_mount": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori/mori:/root/.mori/jit",
+      "aiter_mount": "/scratch/sonle5/dsv4_pretrain_canary_20260527/cache/jit/onenexus_nexus-titan_rocm722-pytorch-nightly-mori/aiter_jit:/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/jit"
+    },
+    "step1": {
+      "loss": 12.30504,
+      "grad_norm": 11.125,
+      "memory_gib_range": [
+        63.02,
+        132.93
+      ],
+      "tps_per_gpu_range": [
+        1910,
+        1913
+      ],
+      "node_tps_range": [
+        15280,
+        15304
+      ],
+      "implied_step_time_seconds_range": [
+        34.26,
+        34.31
+      ],
+      "tflops_per_gpu_range": [
+        36.13,
+        36.20
+      ],
+      "mfu_percent_range": [
+        1.56,
+        1.57
+      ]
+    },
+    "step2": {
+      "loss": 8.90129,
+      "grad_norm": 22.125,
+      "memory_gib_range": [
+        109.11,
+        248.68
+      ],
+      "tps_per_gpu": 2645,
+      "node_tps": 21160,
+      "implied_step_time_seconds": 24.78,
+      "tflops_per_gpu": 50.06,
+      "mfu_percent": 2.17,
+      "cuda_memory_allocation_retry_warning_count": 4
+    },
+    "loss_movement": "12.30504 -> 8.90129",
+    "training_completed_count": 8,
+    "process_group_destroyed_count": 8,
+    "structured_log_file_count": 8,
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s4096_gbs128_steps2_acfull_bwdcachedefault_20260602/docker-run.log",
+    "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_8x_s4096_gbs128_steps2_acfull_bwdcachedefault_20260602",
+    "post_run_gpu_state": {
+      "gpu_use_percent": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "vram_allocated_percent": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "target_comparison": {
+    "normalized_8x_target_tok_per_gpu_per_s": [
+      2200,
+      2400
+    ],
+    "normalized_8x_target_node_tok_per_s": [
+      17600,
+      19200
+    ],
+    "normalized_8x_target_step_time_seconds_at_gbs128_s4096": [
+      27,
+      30
+    ],
+    "step1_read": "Below target at 1910-1913 tok/GPU/s and 34.26-34.31 s/step; this is the warmup step.",
+    "step2_read": "Above target at 2645 tok/GPU/s, 21160 tok/node/s, and 24.78 s/step.",
+    "read": "The intended 8xMI350 target shape now passes as a correctness-first systems canary and exceeds the normalized throughput target on the second step, but it is still guarded dense-fallback systems evidence rather than final sparse-MLA/LightningIndexer performance."
+  },
+  "limitations": [
+    "The compressed DeepSeek-V4 Flash attention layers still fall back over the sparse sequence threshold.",
+    "The owner-rank MoE VJP remains the padded PyTorch local VJP, not final fused MoE backward.",
+    "The second step peaks at 248.68 GiB on some ranks and reports four CUDA allocation retry warnings.",
+    "TorchTitan MFU remains far below the Ascend MFU target because current FLOP accounting and guarded fallback path are not the final fused sparse-MLA/LI plus fused-MoE-backward path."
+  ],
+  "read": "Safe-default MORI routed padded VJP now carries to the intended 8x S4096 GBS128 shape. This establishes the first 8x DeepSeek-V4 Flash target-shape MORI+AITER two-step canary with loss movement and clean process-group teardown."
+}

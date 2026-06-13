@@ -1,0 +1,60 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_floor",
+  "scope": "compressed_shared_kv_dkv_scalar_reduce_by_group_and_d",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "mode": "sorted_balanced",
+  "seed": 1234,
+  "num_pairs": 65536,
+  "d_tile": 16,
+  "num_items": 1048576,
+  "groups": 1024,
+  "key_space": 16384,
+  "full_d512_multiplier": 32.0,
+  "build_seconds": 17.347557379864156,
+  "extension_dir": "/tmp/dsv4_compressed_dkv_rocprim_reduce_by_key",
+  "workspace": {
+    "temp_bytes": 5412,
+    "resident_tensor_bytes": 16782632,
+    "resident_tensor_gib": 0.015630044043064117
+  },
+  "parity": {
+    "unique_count": 16384,
+    "key_space": 16384,
+    "max_abs_diff": 9.5367431640625e-06,
+    "passed": true,
+    "atol": 0.0001
+  },
+  "timings": {
+    "reduce_only_sorted_keys": {
+      "samples_ms": [
+        0.021400000900030136,
+        0.01860000006854534,
+        0.017841000109910965,
+        0.01844000071287155,
+        0.018400000408291817,
+        0.018559999763965607,
+        0.021160999312996864,
+        0.018160000443458557,
+        0.018279999494552612,
+        0.018200000748038292
+      ],
+      "median_ms": 0.018420000560581684,
+      "min_ms": 0.017841000109910965,
+      "max_ms": 0.021400000900030136,
+      "p90_ms": 0.02118489947170019,
+      "timed_iters": 10,
+      "warmup_iters": 3
+    },
+    "torch_sort_only": null,
+    "torch_sort_reorder_values": null,
+    "torch_sort_reorder_values_plus_reduce": null
+  },
+  "extrapolated": {
+    "full_d512_reduce_only_ms": 0.5894400179386139,
+    "full_d512_sort_reorder_reduce_ms": null
+  },
+  "read": "This is a primitive-floor diagnostic for reducing scalar dKV contributions by compressed group and D offset. It excludes sparse-MLA contribution math. sorted_balanced is an optimistic lower bound where route keys are already grouped; random_sort_reduce includes PyTorch/ROCm sort and value reorder overhead before rocPRIM reduce_by_key."
+}

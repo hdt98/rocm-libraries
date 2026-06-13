@@ -1,0 +1,61 @@
+{
+  "artifact": "sparse_mla_query_major_scorepage_dparallel_decision",
+  "created_at": "2026-06-05",
+  "status": "producer_only_surface_timed_not_promoted",
+  "scope": "S4096 layer-2 source-boundary sparse-MLA score/prob/scaled-dP producer checksum on one MI350",
+  "source_file": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+  "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "shape": {
+    "device": "AMD Instinct MI350X VF",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "timing_ms": {
+    "selected64_event_median": 11.512803077697754,
+    "selected256_event_median": 5.816722869873047,
+    "selected512_event_median": 4.791790962219238,
+    "best_selected_block": 512
+  },
+  "gates_ms": {
+    "producer_plus_page_handoff_budget": 3.163376932144166,
+    "current_full_sparse_attention_backward_boundary": 11.13,
+    "current_sparse_atomic_dkv_wall_context": 8.80629825592041,
+    "materialized_hsk_dq_plus_dkv_floor": 7.966623067855835
+  },
+  "derived": {
+    "selected512_over_producer_budget_x": 1.514678689883318,
+    "selected512_margin_vs_current_full_boundary_ms": 6.338209037780762,
+    "selected512_improvement_vs_selected64_x": 2.402674555806877,
+    "selected512_improvement_vs_selected256_x": 1.213898196252353
+  },
+  "read": "Widening the selected window matters. Moving from selected64 to selected512 removes repeated row-term work and reduces CTA count, cutting the source-boundary producer checksum from 11.51 ms to 4.79 ms. This is the first lower-level source-boundary producer surface below the current 11.13 ms full sparse-attention backward boundary, but it is not promoted: it emits only a checksum, not dQ or valid dKV, and it is still 1.51x over the 3.16 ms producer budget implied by the materialized HSK dQ+dKV floor.",
+  "decision": {
+    "promote_to_full_dq_dkv": false,
+    "run_e2e_tflops": false,
+    "retain_surface": true,
+    "why": [
+      "The selected512 producer-only latency is useful and much better than selected64, but dQ and dKV writeback would add work on top of 4.79 ms.",
+      "The strict source-boundary budget is 3.16 ms before a full dQ+dKV implementation can beat the current 11.13 ms boundary with the 7.97 ms materialized floor.",
+      "This one-token CTA schedule has no route-local write reduction: route_atomic_reduction_x remains 1.0 even at selected512."
+    ],
+    "next_kernel_contract": [
+      "Keep selected512 row-term amortization.",
+      "Add token tiling or persistent producer-consumer ownership so a CTA/wave group handles more than one token without recomputing selected KV work wastefully.",
+      "Move from checksum to a tiny score page consumed by D-parallel dQ/dKV consumers only after producer-only is at or below 3.16 ms.",
+      "Do not run 4x/8x TFLOPs materialization for this path until full source-boundary dQ+dKV beats 11.13 ms."
+    ]
+  },
+  "source_artifacts": {
+    "gate": "run_artifacts/sparse_mla_tiny_score_page_d_parallel_gate_20260605.json",
+    "selected64": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_20260605.json",
+    "selected256": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb256_20260605.json",
+    "selected512": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_20260605.json"
+  },
+  "dependency_pins_changed": false
+}

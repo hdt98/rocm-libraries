@@ -1,0 +1,96 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_decision_20260603",
+  "created_date": "2026-06-03",
+  "status": "dense_lds_grouped_reducer_rejected_for_s4096_actual_li",
+  "scope": "Actual LightningIndexer layer-2 compressed shared-KV dKV accumulation on 1xMI350 using the HIP/rocWMMA route-grid diagnostic extension.",
+  "why_this_artifact_exists": "The previous synthetic route-grid probe showed dense local grouped accumulation could reduce modeled global writes but regressed at S4096. This refresh feeds the same HIP/rocWMMA contribution body with actual TorchTitan LightningIndexer top_indices plus materialized diagnostic probs/grad_logits, so the decision is based on real LI route topology instead of synthetic clustered_unique routes.",
+  "new_tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+  "source_artifacts": {
+    "metadata_s128": "run_artifacts/actual_li_rocwmma_route_grid_s128_layer2_t32k32_metadata_20260603.json",
+    "raw_s128_invalid_zero": "run_artifacts/actual_li_rocwmma_route_grid_s128_layer2_t32k32_rawonly_invalidzero_20260603.json",
+    "all_s128_direct_unique_rejected": "run_artifacts/actual_li_rocwmma_route_grid_s128_layer2_t32k32_all_invalidzero_20260603.json",
+    "pass_s128": "run_artifacts/actual_li_rocwmma_route_grid_s128_layer2_t32k32_pass_invalidzero_20260603.json",
+    "pass_s512": "run_artifacts/actual_li_rocwmma_route_grid_s512_layer2_t32k128_pass_invalidzero_20260603.json",
+    "timing_s4096_32x256": "run_artifacts/actual_li_rocwmma_route_grid_s4096_layer2_t32k256_timing_invalidzero_20260603.json",
+    "timing_s4096_32x512": "run_artifacts/actual_li_rocwmma_route_grid_s4096_layer2_t32k512_timing_invalidzero_20260603.json",
+    "retained_active_list_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_summary_20260602.json",
+    "retained_sasg_overlap": "run_artifacts/sparse_mla_sharedkv_sasg_overlap_s4096_layer2_chunk512_20260603.json"
+  },
+  "adapter_findings": {
+    "invalid_group_minus_one_fault": {
+      "observed": true,
+      "command_scope": "S128 raw-only actual-LI adapter with invalid selected slots encoded as -1",
+      "result": "GPU memory access fault before summary write",
+      "workaround": "Encode invalid selected slots as group 0 because their materialized probs/grad_logits are already zero.",
+      "production_implication": "The HIP kernel should not consume negative group ids. A production kernel should carry an explicit valid mask or sanitize route ids before entering the accumulator."
+    },
+    "grouped_direct_unique_rejected": {
+      "observed": true,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_s128_layer2_t32k32_all_invalidzero_20260603.json",
+      "max_abs_diff": 30.158708572387695,
+      "read": "Even though valid K16 route chunks are unique, the direct-unique shortcut is not correct for actual LI with zero-routed invalid lanes. Keep grouped_atomic or a real segmented reducer; do not use grouped_direct_unique."
+    }
+  },
+  "timing_summary_ms": {
+    "s128_layer2_32x32": {
+      "status": "passed",
+      "write_reduction_x": 25.2,
+      "raw_atomic": 0.22408199310302734,
+      "grouped_atomic": 0.13072100281715393,
+      "group_panel_atomic": 0.13248099386692047,
+      "grouped_partial_emit_plus_reduce": 0.13072200119495392,
+      "grouped_vs_raw_speedup_x": 1.7142003830590418
+    },
+    "s512_layer2_32x128": {
+      "status": "passed",
+      "write_reduction_x": 30.0,
+      "raw_atomic": 2.7257080078125,
+      "grouped_atomic": 0.583046019077301,
+      "group_panel_atomic": 0.7136080265045166,
+      "grouped_partial_emit_plus_reduce": 0.5877259969711304,
+      "grouped_vs_raw_speedup_x": 4.6749448905012105
+    },
+    "s4096_layer2_32x256": {
+      "status": "timed_reference_skipped",
+      "write_reduction_x": 12.338365924856399,
+      "contrib_sink": 9.59495735168457,
+      "raw_atomic": 47.28778839111328,
+      "grouped_atomic": 21.3048095703125,
+      "group_panel_atomic": 66.32819366455078,
+      "grouped_vs_raw_speedup_x": 2.2195827770742973,
+      "raw_vs_grouped_max_abs_diff": 0.0001068115234375
+    },
+    "s4096_layer2_32x512": {
+      "status": "timed_reference_skipped",
+      "write_reduction_x": 23.813051840857806,
+      "contrib_sink": 9.010004043579102,
+      "raw_atomic": 47.12506866455078,
+      "grouped_atomic": 20.945831298828125,
+      "grouped_vs_raw_speedup_x": 2.2498543023779307,
+      "raw_vs_grouped_max_abs_diff": 0.000118255615234375
+    }
+  },
+  "decision": {
+    "retain": [
+      "Actual-LI adapter and route/write-model bookkeeping",
+      "S128/S512 correctness evidence for grouped_atomic, group_panel_atomic, and grouped_partial_reduce",
+      "The S4096 route stats showing 12.34x write reduction for 32x256 and 23.81x for 32x512"
+    ],
+    "reject": [
+      "Dense-LDS grouped_atomic route-grid body for production S4096; 20.95-21.30 ms is slower than the retained active-list Triton atomic path around 8.8 ms",
+      "group_panel_atomic for this branch; 66.33 ms at S4096 32x256 is dominated by panel recompute",
+      "grouped_direct_unique shortcut; it fails actual-LI parity",
+      "negative group id route encoding into this HIP body"
+    ],
+    "read": "Actual LI confirms the synthetic lesson. Coalescing global writes is necessary but not sufficient: the dense local group table and scalar local accumulation destroy enough MFMA/tile efficiency that S4096 remains far above the current active-list atomic wall. The next candidate should be sparse segmented accumulation over active rows/lanes, not a denser LDS table or wrapper overlap."
+  },
+  "next_candidate": {
+    "name": "sparse_segmented_mfma_accumulator",
+    "contract": "Keep the query-major MFMA contribution body, but replace the dense group_count x D16 LDS table with a sparse/segmented reducer over only active K16 rows or packed active group rows. Carry an explicit valid mask or pre-sanitized nonnegative group ids.",
+    "promotion_gate": [
+      "S512 must keep grouped correctness and beat 0.58 ms grouped_atomic or clearly explain extra fused work.",
+      "S4096 32x512 must beat the retained active-list atomic path around 8.8 ms, not merely beat this adapter's 47 ms raw path.",
+      "S4096 memory must avoid selected K/V, dense route, and raw partial slabs; diagnostic probs/grad_logits are allowed only for isolated accumulator rungs."
+    ]
+  }
+}

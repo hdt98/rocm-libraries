@@ -1,0 +1,653 @@
+{
+  "force_mori_mbs2_completed": {
+    "backward_calls_by_rank": {
+      "0": 48,
+      "1": 48,
+      "2": 48,
+      "3": 48,
+      "4": 48,
+      "5": 48,
+      "6": 48,
+      "7": 48
+    },
+    "forward_calls_by_rank": {
+      "0": 48,
+      "1": 48,
+      "2": 48,
+      "3": 48,
+      "4": 48,
+      "5": 48,
+      "6": 48,
+      "7": 48
+    },
+    "local_vjp_detail_rank_totals_ms": {
+      "local_aiter_compact_vjp.dgrad_swiglu": {
+        "count": 8,
+        "max": 76.11445689201355,
+        "mean": 74.5296795964241,
+        "min": 72.79820203781128,
+        "p50": 74.65059459209442,
+        "p95": 75.9230772614479
+      },
+      "local_aiter_compact_vjp.dtopk_weight": {
+        "count": 8,
+        "max": 51.08576810359955,
+        "mean": 50.92466174066067,
+        "min": 50.819100856781006,
+        "p50": 50.895744144916534,
+        "p95": 51.06705605983734
+      },
+      "local_aiter_compact_vjp.forward_recompute": {
+        "count": 8,
+        "max": 239.14644765853882,
+        "mean": 234.75995177030563,
+        "min": 232.66544723510742,
+        "p50": 233.75015926361084,
+        "p95": 238.3883984327316
+      },
+      "local_aiter_compact_vjp.gather_scale": {
+        "count": 8,
+        "max": 47.587265849113464,
+        "mean": 47.32680182904005,
+        "min": 47.075813949108124,
+        "p50": 47.359851479530334,
+        "p95": 47.545853519439696
+      },
+      "local_aiter_compact_vjp.prepare_ops": {
+        "count": 8,
+        "max": 0.3423239993862808,
+        "mean": 0.3155838754028082,
+        "min": 0.30440400168299675,
+        "p50": 0.3102430000435561,
+        "p95": 0.33962234975770117
+      },
+      "local_aiter_compact_vjp.route_pack": {
+        "count": 8,
+        "max": 9.857560008764267,
+        "mean": 8.618675120174885,
+        "min": 7.958973988890648,
+        "p50": 8.558804497122765,
+        "p95": 9.531299787759782
+      },
+      "local_aiter_compact_vjp.sort_counts": {
+        "count": 8,
+        "max": 28.690267145633698,
+        "mean": 26.889047019183636,
+        "min": 25.157413005828857,
+        "p50": 26.775969058275223,
+        "p95": 28.462752696871757
+      },
+      "local_aiter_compact_vjp.wgrad": {
+        "count": 8,
+        "max": 242.27708911895752,
+        "mean": 235.26928454637527,
+        "min": 232.3465142250061,
+        "p50": 234.7241244316101,
+        "p95": 240.19162549972535
+      },
+      "local_aiter_compact_vjp.xgrad": {
+        "count": 8,
+        "max": 188.5860424041748,
+        "mean": 185.07095500826836,
+        "min": 183.60296988487244,
+        "p50": 184.30814373493195,
+        "p95": 187.94163821935655
+      }
+    },
+    "logged_steps_unique": [
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.13,
+        "tok_per_gpu_s": 1701.0
+      },
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.17,
+        "tok_per_gpu_s": 1702.0
+      },
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.15,
+        "tok_per_gpu_s": 1701.0
+      },
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.21,
+        "tok_per_gpu_s": 1703.0
+      },
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.2,
+        "tok_per_gpu_s": 1702.0
+      },
+      {
+        "grad_norm": 9.9375,
+        "loss": 12.29009,
+        "memory_gib": 99.85,
+        "mfu_percent": 3.73,
+        "step": 1,
+        "tflops_per_gpu": 86.16,
+        "tok_per_gpu_s": 1702.0
+      },
+      {
+        "grad_norm": 69.0,
+        "loss": 11.21849,
+        "memory_gib": 136.95,
+        "mfu_percent": 9.91,
+        "step": 2,
+        "tflops_per_gpu": 228.93,
+        "tok_per_gpu_s": 4522.0
+      },
+      {
+        "grad_norm": 69.0,
+        "loss": 11.21849,
+        "memory_gib": 136.95,
+        "mfu_percent": 9.91,
+        "step": 2,
+        "tflops_per_gpu": 228.93,
+        "tok_per_gpu_s": 4521.0
+      }
+    ],
+    "max_call_id": 384,
+    "ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "route_stats": {
+      "grad_recv_count": {
+        "count": 384,
+        "max": 9216.0,
+        "mean": 9216.0,
+        "min": 9216.0,
+        "p50": 9216.0,
+        "p95": 9216.0
+      },
+      "local_vjp_assignments": {
+        "count": 384,
+        "max": 49152.0,
+        "mean": 49152.0,
+        "min": 49152.0,
+        "p50": 49152.0,
+        "p95": 49152.0
+      },
+      "local_vjp_max_count": {
+        "count": 384,
+        "max": 1536.0,
+        "mean": 1536.0,
+        "min": 1536.0,
+        "p50": 1536.0,
+        "p95": 1536.0
+      },
+      "local_vjp_mean_count_per_expert": {
+        "count": 384,
+        "max": 1536.0,
+        "mean": 1536.0,
+        "min": 1536.0,
+        "p50": 1536.0,
+        "p95": 1536.0
+      },
+      "local_vjp_min_count_nonzero": {
+        "count": 384,
+        "max": 1536.0,
+        "mean": 1536.0,
+        "min": 1536.0,
+        "p50": 1536.0,
+        "p95": 1536.0
+      },
+      "local_vjp_nonempty_experts": {
+        "count": 384,
+        "max": 32.0,
+        "mean": 32.0,
+        "min": 32.0,
+        "p50": 32.0,
+        "p95": 32.0
+      },
+      "local_vjp_padding_multiplier": {
+        "count": 384,
+        "max": 1.0,
+        "mean": 1.0,
+        "min": 1.0,
+        "p50": 1.0,
+        "p95": 1.0
+      },
+      "recv_count": {
+        "count": 384,
+        "max": 9216.0,
+        "mean": 9216.0,
+        "min": 9216.0,
+        "p50": 9216.0,
+        "p95": 9216.0
+      }
+    },
+    "rows": 3072,
+    "selected_window": "step2",
+    "stage_rank_totals_ms": {
+      "backward.align_grad_output": {
+        "count": 8,
+        "max": 2.1925819870084524,
+        "mean": 2.111169242532924,
+        "min": 2.059979986399412,
+        "p50": 2.1027894923463464,
+        "p95": 2.178889636974782
+      },
+      "backward.combine_dx.call": {
+        "count": 8,
+        "max": 57.214298367500305,
+        "mean": 48.686769761145115,
+        "min": 35.53361815214157,
+        "p50": 51.89605984091759,
+        "p95": 55.93335216045379
+      },
+      "backward.combine_dx.prepare_full": {
+        "count": 8,
+        "max": 5.325708016753197,
+        "mean": 5.247829630970955,
+        "min": 5.195624999701977,
+        "p50": 5.230184514075518,
+        "p95": 5.316090358793735
+      },
+      "backward.combine_dx.slice_contiguous": {
+        "count": 8,
+        "max": 0.2504419977776706,
+        "mean": 0.22910799755482003,
+        "min": 0.2200009971857071,
+        "p50": 0.22334349621087313,
+        "p95": 0.24968599821440873
+      },
+      "backward.dispatch_grad_output.call": {
+        "count": 8,
+        "max": 126.20525646209717,
+        "mean": 110.95779885351658,
+        "min": 91.23344540596008,
+        "p50": 111.17966175079346,
+        "p95": 124.81103717684746
+      },
+      "backward.dtopk_dense_allreduce.all_reduce": {
+        "count": 8,
+        "max": 12.13637800514698,
+        "mean": 10.360134620219469,
+        "min": 8.241696000099182,
+        "p50": 10.24626549333334,
+        "p95": 11.91496833562851
+      },
+      "backward.dtopk_dense_allreduce.prepare": {
+        "count": 8,
+        "max": 8.389861077070236,
+        "mean": 7.349377507343888,
+        "min": 6.821996986865997,
+        "p50": 7.220768012106419,
+        "p95": 8.160805653035641
+      },
+      "backward.dtopk_dense_allreduce.slice": {
+        "count": 8,
+        "max": 0.3851649984717369,
+        "mean": 0.2595882479217835,
+        "min": 0.21452199993655086,
+        "p50": 0.24106149817816913,
+        "p95": 0.34737899808678785
+      },
+      "backward.local_vjp.aiter_compact": {
+        "count": 8,
+        "max": 883.0541572570801,
+        "mean": 868.4806554317474,
+        "min": 858.8990211486816,
+        "p50": 864.8700122833252,
+        "p95": 880.6313574790954
+      },
+      "backward.return_casts": {
+        "count": 8,
+        "max": 0.7524099946022034,
+        "mean": 0.38133562315488234,
+        "min": 0.231604996137321,
+        "p50": 0.31294499710202217,
+        "p95": 0.6611292969435454
+      },
+      "backward.reuse_forward_dispatch": {
+        "count": 8,
+        "max": 0.2983250003308058,
+        "mean": 0.29172325058607385,
+        "min": 0.28428100096061826,
+        "p50": 0.29112250031903386,
+        "p95": 0.2973583004670218
+      }
+    }
+  },
+  "force_mori_mbs4_aborted_step1": {
+    "backward_calls_by_rank": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0
+    },
+    "forward_calls_by_rank": {
+      "0": 48,
+      "1": 48,
+      "2": 48,
+      "3": 48,
+      "4": 48,
+      "5": 48,
+      "6": 48,
+      "7": 48
+    },
+    "local_vjp_detail_rank_totals_ms": {},
+    "max_call_id": 108,
+    "ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "route_stats": {
+      "grad_recv_count": null,
+      "local_vjp_assignments": null,
+      "local_vjp_max_count": null,
+      "local_vjp_mean_count_per_expert": null,
+      "local_vjp_min_count_nonzero": null,
+      "local_vjp_nonempty_experts": null,
+      "local_vjp_padding_multiplier": null,
+      "recv_count": null
+    },
+    "rows": 864,
+    "selected_window": "step1_completed_backward",
+    "stage_rank_totals_ms": {}
+  },
+  "natural_mori_mbs4_profile": {
+    "backward_calls_by_rank": {
+      "0": 24,
+      "1": 24,
+      "2": 24,
+      "3": 24,
+      "4": 24,
+      "5": 24,
+      "6": 24,
+      "7": 24
+    },
+    "forward_calls_by_rank": {
+      "0": 24,
+      "1": 24,
+      "2": 24,
+      "3": 24,
+      "4": 24,
+      "5": 24,
+      "6": 24,
+      "7": 24
+    },
+    "local_vjp_detail_rank_totals_ms": {
+      "local_aiter_compact_vjp.dgrad_swiglu": {
+        "count": 8,
+        "max": 89.03132808208466,
+        "mean": 71.30117378756404,
+        "min": 55.18981796503067,
+        "p50": 70.0519268065691,
+        "p95": 86.91858467459679
+      },
+      "local_aiter_compact_vjp.dtopk_weight": {
+        "count": 8,
+        "max": 65.11735999584198,
+        "mean": 51.598612662404776,
+        "min": 38.279269218444824,
+        "p50": 50.450982347130775,
+        "p95": 63.925808316469194
+      },
+      "local_aiter_compact_vjp.forward_recompute": {
+        "count": 8,
+        "max": 214.71372509002686,
+        "mean": 175.40325692296028,
+        "min": 135.58116269111633,
+        "p50": 172.44252932071686,
+        "p95": 210.07517066001893
+      },
+      "local_aiter_compact_vjp.gather_scale": {
+        "count": 8,
+        "max": 61.23187828063965,
+        "mean": 48.20222554076463,
+        "min": 35.921248376369476,
+        "p50": 46.95115174725652,
+        "p95": 59.88853849768639
+      },
+      "local_aiter_compact_vjp.prepare_ops": {
+        "count": 8,
+        "max": 0.19400000013411045,
+        "mean": 0.16890624968800694,
+        "min": 0.1539210006594658,
+        "p50": 0.16584099945612252,
+        "p95": 0.1908230499830097
+      },
+      "local_aiter_compact_vjp.route_pack": {
+        "count": 8,
+        "max": 3.0659469664096832,
+        "mean": 2.8667109962552786,
+        "min": 2.6664220094680786,
+        "p50": 2.873567011207342,
+        "p95": 3.059268628060818
+      },
+      "local_aiter_compact_vjp.sort_counts": {
+        "count": 8,
+        "max": 12.47235506772995,
+        "mean": 11.592855133116245,
+        "min": 10.776446998119354,
+        "p50": 11.519867464900017,
+        "p95": 12.372506372630596
+      },
+      "local_aiter_compact_vjp.wgrad": {
+        "count": 8,
+        "max": 349.27680253982544,
+        "mean": 284.8266913667321,
+        "min": 201.9122498035431,
+        "p50": 281.4422027170658,
+        "p95": 347.00714395046236
+      },
+      "local_aiter_compact_vjp.xgrad": {
+        "count": 8,
+        "max": 225.65265917778015,
+        "mean": 179.8189054504037,
+        "min": 135.06251817941666,
+        "p50": 176.5571849346161,
+        "p95": 221.28080035448073
+      }
+    },
+    "max_call_id": 192,
+    "ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "route_stats": {
+      "grad_recv_count": {
+        "count": 192,
+        "max": 119149.0,
+        "mean": 73478.97916666667,
+        "min": 1452.0,
+        "p50": 70836.0,
+        "p95": 115916.04999999999
+      },
+      "local_vjp_assignments": {
+        "count": 192,
+        "max": 243512.0,
+        "mean": 98304.0,
+        "min": 1453.0,
+        "p50": 90269.0,
+        "p95": 177252.3
+      },
+      "local_vjp_max_count": {
+        "count": 192,
+        "max": 117962.0,
+        "mean": 42180.817708333336,
+        "min": 1208.0,
+        "p50": 39060.5,
+        "p95": 88044.6
+      },
+      "local_vjp_mean_count_per_expert": {
+        "count": 192,
+        "max": 7609.75,
+        "mean": 3072.0,
+        "min": 45.40625,
+        "p50": 2820.90625,
+        "p95": 5539.134375
+      },
+      "local_vjp_min_count_nonzero": {
+        "count": 192,
+        "max": 5.0,
+        "mean": 1.1302083333333333,
+        "min": 1.0,
+        "p50": 1.0,
+        "p95": 2.0
+      },
+      "local_vjp_nonempty_experts": {
+        "count": 192,
+        "max": 29.0,
+        "mean": 20.984375,
+        "min": 11.0,
+        "p50": 21.0,
+        "p95": 28.0
+      },
+      "local_vjp_padding_multiplier": {
+        "count": 192,
+        "max": 28.941888723086763,
+        "mean": 13.744759951365694,
+        "min": 6.096133687992681,
+        "p50": 13.093559530152174,
+        "p95": 23.605855507507904
+      },
+      "recv_count": {
+        "count": 192,
+        "max": 119149.0,
+        "mean": 73478.97916666667,
+        "min": 1452.0,
+        "p50": 70836.0,
+        "p95": 115916.04999999999
+      }
+    },
+    "rows": 1536,
+    "selected_window": "step2",
+    "stage_rank_totals_ms": {
+      "backward.align_grad_output": {
+        "count": 8,
+        "max": 6.508102983236313,
+        "mean": 5.44775949488394,
+        "min": 3.8997529838234186,
+        "p50": 5.275167992338538,
+        "p95": 6.443827224522829
+      },
+      "backward.combine_dx.call": {
+        "count": 8,
+        "max": 862.6793813705444,
+        "mean": 649.7265492677689,
+        "min": 453.5132780075073,
+        "p50": 663.790185213089,
+        "p95": 835.2487647295
+      },
+      "backward.combine_dx.prepare_full": {
+        "count": 8,
+        "max": 10.530614018440247,
+        "mean": 9.590995758771896,
+        "min": 8.140593022108078,
+        "p50": 9.588025502860546,
+        "p95": 10.492547987401485
+      },
+      "backward.combine_dx.slice_contiguous": {
+        "count": 8,
+        "max": 0.13640099810436368,
+        "mean": 0.11398099869256839,
+        "min": 0.1094409991055727,
+        "p50": 0.1114604992326349,
+        "p95": 0.12790334802120926
+      },
+      "backward.dispatch_grad_output.call": {
+        "count": 8,
+        "max": 62.619361877441406,
+        "mean": 59.280621379613876,
+        "min": 57.00328731536865,
+        "p50": 59.160640001297,
+        "p95": 62.185598862171176
+      },
+      "backward.dtopk_dense_allreduce.all_reduce": {
+        "count": 8,
+        "max": 5.676251992583275,
+        "mean": 5.227683753706515,
+        "min": 4.069877967238426,
+        "p50": 5.324407521635294,
+        "p95": 5.611697311326862
+      },
+      "backward.dtopk_dense_allreduce.prepare": {
+        "count": 8,
+        "max": 5.389077976346016,
+        "mean": 4.236568883992732,
+        "min": 3.845452032983303,
+        "p50": 4.131157502532005,
+        "p95": 4.961707703769207
+      },
+      "backward.dtopk_dense_allreduce.slice": {
+        "count": 8,
+        "max": 0.1268809987232089,
+        "mean": 0.11522599851014093,
+        "min": 0.10988199803978205,
+        "p50": 0.11268199887126684,
+        "p95": 0.12632064877543597
+      },
+      "backward.local_vjp.aiter_compact": {
+        "count": 8,
+        "max": 1022.4803104400635,
+        "mean": 827.9113126397133,
+        "min": 617.9495391845703,
+        "p50": 814.245733499527,
+        "p95": 1005.7893783569336
+      },
+      "backward.return_casts": {
+        "count": 8,
+        "max": 0.2506800009869039,
+        "mean": 0.17971112456871197,
+        "min": 0.13048099912703037,
+        "p50": 0.16444100067019463,
+        "p95": 0.24723670051898805
+      },
+      "backward.reuse_forward_dispatch": {
+        "count": 8,
+        "max": 0.18128200015053153,
+        "mean": 0.15777199965668842,
+        "min": 0.14528099913150072,
+        "p50": 0.15484449989162385,
+        "p95": 0.17572365012019872
+      }
+    }
+  }
+}

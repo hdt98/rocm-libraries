@@ -1,0 +1,75 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_corrected_failure_20260612",
+  "created_at": "2026-06-12",
+  "result": "corrected_launch_failed_after_step1_memory",
+  "host": "do-vunguyen-mi350-gpu",
+  "why_not_do_sonle5": "do-sonle5-mi350-gpu was occupied: GPUs showed 36-80% use and 67-78% VRAM allocation.",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_corrected_8x_s4096_gbs128_steps20_20260612",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_corrected_8x_s4096_gbs128_steps20_20260612",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "chunked_ce_num_chunks": 8
+  },
+  "sparse_mla_backend": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "moe_path_under_test": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "compact_collective_backend": "mori_native",
+    "native_compact_weighted_output": true,
+    "source_scatter_backend": "triton_flat",
+    "hot_weight_forward_backend": "mori_sdma",
+    "hot_weight_reduce_backend": "mori_sdma",
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact",
+    "weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_bwd_score_mode": "torch"
+  },
+  "step1": {
+    "loss": 15.91235,
+    "grad_norm": 14.8125,
+    "tokens_per_gpu_s_range": [1707, 1710],
+    "tflops_per_gpu_range": [84.53, 84.63],
+    "memory_gib_range": [220.80, 224.12]
+  },
+  "failure": {
+    "phase": "step2 forward, standard-EP hot-helper dispatch",
+    "source_location": "torchtitan/models/common/token_dispatcher.py:3682",
+    "exception": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "available_free_memory_mb": 116,
+    "root_rank": 7,
+    "root_exit": "SIGABRT",
+    "trace_summary": "Queue abort during token_dispatcher.dispatch -> moe._schedule_dispatch_forward -> MoE forward in the next step."
+  },
+  "comparison": {
+    "robust_standard_ep_hothelper_baseline": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs1_mbs2_ce8_ladder_20step_20260612.json",
+      "mbs8_late_tok_per_gpu_s": 8632.7813,
+      "status": "completed 20 steps"
+    },
+    "prior_mbs4_weighted_output_gate": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_weighted_output_gate_20260612.json",
+      "steps_2_to_3_tok_per_gpu_s_mean": 6688.5,
+      "delta_vs_dataonly_control_pct": -14.65,
+      "peak_memory_delta_vs_dataonly_control_gib": 9.18
+    }
+  },
+  "read": "The sparse-MLA launch bug is fixed, but native compact weighted-output is not a promotion. At MBS8 it adds enough lifetime/workspace pressure to fail after one finite step; at MBS4 it was already slower and higher-memory than the data-only native compact control. The useful next MORI-native target is not this forward weighted-output bridge; it is an ABI collapse that avoids retaining source-rank rows/flat positions and implements the backward token-return contract natively.",
+  "dependency_pin_changes": "none"
+}

@@ -1,0 +1,584 @@
+{
+  "additive_step2_rank_summary_s": {
+    "accumulated_loss_reduce_s": {
+      "max": 0.365651,
+      "mean": 0.360024,
+      "median": 0.358444,
+      "min": 0.357555,
+      "n": 4
+    },
+    "backward_s": {
+      "max": 20.846193,
+      "mean": 20.845657,
+      "median": 20.845619,
+      "min": 20.845198,
+      "n": 4
+    },
+    "forward_backward_call_s": {
+      "max": 34.290647,
+      "mean": 34.286311,
+      "median": 34.288979,
+      "min": 34.276638,
+      "n": 4
+    },
+    "forward_s": {
+      "max": 7.065776,
+      "mean": 7.043151,
+      "median": 7.049922,
+      "min": 7.006985,
+      "n": 4
+    },
+    "grad_clip_s": {
+      "max": 0.056684,
+      "mean": 0.053261,
+      "median": 0.052985,
+      "min": 0.05039,
+      "n": 4
+    },
+    "loss_s": {
+      "max": 0.982057,
+      "mean": 0.9815,
+      "median": 0.981598,
+      "min": 0.980748,
+      "n": 4
+    },
+    "microbatch_fwdbwd_s": {
+      "max": 34.293862,
+      "mean": 34.289881,
+      "median": 34.292336,
+      "min": 34.280992,
+      "n": 4
+    },
+    "optimizer_step_s": {
+      "max": 0.088259,
+      "mean": 0.087025,
+      "median": 0.087259,
+      "min": 0.085321,
+      "n": 4
+    },
+    "step_gpu_s": {
+      "max": 34.885477,
+      "mean": 34.884427,
+      "median": 34.884768,
+      "min": 34.882695,
+      "n": 4
+    },
+    "step_wall_s": {
+      "max": 34.885511,
+      "mean": 34.88446,
+      "median": 34.884799,
+      "min": 34.882731,
+      "n": 4
+    },
+    "wrapper_residual_s": {
+      "max": 5.459709,
+      "mean": 5.419572,
+      "median": 5.41493,
+      "min": 5.388721,
+      "n": 4
+    }
+  },
+  "date_utc": "2026-06-06",
+  "derived_summary_s": {
+    "backward_residual_after_named_s": {
+      "max": 8.944583,
+      "mean": 8.877977,
+      "median": 8.869067,
+      "min": 8.829189,
+      "n": 4
+    },
+    "backward_s": {
+      "max": 20.846193,
+      "mean": 20.845657,
+      "median": 20.845619,
+      "min": 20.845198,
+      "n": 4
+    },
+    "dense_linear_backward_s": {
+      "max": 1.974665,
+      "mean": 1.914415,
+      "median": 1.925328,
+      "min": 1.832338,
+      "n": 4
+    },
+    "mori_named_backward_s": {
+      "max": 6.830991,
+      "mean": 6.815864,
+      "median": 6.81394,
+      "min": 6.804586,
+      "n": 4
+    },
+    "sharedkv_backward_s": {
+      "max": 3.239273,
+      "mean": 3.237401,
+      "median": 3.237183,
+      "min": 3.235966,
+      "n": 4
+    }
+  },
+  "dsv4_profile_step2_rank_total_summary_s": {
+    "dense_linear_groups": {
+      "attention_projection_dinput": {
+        "max": 0.574215,
+        "mean": 0.537623,
+        "median": 0.538869,
+        "min": 0.498539,
+        "n": 4
+      },
+      "attention_projection_dweight": {
+        "max": 0.657532,
+        "mean": 0.640427,
+        "median": 0.637917,
+        "min": 0.628341,
+        "n": 4
+      },
+      "indexer_dweight": {
+        "max": 0.048988,
+        "mean": 0.047666,
+        "median": 0.048053,
+        "min": 0.04557,
+        "n": 4
+      },
+      "router_dinput": {
+        "max": 0.020925,
+        "mean": 0.020185,
+        "median": 0.020113,
+        "min": 0.019588,
+        "n": 4
+      },
+      "router_dweight": {
+        "max": 0.016299,
+        "mean": 0.016086,
+        "median": 0.016176,
+        "min": 0.015692,
+        "n": 4
+      },
+      "shared_expert_dinput": {
+        "max": 0.519322,
+        "mean": 0.504226,
+        "median": 0.509505,
+        "min": 0.478574,
+        "n": 4
+      },
+      "shared_expert_dweight": {
+        "max": 0.155704,
+        "mean": 0.148202,
+        "median": 0.148299,
+        "min": 0.140507,
+        "n": 4
+      }
+    },
+    "dense_linear_labels": {
+      "dsv4.linear.attention.wkv_a": {
+        "max": 0.035635,
+        "mean": 0.034452,
+        "median": 0.034235,
+        "min": 0.033705,
+        "n": 4
+      },
+      "dsv4.linear.attention.wkv_b": {
+        "max": 0.041416,
+        "mean": 0.03984,
+        "median": 0.040005,
+        "min": 0.037934,
+        "n": 4
+      },
+      "dsv4.linear.attention.wo": {
+        "max": 0.874268,
+        "mean": 0.850799,
+        "median": 0.855001,
+        "min": 0.818926,
+        "n": 4
+      },
+      "dsv4.linear.attention.wq_a": {
+        "max": 0.041081,
+        "mean": 0.040345,
+        "median": 0.040211,
+        "min": 0.039876,
+        "n": 4
+      },
+      "dsv4.linear.attention.wq_b": {
+        "max": 0.224255,
+        "mean": 0.212614,
+        "median": 0.214881,
+        "min": 0.196439,
+        "n": 4
+      },
+      "dsv4.linear.indexer.weights_proj": {
+        "max": 0.005074,
+        "mean": 0.00504,
+        "median": 0.005043,
+        "min": 0.005002,
+        "n": 4
+      },
+      "dsv4.linear.indexer.wk": {
+        "max": 0.008102,
+        "mean": 0.007966,
+        "median": 0.00795,
+        "min": 0.007862,
+        "n": 4
+      },
+      "dsv4.linear.indexer.wq": {
+        "max": 0.03594,
+        "mean": 0.03466,
+        "median": 0.035034,
+        "min": 0.032632,
+        "n": 4
+      },
+      "dsv4.linear.moe.router_gate": {
+        "max": 0.036979,
+        "mean": 0.036271,
+        "median": 0.036109,
+        "min": 0.035887,
+        "n": 4
+      },
+      "dsv4.linear.moe.shared_experts.w1": {
+        "max": 0.079059,
+        "mean": 0.074031,
+        "median": 0.074575,
+        "min": 0.067917,
+        "n": 4
+      },
+      "dsv4.linear.moe.shared_experts.w2": {
+        "max": 0.504724,
+        "mean": 0.494262,
+        "median": 0.497806,
+        "min": 0.476711,
+        "n": 4
+      },
+      "dsv4.linear.moe.shared_experts.w3": {
+        "max": 0.088261,
+        "mean": 0.084136,
+        "median": 0.08459,
+        "min": 0.079102,
+        "n": 4
+      }
+    },
+    "loss_profile": {
+      "chunk_backward": {
+        "max": 0.675234,
+        "mean": 0.671888,
+        "median": 0.672098,
+        "min": 0.668123,
+        "n": 4
+      },
+      "cross_entropy_forward": {
+        "max": 0.068796,
+        "mean": 0.068244,
+        "median": 0.068197,
+        "min": 0.067784,
+        "n": 4
+      },
+      "lm_head_forward": {
+        "max": 0.226845,
+        "mean": 0.223863,
+        "median": 0.223693,
+        "min": 0.22122,
+        "n": 4
+      }
+    },
+    "sharedkv": {
+      "C128.sharedkv_bwd.grad_attn_sink": {
+        "max": 0.107908,
+        "mean": 0.107614,
+        "median": 0.107657,
+        "min": 0.107235,
+        "n": 4
+      },
+      "C128.sharedkv_bwd.query_recompute": {
+        "max": 0.690034,
+        "mean": 0.689154,
+        "median": 0.689086,
+        "min": 0.688411,
+        "n": 4
+      },
+      "C4.sharedkv_bwd.grad_attn_sink": {
+        "max": 0.108093,
+        "mean": 0.107736,
+        "median": 0.107673,
+        "min": 0.107505,
+        "n": 4
+      },
+      "C4.sharedkv_bwd.query_recompute": {
+        "max": 2.33332,
+        "mean": 2.332897,
+        "median": 2.333242,
+        "min": 2.331783,
+        "n": 4
+      }
+    }
+  },
+  "env_highlights": {
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": true,
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "40G",
+    "CANARY_PROFILE_DENSE_LINEAR_BACKWARD": true,
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "IMAGE": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori"
+  },
+  "host": "do-vunguyen-mi350-gpu",
+  "interpretation": {
+    "next_profile_target": "Narrow the remaining backward residual with FSDP/autograd/optimizer-lifetime scopes or a torch-profiler trace on the same all-compressed shape; continue MoE fused owner backward and C4 sparse-attention dKV/recompute work in parallel.",
+    "promotion_decision": "reject_as_profile_only_due_to_dense_linear_timing_overhead",
+    "read": "Dense linear backward is a named contributor but not the whole remainder. The current all-compressed 12-layer wall is still led by MORI owner VJP/dX-return skew plus C4 shared-KV sparse-attention query-recompute, with a remaining multi-second backward residual after subtracting MORI, shared-KV, and dense linear timing."
+  },
+  "local_parse_root": "/tmp/dsv4_flash12_dense_linear_profile_20260606",
+  "mori_step2_rank_total_summary_s": {
+    "group_totals": {
+      "combine_dtopk": {
+        "max": 0.042451,
+        "mean": 0.040604,
+        "median": 0.040834,
+        "min": 0.038298,
+        "n": 4
+      },
+      "combine_dx": {
+        "max": 2.344313,
+        "mean": 1.778018,
+        "median": 1.739308,
+        "min": 1.289144,
+        "n": 4
+      },
+      "dispatch_clone_align": {
+        "max": 0.140924,
+        "mean": 0.13782,
+        "median": 0.139132,
+        "min": 0.132093,
+        "n": 4
+      },
+      "dispatch_dtopk_dummy": {
+        "max": 0.10761,
+        "mean": 0.102598,
+        "median": 0.101816,
+        "min": 0.09915,
+        "n": 4
+      },
+      "dispatch_grad_inputs": {
+        "max": 0.286718,
+        "mean": 0.268847,
+        "median": 0.265098,
+        "min": 0.258474,
+        "n": 4
+      },
+      "return_casts": {
+        "max": 0.00092,
+        "mean": 0.000904,
+        "median": 0.000904,
+        "min": 0.000889,
+        "n": 4
+      }
+    },
+    "recv_count_median_by_rank": {
+      "max": 29370.5,
+      "mean": 27546.125,
+      "median": 27831.75,
+      "min": 25150.5,
+      "n": 4
+    },
+    "stage_totals_selected": {
+      "backward.local_vjp.aiter_compact": {
+        "max": 4.971716,
+        "mean": 4.487072,
+        "median": 4.523036,
+        "min": 3.9305,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.dgrad_swiglu": {
+        "max": 0.813587,
+        "mean": 0.725634,
+        "median": 0.729916,
+        "min": 0.629117,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.dtopk_weight": {
+        "max": 0.236243,
+        "mean": 0.205842,
+        "median": 0.206928,
+        "min": 0.173268,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.forward_recompute": {
+        "max": 1.236309,
+        "mean": 1.141799,
+        "median": 1.147004,
+        "min": 1.03688,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.gather_scale": {
+        "max": 0.20783,
+        "mean": 0.182562,
+        "median": 0.183436,
+        "min": 0.155545,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.prepare_ops": {
+        "max": 0.001278,
+        "mean": 0.001262,
+        "median": 0.001258,
+        "min": 0.001256,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.route_pack": {
+        "max": 0.02557,
+        "mean": 0.024836,
+        "median": 0.025083,
+        "min": 0.023608,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.sort_counts": {
+        "max": 0.0935,
+        "mean": 0.091315,
+        "median": 0.09116,
+        "min": 0.08944,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.wgrad": {
+        "max": 1.452239,
+        "mean": 1.298567,
+        "median": 1.313654,
+        "min": 1.114718,
+        "n": 4
+      },
+      "local_aiter_compact_vjp.xgrad": {
+        "max": 0.894157,
+        "mean": 0.798016,
+        "median": 0.806562,
+        "min": 0.684782,
+        "n": 4
+      }
+    }
+  },
+  "rank_derived_backward_s": {
+    "dsv4_additive_rank0_local0_pid82.jsonl": {
+      "backward_residual_after_named_s": 8.867087,
+      "backward_s": 20.846193,
+      "dense_linear_backward_s": 1.931407,
+      "mori_named_backward_s": 6.808426,
+      "sharedkv_backward_s": 3.239273
+    },
+    "dsv4_additive_rank1_local1_pid83.jsonl": {
+      "backward_residual_after_named_s": 8.871047,
+      "backward_s": 20.845718,
+      "dense_linear_backward_s": 1.91925,
+      "mori_named_backward_s": 6.819455,
+      "sharedkv_backward_s": 3.235966
+    },
+    "dsv4_additive_rank2_local2_pid84.jsonl": {
+      "backward_residual_after_named_s": 8.944583,
+      "backward_s": 20.845198,
+      "dense_linear_backward_s": 1.832338,
+      "mori_named_backward_s": 6.830991,
+      "sharedkv_backward_s": 3.237286
+    },
+    "dsv4_additive_rank3_local3_pid85.jsonl": {
+      "backward_residual_after_named_s": 8.829189,
+      "backward_s": 20.84552,
+      "dense_linear_backward_s": 1.974665,
+      "mori_named_backward_s": 6.804586,
+      "sharedkv_backward_s": 3.23708
+    }
+  },
+  "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_allcompressed_h64n64d128_dense_linear_profile_mori_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "run_id": "torchtitan_dsv4_flash12_allcompressed_h64n64d128_dense_linear_profile_mori_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "schema_version": 1,
+  "shape": {
+    "activation_checkpoint": "none",
+    "checkpoint_enabled": false,
+    "cp": 1,
+    "ep": 4,
+    "fsdp": 4,
+    "global_batch_size": 128,
+    "gpus": 4,
+    "gradient_accumulation_steps": 16,
+    "micro_batch_size": 2,
+    "pp": 1,
+    "sequence_length": 4096,
+    "tp": 1
+  },
+  "sharedkv_step2_per_call_ms": {
+    "C128.sharedkv_bwd.grad_attn_sink": {
+      "max": 1.395052,
+      "mean": 1.34518,
+      "median": 1.343871,
+      "min": 1.318972,
+      "n": 320
+    },
+    "C128.sharedkv_bwd.query_recompute": {
+      "max": 8.815076,
+      "mean": 8.614426,
+      "median": 8.618374,
+      "min": 8.423754,
+      "n": 320
+    },
+    "C4.sharedkv_bwd.grad_attn_sink": {
+      "max": 1.385492,
+      "mean": 1.3467,
+      "median": 1.344592,
+      "min": 1.324412,
+      "n": 320
+    },
+    "C4.sharedkv_bwd.query_recompute": {
+      "max": 29.567123,
+      "mean": 29.161211,
+      "median": 29.155333,
+      "min": 28.81761,
+      "n": 320
+    }
+  },
+  "status": "diagnostic_profile_completed_not_promoted",
+  "step_metrics": {
+    "retained_nonprofile_steps2_to6_tokens_per_gpu_s": 4034.4,
+    "step2_grad_norm": 33.25,
+    "step2_loss": 7.70663,
+    "step2_node_tokens_s_mean": 15020.0,
+    "step2_peak_logged_memory_gib": 217.92,
+    "step2_rank_records": [
+      {
+        "grad_norm": 33.25,
+        "loss": 7.70663,
+        "memory_gib": 217.92,
+        "mfu_pct": 8.23,
+        "step": 2,
+        "tflops_per_gpu": 190.13,
+        "tokens_per_gpu_s": 3755.0
+      },
+      {
+        "grad_norm": 33.25,
+        "loss": 7.70663,
+        "memory_gib": 216.39,
+        "mfu_pct": 8.23,
+        "step": 2,
+        "tflops_per_gpu": 190.13,
+        "tokens_per_gpu_s": 3755.0
+      },
+      {
+        "grad_norm": 33.25,
+        "loss": 7.70663,
+        "memory_gib": 216.5,
+        "mfu_pct": 8.23,
+        "step": 2,
+        "tflops_per_gpu": 190.13,
+        "tokens_per_gpu_s": 3755.0
+      },
+      {
+        "grad_norm": 33.25,
+        "loss": 7.70663,
+        "memory_gib": 217.08,
+        "mfu_pct": 8.23,
+        "step": 2,
+        "tflops_per_gpu": 190.13,
+        "tokens_per_gpu_s": 3755.0
+      }
+    ],
+    "step2_tflops_per_gpu_mean": 190.13,
+    "step2_tokens_per_gpu_s_mean": 3755.0,
+    "throughput_delta_vs_retained_nonprofile_pct": -6.925
+  }
+}

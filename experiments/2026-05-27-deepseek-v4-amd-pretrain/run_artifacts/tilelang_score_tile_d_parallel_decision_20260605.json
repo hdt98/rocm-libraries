@@ -1,0 +1,64 @@
+{
+  "scope": "tilelang_score_tile_d_parallel_decision",
+  "date": "2026-06-05",
+  "question": "Can a small intermediate score tile avoid the serial D-loop inside one CTA while still avoiding repeated QK/PV/softmax recompute?",
+  "artifacts": {
+    "grouped_d_breakdown": "run_artifacts/tilelang_direct_source_grouped_d_breakdown_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json",
+    "grouped_d_decision": "run_artifacts/tilelang_direct_source_grouped_d_dq_dkv_decision_20260605.json",
+    "score_reuse_floor": "run_artifacts/tilelang_hsk_dq_score_reuse_floor_decision_20260605.json"
+  },
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "packed_topk": 1024,
+    "token_block": 32,
+    "block_k": 64,
+    "block_d": 32,
+    "d_blocks_per_kernel": 4,
+    "threads": 512
+  },
+  "timing_ms": {
+    "grouped_d_full_dq_dkv": 15.733488082885742,
+    "grouped_d_no_final_dkv_write": 15.564127922058105,
+    "grouped_d_dq_only": 13.157108306884766,
+    "grouped_d_dkv_no_dq": 10.62852668762207,
+    "grouped_d_dkv_no_dq_no_write": 10.497406005859375,
+    "grouped_d_recompute_only": 5.76652717590332,
+    "grouped_d_final_dkv_write": 0.16936016082763672,
+    "grouped_d_dkv_compute_local_reduce_over_dq": 2.40701961517334,
+    "grouped_d_dq_over_recompute": 7.390581130981445,
+    "grouped_d_dkv_no_dq_compute_local_reduce": 4.730878829956055,
+    "materialized_score_reuse_dq_plus_dkv_floor": 7.966623067855835,
+    "materialized_pdp_store_then_dkv_full_route": 16.238,
+    "triton_sparse_attention_backward_boundary": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.806
+  },
+  "read": "A score tile is plausible, but not as a full detached P/dP slab and not as a grouped-D serial D-loop. The grouped-D breakdown shows that recomputing QK/PV/softmax/scaled-dP once per route tile is 5.77 ms, much lower than the old direct-source recompute-only path, so score reuse is real. However, dQ-only rises to 13.16 ms because the D consumers are serialized inside the same CTA. The final dKV write is only 0.17 ms, so the wall is not final global writeback in this grouped-D family; it is the loss of D-parallel consumer work plus local dKV reduction.",
+  "decision": {
+    "come_up_with_small_intermediate_score_tile": true,
+    "recommended_contract": "Produce a backward-local active-route score tile containing P and scaled-dP for one token/head/selected route page, then let independent D-block consumers compute dQ and group-aware dKV. The score tile must be consumed immediately or double-buffered; it should not become a full forward-saved activation.",
+    "tile_contents": [
+      "P[token_tile, selected_chunk, head_block, block_k] in bf16 or fp16-like storage",
+      "scaled_dP[token_tile, selected_chunk, head_block, block_k] in bf16 or fp16-like storage",
+      "source_selected / pair_slot / active_group metadata for the same route page"
+    ],
+    "why_not_full_slab": "The existing adjacent P/dP slab producer plus dKV consumer projects to about 16.24 ms at the full route and writes two large score slabs. It preserves D parallelism, but the HBM round trip erases the win.",
+    "why_not_grouped_d_cta": "The grouped-D CTA keeps score terms on chip, but collapses D-block parallelism. The dQ-only delta over recompute is 7.39 ms, which is the direct symptom.",
+    "next_kernel_shape": "A cooperative score-producer plus D-parallel consumer gate: either a tiny HBM/L2-resident score page with immediate D-block consumers, or a lower-level HIP/CK/rocWMMA design where waves share a score tile while separate wave groups own D blocks. TileLang CTA-local shared memory alone cannot share P/dP across sibling CTAs."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "scp experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle-kernel 'docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size=64g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/work/tools/dsv4_runtime_probe -e TILELANG_CACHE_DIR=/work/cache/tilelang_direct_grouped_d_breakdown_20260605 -e PYTORCH_ROCM_ARCH=gfx950 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/work -w /work rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full python3 tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py --device cuda --dtype bfloat16 --seq-len 4096 --groups 1024 --heads 64 --dim 512 --layer-id 2 --group-panel-size 256 --panel-capacity 256 --token-block 32 --block-k 64 --block-d 32 --d-blocks-per-kernel 4 --threads 512 --input-layout bshd --plan-on-device --skip-group-filter --include-direct-source-grouped-d-dq-dkv --include-direct-source-grouped-d-breakdown --warmup-iters 2 --timed-iters 3 --output-json /work/run_artifacts/tilelang_direct_source_grouped_d_breakdown_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json'",
+    "scp do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/tilelang_direct_source_grouped_d_breakdown_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/",
+    "jq empty experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/tilelang_direct_source_grouped_d_breakdown_s4096_layer2_gp256_tb32_k64_d32x4_20260605.json"
+  ]
+}

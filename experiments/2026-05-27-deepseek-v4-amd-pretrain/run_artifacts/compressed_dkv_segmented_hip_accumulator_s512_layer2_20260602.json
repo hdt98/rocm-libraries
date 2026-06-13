@@ -1,0 +1,252 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 1.0666666666666667,
+    "nonempty_tiles": 16,
+    "tiles": 16,
+    "unique_groups_max": 128,
+    "unique_groups_mean_all_tiles": 68.0,
+    "unique_groups_mean_nonempty": 68.0,
+    "unique_groups_total": 1088
+  },
+  "active_route_workspace": {
+    "active_counts_bytes": 64,
+    "active_groups_bytes": 8192
+  },
+  "arch": "gfx950",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "block_d": 16,
+    "group_block": 64,
+    "selected_block": 64,
+    "seq_chunk": 32
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.33462009803921566,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 128,
+      "p50_all_rows": 255.0,
+      "p50_nonzero_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p90_nonzero_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p99_nonzero_rows": 503.92,
+      "rows": 128,
+      "top16_share": 0.23480392156862745,
+      "top1_share": 0.01559436274509804,
+      "top64_share": 0.7509803921568627,
+      "top8_share": 0.1213235294117647,
+      "total_selections": 32640,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 66846720,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 66846720
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 16711680,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 16711680
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 128,
+    "prefix_compressed_same_topk": {
+      "gini": 0.33462009803921566,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 128,
+      "p50_all_rows": 255.0,
+      "p50_nonzero_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p90_nonzero_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p99_nonzero_rows": 503.92,
+      "rows": 128,
+      "top16_share": 0.23480392156862745,
+      "top1_share": 0.01559436274509804,
+      "top64_share": 0.7509803921568627,
+      "top8_share": 0.1213235294117647,
+      "total_selections": 32640,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 128,
+    "valid_selected_per_query": {
+      "gini": 0.33464307598039217,
+      "max": 128,
+      "mean_all_rows": 63.75,
+      "mean_nonzero_rows": 64.12573673870334,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 509,
+      "p50_all_rows": 64.0,
+      "p50_nonzero_rows": 64.0,
+      "p90_all_rows": 115.0,
+      "p90_nonzero_rows": 115.0,
+      "p99_all_rows": 126.0,
+      "p99_nonzero_rows": 126.0,
+      "rows": 512,
+      "top16_share": 0.0616421568627451,
+      "top1_share": 0.00392156862745098,
+      "top64_share": 0.23480392156862745,
+      "top8_share": 0.031066176470588236,
+      "total_selections": 32640,
+      "zero_rows": 3
+    }
+  },
+  "build_seconds": 0.25859080418013036,
+  "correctness": {
+    "candidate_norm": 756.64013671875,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 6.4849853515625e-05,
+    "mean_abs_diff": 3.001966035753867e-07,
+    "passed": true,
+    "reference_norm": 756.64013671875
+  },
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "extension_dir": "/workspace/torch_extensions/compressed_dkv_segmented_hip_accumulator_20260602",
+  "included_headers": [
+    "rocprim/device/device_reduce_by_key.hpp",
+    "rocprim/device/device_segmented_reduce.hpp",
+    "hipcub/device/device_segmented_reduce.hpp",
+    "ck_tile/core.hpp"
+  ],
+  "layer_id": 2,
+  "materialized_workspace": {
+    "grad_logits_bytes": 16777216,
+    "probs_bytes": 16777216,
+    "safe_groups_bytes": 524288,
+    "valid_bytes": 65536
+  },
+  "modeled_write_reduction": {
+    "coalesced_active_list_atomic_elements": 557056,
+    "coalesced_active_list_reduction_x": 30.0,
+    "query_major_raw_atomic_elements": 16711680
+  },
+  "read": "First HIP extension accumulator for actual-LI compressed dKV. It consumes materialized probs/grad_logits and active-group lists, so it is an accumulator-path smoke only. The body is scalar and serves as the binding/correctness rung before a CK-Tile/MFMA schedule.",
+  "scope": "compressed_dkv_segmented_hip_accumulator_smoke",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 128,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 640,
+    "seq_len": 512,
+    "topk": 128,
+    "valid_pairs": 32640
+  },
+  "status": "ok",
+  "timing": {
+    "hip_active_list_scalar_accumulator": {
+      "checksum_norm": 756.64013671875,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.470769882202148,
+        "mean_ms": 7.417795976003011,
+        "median_ms": 7.3960089683532715,
+        "min_ms": 7.386609077453613,
+        "samples_ms": [
+          7.386609077453613,
+          7.3960089683532715,
+          7.470769882202148
+        ],
+        "stdev_ms": 0.0461168682883782
+      },
+      "label": "hip_active_list_scalar_accumulator",
+      "peak_memory_allocated_bytes": 762197504,
+      "peak_memory_allocated_gib": 0.7098517417907715,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.52852694131434,
+        "mean_ms": 7.479709650700291,
+        "median_ms": 7.489466108381748,
+        "min_ms": 7.421135902404785,
+        "samples_ms": [
+          7.52852694131434,
+          7.421135902404785,
+          7.489466108381748
+        ],
+        "stdev_ms": 0.05435623385947476
+      }
+    },
+    "pytorch_reference_dkv": {
+      "checksum_norm": 756.64013671875,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.1371049880981445,
+        "mean_ms": 1.7665013472239177,
+        "median_ms": 1.5840200185775757,
+        "min_ms": 1.5783790349960327,
+        "samples_ms": [
+          2.1371049880981445,
+          1.5840200185775757,
+          1.5783790349960327
+        ],
+        "stdev_ms": 0.32096456057618966
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 1635921920,
+      "peak_memory_allocated_gib": 1.5235710144042969,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.176424954086542,
+        "mean_ms": 1.7980043000231187,
+        "median_ms": 1.609679078683257,
+        "min_ms": 1.6079088672995567,
+        "samples_ms": [
+          2.176424954086542,
+          1.609679078683257,
+          1.6079088672995567
+        ],
+        "stdev_ms": 0.327723094972612
+      }
+    },
+    "triton_active_list_scalar_accumulator": {
+      "checksum_norm": 756.64013671875,
+      "event": {
+        "enabled": true,
+        "max_ms": 3.6043190956115723,
+        "mean_ms": 3.3339436848958335,
+        "median_ms": 3.232516050338745,
+        "min_ms": 3.1649959087371826,
+        "samples_ms": [
+          3.6043190956115723,
+          3.232516050338745,
+          3.1649959087371826
+        ],
+        "stdev_ms": 0.23657322211157406
+      },
+      "label": "triton_active_list_scalar_accumulator",
+      "peak_memory_allocated_bytes": 762197504,
+      "peak_memory_allocated_gib": 0.7098517417907715,
+      "wall": {
+        "enabled": true,
+        "max_ms": 3.6683441139757633,
+        "mean_ms": 3.3679347640524306,
+        "median_ms": 3.254160052165389,
+        "min_ms": 3.18130012601614,
+        "samples_ms": [
+          3.6683441139757633,
+          3.254160052165389,
+          3.18130012601614
+        ],
+        "stdev_ms": 0.2627003527798125
+      }
+    }
+  }
+}

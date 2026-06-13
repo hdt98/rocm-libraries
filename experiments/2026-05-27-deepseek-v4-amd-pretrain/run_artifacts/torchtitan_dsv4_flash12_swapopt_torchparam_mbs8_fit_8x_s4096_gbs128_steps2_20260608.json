@@ -1,0 +1,155 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_swapopt_torchparam_mbs8_fit_8x_s4096_gbs128_steps2_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_swapopt_torchparam_mbs8_8x_s4096_gbs128_steps2_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_swapopt_torchparam_mbs8_8x_s4096_gbs128_steps2_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_swapopt_torchparam_mbs8_8x_s4096_gbs128_steps2_20260608",
+  "result": "completed_two_steps_rejected_for_throughput",
+  "purpose": "Check whether CPU-swapped AdamW optimizer states can make the retained 8x flash_12layer_ceiling_probe MBS8 shape fit after AdamW and expert-Muon MBS8 failed after step 1.",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "optimizer": {
+    "implementation": "swap_opt_states_cpu",
+    "swap_update_mode": "torch_param",
+    "swap_state_dtype": "param",
+    "swap_chunk_mib": 16,
+    "swap_pin_memory": "auto",
+    "state_location": "cpu",
+    "read": "This keeps AdamW semantics but swaps exp_avg and exp_avg_sq through CPU-resident buffers during optimizer.step."
+  },
+  "moe_and_attention": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "1": {
+      "loss": 12.13832,
+      "grad_norm": 19.5,
+      "tokens_per_gpu_s_range": [
+        963,
+        966
+      ],
+      "tflops_per_gpu_range": [
+        48.76,
+        48.92
+      ],
+      "memory_gib_range": [
+        252.21,
+        260.49
+      ],
+      "rankmax_step_ms": null
+    },
+    "2": {
+      "loss": 9.48176,
+      "grad_norm": 76.5,
+      "tokens_per_gpu_s_range": [
+        1203,
+        1208
+      ],
+      "tflops_per_gpu_range": [
+        60.91,
+        61.14
+      ],
+      "memory_gib_range": [
+        252.92,
+        260.52
+      ],
+      "rankmax_step_ms": 54235.39
+    }
+  },
+  "comparison": {
+    "retained_mbs4_adamw": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+      "peak_logged_memory_gib": 193.8
+    },
+    "adamw_mbs8_failure": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_mbs8_fit_failure_8x_s4096_gbs128_20260607.json",
+      "status": "failed_after_step1",
+      "step1_peak_logged_memory_gib": 259.68
+    },
+    "batched_muon_mbs8_failure": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_batched_mbs8_fit_failure_20260608.json",
+      "status": "failed_after_step1",
+      "step1_peak_logged_memory_gib": 255.35
+    },
+    "swap_mbs8_step2_vs_retained_mbs4_tokens_per_gpu_pct": -84.96,
+    "swap_mbs8_step2_vs_retained_mbs4_tflops_pct": -84.96,
+    "swap_mbs8_peak_minus_retained_mbs4_peak_gib": 66.72,
+    "swap_mbs8_peak_minus_adamw_mbs8_failure_peak_gib": 0.84,
+    "swap_mbs8_peak_minus_batched_muon_mbs8_failure_peak_gib": 5.17
+  },
+  "read": "CPU-swapped AdamW with torch_param did make the MBS8 run survive a two-step fit gate, but it did not lower the peak-memory class: rank-max logged memory still reached 260.52 GiB, slightly above the original AdamW MBS8 failure point. Throughput is only about 1208 tok/GPU/s on step 2, roughly 15.0% of the retained MBS4 AdamW baseline. This confirms optimizer-state-only Python swap is useful as a fit/debug mechanism, not as a performance candidate.",
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "next_action": "Do not chase Python-level swap knobs for throughput. Larger-MBS work needs activation/backward-memory reduction, or a real HIP/C++ fused and pipelined swap-update/mapped-memory optimizer implementation. Otherwise continue the main MoE/EP and sparse-MLA optimization tracks at MBS4."
+  },
+  "post_run_node_state": {
+    "after_30s": "all 8 GPUs returned to 0% VRAM and no torchrun/torchtitan/docker-run training process remained",
+    "other_containers": [
+      "dev_primus_longnguyen37",
+      "dev_primus_tanth"
+    ]
+  },
+  "validation": {
+    "launcher_result": "completed normally",
+    "jsonl_structured_logs": 8,
+    "local_artifact_validation": "python3 -m json.tool"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "deferred_forward_loss": 0.0,
+  "deferred_grad_norms": {
+    "index_k": 0.0009138343739323318,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "device": "cuda",
+  "direct_grad_norms": {
+    "index_k": 0.0009136777953244746,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "direct_loss": 0.016752004623413086,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {
+    "index_k": 1.9073486328125e-06,
+    "index_q": 0.0,
+    "weights": 0.0
+  },
+  "max_grad_diff": 1.9073486328125e-06,
+  "parity_skipped": false,
+  "read": "The deferred Ascend-style public wrapper intentionally returns a zero scalar in forward, then recomputes the selected sparse LI KL objective in backward and matches the direct oracle parameter gradients.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 32,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 2.9375460147857666,
+      "mean_ms": 1.8797506888707478,
+      "median_ms": 1.3584530353546143,
+      "min_ms": 1.3432530164718628,
+      "samples_ms": [
+        2.9375460147857666,
+        1.3432530164718628,
+        1.3584530353546143
+      ],
+      "stdev_ms": 0.9161091494954379
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 0.0009140882175415754,
+      "index_q": 0.0009185621165670455,
+      "weights": 0.000768651079852134
+    },
+    "peak_memory_allocated_bytes": 1548809728,
+    "peak_memory_allocated_gib": 1.442441463470459,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle in PyTorch.",
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 2.982381032779813,
+      "mean_ms": 1.9075843350340922,
+      "median_ms": 1.378035987727344,
+      "min_ms": 1.36233598459512,
+      "samples_ms": [
+        2.982381032779813,
+        1.36233598459512,
+        1.378035987727344
+      ],
+      "stdev_ms": 0.9308343454333952
+    },
+    "warmup_iters": 1
+  },
+  "top_indices_equal": true,
+  "top_indices_shape": [
+    1,
+    128,
+    32
+  ]
+}

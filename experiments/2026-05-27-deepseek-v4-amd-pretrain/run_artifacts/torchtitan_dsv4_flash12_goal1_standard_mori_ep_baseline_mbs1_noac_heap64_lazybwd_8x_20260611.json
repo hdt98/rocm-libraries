@@ -1,0 +1,99 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs1_noac_heap64_lazybwd_6step_8x_20260611",
+  "recorded_at": "2026-06-11",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+  "purpose": "Goal 1 fair baseline: standard MORI EP without balanced-MoE helper execution, without native compact/balanced engineering, and without the standard-EP MindSpeed-like hot-helper path.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "none"
+  },
+  "mori_ep": {
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "aiter_compact",
+    "mori_aiter_compact_recompute_mode": "expert_loop",
+    "mori_aiter_route_pack_mode": "dense_mask",
+    "mori_aiter_lazy_backward_ops": true,
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "64G"
+  },
+  "balanced_moe": {
+    "standard_ep_balanced_moe_mode": "off",
+    "mori_aiter_balanced_moe_mode": "off",
+    "mori_aiter_balanced_moe_execute_impl": "off"
+  },
+  "result": {
+    "status": "completed_6_steps",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 322.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 15.976,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 321.6667,
+    "steps_4_to_6_tflops_per_gpu_mean": 15.9267,
+    "peak_logged_memory_gib": 128.36,
+    "loss": {
+      "step_1": 15.90050,
+      "step_6": 10.58380
+    },
+    "grad_norm": {
+      "step_1": 17.125,
+      "step_6": 45.0
+    }
+  },
+  "step_metrics": [
+    {"step": 1, "tokens_per_gpu_s": 306, "tflops_per_gpu": 15.16, "loss": 15.90050, "grad_norm": 17.125, "rankmax_memory_gib": 88.93},
+    {"step": 2, "tokens_per_gpu_s": 330, "tflops_per_gpu": 16.35, "loss": 11.46899, "grad_norm": 43.5, "rankmax_memory_gib": 124.62},
+    {"step": 3, "tokens_per_gpu_s": 318, "tflops_per_gpu": 15.75, "loss": 15.57736, "grad_norm": 56.25, "rankmax_memory_gib": 125.28},
+    {"step": 4, "tokens_per_gpu_s": 322, "tflops_per_gpu": 15.94, "loss": 15.17554, "grad_norm": 64.0, "rankmax_memory_gib": 128.36},
+    {"step": 5, "tokens_per_gpu_s": 325, "tflops_per_gpu": 16.08, "loss": 13.34192, "grad_norm": 62.25, "rankmax_memory_gib": 124.62},
+    {"step": 6, "tokens_per_gpu_s": 318, "tflops_per_gpu": 15.76, "loss": 10.58380, "grad_norm": 45.0, "rankmax_memory_gib": 126.32}
+  ],
+  "prior_baseline_attempts_closed": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs4_noac_6step_8x_20260611",
+      "result": "failed_before_step_static_mori_heap_oom_heap32"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs4_noac_heap48_6step_8x_20260611",
+      "result": "failed_before_step_static_mori_heap_oom_heap48"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs2_noac_heap96_6step_8x_20260611",
+      "result": "failed_before_step_hip_oom_dispatch_combine_debug_buffer"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs1_noac_heap96_6step_8x_20260611",
+      "result": "completed_step1_then_hip_oom_dispatch_combine_order_map"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs1_noac_heap96_opcachedefault_6step_8x_20260611",
+      "result": "rejected_backward_recv_semantic_mismatch"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_goal1_standard_mori_ep_baseline_mbs1_noac_heap64_6step_8x_20260611",
+      "result": "completed_step1_then_hip_oom_dispatch_combine_debug_buffer"
+    }
+  ],
+  "candidate_queue": {
+    "run_id": "torchtitan_dsv4_flash12_goal1_mori_ep_balanced_compactdispatch_mbs1_noac_heap64_lazybwd_6step_8x_20260611",
+    "only_intended_deltas": {
+      "mori_aiter_balanced_moe_mode": "execute",
+      "mori_aiter_balanced_moe_hot_experts": 8,
+      "mori_aiter_balanced_moe_execute_impl": "compact_dispatch"
+    },
+    "launch_status": "blocked_after_baseline_by_non_idle_nodes",
+    "blocked_detail": "do-sonle5-mi350-gpu had an unrelated NexusTitan/Qwen job on GPUs 0-1; do-vunguyen-mi350-gpu had an unrelated sglang scheduler on GPU3. Candidate should rerun when an 8-GPU node is idle."
+  },
+  "read": "Lazy backward MORI op lifetime is required for this pure standard-MORI EP baseline to survive repeated steps. The completed six-step denominator is very slow, around 322 tok/GPU/s, which confirms that the standard MORI EP path without balanced/helper machinery is not comparable to the retained standard-EP hot-helper throughput stack. The next fair measurement is the same shape with only native MORI balanced-MoE enabled."
+}

@@ -1,0 +1,98 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_steps20_8x_s4096_gbs128_20260610",
+  "created_at": "2026-06-10",
+  "status": "completed_20_steps_not_promoted",
+  "host": "do-sonle5-mi350-gpu",
+  "host_addr": "165.245.166.41",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_steps20_8x_s4096_gbs128_20260610/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_steps20_8x_s4096_gbs128_20260610",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_steps20_8x_s4096_gbs128_20260610",
+  "shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "hardware": "8xMI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "optimizer": "AdamW",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "env_highlights": {
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8"
+  },
+  "step_metrics": [
+    {"step": 1, "tokens_per_gpu_s": 1839, "tflops_per_gpu": 93.13, "loss": 12.25702, "grad_norm": 16.75, "rank_max_memory_gib": 164.31},
+    {"step": 2, "tokens_per_gpu_s": 8092, "tflops_per_gpu": 409.71, "loss": 8.35378, "grad_norm": 103.0, "rank_max_memory_gib": 212.12},
+    {"step": 3, "tokens_per_gpu_s": 8581, "tflops_per_gpu": 434.49, "loss": 6.66499, "grad_norm": 99.0, "rank_max_memory_gib": 217.47},
+    {"step": 4, "tokens_per_gpu_s": 8592, "tflops_per_gpu": 435.00, "loss": 33.81593, "grad_norm": 98.5, "rank_max_memory_gib": 217.47},
+    {"step": 5, "tokens_per_gpu_s": 8657, "tflops_per_gpu": 438.30, "loss": 21.03447, "grad_norm": 28.625, "rank_max_memory_gib": 222.47},
+    {"step": 6, "tokens_per_gpu_s": 8771, "tflops_per_gpu": 444.09, "loss": 7.85318, "grad_norm": 28.25, "rank_max_memory_gib": 224.48},
+    {"step": 7, "tokens_per_gpu_s": 6624, "tflops_per_gpu": 335.37, "loss": 6.49903, "grad_norm": 28.75, "rank_max_memory_gib": 226.61},
+    {"step": 8, "tokens_per_gpu_s": 7344, "tflops_per_gpu": 371.85, "loss": 10.03166, "grad_norm": 30.75, "rank_max_memory_gib": 226.93},
+    {"step": 9, "tokens_per_gpu_s": 8385, "tflops_per_gpu": 424.54, "loss": 7.34513, "grad_norm": 27.625, "rank_max_memory_gib": 227.01},
+    {"step": 10, "tokens_per_gpu_s": 8363, "tflops_per_gpu": 423.43, "loss": 6.47556, "grad_norm": 30.0, "rank_max_memory_gib": 227.01},
+    {"step": 11, "tokens_per_gpu_s": 7873, "tflops_per_gpu": 398.61, "loss": 5.28605, "grad_norm": 13.625, "rank_max_memory_gib": 227.10},
+    {"step": 12, "tokens_per_gpu_s": 8119, "tflops_per_gpu": 411.07, "loss": 4.74923, "grad_norm": 9.6875, "rank_max_memory_gib": 227.65},
+    {"step": 13, "tokens_per_gpu_s": 7772, "tflops_per_gpu": 393.49, "loss": 3.79431, "grad_norm": 10.625, "rank_max_memory_gib": 227.65},
+    {"step": 14, "tokens_per_gpu_s": 8786, "tflops_per_gpu": 444.82, "loss": 3.51077, "grad_norm": 13.75, "rank_max_memory_gib": 227.84},
+    {"step": 15, "tokens_per_gpu_s": 8757, "tflops_per_gpu": 443.38, "loss": 3.48062, "grad_norm": 10.375, "rank_max_memory_gib": 228.06},
+    {"step": 16, "tokens_per_gpu_s": 8933, "tflops_per_gpu": 452.29, "loss": 3.33724, "grad_norm": 6.875, "rank_max_memory_gib": 228.06},
+    {"step": 17, "tokens_per_gpu_s": 8940, "tflops_per_gpu": 452.66, "loss": 3.24091, "grad_norm": 6.8125, "rank_max_memory_gib": 228.06},
+    {"step": 18, "tokens_per_gpu_s": 8964, "tflops_per_gpu": 453.88, "loss": 3.15745, "grad_norm": 4.4375, "rank_max_memory_gib": 228.06},
+    {"step": 19, "tokens_per_gpu_s": 8607, "tflops_per_gpu": 435.77, "loss": 3.09782, "grad_norm": 2.4844, "rank_max_memory_gib": 228.06},
+    {"step": 20, "tokens_per_gpu_s": 8963, "tflops_per_gpu": 453.81, "loss": 3.12381, "grad_norm": 3.0156, "rank_max_memory_gib": 228.06}
+  ],
+  "windows": {
+    "steps_2_to_20": {
+      "tokens_per_gpu_s": 8374.8947,
+      "node_tokens_s": 66999.1576,
+      "tflops_per_gpu": 424.0295,
+      "delta_vs_retained_baseline_tokens_per_gpu_pct": -1.6898
+    },
+    "steps_7_to_20": {
+      "tokens_per_gpu_s": 8316.4286,
+      "node_tokens_s": 66531.4288,
+      "tflops_per_gpu": 421.0693
+    },
+    "steps_13_to_20": {
+      "tokens_per_gpu_s": 8715.25,
+      "node_tokens_s": 69722.0,
+      "tflops_per_gpu": 441.2625,
+      "delta_vs_retained_baseline_steps_13_to_20_tokens_per_gpu_pct": 0.9801
+    },
+    "steps_14_to_20": {
+      "tokens_per_gpu_s": 8850.0,
+      "node_tokens_s": 70800.0,
+      "tflops_per_gpu": 448.0871
+    },
+    "steps_15_to_20": {
+      "tokens_per_gpu_s": 8860.6667,
+      "node_tokens_s": 70885.3336,
+      "tflops_per_gpu": 448.6317
+    }
+  },
+  "comparison_baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "steps_2_to_20_tokens_per_gpu_s": 8518.8421,
+    "steps_2_to_20_tflops_per_gpu": 431.3139,
+    "steps_13_to_20_tokens_per_gpu_s": 8630.66,
+    "steps_13_to_20_tflops_per_gpu": 436.97,
+    "peak_logged_memory_gib": 251.97
+  },
+  "read": "The corrected native MORI compact eager-stage path completes a matched 20-step gate and saves about 23.91 GiB peak logged memory versus the retained baseline. The late window beats the retained late window by about 0.98%, but the full steps 2-20 window is still 1.69% slower and has a mid-run trough at steps 7-13. This is promising evidence, not a full-window promotion."
+}

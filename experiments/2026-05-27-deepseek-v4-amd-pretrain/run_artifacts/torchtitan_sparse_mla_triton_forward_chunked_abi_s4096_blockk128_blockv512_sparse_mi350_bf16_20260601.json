@@ -1,0 +1,22 @@
+{
+  "batch": 1,
+  "compressed_groups": 1024,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "estimated_selected_state_elements": 171798691840,
+  "expect_missing": false,
+  "flavor": "flash_4layer",
+  "input_grad_norm": 3.495144846965559e-05,
+  "layer_id": 2,
+  "loss": 0.0014034705236554146,
+  "module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "output_shape": [
+    1,
+    4096,
+    4096
+  ],
+  "selected_keys": 640,
+  "seq_len": 4096,
+  "sparse_used": true,
+  "status": "passed_backend_abi"
+}

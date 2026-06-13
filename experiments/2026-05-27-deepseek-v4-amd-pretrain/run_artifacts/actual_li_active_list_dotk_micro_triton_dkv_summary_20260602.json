@@ -1,0 +1,94 @@
+{
+  "artifact": "actual_li_active_list_dotk_micro_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Mechanism probe for actual-LI compressed dKV: selected-key dot-K contraction with active groups compacted per selected-key microtile.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_micro",
+  "host": "do-sonle5-mi350-gpu",
+  "device": "1xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "status": "short_sequence_positive_s4096_rejected",
+  "read": "This branch builds active compressed-group lists per (seq_tile, selected_block), then uses dense tl.dot route matrices only over each micro active list. It tests whether shrinking the active-group dimension fixes the earlier dense-route dot-K failure while preserving coalesced writes. S128/S512 pass and are fast, but hard S4096 layer2 still has hundreds of active groups per microtile, so route-matrix compute dominates and the branch is rejected for target shape.",
+  "s128_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s128_layer2_sc16_u64d16h64k32_20260602.json",
+    "status": "passed",
+    "seq_len": 128,
+    "topk": 32,
+    "seq_chunk": 16,
+    "block_u": 64,
+    "block_k": 32,
+    "max_abs_diff": 0.0840902328491211,
+    "median_ms": 0.10520199686288834,
+    "write_reduction_x": 14.0,
+    "unique_groups_max": 32,
+    "unique_groups_mean_nonempty": 18.0
+  },
+  "s512_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s512_layer2_sc32_u128d16h64k64_20260602.json",
+    "status": "passed",
+    "seq_len": 512,
+    "topk": 128,
+    "seq_chunk": 32,
+    "block_u": 128,
+    "block_k": 64,
+    "max_abs_diff": 0.0851144790649414,
+    "median_ms": 0.30684399604797363,
+    "write_reduction_x": 17.510729613733904,
+    "unique_groups_max": 128,
+    "unique_groups_mean_nonempty": 77.66666412353516
+  },
+  "s4096_layer2_sweep": [
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u128d16h64k64_timing_20260602.json",
+      "seq_len": 4096,
+      "seq_chunk": 32,
+      "block_u": 128,
+      "block_k": 64,
+      "status": "timing_only",
+      "median_ms": 60.67277908325195,
+      "write_reduction_x": 3.428225069715621,
+      "unique_groups_max": 908,
+      "unique_groups_mean_nonempty": 573.311279296875
+    },
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u256d16h64k128_timing_20260602.json",
+      "seq_len": 4096,
+      "seq_chunk": 32,
+      "block_u": 256,
+      "block_k": 128,
+      "status": "timing_only",
+      "median_ms": 57.238929748535156,
+      "write_reduction_x": 6.368246896579656,
+      "unique_groups_max": 1015,
+      "unique_groups_mean_nonempty": 593.5216064453125
+    },
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u512d16h64k256_timing_20260602",
+      "seq_len": 4096,
+      "seq_chunk": 32,
+      "block_u": 512,
+      "block_k": 256,
+      "status": "compile_failed_shared_memory",
+      "required_shared_bytes": 262144,
+      "hardware_shared_limit_bytes": 163840
+    },
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u256d16h64k256_timing_20260602.json",
+      "seq_len": 4096,
+      "seq_chunk": 32,
+      "block_u": 256,
+      "block_k": 256,
+      "status": "timing_only",
+      "median_ms": 124.83580017089844,
+      "write_reduction_x": 12.338365924856399,
+      "unique_groups_max": 1024,
+      "unique_groups_mean_nonempty": 568.9107055664062
+    }
+  ],
+  "comparison": {
+    "dot_k_dense_route_s4096_ms": 47.259422302246094,
+    "dot_k_atomic_s4096_ms": 8.80629825592041,
+    "dot_k_partial_store_emit_only_s4096_ms": 8.794984817504883,
+    "target_coalesced_reduction_x": 23.813051840857806
+  },
+  "decision": "Do not pursue Triton micro-active dense route-dot as the S4096 production path. It is a useful short-sequence sanity check, but layer2 S4096 dynamic LI routes still make each micro active list hundreds of groups wide. The next production branch remains selected-key MFMA plus true in-tile segmented/scatter reduction, preferably HIP/CK-Tile/rocPRIM, or deeper LI/compressor fusion before dKV writes."
+}

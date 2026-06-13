@@ -1,0 +1,80 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "created_at": "2026-06-08",
+  "branch": "standard_ep_ownercompact_hot_split_triton_weighted_scatter",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_8x_s4096_gbs128_mbs4_steps2_20260608/docker-run.log",
+  "remote_structured_logs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_8x_s4096_gbs128_mbs4_steps2_20260608/structured_logs",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "tokens_per_step": 524288,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "config": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_weighted_scatter_backend": "torch",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton",
+    "activation_checkpoint_mode": "none",
+    "optimizer": "adamw",
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "result": {
+    "status": "completed_two_steps_not_promoted",
+    "step1_rankmax_wall_ms": 37885.007329052314,
+    "step2_rankmax_wall_ms": 12192.995547084138,
+    "step2_node_tokens_per_s": 42999.11354641473,
+    "step2_tokens_per_gpu_s": 5374.889193301841,
+    "flops_per_token_tflop_inferred_from_retained_mbs4": 0.05063153972738846,
+    "step2_tflops_per_gpu_inferred": 272.1389157209731,
+    "step2_optimizer_rankmax_ms": 118.88980097137392,
+    "step2_fwd_bwd_rankmax_events_ms": [
+      2953.6366078536958,
+      2894.653568044305,
+      2897.5740030873567,
+      2911.281199892983
+    ],
+    "peak_logged_memory_gib": null,
+    "peak_memory_note": "No peak-memory metric was emitted in the detached structured-log-only parse; this two-step gate is used for throughput direction, not memory promotion."
+  },
+  "baseline": {
+    "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8051.75,
+    "steps_2_to_6_tflops_per_gpu_mean": 407.6725,
+    "peak_logged_memory_gib": 194.9
+  },
+  "comparison_vs_baseline": {
+    "tokens_per_gpu_s_delta": -2676.860806698159,
+    "tokens_per_gpu_s_delta_pct": -33.2440547587624,
+    "tflops_per_gpu_delta": -135.53358427902688,
+    "tflops_per_gpu_delta_pct": -33.24405475876239
+  },
+  "decision": {
+    "promote": false,
+    "read": "The Triton weighted-scatter backend was a local helper-boundary win, but it regresses the materialized 8x TorchTitan MBS4 step-2 throughput by about 33% versus the retained owner-compact MBS4 branch. Do not pursue scatter-only backend swaps as the next MoE/EP rung.",
+    "next_action": "Return to the first-class compact-row helper VJP plus weighted dX/dTopK return contract, ideally fusing or overlapping the helper grouped training backward with the token-gradient return rather than replacing only weighted scatter."
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,50 @@
+{
+  "run_id": "torchtitan_direct_dsv4_s512_densefallback_4xmi350_noac_20260601T000000",
+  "date_utc": "2026-05-31",
+  "result": "passed_one_step_checkpoint_free_direct_torchtitan",
+  "selected_execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "host": "do-sonle5-mi350-gpu",
+  "visible_devices": "0,1,2,3",
+  "model": "DeepSeek-V4-Flash_4layer_dense_fallback_for_compressed_layers_at_s512",
+  "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+  "checkpoint_enable": false,
+  "activation_checkpoint_mode": "none",
+  "sparse_mla_max_seq_len": 128,
+  "gradient_accumulation_steps": 16,
+  "command": "env GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=64 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SPARSE_MLA_MAX_SEQ_LEN=128 MASTER_PORT=29542 RUN_ID=torchtitan_direct_dsv4_s512_densefallback_4xmi350_noac_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "observed": {
+    "created_meshes": ["batch", "loss", "ep", "fsdp"],
+    "trainer_initialized": true,
+    "training_started_step": 1,
+    "training_completed": true,
+    "process_group_destroyed": true,
+    "remote_output_size": "828K",
+    "checkpoint_directory_created": false
+  },
+  "step1": {
+    "loss": 12.24314,
+    "grad_norm": 10.3125,
+    "memory_gib": 75.66,
+    "tokens_per_gpu_s_range": [356, 358],
+    "tflops_per_gpu_range": [4.73, 4.75],
+    "torchtitan_reported_mfu_pct_a100_fallback": 1.52,
+    "mi350x_peak_normalized_mfu_pct_range": [0.20, 0.21]
+  },
+  "target_comparison": {
+    "normalized_4x_target_tokens_per_gpu_s_range": [2200, 2400],
+    "normalized_4x_target_node_tokens_per_s_range": [8800, 9600],
+    "observed_node_tokens_per_s_range": [1424, 1432],
+    "observed_ratio_to_target_range": [0.148, 0.163],
+    "target_speedup_needed_range": [6.15, 6.74],
+    "tokens_per_step_at_gbs64_s512": 32768,
+    "observed_step_time_s_range": [22.88, 23.01],
+    "target_step_time_s_range": [3.41, 3.72],
+    "caveat": "This S512 dense-fallback isolation is a stability check for the materialized sparse-MLA guard, not final S4096 sparse-MLA performance."
+  },
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s512_densefallback_4xmi350_noac_20260601T000000/docker-run.log",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s512_densefallback_4xmi350_noac_20260601T000000",
+  "mfu_note": "The raw TorchTitan MFU in this run used the old A100 fallback peak of 312e12. The MI350X-normalized field uses dense BF16 peak 2309.6e12.",
+  "read": "Forcing dense fallback at S512 clears the 4xMI350 backward fault, localizing the failure to the bounded PyTorch sparse-MLA/LightningIndexer path rather than generic S512 TorchTitan/FSDP/EP. Throughput is still far below the normalized 4xMI350 target."
+}

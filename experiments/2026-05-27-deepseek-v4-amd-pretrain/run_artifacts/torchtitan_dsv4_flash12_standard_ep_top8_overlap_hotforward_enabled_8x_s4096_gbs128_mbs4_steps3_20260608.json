@@ -1,0 +1,74 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_overlap_hotforward_enabled_8x_s4096_gbs128_mbs4_steps3_20260608",
+  "date": "2026-06-08",
+  "result": "completed_three_steps_not_promoted",
+  "decision": "Reject overlap-hot-forward as a throughput path. It proves the normal combine all-to-all wait can be hidden, but the overlapped hot-helper callback is much larger than the wait it hides, so e2e throughput regresses versus the retained standard-EP top-8 SDMA baseline.",
+  "shape": {
+    "node": "do-sonle5-mi350-gpu",
+    "gpus": 8,
+    "gpu": "MI350",
+    "model_config": "flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpointing": "full",
+    "checkpoint_enable": false
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_OVERLAP_HOT_SPLIT_FORWARD": "true",
+    "CANARY_STANDARD_EP_HOT_SPLIT_BACKWARD_TIMING": "true"
+  },
+  "metrics": {
+    "step_2_tokens_per_gpu_s": 5037,
+    "step_2_tflops_per_gpu": 255.04,
+    "step_2_peak_logged_memory_gib": 122.27,
+    "step_3_tokens_per_gpu_s": 5043,
+    "step_3_tflops_per_gpu": 255.32,
+    "step_3_peak_logged_memory_gib": 126.89,
+    "steps_2_to_3_tokens_per_gpu_s_mean": 5040.0,
+    "steps_2_to_3_tflops_per_gpu_mean": 255.18
+  },
+  "baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+    "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+    "peak_logged_memory_gib": 193.80
+  },
+  "steady_profile_summary": {
+    "artifact": "run_artifacts/standard_ep_top8_overlap_hotforward_profile_summary_steady_20260608.json",
+    "min_call_id_exclusive": 288,
+    "rankmax_ms": {
+      "standard_ep.combine.overlap_callback": 2616.705,
+      "standard_ep.combine.all_to_all_wait": 19.426,
+      "standard_ep.combine.weighted_scatter_add": 529.029,
+      "standard_ep.hot_split.broadcast_hot_weights": 1490.880,
+      "standard_ep.hot_split.grouped_w1": 218.484,
+      "standard_ep.hot_split.grouped_w3": 186.290,
+      "standard_ep.hot_split.grouped_w2": 182.223,
+      "standard_ep.hot_split.weighted_scatter_tokens": 259.568,
+      "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": 710.396,
+      "standard_ep.hot_split.backward.scatter_to_remote_y": 185.985
+    },
+    "read": "The normal combine wait drops from the earlier wait-split profile's approximately 256 ms to about 19 ms, but only because the hot-helper branch is now inside combine as an overlap callback. The callback itself costs about 2.62 s rank-max in the warmed window, so this is not a material latency win."
+  },
+  "raw_artifacts_outside_repo": {
+    "local_profile_dir": "/Users/sonle5/amd_profile/dsv4_pretrain/20260608_overlap_hotforward_enabled/profile",
+    "local_structured_logs_dir": "/Users/sonle5/amd_profile/dsv4_pretrain/20260608_overlap_hotforward_enabled/structured_logs",
+    "local_docker_log": "/Users/sonle5/amd_profile/dsv4_pretrain/20260608_overlap_hotforward_enabled/docker-run.log",
+    "remote_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_overlap_hotforward_enabled_8x_s4096_gbs128_mbs4_steps3_20260608",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_overlap_hotforward_enabled_8x_s4096_gbs128_mbs4_steps3_20260608"
+  },
+  "next_action": "Do not pursue callback overlap around the existing dense selected-hot ABI. Continue with first-class hot/cold/helper row dispatcher layout: saved forward partitions, compact owner-sharded needed rows as the helper ABI, batched helper grouped VJP, and independent dX/dTopK return plus hot dW reduce."
+}

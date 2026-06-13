@@ -1,0 +1,391 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "peak_memory_allocated_bytes": 11953242624,
+  "peak_memory_allocated_gib": 11.132324695587158,
+  "read": "This profiles the explicit backward math currently used by sparse_mla_shared_kv. It intentionally materializes selected KV and probability tensors to expose which parts need fused Triton/HIP replacement first. scatter_impl=backend uses the loaded backend scatter path, including its Triton atomic CUDA prototype when enabled by the backend.",
+  "scatter_impl": "backend_fused_selected",
+  "scope": "sparse_mla_shared_latent_kv_explicit_backward_component_profile",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.625,
+    "materialized_shared_selected_kv_fp32_gib": 5.0,
+    "output_bf16_gib": 0.25,
+    "selected_count": 640,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "timed_iters": 3,
+  "timing": {
+    "by_component": {
+      "forward_with_lse": {
+        "enabled": true,
+        "max_ms": 1.9478130340576172,
+        "mean_ms": 1.8003327051798503,
+        "median_ms": 1.7627320289611816,
+        "min_ms": 1.690453052520752,
+        "samples_ms": [
+          1.9478130340576172,
+          1.7627320289611816,
+          1.690453052520752
+        ],
+        "stdev_ms": 0.13273619763741829
+      },
+      "fused_selected_grad_scatter": {
+        "enabled": true,
+        "max_ms": 14.812986373901367,
+        "mean_ms": 14.69999090830485,
+        "median_ms": 14.668232917785645,
+        "min_ms": 14.618753433227539,
+        "samples_ms": [
+          14.812986373901367,
+          14.668232917785645,
+          14.618753433227539
+        ],
+        "stdev_ms": 0.10093580277614173
+      },
+      "gather_selected_kv_fp32": {
+        "enabled": true,
+        "max_ms": 3.5204250812530518,
+        "mean_ms": 3.2820237477620444,
+        "median_ms": 3.1697840690612793,
+        "min_ms": 3.1558620929718018,
+        "samples_ms": [
+          3.5204250812530518,
+          3.1558620929718018,
+          3.1697840690612793
+        ],
+        "stdev_ms": 0.20657892489863752
+      },
+      "grad_attn_sink": {
+        "enabled": true,
+        "max_ms": 0.05031999945640564,
+        "mean_ms": 0.04253366713722547,
+        "median_ms": 0.04004000127315521,
+        "min_ms": 0.037241000682115555,
+        "samples_ms": [
+          0.05031999945640564,
+          0.04004000127315521,
+          0.037241000682115555
+        ],
+        "stdev_ms": 0.006886859176409253
+      },
+      "grad_kv_zero": {
+        "enabled": true,
+        "max_ms": 0.023959999904036522,
+        "mean_ms": 0.019453999896844227,
+        "median_ms": 0.017361000180244446,
+        "min_ms": 0.017040999606251717,
+        "samples_ms": [
+          0.023959999904036522,
+          0.017361000180244446,
+          0.017040999606251717
+        ],
+        "stdev_ms": 0.0039055892180888192
+      },
+      "grad_logits": {
+        "enabled": true,
+        "max_ms": 0.5804839730262756,
+        "mean_ms": 0.5723246534665426,
+        "median_ms": 0.569445013999939,
+        "min_ms": 0.5670449733734131,
+        "samples_ms": [
+          0.5804839730262756,
+          0.569445013999939,
+          0.5670449733734131
+        ],
+        "stdev_ms": 0.007167351010703028
+      },
+      "grad_output_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.14316099882125854,
+        "mean_ms": 0.140174334247907,
+        "median_ms": 0.13920100033283234,
+        "min_ms": 0.13816100358963013,
+        "samples_ms": [
+          0.13816100358963013,
+          0.13920100033283234,
+          0.14316099882125854
+        ],
+        "stdev_ms": 0.002638280171201054
+      },
+      "grad_probs_do_v": {
+        "enabled": true,
+        "max_ms": 2.3229360580444336,
+        "mean_ms": 2.102242032686869,
+        "median_ms": 2.016695022583008,
+        "min_ms": 1.9670950174331665,
+        "samples_ms": [
+          2.3229360580444336,
+          2.016695022583008,
+          1.9670950174331665
+        ],
+        "stdev_ms": 0.19272890221528788
+      },
+      "grad_q": {
+        "enabled": true,
+        "max_ms": 2.30297589302063,
+        "mean_ms": 2.1722026666005454,
+        "median_ms": 2.114896059036255,
+        "min_ms": 2.098736047744751,
+        "samples_ms": [
+          2.30297589302063,
+          2.114896059036255,
+          2.098736047744751
+        ],
+        "stdev_ms": 0.11354080346938904
+      },
+      "lse_layout": {
+        "enabled": true,
+        "max_ms": 0.015479999594390392,
+        "mean_ms": 0.011213333035508791,
+        "median_ms": 0.009399999864399433,
+        "min_ms": 0.00875999964773655,
+        "samples_ms": [
+          0.015479999594390392,
+          0.009399999864399433,
+          0.00875999964773655
+        ],
+        "stdev_ms": 0.0037088721618358665
+      },
+      "make_grad_output": {
+        "enabled": true,
+        "max_ms": 0.7166450023651123,
+        "mean_ms": 0.6540183226267496,
+        "median_ms": 0.62288498878479,
+        "min_ms": 0.6225249767303467,
+        "samples_ms": [
+          0.7166450023651123,
+          0.62288498878479,
+          0.6225249767303467
+        ],
+        "stdev_ms": 0.054236594320241166
+      },
+      "probs_exp_mask": {
+        "enabled": true,
+        "max_ms": 0.9291269779205322,
+        "mean_ms": 0.9129670063654581,
+        "median_ms": 0.9108070135116577,
+        "min_ms": 0.8989670276641846,
+        "samples_ms": [
+          0.9291269779205322,
+          0.9108070135116577,
+          0.8989670276641846
+        ],
+        "stdev_ms": 0.015195552859724883
+      },
+      "q_to_fp32": {
+        "enabled": true,
+        "max_ms": 0.14576099812984467,
+        "mean_ms": 0.1427343338727951,
+        "median_ms": 0.1430409997701645,
+        "min_ms": 0.13940100371837616,
+        "samples_ms": [
+          0.1430409997701645,
+          0.14576099812984467,
+          0.13940100371837616
+        ],
+        "stdev_ms": 0.0031910680356167093
+      },
+      "safe_indices": {
+        "enabled": true,
+        "max_ms": 0.030719999223947525,
+        "mean_ms": 0.0221599992364645,
+        "median_ms": 0.018959999084472656,
+        "min_ms": 0.01679999940097332,
+        "samples_ms": [
+          0.030719999223947525,
+          0.018959999084472656,
+          0.01679999940097332
+        ],
+        "stdev_ms": 0.007491435075969179
+      },
+      "scores_qk": {
+        "enabled": true,
+        "max_ms": 2.59401798248291,
+        "mean_ms": 2.271442969640096,
+        "median_ms": 2.1335349082946777,
+        "min_ms": 2.0867760181427,
+        "samples_ms": [
+          2.59401798248291,
+          2.1335349082946777,
+          2.0867760181427
+        ],
+        "stdev_ms": 0.28033475994775864
+      },
+      "sink_probs": {
+        "enabled": true,
+        "max_ms": 0.09660100191831589,
+        "mean_ms": 0.0489873339732488,
+        "median_ms": 0.028080999851226807,
+        "min_ms": 0.022280000150203705,
+        "samples_ms": [
+          0.09660100191831589,
+          0.028080999851226807,
+          0.022280000150203705
+        ],
+        "stdev_ms": 0.0413365326408753
+      },
+      "softmax_dot": {
+        "enabled": true,
+        "max_ms": 0.5846440196037292,
+        "mean_ms": 0.5756310025850931,
+        "median_ms": 0.5745239853858948,
+        "min_ms": 0.5677250027656555,
+        "samples_ms": [
+          0.5846440196037292,
+          0.5745239853858948,
+          0.5677250027656555
+        ],
+        "stdev_ms": 0.008513659495260919
+      },
+      "valid_mask": {
+        "enabled": true,
+        "max_ms": 0.0628800019621849,
+        "mean_ms": 0.041186666737000145,
+        "median_ms": 0.03215999901294708,
+        "min_ms": 0.028519999235868454,
+        "samples_ms": [
+          0.0628800019621849,
+          0.03215999901294708,
+          0.028519999235868454
+        ],
+        "stdev_ms": 0.01887493031744659
+      }
+    },
+    "component_event_sum": {
+      "enabled": true,
+      "max_ms": 30.873217401094735,
+      "mean_ms": 29.511619683355093,
+      "median_ms": 28.960578029043972,
+      "min_ms": 28.701063619926572,
+      "samples_ms": [
+        30.873217401094735,
+        28.960578029043972,
+        28.701063619926572
+      ],
+      "stdev_ms": 1.1862959963054074
+    },
+    "component_median_sum_ms": 28.97178000677377,
+    "iteration_wall": {
+      "enabled": true,
+      "max_ms": 31.341776018962264,
+      "mean_ms": 29.950472332226735,
+      "median_ms": 29.411735013127327,
+      "min_ms": 29.09790596459061,
+      "samples_ms": [
+        31.341776018962264,
+        29.411735013127327,
+        29.09790596459061
+      ],
+      "stdev_ms": 1.215078857304856
+    },
+    "last_checksums": {
+      "grad_attn_sink_norm": 2.8170259611215442e-05,
+      "grad_kv_norm": 0.0001252243819180876,
+      "grad_q_norm": 1.959703877218999e-05,
+      "output_mean": 0.0015139507595449686
+    },
+    "ranked_by_median_ms": [
+      {
+        "component": "fused_selected_grad_scatter",
+        "median_ms": 14.668232917785645,
+        "pct_of_component_median_sum": 50.62938112313474
+      },
+      {
+        "component": "gather_selected_kv_fp32",
+        "median_ms": 3.1697840690612793,
+        "pct_of_component_median_sum": 10.940936553847108
+      },
+      {
+        "component": "scores_qk",
+        "median_ms": 2.1335349082946777,
+        "pct_of_component_median_sum": 7.364183035339371
+      },
+      {
+        "component": "grad_q",
+        "median_ms": 2.114896059036255,
+        "pct_of_component_median_sum": 7.299848537237891
+      },
+      {
+        "component": "grad_probs_do_v",
+        "median_ms": 2.016695022583008,
+        "pct_of_component_median_sum": 6.960894436280729
+      },
+      {
+        "component": "forward_with_lse",
+        "median_ms": 1.7627320289611816,
+        "pct_of_component_median_sum": 6.084306965429962
+      },
+      {
+        "component": "probs_exp_mask",
+        "median_ms": 0.9108070135116577,
+        "pct_of_component_median_sum": 3.1437730553618235
+      },
+      {
+        "component": "make_grad_output",
+        "median_ms": 0.62288498878479,
+        "pct_of_component_median_sum": 2.1499714157678813
+      },
+      {
+        "component": "softmax_dot",
+        "median_ms": 0.5745239853858948,
+        "pct_of_component_median_sum": 1.9830469002994215
+      },
+      {
+        "component": "grad_logits",
+        "median_ms": 0.569445013999939,
+        "pct_of_component_median_sum": 1.9655161466323416
+      },
+      {
+        "component": "q_to_fp32",
+        "median_ms": 0.1430409997701645,
+        "pct_of_component_median_sum": 0.4937252724434628
+      },
+      {
+        "component": "grad_output_to_fp32",
+        "median_ms": 0.13920100033283234,
+        "pct_of_component_median_sum": 0.48047099729559706
+      },
+      {
+        "component": "grad_attn_sink",
+        "median_ms": 0.04004000127315521,
+        "pct_of_component_median_sum": 0.13820345613487894
+      },
+      {
+        "component": "valid_mask",
+        "median_ms": 0.03215999901294708,
+        "pct_of_component_median_sum": 0.11100456722171675
+      },
+      {
+        "component": "sink_probs",
+        "median_ms": 0.028080999851226807,
+        "pct_of_component_median_sum": 0.09692535234169701
+      },
+      {
+        "component": "safe_indices",
+        "median_ms": 0.018959999084472656,
+        "pct_of_component_median_sum": 0.06544298997175768
+      },
+      {
+        "component": "grad_kv_zero",
+        "median_ms": 0.017361000180244446,
+        "pct_of_component_median_sum": 0.05992382993445809
+      },
+      {
+        "component": "lse_layout",
+        "median_ms": 0.009399999864399433,
+        "pct_of_component_median_sum": 0.03244536532516006
+      }
+    ]
+  },
+  "warmup_iters": 1
+}

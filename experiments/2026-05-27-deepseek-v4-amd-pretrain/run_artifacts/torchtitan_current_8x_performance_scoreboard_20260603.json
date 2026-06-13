@@ -1,0 +1,121 @@
+{
+  "artifact": "torchtitan_current_8x_performance_scoreboard",
+  "date_utc": "2026-06-03",
+  "scope": "Disambiguate the retained 8xMI350 DSv4-style canary, the nearby CE2 A/B peak observation, and the older guarded dense-fallback systems baseline.",
+  "inputs": {
+    "retained_default_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "manual_ce2_ab_artifact": "run_artifacts/chunked_ce2_retained_8x_target_shape_20260603.json",
+    "old_guarded_dense_fallback_artifact": "run_artifacts/torchtitan_direct_dsv4_s4096_guarded_8xmi350_ckptfree_20260601.json",
+    "latest_profile_summary_artifact": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_profile_summary_20260603.json"
+  },
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "tokens_per_step": 524288,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full"
+  },
+  "target": {
+    "pass_fail_tflops_per_gpu": 277.0,
+    "implied_mfu_percent_of_mi350x_bf16_peak": 11.993418773813648,
+    "derived_tok_per_gpu_s_using_retained_flop_accounting": 14640.282745699198,
+    "derived_node_tok_s": 117122.26196559359,
+    "derived_step_time_s": 4.476416278179612,
+    "read": "The current pass/fail canary gate is the user-updated 277 TFLOPs/GPU target at MBS=1, S=4096, GBS=128. Token/s and step-time equivalents are derived only for comparability using the retained run's FLOPs/token accounting."
+  },
+  "retained_default": {
+    "run_id": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+    "status": "passed",
+    "loss_movement": "12.20713 -> 8.75234",
+    "tok_per_gpu_s": 3103.0,
+    "node_tok_s": 24824.0,
+    "step_time_s": 21.12,
+    "tflops_per_gpu": 58.71,
+    "mfu_percent_mi350": 2.54,
+    "peak_logged_memory_gib": 166.47,
+    "estimated_tflop_per_token": 0.018920399613277475,
+    "tflops_ratio_to_target": 0.21194945848375452,
+    "speedup_needed_to_target_tflops": 4.718105944472833,
+    "derived_tok_ratio_to_target": 0.21194945848375454,
+    "step_time_delta_s_vs_derived_target": 16.643583721820388,
+    "target_status": {
+      "tflops": "below_target",
+      "derived_token_throughput": "below_target",
+      "derived_step_time": "slower_than_target"
+    },
+    "read": "Canonical retained no-profile anchor because it validates the launcher-selected CE2 default with no chunk override. Under the updated 277 TFLOPs/GPU target, this is a systems/correctness anchor, not a passing performance anchor."
+  },
+  "highest_nearby_ce2_ab_observation": {
+    "run_id": "torchtitan_dsv4_chunked_ce2_ep8_s4096_gbs128_20260603",
+    "tok_per_gpu_s_range": [
+      3136.0,
+      3137.0
+    ],
+    "estimated_tflops_per_gpu_range_using_retained_flop_accounting": [
+      59.334373187238164,
+      59.353293586851436
+    ],
+    "tflops_ratio_to_target_range": [
+      0.2142035133113291,
+      0.21427181800307377
+    ],
+    "read": "Nearby manual CE2 A/B was slightly faster than the retained default, but the retained default is the canonical launcher-selected baseline."
+  },
+  "old_guarded_dense_fallback_systems_baseline": {
+    "run_id": "torchtitan_direct_dsv4_s4096_guarded_8xmi350_ckptfree_20260601T000000",
+    "tok_per_gpu_s_clean_avg": 10827.0,
+    "node_tok_s_clean_avg": 86616.0,
+    "step_time_s_clean_avg": 6.05,
+    "tflops_per_gpu_clean_avg": 204.865,
+    "mfu_percent_mi350_clean_avg": 8.87,
+    "estimated_tflop_per_token": 0.01892167728826083,
+    "current_retained_tok_ratio": 0.2865983190172716,
+    "current_retained_tflops_ratio": 0.2865789666365655,
+    "tflops_ratio_to_target": 0.7395848375451264,
+    "speedup_needed_to_target_tflops": 1.3521099260488614,
+    "read": "This old number is much faster because it is a guarded dense-fallback systems baseline, not the retained sparse/prototype DSv4-style canary. It is still below the updated 277 TFLOPs/GPU target."
+  },
+  "flop_accounting_check": {
+    "retained_estimated_tflop_per_token": 0.018920399613277475,
+    "old_baseline_estimated_tflop_per_token": 0.01892167728826083,
+    "relative_difference_pct": 0.006752440409432037,
+    "read": "The TFLOPs/GPU and tok/GPU/s numbers use the same FLOPs/token accounting. The lower retained TFLOPs is explained by lower retained tok/GPU/s, not by a unit conversion mismatch."
+  },
+  "profile_ranking": {
+    "source": "run_artifacts/torchtitan_latest_ce2_ep4_ep8_profile_summary_20260603.json",
+    "ep8_retained_no_profiler_anchor": {
+      "step2_tok_per_gpu_s": 3103,
+      "implied_step_s": 21.12,
+      "source": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603"
+    },
+    "ep8_mori_median_rank_total_ms": {
+      "local_vjp_padded": 2008.17,
+      "combine_dx_call": 1777.44,
+      "dispatch_x_call": 182.0,
+      "dispatch_grad_output_call": 41.62,
+      "align_grad_output": 49.7
+    },
+    "ep8_dsv4_median_rank_total_ms": {
+      "loss_chunked_ce_total": 459.41,
+      "loss_chunk_backward": 312.57,
+      "loss_lm_head_forward": 113.86,
+      "loss_cross_entropy_forward": 33.36,
+      "attention_projection_total": 235.18,
+      "attention_projection_wo": 125.89,
+      "attention_projection_wkv_b": 44.41,
+      "attention_projection_wq_b": 41.31,
+      "shared_expert_linears_total": 60.54,
+      "router_gate_total": 13.5
+    },
+    "read": [
+      "EP8 reduces local owner-rank MoE VJP from EP4, but dX combine/arrival wait grows and becomes comparable to local VJP.",
+      "The highest-return MoE work is a real overlap/skew plan plus a more fused/less padded owner-rank VJP contract, not another blind MORI launch tuple sweep.",
+      "Attention projection linears are a mid-sized bucket; the final sparse MLA/LI backward remains necessary, but this guarded canary profile does not exercise the final sparse override.",
+      "Chunked CE/lm-head is visible but smaller than the MoE backward path; keep CE2 for this canary while avoiding loss-only tuning as the main ladder.",
+      "Profiler kernel-family totals are cumulative GPU event time across streams/ranges and should be used for ranking, not as additive wall time."
+    ]
+  },
+  "bottom_line": "Use 3,103 tok/GPU/s, 21.12 s/step, and 58.71 TFLOPs/GPU as the retained 8xMI350 canary anchor. Against the updated 277 TFLOPs/GPU target this is 21.2% of target and needs about 4.72x speedup. The nearby manual CE2 A/B reached about 59.35 TFLOPs/GPU, and the older 204.865 TFLOPs/GPU line belongs to the separate 10,827 tok/GPU/s guarded dense-fallback systems baseline, which is still only 74.0% of the updated target."
+}

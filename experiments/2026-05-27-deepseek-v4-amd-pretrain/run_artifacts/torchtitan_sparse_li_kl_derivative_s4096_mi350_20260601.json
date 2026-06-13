@@ -1,0 +1,93 @@
+{
+  "device": "cuda",
+  "kernel": {
+    "block_k": 512,
+    "read": "Given target_probs from the sparse MLA attention target and index_logits from the LI logits tile, this kernel computes the clamp-aware KL derivative d_index_logits. It intentionally does not build target_probs; production should source those from the attention recompute/softmax path.",
+    "workspace": {
+      "d_index_logits_bytes": 8388608,
+      "index_logits_bytes": 8388608,
+      "row_count": 4093,
+      "target_probs_bytes": 8388608
+    }
+  },
+  "max_abs_diff": null,
+  "reference": null,
+  "scope": "triton_sparse_lightning_indexer_kl_derivative_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 1024,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_edges": 1572352
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.14312100410461426,
+      "mean_ms": 0.05730265062302351,
+      "median_ms": 0.05114100128412247,
+      "min_ms": 0.049001000821590424,
+      "samples_ms": [
+        0.14312100410461426,
+        0.058400001376867294,
+        0.05428000167012215,
+        0.05344000086188316,
+        0.053199999034404755,
+        0.051281001418828964,
+        0.050801001489162445,
+        0.051840998232364655,
+        0.05044100061058998,
+        0.07044100016355515,
+        0.05760100111365318,
+        0.05100100114941597,
+        0.05296099931001663,
+        0.05028099939227104,
+        0.049479998648166656,
+        0.05000000074505806,
+        0.050280001014471054,
+        0.049001000821590424,
+        0.04920100048184395,
+        0.049001000821590424
+      ],
+      "stdev_ms": 0.020787403867742034
+    },
+    "peak_memory_allocated_bytes": 35651584,
+    "peak_memory_allocated_gib": 0.033203125,
+    "timed_iters": 20,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.1744590699672699,
+      "mean_ms": 0.0741672411095351,
+      "median_ms": 0.06737449439242482,
+      "min_ms": 0.06512901745736599,
+      "samples_ms": [
+        0.1744590699672699,
+        0.07334002293646336,
+        0.06854906678199768,
+        0.06699003279209137,
+        0.0673800241202116,
+        0.07069890853017569,
+        0.06736896466463804,
+        0.06809097249060869,
+        0.06681005470454693,
+        0.0867599155753851,
+        0.0716398935765028,
+        0.0675299670547247,
+        0.06620993372052908,
+        0.06663997191935778,
+        0.0655690673738718,
+        0.06614997982978821,
+        0.0662199454382062,
+        0.06512901745736599,
+        0.072640017606318,
+        0.06516999565064907
+      ],
+      "stdev_ms": 0.0240972859744747
+    },
+    "warmup_iters": 3
+  },
+  "triton_norm": 1.967560820048675e-06
+}

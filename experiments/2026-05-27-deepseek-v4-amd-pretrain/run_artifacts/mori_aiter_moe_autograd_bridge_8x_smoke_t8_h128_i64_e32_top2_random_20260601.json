@@ -1,0 +1,832 @@
+{
+  "probe": "mori_aiter_moe_autograd_bridge",
+  "created_unix": 1780331125.534904,
+  "world_size": 8,
+  "shape": {
+    "tokens_per_rank": 8,
+    "hidden": 128,
+    "intermediate": 64,
+    "experts": 32,
+    "num_local_experts": 4,
+    "topk": 2,
+    "topk_pattern": "random",
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.05,
+    "warmup": 1,
+    "iters": 1
+  },
+  "thresholds": {
+    "output_atol": 0.0625,
+    "grad_atol": 0.0005
+  },
+  "contract": {
+    "forward": "actual MORI dispatch -> local AITER fused_moe with preshuffled w13/w2 -> MORI combine",
+    "backward": "reference PyTorch VJP; all-gather local expert shards, recompute global routed SwiGLU for local tokens, all-reduce dW, return local owner gradients",
+    "scope": "training API semantics probe only; backward is not a performance candidate"
+  },
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "summary": {
+    "all_ranks_pass": true,
+    "max_forward_abs_diff_across_ranks": 1.9073486328125e-06,
+    "max_grad_abs_diff_across_ranks": 0.0,
+    "bridge_fwd_bwd_ms_rank_median": 10.078106880187988
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "expert_owner_range": [
+        0,
+        4
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.734286681516096e-07,
+        "max_rel_diff": 1.3703703880310059,
+        "cosine_distance": 6.079673767089844e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.018842697143555,
+        "min": 10.018842697143555,
+        "max": 10.018842697143555
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "expert_owner_range": [
+        4,
+        8
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.1203686628723517e-07,
+        "max_rel_diff": 3.056224822998047,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.045963287353516,
+        "min": 10.045963287353516,
+        "max": 10.045963287353516
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "expert_owner_range": [
+        8,
+        12
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 1.8347714103583712e-07,
+        "max_rel_diff": 3.9708738327026367,
+        "cosine_distance": 4.708766937255859e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.241564750671387,
+        "min": 10.241564750671387,
+        "max": 10.241564750671387
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "expert_owner_range": [
+        12,
+        16
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.1561208995990455e-07,
+        "max_rel_diff": 1.0125786066055298,
+        "cosine_distance": 5.245208740234375e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.102001190185547,
+        "min": 10.102001190185547,
+        "max": 10.102001190185547
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 4,
+      "local_rank": 4,
+      "expert_owner_range": [
+        16,
+        20
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 1.8993887351825833e-07,
+        "max_rel_diff": 1.0,
+        "cosine_distance": 5.900859832763672e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.078207015991211,
+        "min": 10.078207015991211,
+        "max": 10.078207015991211
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 5,
+      "local_rank": 5,
+      "expert_owner_range": [
+        20,
+        24
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.007445800700225e-07,
+        "max_rel_diff": 2.7925925254821777,
+        "cosine_distance": 5.7220458984375e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 5.960464477539063e-08,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.057207107543945,
+        "min": 10.057207107543945,
+        "max": 10.057207107543945
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 6,
+      "local_rank": 6,
+      "expert_owner_range": [
+        24,
+        28
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.0968946046195924e-07,
+        "max_rel_diff": 1.0,
+        "cosine_distance": 5.662441253662109e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.078006744384766,
+        "min": 10.078006744384766,
+        "max": 10.078006744384766
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    },
+    {
+      "rank": 7,
+      "local_rank": 7,
+      "expert_owner_range": [
+        28,
+        32
+      ],
+      "forward_compare": {
+        "shape": [
+          8,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.1186201593081933e-07,
+        "max_rel_diff": 1.0,
+        "cosine_distance": 6.079673767089844e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            8,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": -1.1920928955078125e-07,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            8,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0,
+          "cosine_distance": 0.0,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0,
+      "passes_atol": true,
+      "bridge_fwd_bwd_ms": {
+        "median": 10.098566055297852,
+        "min": 10.098566055297852,
+        "max": 10.098566055297852
+      },
+      "timing_read": "Includes real MORI+AITER forward plus slow PyTorch reference backward and gradient all-reduce; not a performance target."
+    }
+  ]
+}

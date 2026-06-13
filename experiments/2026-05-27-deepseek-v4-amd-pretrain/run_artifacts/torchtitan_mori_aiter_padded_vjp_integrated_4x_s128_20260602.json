@@ -1,0 +1,77 @@
+{
+  "artifact": "torchtitan_mori_aiter_padded_vjp_integrated_4x_s128_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_short_sequence_integration_smokes",
+  "purpose": "Record the opt-in padded owner-rank VJP replacement for the TorchTitan MORI+AITER routed backward local PyTorch autograd VJP.",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "target_host": "do-sonle5-mi350-gpu",
+  "visible_gpus": "4,5,6,7",
+  "source_changes": {
+    "bridge": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "activation": {
+      "TORCHTITAN_MORI_AITER_BACKWARD_MODE": "routed",
+      "TORCHTITAN_MORI_AITER_LOCAL_VJP_MODE": "padded"
+    },
+    "default_behavior": "Default local VJP mode remains autograd unless TORCHTITAN_MORI_AITER_LOCAL_VJP_MODE=padded is set."
+  },
+  "static_validation": {
+    "py_compile_bridge": true,
+    "launcher_bash_n": true,
+    "launcher_check_source": true,
+    "remote_check_config": {
+      "result": "pass",
+      "model_spec": "deepseek_v4 flash_4layer",
+      "shape": {
+        "local_batch_size": 1,
+        "global_batch_size": 64,
+        "seq_len": 128,
+        "steps": 1,
+        "expert_parallel_degree": 4,
+        "data_parallel_shard_degree": -1
+      },
+      "moe_comm_backend": "mori",
+      "mori_aiter_backward_mode": "routed",
+      "mori_aiter_local_vjp_mode": "padded",
+      "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+      "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+      "attention_sparse_backward_mode_by_layer": ["manual", "manual", "manual", "manual"]
+    }
+  },
+  "runs": {
+    "gbs4_noaux": {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_padded_vjp_4x_s128_gbs4_noaux_20260602",
+      "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_GBS=4 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_DSA_INDEXER_LOSS_COEFF=0 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "seq_len": 128,
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "dsa_indexer_loss_coeff": 0,
+      "activation_checkpoint_mode": "none",
+      "checkpoint_enable": false,
+      "loss": 12.24120,
+      "grad_norm": 11.875,
+      "memory_gib": 73.79,
+      "checkpoint_dir_present": false,
+      "process_group_destroyed": true,
+      "raw_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_padded_vjp_4x_s128_gbs4_noaux_20260602"
+    },
+    "gbs64_liaux": {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_padded_vjp_4x_s128_gbs64_liaux_20260602",
+      "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_SEQ_LEN=128 CANARY_GBS=64 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "seq_len": 128,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 16,
+      "dsa_indexer_loss_coeff": 0.001,
+      "activation_checkpoint_mode": "none",
+      "checkpoint_enable": false,
+      "loss": 12.29954,
+      "grad_norm": 9.4375,
+      "memory_gib": 80.78,
+      "checkpoint_dir_present": false,
+      "process_group_destroyed": true,
+      "raw_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_padded_vjp_4x_s128_gbs64_liaux_20260602"
+    }
+  },
+  "read": "The padded owner-rank VJP mode replaces the local autograd VJP inside the MORI-routed backward path and passes 4xMI350 short-sequence direct TorchTitan training with finite loss/grad norm, gradient accumulation, default LI aux on the GBS64 run, no checkpoint directory, and clean process-group teardown. This is an integration gate, not final long-sequence performance evidence.",
+  "dependency_pin_changes": []
+}

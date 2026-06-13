@@ -1,0 +1,59 @@
+{
+  "status": "partial_progress_not_promoted_over_explicit_pytorch",
+  "scope": "TileLang sparse-MLA compressed-dKV group-filter bridge",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 128,
+    "compressed_count": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "token_block": 16,
+    "block_k": 64
+  },
+  "implementation": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "torchtitan_backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "bridge_verifier": "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py",
+    "default_tilelang_mode": "explicit_tilelang_dkv uses plan-free group-filter dKV",
+    "control_mode": "tilelang_materialized_dkv keeps selected-limit route-plan packing"
+  },
+  "key_results": {
+    "selected_limit_source_indexed_s4096_gp256_kernel_ms": 7.670546054840088,
+    "selected_limit_s4096_gp256_static_plan_wall_ms": 74.33216390199959,
+    "group_filter_s4096_gp256_kernel_ms": 12.124062538146973,
+    "group_filter_s4096_gp256_kernel_wall_ms": 12.14484591037035,
+    "group_filter_s4096_gp512_blockd32_kernel_ms": 13.102791786193848,
+    "bridge_s512_group_filter_gpu_event_ms": 2.0291779041290283,
+    "bridge_s512_group_filter_wall_ms": 2.0529329776763916,
+    "bridge_s4096_group_filter_gpu_event_ms": 32.04844665527344,
+    "bridge_s4096_group_filter_wall_ms": 32.11456607095897,
+    "bridge_s4096_group_filter_vs_pytorch_gpu_event_ms": 31.938735961914062,
+    "bridge_s4096_explicit_pytorch_gpu_event_ms": 30.99850845336914,
+    "bridge_s4096_group_filter_vs_pytorch_wall_ms": 31.987416790798306,
+    "bridge_s4096_explicit_pytorch_wall_ms": 31.046149553731084
+  },
+  "artifacts": {
+    "s128_correctness": "run_artifacts/tilelang_group_filter_adapter_s128_20260604.json",
+    "s512_correctness": "run_artifacts/tilelang_group_filter_adapter_s512_20260604.json",
+    "s4096_gp256_adapter": "run_artifacts/tilelang_group_filter_adapter_s4096_gp256_20260604.json",
+    "s4096_gp512_blockd32_adapter": "run_artifacts/tilelang_group_filter_adapter_s4096_gp512_bd32_20260604.json",
+    "s512_bridge": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_group_filter_s512_20260604.json",
+    "s4096_bridge_timing": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_group_filter_s4096_timing_20260604.json",
+    "s4096_bridge_vs_pytorch": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_group_filter_s4096_vs_pytorch_20260604.json"
+  },
+  "read": [
+    "The source-indexed selected-limit kernel removes the packed probability/logit slab and is faster than pack+kernel, but the selected-limit route plan is still too expensive at S4096 when built as host metadata.",
+    "The plan-free group-filter TileLang kernel avoids route planning entirely and reduces compressed dKV inside group-panel CTAs before global atomics.",
+    "At S4096, group-filter is much better than the previous selected-limit bridge wall path, but it is still about 1 ms slower than explicit PyTorch for the current materialized bridge.",
+    "The remaining high-return path is not another Python route-plan tweak. It is fusing or adjacent-producing P/dP from Q/K/V/LSE and LI derivative so the bridge stops materializing selected-KV/probs/grad_logits, while keeping selected-limit-style reduced writes if route metadata can be produced cheaply on device."
+  ],
+  "next": [
+    "Keep explicit_pytorch as the stable default and explicit_tilelang_dkv as the plan-free TileLang candidate gate.",
+    "Use group_filter for wall-time experiments when route planning would dominate.",
+    "Return to selected-limit scheduling only when LI route metadata is already available on device or fused into the producer."
+  ]
+}

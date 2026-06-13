@@ -1,0 +1,144 @@
+{
+  "artifact": "ascend910_vs_mi350_tflops_comparison_20260605",
+  "created_at": "2026-06-05",
+  "scope": "Best-effort end-to-end throughput comparison between existing Ascend 910C 16-die DSv4-Flash 4-layer runs and current AMD MI350 materialized candidates.",
+  "comparison_policy": {
+    "user_memory_equivalence": "8 dual-die Ascend 910C devices, 16 logical 64 GiB dies, are treated as roughly memory-equivalent to 4xMI350.",
+    "primary_metric": "training tokens/s at the node or memory-equivalent-box level",
+    "secondary_metric": "TFLOPs normalized with the same FLOPs/token accounting",
+    "reason": "The Ascend and AMD logs use different printed FLOPs/token accounting, so raw logged TFLOPs are not directly apples-to-apples."
+  },
+  "flops_accounting": {
+    "ascend_logged_gflop_per_token": 24.95,
+    "amd_retained_gflop_per_token": 18.92,
+    "read": "Ascend logs around 73.9 TFLOPs/die at about 2961 tokens/die/s, while AMD logs around 77.4 TFLOPs/GPU at about 4090 tokens/GPU/s. That means raw TFLOPs line items are using different model FLOP/token constants."
+  },
+  "ascend_910c_best_existing_run": {
+    "remote_node": "ascend-910-dev",
+    "run_dir": "/data2/sonle/dsv4_ascend910_fit_20260601",
+    "log": "/data2/sonle/dsv4_ascend910_fit_20260601/logs/bf16_compile_customopp_novirtual_fullac_forcebalance_5step_20260602T032337.log",
+    "hardware": {
+      "physical_devices": 8,
+      "logical_dies": 16,
+      "hbm_per_die_gib": 64
+    },
+    "shape": {
+      "model": "DeepSeek-V4 285B_debug_4_layers",
+      "precision": "bf16",
+      "sequence_length": 4096,
+      "micro_batch_size": 1,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 8,
+      "tokens_per_step": 524288,
+      "parallelism_observed": "batch/loss/fsdp/ep active, 16 ranks"
+    },
+    "late_steps": [3, 4, 5],
+    "late_mean": {
+      "logged_tflops_per_die": 73.89,
+      "tokens_per_die_s": 2960.67,
+      "node_tokens_s": 47370.67,
+      "elapsed_time_per_step_s": 11.07,
+      "logged_node_tflops": 1182.29,
+      "node_tflops_normalized_to_amd_accounting": 896.5,
+      "tflops_per_mi350_equivalent_normalized_to_amd_accounting": 224.13
+    }
+  },
+  "ascend_910c_longer_existing_run": {
+    "log": "/data2/sonle/dsv4_ascend910_fit_20260601/logs/bf16_compile_customopp_novirtual_fullac_lbcoeff002_8step_retry1_20260602T091640.log",
+    "late_steps": [3, 4, 5, 6, 7, 8],
+    "late_mean": {
+      "logged_tflops_per_die": 70.42,
+      "tokens_per_die_s": 2824.0,
+      "node_tokens_s": 45184.0,
+      "elapsed_time_per_step_s": 11.62,
+      "logged_node_tflops": 1126.67,
+      "node_tflops_normalized_to_amd_accounting": 854.96,
+      "tflops_per_mi350_equivalent_normalized_to_amd_accounting": 213.74
+    }
+  },
+  "amd_mi350_best_4x_current_candidate": {
+    "artifact": "run_artifacts/torchtitan_query_recompute_stability_4x_s4096_gbs64_20260604.json",
+    "hardware": "4xMI350",
+    "shape": {
+      "model": "DeepSeek-V4-Flash 4-layer canary",
+      "precision": "bf16",
+      "sequence_length": 4096,
+      "micro_batch_size": 1,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 16,
+      "tokens_per_step": 262144,
+      "parallelism": "TP1_PP1_CP1_FSDP4_EP4"
+    },
+    "late_steps": [4, 5, 6],
+    "late_mean": {
+      "logged_tflops_per_gpu": 77.4,
+      "tokens_per_gpu_s": 4090.33,
+      "node_tokens_s": 16361.32,
+      "elapsed_time_per_step_s": 16.02,
+      "logged_node_tflops": 309.6
+    }
+  },
+  "amd_mi350_alternate_4x_explicit_sharedkv_candidate": {
+    "artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_noprofile_4x_s4096_gbs64_ep4_20260604.json",
+    "late_steps": [4, 5, 6],
+    "late_mean": {
+      "logged_tflops_per_gpu": 74.13,
+      "tokens_per_gpu_s": 3916.0,
+      "node_tokens_s": 15664.0,
+      "elapsed_time_per_step_s": 16.73,
+      "logged_node_tflops": 296.53
+    }
+  },
+  "amd_mi350_best_8x_current_sustained_candidate": {
+    "artifact": "run_artifacts/torchtitan_8x_step_burst_diagnosis_20260604.json",
+    "hardware": "8xMI350",
+    "shape": {
+      "sequence_length": 4096,
+      "micro_batch_size": 1,
+      "global_batch_size": 128,
+      "tokens_per_step": 524288,
+      "parallelism": "TP1_PP1_CP1_FSDP8_EP8"
+    },
+    "late_steps": [4, 5, 6],
+    "late_mean": {
+      "logged_tflops_per_gpu": 64.91,
+      "tokens_per_gpu_s": 3430.33,
+      "node_tokens_s": 27442.64,
+      "elapsed_time_per_step_s": 19.11,
+      "logged_node_tflops": 519.28
+    }
+  },
+  "normalized_comparison": {
+    "memory_equivalent_4xmi350_target": {
+      "target_tflops_per_gpu": 277.0,
+      "target_node_tokens_s": 58561.13,
+      "target_step_time_s": 4.48
+    },
+    "ascend_best_existing_vs_4xmi350_target": {
+      "node_tokens_s_ratio_to_target": 0.809,
+      "normalized_tflops_per_mi350_equiv_ratio_to_target": 0.809,
+      "remaining_speedup_to_target": 1.236
+    },
+    "amd_best_4x_vs_4xmi350_target": {
+      "node_tokens_s_ratio_to_target": 0.279,
+      "tflops_per_gpu_ratio_to_target": 0.279,
+      "remaining_speedup_to_target": 3.579
+    },
+    "ascend_best_existing_vs_amd_best_4x": {
+      "node_tokens_s_ratio": 2.897,
+      "normalized_tflops_per_mi350_equiv_ratio": 2.897,
+      "raw_logged_node_tflops_ratio": 3.82,
+      "raw_logged_node_tflops_ratio_is_not_primary": true
+    },
+    "ascend_longer_existing_vs_amd_best_4x": {
+      "node_tokens_s_ratio": 2.762,
+      "normalized_tflops_per_mi350_equiv_ratio": 2.762
+    },
+    "ascend_best_existing_vs_amd_best_8x": {
+      "node_tokens_s_ratio": 1.727,
+      "note": "This is not memory-equivalent because 8xMI350 has about twice the MI350 memory-equivalent capacity used for the 4x comparison."
+    }
+  },
+  "read": "On raw per-device log lines, Ascend and AMD look similar: about 70-74 TFLOPs per Ascend die versus 74-77 TFLOPs per MI350. That is misleading for the user's memory-equivalent comparison because the Ascend box has 16 compute dies. At the memory-equivalent node level, existing Ascend runs deliver about 45-47k tokens/s versus the best current 4xMI350 candidate at about 16.4k tokens/s. With the same AMD FLOPs/token accounting, Ascend maps to about 214-224 TFLOPs per MI350-equivalent, while AMD is about 77 TFLOPs/GPU. So current AMD is roughly 34-36% of the observed Ascend memory-equivalent throughput and needs about 2.8-2.9x to match these local Ascend runs, or about 3.6x to hit the active 277 TFLOPs/GPU target.",
+  "dependency_pin_changes": []
+}

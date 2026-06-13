@@ -1,0 +1,266 @@
+{
+  "artifact": "<stdin>",
+  "created_at": "2026-06-12T10:37:30",
+  "purpose": "Record the completed current-source selected-layout 8x MBS8 control launched after runtime-layout integration. This is not a promotion because it underperforms the retained hot-helper baseline and needs env/source mismatch analysis before use as a control.",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_runtime_layout_selected_control_8x_mbs8_steps20_20260612",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_runtime_layout_selected_control_8x_mbs8_steps20_20260612/docker-run.log",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "status": "pass_20_steps_not_promoted_suspicious_low_perf",
+  "windows": {
+    "steps_2_to_20": {
+      "steps": [
+        2,
+        20
+      ],
+      "tok_per_gpu_s_mean": 6306.6579,
+      "node_tok_s_mean": 50453.2632,
+      "tflops_per_gpu_mean": 312.2241,
+      "peak_logged_memory_gib": 275.21,
+      "loss_first_last": [
+        11.32667,
+        4.24247
+      ]
+    },
+    "steps_13_to_20": {
+      "steps": [
+        13,
+        20
+      ],
+      "tok_per_gpu_s_mean": 6342.2969,
+      "node_tok_s_mean": 50738.375,
+      "tflops_per_gpu_mean": 313.9895,
+      "peak_logged_memory_gib": 275.21,
+      "loss_first_last": [
+        4.81716,
+        4.24247
+      ]
+    },
+    "steps_4_to_6": {
+      "steps": [
+        4,
+        6
+      ],
+      "tok_per_gpu_s_mean": 6268.3333,
+      "node_tok_s_mean": 50146.6667,
+      "tflops_per_gpu_mean": 310.3304,
+      "peak_logged_memory_gib": 275.21,
+      "loss_first_last": [
+        15.53265,
+        11.34852
+      ]
+    }
+  },
+  "steps": {
+    "1": {
+      "rank_count": 8,
+      "loss": 16.00988,
+      "grad_norm": 14.875,
+      "tok_per_gpu_s_mean": 1947.25,
+      "tok_per_gpu_s_min": 1946.0,
+      "tok_per_gpu_s_max": 1949.0,
+      "tflops_per_gpu_mean": 96.4062,
+      "peak_logged_memory_gib": 231.98
+    },
+    "2": {
+      "rank_count": 8,
+      "loss": 11.32667,
+      "grad_norm": 35.5,
+      "tok_per_gpu_s_mean": 6129.0,
+      "tok_per_gpu_s_min": 6129.0,
+      "tok_per_gpu_s_max": 6129.0,
+      "tflops_per_gpu_mean": 303.4112,
+      "peak_logged_memory_gib": 272.0
+    },
+    "3": {
+      "rank_count": 8,
+      "loss": 16.41159,
+      "grad_norm": 54.75,
+      "tok_per_gpu_s_mean": 6152.0,
+      "tok_per_gpu_s_min": 6152.0,
+      "tok_per_gpu_s_max": 6152.0,
+      "tflops_per_gpu_mean": 304.56,
+      "peak_logged_memory_gib": 275.21
+    },
+    "4": {
+      "rank_count": 8,
+      "loss": 15.53265,
+      "grad_norm": 47.5,
+      "tok_per_gpu_s_mean": 6193.0,
+      "tok_per_gpu_s_min": 6193.0,
+      "tok_per_gpu_s_max": 6193.0,
+      "tflops_per_gpu_mean": 306.6125,
+      "peak_logged_memory_gib": 275.21
+    },
+    "5": {
+      "rank_count": 8,
+      "loss": 12.73992,
+      "grad_norm": 74.0,
+      "tok_per_gpu_s_mean": 6300.0,
+      "tok_per_gpu_s_min": 6300.0,
+      "tok_per_gpu_s_max": 6300.0,
+      "tflops_per_gpu_mean": 311.8713,
+      "peak_logged_memory_gib": 275.21
+    },
+    "6": {
+      "rank_count": 8,
+      "loss": 11.34852,
+      "grad_norm": 58.75,
+      "tok_per_gpu_s_mean": 6312.0,
+      "tok_per_gpu_s_min": 6312.0,
+      "tok_per_gpu_s_max": 6312.0,
+      "tflops_per_gpu_mean": 312.5075,
+      "peak_logged_memory_gib": 275.21
+    },
+    "7": {
+      "rank_count": 8,
+      "loss": 8.96097,
+      "grad_norm": 44.0,
+      "tok_per_gpu_s_mean": 6294.0,
+      "tok_per_gpu_s_min": 6294.0,
+      "tok_per_gpu_s_max": 6294.0,
+      "tflops_per_gpu_mean": 311.6075,
+      "peak_logged_memory_gib": 275.21
+    },
+    "8": {
+      "rank_count": 8,
+      "loss": 8.4526,
+      "grad_norm": 47.25,
+      "tok_per_gpu_s_mean": 6331.0,
+      "tok_per_gpu_s_min": 6331.0,
+      "tok_per_gpu_s_max": 6331.0,
+      "tflops_per_gpu_mean": 313.4212,
+      "peak_logged_memory_gib": 275.21
+    },
+    "9": {
+      "rank_count": 8,
+      "loss": 7.33095,
+      "grad_norm": 28.625,
+      "tok_per_gpu_s_mean": 6365.0,
+      "tok_per_gpu_s_min": 6365.0,
+      "tok_per_gpu_s_max": 6365.0,
+      "tflops_per_gpu_mean": 315.0987,
+      "peak_logged_memory_gib": 275.21
+    },
+    "10": {
+      "rank_count": 8,
+      "loss": 6.24994,
+      "grad_norm": 27.375,
+      "tok_per_gpu_s_mean": 6350.0,
+      "tok_per_gpu_s_min": 6350.0,
+      "tok_per_gpu_s_max": 6350.0,
+      "tflops_per_gpu_mean": 314.38,
+      "peak_logged_memory_gib": 275.21
+    },
+    "11": {
+      "rank_count": 8,
+      "loss": 5.3537,
+      "grad_norm": 25.875,
+      "tok_per_gpu_s_mean": 6327.0,
+      "tok_per_gpu_s_min": 6327.0,
+      "tok_per_gpu_s_max": 6327.0,
+      "tflops_per_gpu_mean": 313.225,
+      "peak_logged_memory_gib": 275.21
+    },
+    "12": {
+      "rank_count": 8,
+      "loss": 4.90164,
+      "grad_norm": 33.5,
+      "tok_per_gpu_s_mean": 6335.125,
+      "tok_per_gpu_s_min": 6335.0,
+      "tok_per_gpu_s_max": 6336.0,
+      "tflops_per_gpu_mean": 313.6475,
+      "peak_logged_memory_gib": 275.21
+    },
+    "13": {
+      "rank_count": 8,
+      "loss": 4.81716,
+      "grad_norm": 20.5,
+      "tok_per_gpu_s_mean": 6351.125,
+      "tok_per_gpu_s_min": 6351.0,
+      "tok_per_gpu_s_max": 6352.0,
+      "tflops_per_gpu_mean": 314.4362,
+      "peak_logged_memory_gib": 275.21
+    },
+    "14": {
+      "rank_count": 8,
+      "loss": 4.68021,
+      "grad_norm": 18.875,
+      "tok_per_gpu_s_mean": 6337.0,
+      "tok_per_gpu_s_min": 6337.0,
+      "tok_per_gpu_s_max": 6337.0,
+      "tflops_per_gpu_mean": 313.7237,
+      "peak_logged_memory_gib": 275.21
+    },
+    "15": {
+      "rank_count": 8,
+      "loss": 4.54603,
+      "grad_norm": 12.75,
+      "tok_per_gpu_s_mean": 6340.0,
+      "tok_per_gpu_s_min": 6340.0,
+      "tok_per_gpu_s_max": 6340.0,
+      "tflops_per_gpu_mean": 313.8575,
+      "peak_logged_memory_gib": 275.21
+    },
+    "16": {
+      "rank_count": 8,
+      "loss": 4.37492,
+      "grad_norm": 11.5,
+      "tok_per_gpu_s_mean": 6343.0,
+      "tok_per_gpu_s_min": 6343.0,
+      "tok_per_gpu_s_max": 6343.0,
+      "tflops_per_gpu_mean": 314.02,
+      "peak_logged_memory_gib": 275.21
+    },
+    "17": {
+      "rank_count": 8,
+      "loss": 4.31288,
+      "grad_norm": 10.4375,
+      "tok_per_gpu_s_mean": 6339.0,
+      "tok_per_gpu_s_min": 6339.0,
+      "tok_per_gpu_s_max": 6339.0,
+      "tflops_per_gpu_mean": 313.82,
+      "peak_logged_memory_gib": 275.21
+    },
+    "18": {
+      "rank_count": 8,
+      "loss": 4.27894,
+      "grad_norm": 7.4688,
+      "tok_per_gpu_s_mean": 6337.0,
+      "tok_per_gpu_s_min": 6337.0,
+      "tok_per_gpu_s_max": 6337.0,
+      "tflops_per_gpu_mean": 313.75,
+      "peak_logged_memory_gib": 275.21
+    },
+    "19": {
+      "rank_count": 8,
+      "loss": 4.2326,
+      "grad_norm": 6.0625,
+      "tok_per_gpu_s_mean": 6353.0,
+      "tok_per_gpu_s_min": 6353.0,
+      "tok_per_gpu_s_max": 6353.0,
+      "tflops_per_gpu_mean": 314.51,
+      "peak_logged_memory_gib": 275.21
+    },
+    "20": {
+      "rank_count": 8,
+      "loss": 4.24247,
+      "grad_norm": 5.5938,
+      "tok_per_gpu_s_mean": 6338.25,
+      "tok_per_gpu_s_min": 6338.0,
+      "tok_per_gpu_s_max": 6339.0,
+      "tflops_per_gpu_mean": 313.7988,
+      "peak_logged_memory_gib": 275.21
+    }
+  },
+  "read": "The run completed cleanly but steps 13-20 averaged about 6.30k tok/GPU/s versus the retained standard-EP hot-helper MBS8 late-window around 8.63k tok/GPU/s. Treat as current-source/default mismatch evidence, not a replacement baseline.",
+  "next_action": "Compare effective hot-helper env/source defaults, especially weight_order/layout and runtime-layout source_partition timing, before launching candidate needed/MORI rows."
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-03",
+  "question": "Does the two-level K128 query-major micro-partial producer become a speedup candidate at S4096 layer 2?",
+  "short_answer": "No. The K128 micro-partial runtime probe preserves the modeled write reduction, but the dense active-group by selected-K route-matrix producer is itself about 58 ms, far slower than the current 8.0-8.8 ms sparse-atomic wall. The next kernel must not use a dense active-group route matrix for microtile reduction.",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk_groups_per_token": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "new_tool": "tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py",
+  "artifacts": {
+    "s128_correctness": "run_artifacts/actual_li_micro_partial_store_s128_layer2_sc16_u64d16h64k32_20260603.json",
+    "s4096_k128": "run_artifacts/actual_li_micro_partial_store_s4096_layer2_sc32_u256d16h64k128_timing_20260603.json",
+    "s4096_k64": "run_artifacts/actual_li_micro_partial_store_s4096_layer2_sc32_u128d16h64k64_timing_20260603.json"
+  },
+  "results": {
+    "s128_k32_correctness": {
+      "passed": true,
+      "max_abs_diff": 0.08409309387207031,
+      "emit_only_median_ms": 0.11692199856042862,
+      "emit_plus_torch_index_add_median_ms": 0.16772200167179108,
+      "raw_to_micro_reduction_x": 14.0
+    },
+    "s4096_k128": {
+      "seq_chunk": 32,
+      "block_k": 128,
+      "block_u": 256,
+      "micro_rows": 246905,
+      "max_active_groups_per_microtile": 1015,
+      "raw_to_micro_reduction_x": 6.368246896579656,
+      "micro_partial_stream_mib_fp32": 482.236328125,
+      "emit_only_median_ms": 58.39822006225586,
+      "emit_plus_torch_index_add_median_ms": 58.890663146972656
+    },
+    "s4096_k64": {
+      "seq_chunk": 32,
+      "block_k": 64,
+      "block_u": 128,
+      "micro_rows": 458649,
+      "max_active_groups_per_microtile": 908,
+      "raw_to_micro_reduction_x": 3.428225069715621,
+      "micro_partial_stream_mib_fp32": 895.798828125,
+      "emit_only_median_ms": 106.8537368774414
+    },
+    "comparison": {
+      "current_dot_k_atomic_sparse_wall_ms": 8.006924390792847,
+      "old_dot_k_micro_combined_k128_ms": 57.238929748535156,
+      "target_gate_ms": "producer plus merge plus final reducer must beat 8.0-8.8 ms"
+    }
+  },
+  "interpretation": {
+    "what_worked": [
+      "The micro-partial script compiles and passes S128 parity against the PyTorch dKV reference.",
+      "The K128 metadata/write-reduction model is reproduced by the runtime probe: 805M raw scalar dKV elements shrink to 126M micro-partial elements."
+    ],
+    "what_failed": [
+      "At S4096 layer 2, K128 emit-only is 58.4 ms before any selected-tile merge or final reducer.",
+      "K64 is worse at 106.9 ms.",
+      "The final torch index_add adds only about 0.5 ms on top of K128 emit-only, so the wall is not final reduction. It is the dense active-group route-matrix producer."
+    ],
+    "root_cause": "Each S4096 layer-2 microtile still has hundreds to about one thousand active compressed groups. The Triton micro producer forms an active_group x selected_K route matrix and multiplies it into KxD contribution tiles, so it replaces global atomic pressure with much larger route-matrix compute.",
+    "decision": "Retire dense-route micro-partial producer as the next sparse-dKV runtime candidate."
+  },
+  "next_kernel_contract": {
+    "retain": [
+      "query-major selected-K dot producer",
+      "cheap prepacked route metadata",
+      "compact final reduce-by-key or segmented reducer as a separate small stage"
+    ],
+    "avoid": [
+      "dense active_group x selected_K route matrices",
+      "group-outermost contribution production",
+      "micro active-list dot routing with hundreds of active groups"
+    ],
+    "candidate": "query-major sparse-keyed segmented reduction: compute KxD contribution tiles once, then use a true sparse keyed local reducer over selected_groups before global writes, without expanding selected groups into a dense active-group route matrix."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py --seq-len 128 --layer-id 2 --seq-chunk 16 --block-k 32 --block-u 64 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_micro_partial_store_s128_layer2_sc16_u64d16h64k32_20260603.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --block-k 128 --block-u 256 --timed-iters 5 --skip-correctness --allow-large-materialization --summary-path /workspace/run_artifacts/actual_li_micro_partial_store_s4096_layer2_sc32_u256d16h64k128_timing_20260603.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_dkv_micro_partial_store.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --block-k 64 --block-u 128 --timed-iters 3 --skip-correctness --skip-final-reduce-timing --allow-large-materialization --summary-path /workspace/run_artifacts/actual_li_micro_partial_store_s4096_layer2_sc32_u128d16h64k64_timing_20260603.json --json'"
+  ],
+  "dependency_pin_changes": []
+}

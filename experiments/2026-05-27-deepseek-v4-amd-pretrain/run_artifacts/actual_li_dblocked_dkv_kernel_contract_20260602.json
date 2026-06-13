@@ -1,0 +1,112 @@
+{
+  "artifact": "actual_li_dblocked_dkv_kernel_contract",
+  "date": "2026-06-02",
+  "source_artifacts": {
+    "tile_coalescing_layer2": "run_artifacts/actual_li_tile_coalescing_s4096_layer2_20260602.json",
+    "tile_budget_layer2": "run_artifacts/actual_li_tile_budget_s4096_layer2_20260602.json",
+    "tile_coalescing_layer3": "run_artifacts/actual_li_tile_coalescing_s4096_layer3_20260602.json",
+    "tile_budget_layer3": "run_artifacts/actual_li_tile_budget_s4096_layer3_20260602.json"
+  },
+  "hard_case": {
+    "layer_id": 2,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "total_valid_pairs": 1572352,
+    "baseline_h64_atomic_add_elements": 805044224
+  },
+  "rejected_shapes": [
+    {
+      "shape": "small query-major-like coalescer",
+      "token_block": 4,
+      "selected_block": 128,
+      "reason": "Fits wider D blocks but only reduces layer-2 atomic traffic 1.43x, leaving about 565M H64 atomic elements."
+    },
+    {
+      "shape": "wide D block",
+      "token_block": 64,
+      "selected_block": 512,
+      "d_block": 32,
+      "reason": "Persistent accumulator plus row-state p99 is 162.62 KiB before score microtile scratch, already above the 128 KiB planning budget."
+    },
+    {
+      "shape": "score microtile selected_block=64",
+      "token_block": 64,
+      "selected_block": 512,
+      "d_block": 16,
+      "micro_token": 1,
+      "micro_selected": 64,
+      "reason": "Adding fp32 QK and grad-prob scratch pushes p99 combined scratch to 131.29 KiB, above the 128 KiB planning budget."
+    }
+  ],
+  "next_candidate": {
+    "description": "First executable streaming D-blocked MFMA compressed-dKV accumulator for actual dynamic LI routes.",
+    "token_block": 32,
+    "selected_block": 512,
+    "head_block": 64,
+    "d_block": 16,
+    "d_blocks_per_full_dim": 32,
+    "micro_token": 1,
+    "micro_selected": 64,
+    "route_atomic_reduction_x": 23.813051840857806,
+    "persistent_accumulator_row_state_p99_kib": 83.25890625,
+    "qk_gradprob_microtile_scratch_kib": 32.0,
+    "combined_p99_kib": 115.25890625,
+    "budget_kib": 128.0,
+    "dblock_tile_microsteps": 256,
+    "full_dim_tile_microsteps": 8192,
+    "layer_dblock_tiles": 4096,
+    "layer_microsteps": 1048576,
+    "coalesced_atomic_add_elements": 33806848,
+    "expected_dkv_write_contract": "Accumulate dKV by unique compressed group inside the tile and write each group/D-block once per tile, replacing per-token/per-selected global atomic adds.",
+    "important_caveat": "This is a schedule contract, not a performance result. It still needs an executable Triton/TileLang/CK kernel and parity against the current shared-KV backward. It is selected over the route-max tile because it keeps the selected-key loop at 256 microsteps per D-block tile while still cutting H64 dKV atomic traffic by about 23.8x."
+  },
+  "stretch_candidate": {
+    "description": "Route-max tile-local coalescing candidate with higher implementation pressure.",
+    "token_block": 64,
+    "selected_block": 512,
+    "head_block": 64,
+    "d_block": 16,
+    "d_blocks_per_full_dim": 32,
+    "micro_token": 1,
+    "micro_selected": 32,
+    "route_atomic_reduction_x": 47.254673318506946,
+    "persistent_accumulator_row_state_p99_kib": 99.2887890625,
+    "qk_gradprob_microtile_scratch_kib": 16.0,
+    "combined_p99_kib": 115.2887890625,
+    "budget_kib": 128.0,
+    "dblock_tile_microsteps": 1024,
+    "full_dim_tile_microsteps": 32768,
+    "layer_dblock_tiles": 2048,
+    "layer_microsteps": 2097152,
+    "coalesced_atomic_add_elements": 17036288,
+    "important_caveat": "This has the strongest write reduction but extreme loop pressure: 64 token rows times 16 selected-key microtiles per D-block tile. Treat it as a second-stage TileLang/CK target after proving the smaller pressure-balanced kernel."
+  },
+  "nearby_pressure_balanced_candidates": {
+    "token32_selected256_d16_micro64": {
+      "route_atomic_reduction_x": 12.338365924856399,
+      "dblock_tile_microsteps": 128,
+      "combined_p99_kib": 115.3870703125,
+      "coalesced_atomic_add_elements": 65247232
+    },
+    "token16_selected512_d16_micro64": {
+      "route_atomic_reduction_x": 11.952959063438367,
+      "dblock_tile_microsteps": 128,
+      "combined_p99_kib": 107.25625,
+      "coalesced_atomic_add_elements": 67351040
+    }
+  },
+  "layer3_easy_case": {
+    "layer_id": 3,
+    "topk": 32,
+    "compressed_groups": 32,
+    "best_wide_reduction_x": 62.03125,
+    "d_block128_p99_kib": 47.812578125,
+    "d_block128_micro_token1_selected32_combined_p99_kib": 63.812578125,
+    "read": "Layer 3 fits comfortably because the topology is all-valid over only 32 compressed groups."
+  },
+  "read": "The next sparse-attention backward experiment should not be another dense-route BMM, group-major recompute, materialized partial buffer, or small local atomic coalescer. The narrowed layer-2 path is a pressure-balanced streaming D16 compressed-dKV accumulator. The first executable candidate is token_block=32, selected_block=512, micro_selected=64: it cuts H64 dKV writes about 23.8x while keeping the selected-key microtile loop to 256 steps per D-block tile. The older token_block=64, selected_block=512 shape remains a stretch target with 47.25x write reduction but 1024 microsteps per D-block tile, or the implementation can go deeper and fuse LI/compressor backward to avoid writing compressed dKV in this form."
+}

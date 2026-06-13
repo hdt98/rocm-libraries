@@ -1,0 +1,54 @@
+{
+  "backend": "torch_custom",
+  "device": "cuda:0",
+  "env": {
+    "TORCHTITAN_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_BLOCK_M": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_BLOCK_N": null,
+    "TORCHTITAN_WEIGHTED_SCATTER_NUM_WARPS": null
+  },
+  "kind": "standard_ep_weighted_scatter_probe",
+  "parity": {
+    "finite": true,
+    "out_max_abs_diff": 0.0,
+    "score_grad_max_abs_diff": 0.0,
+    "src_grad_max_abs_diff": 0.0
+  },
+  "shape": {
+    "hidden": 7168,
+    "rows": 131072,
+    "score_dtype": "float32",
+    "src_dtype": "bfloat16",
+    "tokens": 16384
+  },
+  "timing": {
+    "forward": {
+      "torch": {
+        "max_ms": 6.795033931732178,
+        "mean_ms": 6.7482373237609865,
+        "median_ms": 6.744032859802246,
+        "min_ms": 6.698916912078857
+      },
+      "torch_custom": {
+        "max_ms": 6.793357849121094,
+        "mean_ms": 6.7440694808959964,
+        "median_ms": 6.744751930236816,
+        "min_ms": 6.690555095672607
+      }
+    },
+    "forward_backward": {
+      "torch": {
+        "max_ms": 13.118057250976562,
+        "mean_ms": 13.078647232055664,
+        "median_ms": 13.07629680633545,
+        "min_ms": 13.021536827087402
+      },
+      "torch_custom": {
+        "max_ms": 15.004454612731934,
+        "mean_ms": 14.956445550918579,
+        "median_ms": 14.964245796203613,
+        "min_ms": 14.882564544677734
+      }
+    }
+  }
+}

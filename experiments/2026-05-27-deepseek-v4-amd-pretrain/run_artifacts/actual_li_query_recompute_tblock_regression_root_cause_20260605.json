@@ -1,0 +1,68 @@
+{
+  "artifact": "actual_li_query_recompute_tblock_regression_root_cause",
+  "date": "2026-06-05",
+  "scope": "Explain why BLOCK_T=4/8 dKV-only Triton latency rises even though final dKV atomic pressure falls",
+  "source": {
+    "file": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py",
+    "token2_kernel_lines": "47-753",
+    "token4_kernel_lines": "754-1286",
+    "token8_kernel_lines": "1287-2340"
+  },
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128
+  },
+  "measured_latency_ms": {
+    "matched_single_token_no_dkv": 1.990291953086853,
+    "matched_single_token_full_boundary": 11.076744079589844,
+    "token2": {
+      "dkv_only_sink": 3.0649380683898926,
+      "dkv_only_full": 10.71346664428711,
+      "final_global_accum": 7.648528575897217,
+      "split_total_with_single_token_no_dkv": 12.703758597373962,
+      "route_atomic_reduction_x": 1.0709589884563935,
+      "pairwise_route_matrices": 1
+    },
+    "token4": {
+      "dkv_only_sink": 6.435856819152832,
+      "dkv_only_full": 11.556740760803223,
+      "final_global_accum": 5.120883941650391,
+      "split_total_with_single_token_no_dkv": 13.547032713890076,
+      "route_atomic_reduction_x": 1.2078495718932107,
+      "pairwise_route_matrices": 6
+    },
+    "token8": {
+      "dkv_only_sink": 16.274831771850586,
+      "dkv_only_full": 19.40089988708496,
+      "final_global_accum": 3.126068115234375,
+      "split_total_with_single_token_no_dkv": 21.391191840171814,
+      "route_atomic_reduction_x": 1.4862027702213492,
+      "pairwise_route_matrices": 28
+    }
+  },
+  "root_cause": {
+    "short_read": "The wider token-block prototype keeps the same external token/query-major contract, but not the same inner cost. It unrolls separate score/prob/dKV state per token, reloads q/grad_output/kv/index metadata per token, and adds dense pairwise selected-route equality matrices inside every selected window. That O(T^2 * block_n^2) epilogue/sink work grows faster than the saved final atomics.",
+    "specific_added_work": [
+      "T4/T8 load grad_output/output/q/kv/indices separately for every token lane instead of getting free reuse from one token-major loop.",
+      "T4 creates route01, route02, route03, route12, route13, and route23, each a block_n by block_n equality matrix.",
+      "T8 creates 28 pairwise route matrices: route01 through route67, then converts each to BF16 and applies dot-based folding.",
+      "Each selected window then computes dkv0..dkvT and folds later-token dKV through those pairwise route matrices before the final atomic writes.",
+      "This fold is counted in dkv_only_sink, so it remains even when final global atomics are disabled."
+    ],
+    "why_final_atomic_pressure_falls": "Later tokens whose selected compressed group already appears in an earlier token can skip or fold final atomic writes. This reduced the measured final global accumulation from 7.65 ms at T2 to 5.12 ms at T4 and 3.13 ms at T8.",
+    "why_total_latency_rises": "The local fold/reducer work grew from 3.06 ms at T2 to 6.44 ms at T4 and 16.27 ms at T8. The final atomic saving is smaller than this new local producer/sink cost."
+  },
+  "decision": {
+    "status": "reject_current_T4_T8_epilogue",
+    "read": "The problem is not that multiple tokens are conceptually bad. The problem is this implementation uses dense pairwise route equality and dot folding inside one Triton CTA. To make multi-token local reduction viable, the epilogue must use a sparse grouped/segmented local reducer keyed by the forward group sidecar, not pairwise N64xN64 route matrices between every token pair.",
+    "next": "Keep the fast single-token dQ/no-dKV path. For dKV, either keep T small and use a sparse group-keyed reducer, or move to a lower-level HIP/CK persistent/cooperative kernel that owns a compact group table without O(T^2) pairwise route matrices."
+  }
+}

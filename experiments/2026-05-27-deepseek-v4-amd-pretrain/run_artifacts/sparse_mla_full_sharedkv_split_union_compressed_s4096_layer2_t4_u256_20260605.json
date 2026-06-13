@@ -1,0 +1,251 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "checked": false,
+    "dkv_atol": 1.0,
+    "passed": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": false,
+    "compressed_union_dkv_only_full_ms": 7.468911170959473,
+    "full_dq_no_dkv_ms": 4.121997833251953,
+    "full_split_boundary_ms": 13.316407203674316,
+    "full_split_vs_retained_speedup_x": 0.8361639764911717,
+    "local_dkv_only_full_ms": 2.093179941177368,
+    "retained_sparse_attention_backward_gate_ms": 11.1347
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "contract": "dQ/no-dKV uses full local+compressed indices; local dKV uses the old selected-slot query-major path; compressed dKV uses the token4 compressed-group union path.",
+    "route_model_selected_block": 512,
+    "token_block": 4
+  },
+  "read": "This is the first materialization check for the compressed-only union split against the actual full shared-KV attention index contract. It is still a multi-launch diagnostic path and includes an extra local+compressed dKV tensor add, so it is not a final production fused owner.",
+  "route_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "scope": "sparse_mla_actual_full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "selected_keys_full": 640,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_compressed_pairs": 1572352,
+    "window": 128
+  },
+  "status": "not_checked",
+  "timing": {
+    "compressed_union_dkv_only_full": {
+      "checksum_norm": 463.215087890625,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.523672103881836,
+        "mean_ms": 7.471579415457589,
+        "median_ms": 7.468911170959473,
+        "min_ms": 7.416390895843506,
+        "samples_ms": [
+          7.5207109451293945,
+          7.523672103881836,
+          7.447269916534424,
+          7.475790977478027,
+          7.448309898376465,
+          7.468911170959473,
+          7.416390895843506
+        ],
+        "stdev_ms": 0.03943477111803119
+      },
+      "label": "full_sharedkv_compressed_union_dkv_only_full",
+      "peak_memory_allocated_bytes": 1719891968,
+      "peak_memory_allocated_gib": 1.6017742156982422,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.606857921928167,
+        "mean_ms": 7.498595930103745,
+        "median_ms": 7.4847780633717775,
+        "min_ms": 7.431476842612028,
+        "samples_ms": [
+          7.606857921928167,
+          7.542175939306617,
+          7.466257782652974,
+          7.494268007576466,
+          7.464356953278184,
+          7.4847780633717775,
+          7.431476842612028
+        ],
+        "stdev_ms": 0.05852716698347312
+      }
+    },
+    "full_dq_no_dkv": {
+      "checksum_norm": 541.3256225585938,
+      "event": {
+        "enabled": true,
+        "max_ms": 4.544122219085693,
+        "mean_ms": 4.167376109531948,
+        "median_ms": 4.121997833251953,
+        "min_ms": 3.9459969997406006,
+        "samples_ms": [
+          4.143478870391846,
+          4.544122219085693,
+          4.358720779418945,
+          4.121997833251953,
+          4.06735897064209,
+          3.989957094192505,
+          3.9459969997406006
+        ],
+        "stdev_ms": 0.21278718832143445
+      },
+      "label": "full_sharedkv_selected_dq_no_dkv",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.6287160366773605,
+        "mean_ms": 4.206937272101641,
+        "median_ms": 4.1380468755960464,
+        "min_ms": 3.965137992054224,
+        "samples_ms": [
+          4.233818035572767,
+          4.6287160366773605,
+          4.37712692655623,
+          4.1380468755960464,
+          4.087236942723393,
+          4.018478095531464,
+          3.965137992054224
+        ],
+        "stdev_ms": 0.2311717358819703
+      }
+    },
+    "full_split_boundary": {
+      "checksum_norm": 1288.9986572265625,
+      "event": {
+        "enabled": true,
+        "max_ms": 13.48940658569336,
+        "mean_ms": 13.327377455575126,
+        "median_ms": 13.316407203674316,
+        "min_ms": 13.231405258178711,
+        "samples_ms": [
+          13.48940658569336,
+          13.316407203674316,
+          13.266566276550293,
+          13.324405670166016,
+          13.372526168823242,
+          13.231405258178711,
+          13.290925025939941
+        ],
+        "stdev_ms": 0.08431929894149567
+      },
+      "label": "full_sharedkv_split_dq_local_dkv_union_compressed_dkv",
+      "peak_memory_allocated_bytes": 2804117504,
+      "peak_memory_allocated_gib": 2.6115379333496094,
+      "wall": {
+        "enabled": true,
+        "max_ms": 13.514660065993667,
+        "mean_ms": 13.354317251858967,
+        "median_ms": 13.337519951164722,
+        "min_ms": 13.252009870484471,
+        "samples_ms": [
+          13.514660065993667,
+          13.337519951164722,
+          13.287320034578443,
+          13.345120940357447,
+          13.433380052447319,
+          13.252009870484471,
+          13.310209847986698
+        ],
+        "stdev_ms": 0.0905799429792508
+      }
+    },
+    "local_dkv_only_full": {
+      "checksum_norm": 586.8958740234375,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.1232590675354004,
+        "mean_ms": 2.086716720036098,
+        "median_ms": 2.093179941177368,
+        "min_ms": 2.0380990505218506,
+        "samples_ms": [
+          2.1232590675354004,
+          2.093179941177368,
+          2.103060007095337,
+          2.0658199787139893,
+          2.0380990505218506,
+          2.0818190574645996,
+          2.1017799377441406
+        ],
+        "stdev_ms": 0.027974567716187244
+      },
+      "label": "full_sharedkv_local_window_dkv_only_full",
+      "peak_memory_allocated_bytes": 2256762368,
+      "peak_memory_allocated_gib": 2.101773738861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.2086130920797586,
+        "mean_ms": 2.112344971724919,
+        "median_ms": 2.110533881932497,
+        "min_ms": 2.053444040939212,
+        "samples_ms": [
+          2.2086130920797586,
+          2.110533881932497,
+          2.1190939005464315,
+          2.080983016639948,
+          2.053444040939212,
+          2.0967540331184864,
+          2.116992836818099
+        ],
+        "stdev_ms": 0.04836312468168338
+      }
+    }
+  },
+  "union_route_stats": {
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "max_members_per_group": 4,
+    "members_per_group_hist": {
+      "1": 48504,
+      "2": 107203,
+      "3": 130890,
+      "4": 229193
+    },
+    "nonempty_union_memberships": 515790,
+    "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness.",
+    "workspace_bytes": 31883264,
+    "workspace_mib": 30.40625
+  }
+}

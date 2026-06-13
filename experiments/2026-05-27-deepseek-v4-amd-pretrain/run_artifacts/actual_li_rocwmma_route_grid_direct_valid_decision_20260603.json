@@ -1,0 +1,63 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_direct_valid_decision",
+  "created_at": "2026-06-03",
+  "scope": "compressed sparse MLA backward dKV ScatterAdd split probe",
+  "shape_under_test": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "token_block": 32,
+    "selected_block": 512,
+    "device": "AMD Instinct MI350X VF"
+  },
+  "source_artifacts": {
+    "s128_correctness": "run_artifacts/actual_li_rocwmma_route_grid_direct_valid_s128_layer2_t32k32_20260603.json",
+    "s512_correctness": "run_artifacts/actual_li_rocwmma_route_grid_direct_valid_s512_layer2_t32k128_20260603.json",
+    "s4096_timing": "run_artifacts/actual_li_rocwmma_route_grid_direct_valid_s4096_layer2_t32k512_timing_20260603.json"
+  },
+  "implementation": {
+    "new_kernel": "compressed_dkv_route_grid_grouped_direct_valid_bf16",
+    "read": "This branch keeps the rocWMMA route-grid contribution body, carries an explicit uint8 valid mask, and avoids the known invalid-lane group-0 collision that made grouped_direct_unique incorrect on actual LightningIndexer routes."
+  },
+  "correctness": {
+    "s128_status": "passed",
+    "s128_grouped_direct_valid_max_abs_diff_vs_reference": 0.000019073486328125,
+    "s512_status": "passed",
+    "s512_grouped_direct_valid_max_abs_diff_vs_reference": 0.000041961669921875,
+    "s4096_reference": "skipped_large_materialization",
+    "s4096_raw_vs_grouped_direct_valid_max_abs_diff": 0.0001220703125
+  },
+  "timing_ms": {
+    "s128": {
+      "raw_atomic": 0.22452299296855927,
+      "grouped_atomic": 0.13068099319934845,
+      "grouped_direct_valid": 0.13932199776172638
+    },
+    "s512": {
+      "raw_atomic": 2.7048909664154053,
+      "grouped_atomic": 0.5875219702720642,
+      "grouped_direct_valid": 0.6568030118942261
+    },
+    "s4096": {
+      "contrib_sink": 8.982365608215332,
+      "raw_atomic": 46.49620056152344,
+      "grouped_atomic": 21.015947341918945,
+      "grouped_direct_valid": 21.22722816467285
+    }
+  },
+  "derived": {
+    "s4096_grouped_atomic_vs_raw_speedup_x": 2.212424679461436,
+    "s4096_grouped_direct_valid_vs_raw_speedup_x": 2.1904037682557234,
+    "s4096_grouped_direct_valid_vs_grouped_atomic_speedup_x": 0.990046706940969,
+    "s4096_modeled_write_reduction_x": 23.813051840857806,
+    "s4096_raw_minus_contrib_sink_ms": 37.513834953308105
+  },
+  "decision": {
+    "status": "measured_rejected_for_latency",
+    "read": "The detached/direct-valid ScatterAdd branch fixes the invalid-lane correctness issue but does not reduce target-shape latency. It is slightly slower than grouped_atomic at S128, S512, and S4096. The remaining wall is not the lack of a separate ScatterAdd kernel by itself; it is the route-grid grouped accumulation schedule, where contribution math is about 9 ms but the coalesced write path still costs about 21 ms. The next viable sparse-attention backward branch is a sparse segmented MFMA accumulator that computes contributions once and performs tile-local grouped or segmented reduction before global writes, without dense route-table scans or materialized [S,K,H] diagnostics."
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "artifact": "compact_reduce_vs_contig_wgrad_lhs_decision_20260531",
+  "created_utc": "2026-05-31T07:39:07Z",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "device": "cuda"
+  },
+  "candidate_a": {
+    "label": "compact_reduce",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "probe_artifact": "run_artifacts/dynamic_moe_bridge_ops_compact_reduce_gpu_s2048_20260531.json",
+    "full_layer_artifact": "run_artifacts/paired_compact_reduce_full_layer_s2048_20260531.json"
+  },
+  "candidate_b": {
+    "label": "contig_wgrad_lhs",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-contig-wgrad-lhs-dense-wgrad",
+    "probe_artifact": "run_artifacts/dynamic_moe_bridge_ops_contig_wgrad_lhs_gpu_s2048_20260531.json",
+    "full_layer_artifact": "run_artifacts/paired_contig_wgrad_lhs_full_layer_s2048_20260531.json"
+  },
+  "isolated_probe": {
+    "compact_reduce_train_total_isolated_ms": 39.369891898706555,
+    "contig_wgrad_lhs_train_total_isolated_ms": 38.88457990810275,
+    "contig_minus_compact_ms": -0.4853119906038046,
+    "compact_reduce_backward_total_isolated_ms": 28.133224934339523,
+    "contig_wgrad_lhs_backward_total_isolated_ms": 27.75222586095333,
+    "compact_reduce_check_ok": true,
+    "contig_wgrad_lhs_check_ok": true,
+    "read": "Contig materialization is numerically valid and slightly better in isolated median sums, but the advantage is sub-millisecond and does not survive full-layer measurement."
+  },
+  "paired_full_layer": {
+    "compact_reduce": {
+      "avg_ms": 52.328626019880176,
+      "min_ms": 52.19650699291378,
+      "tokens_per_s": 39137.2783077076,
+      "estimated_tflops": 186.05789468695653
+    },
+    "contig_wgrad_lhs": {
+      "avg_ms": 52.93733838479966,
+      "min_ms": 52.594388951547444,
+      "tokens_per_s": 38687.24916075606,
+      "estimated_tflops": 183.91846447488987
+    },
+    "contig_minus_compact_avg_ms": 0.6087123649194837,
+    "contig_minus_compact_min_ms": 0.39788195863366127
+  },
+  "decision": {
+    "promote": "compact_reduce",
+    "demote": "contig_wgrad_lhs",
+    "reason": "The contig-wgrad-LHS wrapper is a correct control but is slower in paired full-layer S2048 timing. Keep the default compact-reduce path while designing a fused compact grouped MoE training kernel."
+  },
+  "next_kernel_contract": {
+    "must_attack": [
+      "moe.routed.dgrad",
+      "moe.routed.wgrad"
+    ],
+    "baseline_profile": "run_artifacts/rocprof_retained_compact_reduce_s2048_blocks_goal_cont_20260531.json",
+    "baseline_profile_read": {
+      "routed_dgrad_kernel_ms": 27.40845,
+      "routed_wgrad_kernel_ms": 27.230685,
+      "attention_dgrad_kernel_ms": 6.865833,
+      "attention_wgrad_kernel_ms": 7.153354
+    },
+    "avoid": [
+      "Do not materialize extra contiguous wgrad LHS tensors unless the fused kernel consumes them without separate copy overhead.",
+      "Do not replace padded BMM with AITER grouped GEMM unless it beats compact-reduce in full-layer timing.",
+      "Do not promote compact-save-bwd; it is correct but regressed to 64.69493699260056 ms at S2048."
+    ]
+  },
+  "commands": [
+    "env RUN_TAG=contig_wgrad_lhs_probe_gpu_20260531 PROBE_VARIANT=compact-reduce-contig-wgrad-lhs bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-ops-2048",
+    "env RUN_TAG=compact_reduce_probe_gpu_compare_20260531 PROBE_VARIANT=compact-reduce bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-ops-2048",
+    "env RUN_TAG=paired_compact_reduce_s2048_20260531 MOE_IMPL=grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-2048",
+    "env RUN_TAG=paired_contig_wgrad_lhs_s2048_20260531 MOE_IMPL=grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-contig-wgrad-lhs-dense-wgrad bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-2048"
+  ],
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,50 @@
+{
+  "deferred_forward_loss": 0.0,
+  "deferred_grad_norms": {
+    "weights_proj.weight": 0.0034207862336188555,
+    "wk.weight": 0.0043421778827905655,
+    "wq.weight": 0.003732160897925496
+  },
+  "device": "cuda",
+  "direct_grad_norms": {
+    "weights_proj.weight": 0.0034207862336188555,
+    "wk.weight": 0.004341232590377331,
+    "wq.weight": 0.003732160897925496
+  },
+  "direct_loss": 0.012561112642288208,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {
+    "weights_proj.weight": 0.0,
+    "wk.weight": 3.814697265625e-06,
+    "wq.weight": 0.0
+  },
+  "index_scores_second_shape": [
+    1,
+    128,
+    32
+  ],
+  "index_scores_shape": [
+    1,
+    128,
+    32
+  ],
+  "max_grad_diff": 3.814697265625e-06,
+  "read": "The deferred path intentionally returns a zero scalar in forward, then recomputes the selected sparse LI KL objective in backward and matches the direct oracle parameter gradients.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 64,
+    "groups": 32,
+    "head_dim": 8,
+    "main_head_dim": 8,
+    "main_heads": 4,
+    "n_heads": 4,
+    "q_lora_rank": 32,
+    "seq_len": 128,
+    "topk": 4
+  },
+  "status": "passed",
+  "top_indices_equal": true
+}

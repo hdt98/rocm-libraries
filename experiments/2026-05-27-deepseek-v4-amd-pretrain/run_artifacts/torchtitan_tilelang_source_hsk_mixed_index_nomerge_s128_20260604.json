@@ -1,0 +1,155 @@
+{
+  "backend_path": "/workspace/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "candidate_mode": "tilelang_source_hsk_dkv",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": null,
+    "tilelang_block_k": null,
+    "tilelang_dkv_backend": null,
+    "tilelang_group_panel_size": null,
+    "tilelang_panel_capacity": null,
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "TileLang compressed-dKV backend is selected by TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND: group_filter, selected_limit_hsk_source, selected_limit_source, or selected_limit_packed.",
+    "explicit_tilelang_dkv still materializes selected-KV/probs/grad_logits before the TileLang compressed-dKV slice; tilelang_source_hsk_dkv moves probability/scaled-dP/dQ recompute into TileLang and feeds selected-limit dKV from BF16 HSK tensors."
+  ],
+  "parity": {
+    "dkv_compressed_candidate_max_abs": 6.3125,
+    "dkv_compressed_max_abs": 0.03125,
+    "dkv_compressed_mean_abs": 0.001895182766020298,
+    "dkv_compressed_ref_max_abs": 6.3125,
+    "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+    "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": 2.4326127459062263e-05,
+    "dkv_local_max_abs": 0.015625,
+    "dkv_max_abs": 0.03125,
+    "dkv_mean_abs": 0.0012639048509299755,
+    "dq_max_abs": 0.0078125,
+    "dsink_max_abs": 0.0,
+    "enabled": true,
+    "tilelang_bf16_ref_vs_explicit_ref_max_abs": 0.03125,
+    "tilelang_bf16_ref_vs_explicit_ref_mean_abs": 0.0018934442196041346
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 128,
+    "dim": 512,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 16,
+    "selected": 144,
+    "seq_len": 128
+  },
+  "source_hsk_export_check": {
+    "checksums": {
+      "grad_logits_scaled_hsk": -0.017211437225341797,
+      "grad_logits_scaled_ref_bf16": -0.016135290265083313,
+      "probs_hsk": 8157.08935546875,
+      "probs_ref_bf16": 8157.08984375
+    },
+    "compressed": {
+      "grad_logits_scaled_max_abs": 0.0009765625,
+      "probs_max_abs": 0.000244140625
+    },
+    "dq_max_abs": 0.0078125,
+    "dq_mean_abs": 0.00016798512660898268,
+    "enabled": true,
+    "grad_logits_scaled_max_abs": 0.0009765625,
+    "grad_logits_scaled_mean_abs": 2.629848117052802e-09,
+    "local": {
+      "grad_logits_scaled_max_abs": 0.000244140625,
+      "probs_max_abs": 6.103515625e-05
+    },
+    "local_count": 16,
+    "max_locations": {
+      "grad_logits_scaled": {
+        "candidate": 0.1904296875,
+        "head": 45,
+        "kv_index": 155,
+        "ref_bf16": 0.19140625,
+        "ref_fp32": 0.1909179985523224,
+        "score_diagnostic": {
+          "candidate_grad_logits_scaled": 0.1904296875,
+          "candidate_prob": 0.055419921875,
+          "closest_full_kv_index_by_score": 155,
+          "closest_full_kv_score": 2.5227458477020264,
+          "closest_selected_slot_by_grad_prob": 70,
+          "closest_selected_slot_by_score": 70,
+          "closest_selected_slot_grad_prob": 85.51019287109375,
+          "closest_selected_slot_kv_index": 155,
+          "closest_selected_slot_prob_ref": 0.05534474179148674,
+          "closest_selected_slot_score": 2.5227456092834473,
+          "delta": 7.454339981079102,
+          "inferred_grad_prob_from_candidate": 85.20493583313295,
+          "inferred_score_from_candidate_prob": 2.524103082176854,
+          "lse": 5.416919231414795,
+          "ref_grad_prob_for_requested_slot": 85.51019287109375,
+          "ref_score_for_requested_slot": 2.5227456092834473,
+          "requested_score_abs_diff": 0.0013574728934067082
+        },
+        "selected": 70,
+        "seq": 35,
+        "valid": true
+      },
+      "probs": {
+        "candidate": 0.04052734375,
+        "head": 28,
+        "kv_index": 235,
+        "ref_bf16": 0.040771484375,
+        "ref_fp32": 0.0406494215130806,
+        "score_diagnostic": {
+          "candidate_grad_logits_scaled": 0.024169921875,
+          "candidate_prob": 0.04052734375,
+          "closest_full_kv_index_by_score": 235,
+          "closest_full_kv_score": 2.254338502883911,
+          "closest_selected_slot_by_grad_prob": 79,
+          "closest_selected_slot_by_score": 79,
+          "closest_selected_slot_grad_prob": 15.187699317932129,
+          "closest_selected_slot_kv_index": 235,
+          "closest_selected_slot_prob_ref": 0.0406494215130806,
+          "closest_selected_slot_score": 2.2543387413024902,
+          "delta": 1.723921775817871,
+          "inferred_grad_prob_from_candidate": 15.218586130028608,
+          "inferred_score_from_candidate_prob": 2.2513310729311447,
+          "lse": 5.457109451293945,
+          "ref_grad_prob_for_requested_slot": 15.187699317932129,
+          "ref_score_for_requested_slot": 2.2543387413024902,
+          "requested_score_abs_diff": 0.0030076683713455843
+        },
+        "selected": 79,
+        "seq": 33,
+        "valid": true
+      }
+    },
+    "probs_max_abs": 0.000244140625,
+    "probs_mean_abs": 1.6718534334714263e-09,
+    "selected": 144
+  },
+  "timing": {
+    "explicit_pytorch": {
+      "median_ms": 1.4310959577560425,
+      "times_ms": [
+        1.4310959577560425
+      ],
+      "wall_median_ms": 1.4658209402114153,
+      "wall_times_ms": [
+        1.4658209402114153
+      ]
+    },
+    "tilelang_source_hsk_dkv": {
+      "median_ms": 5.401988983154297,
+      "times_ms": [
+        5.401988983154297
+      ],
+      "wall_median_ms": 5.435992032289505,
+      "wall_times_ms": [
+        5.435992032289505
+      ]
+    }
+  }
+}

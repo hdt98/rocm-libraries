@@ -1,0 +1,144 @@
+{
+  "artifact": "owned_expert_vjp_ep4_ep8_latency_breakdown",
+  "created": "2026-06-02",
+  "scope": "MORI routed-backward local owner-rank MoE VJP at DeepSeek-V4 Flash S4096 EP4/EP8 shapes",
+  "source_artifacts": {
+    "ep4_detail": "run_artifacts/owned_expert_vjp_ep4_triton_swiglu_saved_detail_refresh_20260602.json",
+    "ep4_saved_refresh": "run_artifacts/owned_expert_vjp_ep4_saved_activation_refresh_20260602.json",
+    "ep8_detail": "run_artifacts/owned_expert_vjp_ep8_triton_swiglu_saved_detail_refresh_20260602.json",
+    "ep8_saved_refresh": "run_artifacts/owned_expert_vjp_ep8_saved_activation_refresh_20260602.json",
+    "ep8_older_detail": "run_artifacts/owned_expert_vjp_ep8_triton_swiglu_detail_20260602.json"
+  },
+  "method": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "probe": "/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_owned_expert_vjp_ep_shape.py",
+    "command_shape": "docker run ... --entrypoint python ... probe_owned_expert_vjp_ep_shape.py --tokens-per-rank 4096 --world-size {4,8} --hidden 4096 --intermediate 2048 --experts 256 --topk 6 --backend torch --triton-swiglu --saved-activation --detail --check --warmup 2 --iters 5 --summary-path <artifact>",
+    "timing_read": "CUDA-event timer slices for the owner-rank local VJP. Slices are useful for attribution but are not strictly additive because components are timed separately and may reuse/cache intermediate state differently from the fused call.",
+    "parity": "All Triton-SwiGLU recompute and saved-activation variants passed dx, dw1, dw2, dw3, and dtopk checks against the padded torch reference."
+  },
+  "ep4_owner_rank": {
+    "shape": {
+      "tokens_per_rank": 4096,
+      "world_size": 4,
+      "source_tokens_all_ranks": 16384,
+      "local_experts": 64,
+      "hidden": 4096,
+      "intermediate": 2048,
+      "topk": 6,
+      "dtype": "bfloat16"
+    },
+    "route_stats": {
+      "assignments_to_owner_rank": 24508,
+      "mean_rows_per_local_expert": 382.9375,
+      "min_rows_per_local_expert": 319,
+      "max_rows_per_local_expert": 440,
+      "padding_multiplier_local_max": 1.1490125673249552
+    },
+    "triton_swiglu_recompute_timing_ms_median": {
+      "full_local_vjp": 7.089828968048096,
+      "forward_recompute": 2.6663060188293457,
+      "wgrad": 2.3701019287109375,
+      "xgrad_plus_reduce": 1.6680959463119507,
+      "dgrad_plus_backward_swiglu": 0.7324470281600952
+    },
+    "component_share_vs_full_local_vjp_pct": {
+      "forward_recompute": 37.61,
+      "wgrad": 33.43,
+      "xgrad_plus_reduce": 23.53,
+      "dgrad_plus_backward_swiglu": 10.33
+    },
+    "detail_timing_ms_median": {
+      "forward_swiglu_only": 0.11312100291252136,
+      "backward_swiglu_only": 0.14284199476242065,
+      "forward_dtopk_only": 0.5836459994316101,
+      "xgrad_reduce_only": 0.5879650115966797
+    },
+    "saved_activation_timing_ms_median": {
+      "recompute": 7.089828968048096,
+      "save_stage1_hidden_only": 7.036800861358643,
+      "save_stage1_hidden_plus_output": 6.360235214233398,
+      "save_gate_up_hidden": 5.826148986816406,
+      "save_gate_up_hidden_plus_output": 5.2110209465026855
+    },
+    "saved_activation_delta_vs_recompute_ms": {
+      "save_stage1_hidden_only": 0.053028106689453125,
+      "save_stage1_hidden_plus_output": 0.7295937538146973,
+      "save_gate_up_hidden": 1.2636799812316895,
+      "save_gate_up_hidden_plus_output": 1.8788080215454102
+    },
+    "saved_activation_memory_gib": {
+      "save_stage1_hidden_only": 0.107421875,
+      "save_stage1_hidden_plus_output": 0.294403076171875,
+      "save_gate_up_hidden": 0.322265625,
+      "save_gate_up_hidden_plus_output": 0.509246826171875
+    }
+  },
+  "ep8_owner_rank": {
+    "shape": {
+      "tokens_per_rank": 4096,
+      "world_size": 8,
+      "source_tokens_all_ranks": 32768,
+      "local_experts": 32,
+      "hidden": 4096,
+      "intermediate": 2048,
+      "topk": 6,
+      "dtype": "bfloat16"
+    },
+    "route_stats": {
+      "assignments_to_owner_rank": 24695,
+      "mean_rows_per_local_expert": 771.71875,
+      "min_rows_per_local_expert": 708,
+      "max_rows_per_local_expert": 816,
+      "padding_multiplier_local_max": 1.0573800364446244
+    },
+    "triton_swiglu_recompute_timing_ms_median": {
+      "full_local_vjp": 6.691718101501465,
+      "forward_recompute": 2.4947080612182617,
+      "wgrad": 2.385387897491455,
+      "xgrad_plus_reduce": 1.6490989923477173,
+      "dgrad_plus_backward_swiglu": 0.7165279984474182
+    },
+    "component_share_vs_full_local_vjp_pct": {
+      "forward_recompute": 37.28,
+      "wgrad": 35.65,
+      "xgrad_plus_reduce": 24.64,
+      "dgrad_plus_backward_swiglu": 10.71
+    },
+    "detail_timing_ms_median": {
+      "forward_swiglu_only": 0.10172100365161896,
+      "backward_swiglu_only": 0.13776199519634247,
+      "forward_dtopk_only": 0.5857669711112976,
+      "xgrad_reduce_only": 0.6140069961547852
+    },
+    "saved_activation_timing_ms_median": {
+      "recompute": 6.691718101501465,
+      "save_stage1_hidden_only": 6.537156105041504,
+      "save_stage1_hidden_plus_output": 6.006190776824951,
+      "save_gate_up_hidden": 5.51730489730835,
+      "save_gate_up_hidden_plus_output": 5.114698886871338
+    },
+    "saved_activation_delta_vs_recompute_ms": {
+      "save_stage1_hidden_only": 0.15456199645996094,
+      "save_stage1_hidden_plus_output": 0.6855273246765137,
+      "save_gate_up_hidden": 1.1744132041931152,
+      "save_gate_up_hidden_plus_output": 1.577019214630127
+    },
+    "saved_activation_memory_gib": {
+      "save_stage1_hidden_only": 0.099609375,
+      "save_stage1_hidden_plus_output": 0.28801727294921875,
+      "save_gate_up_hidden": 0.298828125,
+      "save_gate_up_hidden_plus_output": 0.48723602294921875
+    }
+  },
+  "read": {
+    "bulk_latency": "At both EP4 and EP8 owner-rank shapes, the local MoE VJP wall is still dominated by GEMM-family work: forward recompute is about 2.5-2.7 ms, wgrad is about 2.37-2.39 ms, and xgrad plus scatter/reduce is about 1.65 ms. The fused SwiGLU kernels are now small, roughly 0.10-0.14 ms each.",
+    "why_ep8_is_better_than_ep4": "EP8 has fewer local experts and a larger mean M per local expert, so padding drops from 1.149x to 1.057x. That makes the owner-rank local VJP slightly better even though the assignment count is similar.",
+    "recompute_tax": "Saving the true training intermediates gate/up/hidden saves about 1.17-1.26 ms per owner-rank VJP; saving compact output as well saves about 1.58-1.88 ms. The public AITER-style stage1-hidden-only contract saves almost nothing because backward still needs gate and up to form SwiGLU derivatives.",
+    "decision": "Do not chase dispatch/combine-only or Primus-Turbo grouped-GEMM-only swaps for this MoE backward wall. The next useful branches are a training-aware fused MoE backward contract that either saves gate/up/hidden/out_compact or recomputes them inside one fused pipeline, plus a better grouped wgrad/xgrad GEMM backend for the owner-rank EP shape."
+  },
+  "next_profile_step": {
+    "need": "rocprof/omniperf kernel-level profile for the same EP4/EP8 owner-rank VJP to confirm the GEMM kernels and reduce/scatter kernels that dominate the timer slices.",
+    "suggested_shape": "Run a short profiling pass around --world-size 4 and --world-size 8 with --triton-swiglu --saved-activation --detail, saving traces under /scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/owned_expert_vjp_ep4_ep8_20260602/."
+  }
+}

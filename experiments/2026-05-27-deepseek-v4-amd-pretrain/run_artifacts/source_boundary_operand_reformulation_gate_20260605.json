@@ -1,0 +1,94 @@
+{
+  "artifact": "source_boundary_operand_reformulation_gate",
+  "date": "2026-06-05",
+  "status": "selected_tile_hash_rejected_union_group_owner_rejected_ck_operand_fix_retained",
+  "scope": "DeepSeek-V4 layer-2 S4096 compressed sparse-MLA dKV source-boundary producer experiments on MI350",
+  "target": {
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041
+  },
+  "code_changes": [
+    {
+      "file": "tools/dsv4_runtime_probe/source_boundary_union_gather_dkv_mfma.hip",
+      "change": "Added scalar-contribution, head-loop, and H64 CK contribution branches; fixed MFMA operand validity so sparse row validity zeros A operands only, not shared B operands."
+    },
+    {
+      "file": "tools/dsv4_runtime_probe/source_boundary_selected_tile_hash_dkv_mfma.hip",
+      "change": "Added query-major selected-tile source-boundary dKV kernel with P/dP tile page, four-head-wave contribution consumer, and shared-memory hash reduction by compressed group."
+    },
+    {
+      "file": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+      "change": "Added selected_tile_hash_mfma validation so the new external HIP source can run as a full-D source-boundary row-leader dKV producer."
+    },
+    {
+      "file": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+      "change": "Applied the same MFMA operand-validity fix to the group-panel scorepage contribution path."
+    }
+  ],
+  "key_results": [
+    {
+      "artifact": "run_artifacts/source_boundary_union_gather_mfma_scalarcontrib_dkv_s512_layer2_t1k512_d512_20260605.json",
+      "status": "passed",
+      "event_median_ms": 3.3609108924865723,
+      "read": "MFMA score/prob producer was correct; scalar contribution isolated the bad CK contribution path."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_union_gather_mfma_fullh_bfix_dkv_s512_layer2_t1k512_d512_20260605.json",
+      "status": "passed",
+      "event_median_ms": 2.7308220863342285,
+      "read": "Correct CK H64 contribution tile works once B operands are not zeroed by sparse row validity."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_union_gather_mfma_fullh_accum_dkv_s4096_layer2_t8k512_d512_timing5_20260605.json",
+      "status": "rejected",
+      "event_median_ms": 138.12847900390625,
+      "route_atomic_reduction_x": 5.992058108427399,
+      "read": "Active-group owner reduces writes but catastrophically replays QK/dO.V for every active-group block."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_selected_tile_hash_mfma_head4_s512_layer2_t4k64_d512_20260605.json",
+      "status": "passed",
+      "event_median_ms": 2.28541898727417,
+      "route_atomic_reduction_x": 2.5800331989566043,
+      "read": "Selected-tile hash reducer is correct at S512 and benefits from four head waves."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_selected_tile_hash_mfma_head4_s4096_layer2_t4k64_d512_timing5_20260605.json",
+      "status": "rejected",
+      "event_median_ms": 70.56670379638672,
+      "route_atomic_reduction_x": 1.2078495718932107,
+      "read": "Unsorted K64/T4 has too little duplicate-group locality and the P/dP page path is too expensive."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_selected_tile_hash_mfma_head4_sorted_s4096_layer2_t4k64_d512_timing3_20260605.json",
+      "status": "rejected",
+      "event_median_ms": 65.53453826904297,
+      "route_atomic_reduction_x": 2.846375394864275,
+      "read": "Sorting improves group locality but not enough; hash/P-dP producer mechanics remain far above target."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_selected_tile_hash_mfma_head4_direct_sorted_s4096_layer2_t4k64_d512_timing3_20260605.json",
+      "status": "diagnostic",
+      "event_median_ms": 51.26341247558594,
+      "read": "Direct global atomics from the same producer show shared hash reduction adds about 14 ms on top of an already slow producer."
+    },
+    {
+      "artifact": "run_artifacts/source_boundary_selected_tile_hash_mfma_head4_sink_sorted_s4096_layer2_t4k64_d512_timing3_20260605.json",
+      "status": "diagnostic",
+      "event_median_ms": 47.78163146972656,
+      "read": "No-write mode pins the producer/page/contribution floor at about 47.8 ms."
+    }
+  ],
+  "decision": {
+    "reject": [
+      "active-group outer owner",
+      "selected-tile P/dP shared-page plus hash reducer"
+    ],
+    "retain": [
+      "CK H64 contribution operand fix: sparse validity gates A rows only; B tile loads stay independent",
+      "query-major ownership requirement",
+      "forward-known sorted group sidecar as useful metadata, but not through a materialized P/dP page"
+    ],
+    "next_code_gate": "Move the group-aware epilogue into the existing fast query-major scorepage/Triton-style producer without materializing a selected-tile P/dP page: compute score/prob/dP for K16/K64, immediately consume it for dKV, and only keep a tiny per-D local reducer."
+  }
+}

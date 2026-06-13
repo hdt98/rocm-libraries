@@ -1,0 +1,70 @@
+{
+  "artifact": "sparse_mla_forward_sidecar_qgo_reload_attribution",
+  "date": "2026-06-05",
+  "scope": "Attribute the producer-side latency in the forward-carried sidecar sparse-MLA dKV path by removing contribution-stage q/grad_output global reloads",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "selected_block": 512,
+    "seq_chunk": 1,
+    "k_tile": 16,
+    "score_d_tile": 32,
+    "d_block": 16,
+    "threads": 256
+  },
+  "measured_modes_event_median_ms": {
+    "mode2_score_qk_dov_prob_dp_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_dotpart4_20260605.json",
+      "median_ms": 7.075130939483643,
+      "read": "Normal K16 query-major QK, dO.V, softmax/prob/scaled-dP page producer, checksum only."
+    },
+    "mode15_forward_sidecar_contribution_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+      "median_ms": 21.471811294555664,
+      "read": "Uses forward-carried group_ids sidecar, then runs the normal contribution consumer with real q and grad_output reloads from global memory."
+    },
+    "mode19_forward_sidecar_const_qgo_contribution_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode19_const_qgo_contrib_sink_20260605.json",
+      "median_ms": 11.716370582580566,
+      "read": "Same as mode15 through sidecar preload/use and score/prob/scaled-dP, but replaces contribution-stage q and grad_output global reloads with BF16 constants. This is an attribution-only checksum path, not a numerically meaningful dKV kernel."
+    },
+    "mode20_forward_sidecar_const_all_contribution_checksum": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode20_const_all_contrib_sink_20260605.json",
+      "median_ms": 7.573606967926025,
+      "read": "Same as mode19, but also replaces contribution-stage prob/scaled-dP shared-memory reads with BF16 constants. It still computes and stores the score/prob/scaled-dP page, then runs the same contribution MFMA and H-wave reduction structure. This is an attribution-only checksum path, not a numerically meaningful dKV kernel."
+    },
+    "mode16_forward_sidecar_valid_dkv": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+      "median_ms": 22.955167770385742,
+      "read": "Same as mode15, plus valid final compressed dKV atomics."
+    }
+  },
+  "attribution_ms": {
+    "score_prob_dp_producer_mode2": 7.075130939483643,
+    "contribution_mfma_reduction_bookkeeping_with_constant_operands_mode20_minus_mode2": 0.4984760284423828,
+    "contribution_prob_scaled_dp_shared_replay_mode19_minus_mode20": 4.142763614654541,
+    "contribution_q_grad_output_global_reload_and_real_operand_tax_mode15_minus_mode19": 9.755440711975098,
+    "final_valid_dkv_global_atomic_write_mode16_minus_mode15": 1.4833564758300781,
+    "full_sidecar_valid_dkv_mode16": 22.955167770385742
+  },
+  "traffic_model": {
+    "sidecar_metadata_upper_bound_duplicate_global_read_mib": 13.99609375,
+    "sidecar_shared_memory_store_read_when_used_mib": 27.49660301208496,
+    "contribution_stage_q_grad_output_global_reload_lower_bound_gib": 16.0,
+    "shared_prob_scaled_dp_replay_read_lower_bound_gib": 16.0,
+    "shared_hwave_contribution_partial_write_read_lower_bound_gib": 32.0,
+    "read": "The measured sidecar metadata path is tiny and within noise. Mode19 shows the producer wall is dominated by the contribution consumer's q/grad_output replay. Mode20 then splits the residual and shows prob/scaled-dP shared replay is the next meaningful cost, while constant-operand MFMA/reduction bookkeeping is small."
+  },
+  "decision": {
+    "status": "producer_memory_replay_confirmed",
+    "read": "Mode19 reduces the sidecar checksum path from 21.47 ms to 11.72 ms by removing only contribution-stage q and grad_output global reloads, attributing about 9.76 ms to real q/dO replay. Mode20 then reduces 11.72 ms to 7.57 ms by also removing contribution-stage prob/scaled-dP shared-memory reads, attributing about 4.14 ms to that shared replay. The residual constant-operand contribution MFMA/reduction structure is only about 0.50 ms over the mode-2 score/prob producer. The final atomics add about 1.48 ms in the comparable valid-dKV path. Therefore the latency added inside the sidecar producer is not the sidecar metadata; it is memory replay inside the contribution consumer.",
+    "next": "Keep the forward sidecar contract, but rewrite the producer so q, grad_output, prob, and scaled-dP are consumed while resident instead of replayed from global/shared memory across contribution D tiles. The dKV epilogue should then do group-aware reduction from that resident tile before the final global atomic stream."
+  }
+}

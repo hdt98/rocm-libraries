@@ -1,0 +1,75 @@
+{
+  "atol": 0.0005,
+  "attention_impl": "dense-mask",
+  "batch": 1,
+  "boundary_impl": "separate",
+  "device": "cpu",
+  "dtype": "float64",
+  "eps": 1e-05,
+  "fast_mode": true,
+  "ok": true,
+  "results": [
+    {
+      "attention_impl": "dense-mask",
+      "elapsed_s": 1.7973847551038489,
+      "finite": true,
+      "fp4": {
+        "block_m": 4,
+        "block_n": 4,
+        "eps": 1e-12,
+        "max_normal": 6.0,
+        "runtime": "packed-sim"
+      },
+      "grad_errors": {
+        "input": {
+          "max_abs": 5.421010862427522e-20,
+          "rel_l2": 1.0152445442553564e-18
+        },
+        "moe.shared_w1": {
+          "max_abs": 0.0,
+          "rel_l2": 0.0
+        },
+        "moe.shared_w2": {
+          "max_abs": 0.0,
+          "rel_l2": 0.0
+        },
+        "moe.shared_w3": {
+          "max_abs": 0.0,
+          "rel_l2": 0.0
+        },
+        "moe.w1": {
+          "max_abs": 1.0842021724855044e-19,
+          "rel_l2": 3.974043166575318e-16
+        },
+        "moe.w2": {
+          "max_abs": 8.131516293641283e-20,
+          "rel_l2": 3.831941524907023e-16
+        },
+        "moe.w3": {
+          "max_abs": 1.0842021724855044e-19,
+          "rel_l2": 4.169654762985006e-16
+        }
+      },
+      "gradcheck": true,
+      "grouped_impl": "grouped-expert-batches-dynamic-base64-overflow-compact-reduce-dense-wgrad",
+      "loop_impl": "loop",
+      "loss_grouped": 1.029947962848108,
+      "loss_loop": 1.029947962848108,
+      "max_grad_rel_l2": 4.169654762985006e-16,
+      "name": "moe_expert_batches_dynamic_base64_overflow_compact_reduce_dense_wgrad_match",
+      "ok": true,
+      "output_errors": {
+        "max_abs": 0.0,
+        "rel_l2": 0.0
+      },
+      "shared_expert_impl": "linear-pair",
+      "thresholds": {
+        "grad_rtol": 1e-06,
+        "output_atol": 1e-08
+      }
+    }
+  ],
+  "rmsnorm_save_policy": "memory-light",
+  "rtol": 0.001,
+  "seqlen": 160
+}

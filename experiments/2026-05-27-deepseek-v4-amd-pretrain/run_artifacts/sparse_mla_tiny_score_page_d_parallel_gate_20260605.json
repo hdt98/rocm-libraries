@@ -1,0 +1,194 @@
+{
+  "artifact": "sparse_mla_tiny_score_page_d_parallel_gate",
+  "created_at": "2026-06-05",
+  "status": "implementation_contract_ready_no_new_kernel_timed",
+  "scope": "S4096 DeepSeek-V4 sparse-MLA backward HIP/CK cooperative producer-consumer gate",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024
+  },
+  "why_this_branch": [
+    "Late dKV-only TileLang and CK slices can be fast only when P/scaled-dP are already materialized.",
+    "Route-owned fused TileLang makes final dKV write tiny, but loses query-major and D-parallel reuse, so dQ/recompute dominates.",
+    "The useful design is query-major score/prob/dP production with a tiny score page consumed immediately by D-parallel consumers."
+  ],
+  "latency_gates_ms": {
+    "full_source_boundary_must_beat": 11.13,
+    "current_sparse_atomic_dkv_wall_context": 8.80629825592041,
+    "materialized_hsk_dq_plus_dkv_floor": 7.966623067855835,
+    "materialized_hsk_dq_floor": 2.027456045150757,
+    "materialized_hsk_dkv_floor": 5.939167022705078,
+    "producer_plus_page_handoff_budget": 3.163376932144166,
+    "read": "Because the materialized dQ+dKV floor is already about 7.97 ms, a source-boundary producer can spend only about 3.16 ms before missing the current 11.13 ms sparse-attention backward boundary."
+  },
+  "negative_evidence_ms": {
+    "tilelang_grouped_d_recompute_only": 5.76652717590332,
+    "tilelang_grouped_d_full_dq_dkv": 15.733488082885742,
+    "tilelang_grouped_d_dq_only": 13.157108306884766,
+    "tilelang_grouped_d_final_dkv_write": 0.16936016082763672,
+    "tilelang_route_owned_same_kernel_full": 16.87541961669922,
+    "tilelang_route_owned_same_kernel_dq_recompute_path": 14.327399253845215,
+    "tilelang_route_owned_same_kernel_dkv_local_reduce": 2.501339912414551,
+    "tilelang_route_owned_same_kernel_final_write": 0.046680450439453125,
+    "tilelang_recompute_pdp_sink_best": 8.42343521118164,
+    "tilelang_recompute_pdp_store_best": 8.689334869384766,
+    "tilelang_two_kernel_pdp_then_dkv_full": 16.238040924072266,
+    "query_headblock_ck_producer_only": 29.238218307495117,
+    "rocwmma_selected_tile_score_only": 21.455720901489258,
+    "triton_reference_no_dkv": 2.0338199,
+    "triton_reference_dkv_accumulation_like": 8.195401
+  },
+  "derived_gaps": {
+    "tilelang_grouped_recompute_over_budget_x": 1.822902328618397,
+    "tilelang_recompute_sink_over_budget_x": 2.6627984561650577,
+    "query_headblock_ck_over_budget_x": 9.242723499180727,
+    "tilelang_route_owned_full_gap_to_current_boundary_ms": 5.745419616699218,
+    "tilelang_grouped_d_full_gap_to_current_boundary_ms": 4.603488082885741,
+    "read": "Grouped-D proved score reuse, but 5.77 ms recompute-only is still 1.82x over the producer budget and its 15.73 ms full path loses D parallelism. The CK one-token/H16 probe is a compile surface only, not a speed surface."
+  },
+  "active_kernel_contract": {
+    "name": "source_boundary_query_major_tiny_score_page_dparallel_v1",
+    "preferred_new_source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "wrapper_to_extend": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "source_boundary_inputs": [
+      "q[B,S,H,D] BF16",
+      "grad_output[B,S,H,D] BF16",
+      "forward_output[B,S,H,D] BF16",
+      "lse[B,S,H] FP32",
+      "compressed/shared KV bank[B,S+G,D] BF16",
+      "safe_groups[B,S,topk]",
+      "valid_u8[B,S,topk]"
+    ],
+    "outputs": [
+      "grad_q[B,S,H,D] FP32 or BF16-accumulated output contract",
+      "grad_compressed_kv[B,S+G,D] FP32"
+    ],
+    "producer_decomposition": {
+      "owner": "query-major token tile plus selected window",
+      "score_page": "P and scaled-dP for a tiny token/head/selected page, never full [S,topk,H]",
+      "first_runtime_gate": "producer checksum at S4096 <= 3.16 ms",
+      "full_runtime_gate": "source tensors in, dQ+dKV out at S4096 < 11.13 ms"
+    },
+    "consumer_decomposition": {
+      "requirement": "D blocks remain parallel consumers of the same score page",
+      "why": "Serializing D consumers inside one CTA is what made grouped-D full latency 15.73 ms.",
+      "candidate_surfaces": [
+        "single persistent HIP kernel with producer waves and D-consumer wave groups if LDS/register footprint fits",
+        "bounded tiny L2/HBM ring-buffer score page with immediate same-stream consumers if cross-CTA sharing is needed",
+        "CK block-attention style primitive only if it supports sparse route gather and custom group-aware dKV epilogue"
+      ]
+    },
+    "dKV_epilogue": {
+      "order": "add only after producer-only gate passes",
+      "target": "tile-local segmented/group-aware reduction before global dKV writes",
+      "must_not_use": "leader-scan or dense active-group table that serializes the route-owned schedule"
+    }
+  },
+  "resource_model_read": {
+    "best_thread_cap_fit": {
+      "token_block": 4,
+      "selected_block": 512,
+      "head_tile": 64,
+      "head_splits": 1,
+      "waves_per_token": 4,
+      "fully_parallel_threads": 1024,
+      "fits_thread_cap": true,
+      "route_reduction_x_if_h64_reduced": 3.04843444037302,
+      "effective_page_reduction_x_after_head_split": 3.04843444037302,
+      "serial_token_batches_if_single_cta": 1,
+      "classification": "fits_but_head_split_erases_reduction"
+    },
+    "best_h64_persistent_candidate": {
+      "token_block": 128,
+      "selected_block": 512,
+      "head_tile": 64,
+      "head_splits": 1,
+      "waves_per_token": 4,
+      "fully_parallel_threads": 32768,
+      "fits_thread_cap": false,
+      "route_reduction_x_if_h64_reduced": 93.07162306144193,
+      "effective_page_reduction_x_after_head_split": 93.07162306144193,
+      "serial_token_batches_if_single_cta": 32,
+      "classification": "needs_cross_cta_or_persistent_h64_reduction"
+    },
+    "first_serial_or_persistent_candidate": {
+      "classification": "requires_serial_or_persistent_producer",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 40.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.3125,
+        "with_dense_group_table_p99_kib": 131.6125,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 4096,
+        "fully_parallel_waves": 64,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 4,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1024.0,
+        "mean_segments_per_tile": 513.84765625,
+        "p99_segments_per_tile": 1012.8,
+        "pair_share_ge16": 0.37893804949527843,
+        "pair_share_ge32": 0.0,
+        "segment_p50": 12.0,
+        "segment_p90": 16.0,
+        "segment_p99": 16.0,
+        "tile_local_write_reduction_x": 11.952959063438367
+      },
+      "selected_block": 512,
+      "token_block": 16
+    },
+    "mori_shared_memory": "Not an attention score-page mechanism. MORI/SHMEM can help EP/MoE communication buffers and overlap, but it cannot make LDS-like score pages visible between sibling CTAs inside one sparse-attention kernel."
+  },
+  "closed_non_goals": [
+    "TileLang late dKV-only replacement",
+    "detached P/dP slab producer then dKV consumer",
+    "route-owned TileLang source-boundary schedule",
+    "one-token/H16 query-headblock CK schedule",
+    "plain H16/H32 head split without on-chip cross-head merge",
+    "MORI shared-memory workaround for attention score pages"
+  ],
+  "next_commands": [
+    "Implement producer-checksum mode in source_boundary_query_major_scorepage_dparallel.hip.",
+    "Run S4096 producer-only on one MI350; reject unless median <= 3.16 ms.",
+    "Only then wire dQ+dKV output and run full source-boundary timing against 11.13 ms.",
+    "Only if full source-boundary improves, run 4x/8x TorchTitan TFLOPs materialization."
+  ],
+  "promotion_rule": {
+    "single_gpu_latency": "No sparse-attention promotion until S4096 source-boundary dQ+dKV is < 11.13 ms.",
+    "e2e_tflops": "No new 4x/8x TFLOPs claim for this path until the single-GPU boundary improves."
+  },
+  "source_artifacts": {
+    "persistent_gate": "run_artifacts/sparse_mla_persistent_coop_kernel_gate_20260605.json",
+    "score_tile": "run_artifacts/tilelang_score_tile_d_parallel_decision_20260605.json",
+    "same_kernel": "run_artifacts/sparse_attention_tilelang_same_kernel_breakdown_decision_20260605.json",
+    "recompute_sink": "run_artifacts/sparse_dkv_tilelang_recompute_pdp_sink_decision_20260604.json",
+    "recompute_store": "run_artifacts/sparse_dkv_tilelang_recompute_pdp_store_decision_20260604.json",
+    "pdp_pipeline": "run_artifacts/sparse_dkv_tilelang_pdp_pipeline_grouped_dkv_decision_20260604.json",
+    "query_headblock_ck": "run_artifacts/sparse_mla_source_boundary_query_headblock_ck_mode0_producer_s4096_layer2_20260605.json",
+    "rocwmma_decomposition": "run_artifacts/sparse_mla_source_boundary_rocwmma_8wave_decomposition_decision_20260605.json",
+    "workgroup_feasibility": "run_artifacts/sparse_mla_coop_workgroup_feasibility_s4096_layer2_20260605.json",
+    "headsplit_tradeoff": "run_artifacts/sparse_mla_coop_headsplit_tradeoff_s4096_layer2_20260605.json"
+  },
+  "dependency_pins_changed": false
+}

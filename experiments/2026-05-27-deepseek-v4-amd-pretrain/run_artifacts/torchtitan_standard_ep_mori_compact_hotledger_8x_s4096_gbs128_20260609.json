@@ -1,0 +1,152 @@
+{
+  "artifact": "torchtitan_standard_ep_mori_compact_hotledger_8x_s4096_gbs128_20260609",
+  "date": "2026-06-09",
+  "node": "do-sonle5-mi350-gpu",
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "activation_checkpoint_scope": "attention_only",
+    "sparse_mla_backward": "shared_kv query_recompute",
+    "sharedkv_block": {
+      "h": 64,
+      "n": 64,
+      "d": 128
+    }
+  },
+  "source_change_under_test": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "change": "Default standard-EP hot split weight order to owner_compact so owner-compact helper rows no longer realign selected-order hot weights with W1/W2/W3 index_select.",
+    "validation": [
+      "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/moe.py sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "git diff --check -- sources/wip/torchtitan/torchtitan/models/common/moe.py sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py"
+    ]
+  },
+  "materialized_gate": {
+    "run_id": "torchtitan_dsv4_flash12_ownercompact_weight_default_h64n64d128_8x_s4096_gbs128_steps6_20260609",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_ownercompact_weight_default_h64n64d128_8x_s4096_gbs128_steps6_20260609/docker-run.log",
+    "status": "completed_not_promoted",
+    "steps_2_to_6": {
+      "tok_per_gpu_s_avg": 8308.2,
+      "tflops_per_gpu_avg": 418.4
+    },
+    "steps_4_to_6": {
+      "tok_per_gpu_s_avg": 8420.3,
+      "tflops_per_gpu_avg": 426.3
+    },
+    "peak_memory_gib_max": 251.28,
+    "read": "Corrected H64/N64/D128 rerun returned to the current torch-materializer control band, so the earlier 5.4k tok/GPU/s run was a sparse-MLA block-shape mismatch, not a MORI/native-layout regression. Still below retained 20-step AdamW baseline 8518.84 tok/GPU/s."
+  },
+  "profile_ab": {
+    "purpose": "Compare torch owner-compact materialization with MORI compact materialization at the hot-helper ABI, with owner-compact weight order fixed to remove selected-order weight realignment.",
+    "caveat": "These two timing runs used default seeding and therefore had different hot expert choices and remote row counts. A fixed-seed rerun was attempted but blocked because other jobs occupied GPUs 0-3 on both MI350 nodes. The rank-max stage ledger is still useful for mechanism sizing, not a promoted throughput comparison.",
+    "torch_ownercompact": {
+      "run_id": "torchtitan_dsv4_flash12_hotledger_torch_ownercompact_8x_s4096_gbs128_steps3_20260609",
+      "profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_hotledger_torch_ownercompact_8x_s4096_gbs128_steps3_20260609/profile_timing",
+      "step2_tok_per_gpu_s": 7909,
+      "step2_tflops_per_gpu": 400.44,
+      "step2_remote_hot_rows_mean": 69906.5,
+      "step2_remote_hot_rows_max": 126108,
+      "align_selected_hot_weight_stage_records": 0
+    },
+    "mori_compact_ownercompact": {
+      "run_id": "torchtitan_dsv4_flash12_hotledger_mori_compact_ownercompact_8x_s4096_gbs128_steps3_20260609",
+      "profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_hotledger_mori_compact_ownercompact_8x_s4096_gbs128_steps3_20260609/profile_timing",
+      "step2_tok_per_gpu_s": 7908,
+      "step2_tflops_per_gpu": 400.38,
+      "step2_remote_hot_rows_mean": 79255.9,
+      "step2_remote_hot_rows_max": 128099,
+      "align_selected_hot_weight_stage_records": 0
+    }
+  },
+  "step2_rankmax_gpu_ms": {
+    "torch_ownercompact": {
+      "standard_ep.dispatch.hot_metadata": 18.012,
+      "standard_ep.dispatch.local_reorder": 20.037,
+      "standard_ep.dispatch.count_all_to_all": 107.012,
+      "standard_ep.dispatch.build_hot_plan": 11.234,
+      "standard_ep.dispatch.hot_mask": 6.349,
+      "standard_ep.dispatch.hot_local_reorder": 23.111,
+      "standard_ep.dispatch.hot_count_all_to_all": 14.381,
+      "standard_ep.dispatch.permute": 80.597,
+      "standard_ep.combine.all_to_all_wait": 156.211,
+      "standard_ep.combine.weighted_scatter_add": 134.483,
+      "standard_ep.hot_split.broadcast_hot_weights": 98.482,
+      "standard_ep.hot_split.grouped_w1": 38.228,
+      "standard_ep.hot_split.grouped_w2": 40.102,
+      "standard_ep.hot_split.grouped_w3": 42.866,
+      "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": 282.935,
+      "standard_ep.hot_split.backward.autograd_vjp.w1": 82.266,
+      "standard_ep.hot_split.backward.autograd_vjp.w2": 88.601,
+      "standard_ep.hot_split.backward.autograd_vjp.w3": 165.279,
+      "standard_ep.hot_split.backward.autograd_vjp.activation_gate": 97.832,
+      "standard_ep.hot_split.weighted_scatter_tokens": 80.908,
+      "standard_ep.hot_split.backward.compact_dx_return.index_add": 33.503,
+      "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": 49.529,
+      "standard_ep_hot_weight.w1.forward.all_reduce_hot_weight": 19.709,
+      "standard_ep_hot_weight.w3.forward.all_reduce_hot_weight": 18.77,
+      "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": 18.382,
+      "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": 17.812,
+      "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": 87.246,
+      "sharedkv_bwd.query_recompute": 1523.719,
+      "sharedkv_bwd.grad_attn_sink": 165.259
+    },
+    "mori_compact_ownercompact": {
+      "standard_ep.dispatch.hot_metadata": 17.47,
+      "standard_ep.dispatch.hot_materialize_mori_compact.init": 1.493,
+      "standard_ep.dispatch.hot_materialize_mori_compact.pack": 5.297,
+      "standard_ep.dispatch.local_reorder": 16.645,
+      "standard_ep.dispatch.count_all_to_all": 97.834,
+      "standard_ep.dispatch.build_hot_plan": 7.864,
+      "standard_ep.dispatch.hot_mask": 4.786,
+      "standard_ep.dispatch.hot_local_reorder": 17.985,
+      "standard_ep.dispatch.hot_count_all_to_all": 7.651,
+      "standard_ep.dispatch.permute": 69.323,
+      "standard_ep.combine.all_to_all_wait": 135.863,
+      "standard_ep.combine.weighted_scatter_add": 116.584,
+      "standard_ep.hot_split.broadcast_hot_weights": 111.115,
+      "standard_ep.hot_split.grouped_w1": 36.296,
+      "standard_ep.hot_split.grouped_w2": 46.405,
+      "standard_ep.hot_split.grouped_w3": 40.773,
+      "standard_ep.hot_split.backward.helper_mlp_vjp_to_sorted_x": 283.06,
+      "standard_ep.hot_split.backward.autograd_vjp.w1": 81.977,
+      "standard_ep.hot_split.backward.autograd_vjp.w2": 88.188,
+      "standard_ep.hot_split.backward.autograd_vjp.w3": 165.698,
+      "standard_ep.hot_split.backward.autograd_vjp.activation_gate": 98.79,
+      "standard_ep.hot_split.weighted_scatter_tokens": 91.052,
+      "standard_ep.hot_split.backward.compact_dx_return.index_add": 33.858,
+      "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": 69.186,
+      "standard_ep_hot_weight.w1.forward.all_reduce_hot_weight": 17.087,
+      "standard_ep_hot_weight.w3.forward.all_reduce_hot_weight": 16.279,
+      "standard_ep_hot_weight.w1.backward.all_reduce_grad_hot_weight": 17.614,
+      "standard_ep_hot_weight.w2.backward.all_reduce_grad_hot_weight": 17.475,
+      "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": 83.596,
+      "sharedkv_bwd.query_recompute": 1525.79,
+      "sharedkv_bwd.grad_attn_sink": 186.215
+    }
+  },
+  "read": {
+    "mori_buys": [
+      "Owner-compact weight order removes selected-order hot-weight realignment; align_selected_hot_weight stage records are zero in both owner-compact runs.",
+      "MORI compact pack itself is small at this shape: about 1.49 ms init plus 5.30 ms pack rank-max in the step-2 ledger.",
+      "The whole dispatch hot_metadata parent is roughly equal between torch and MORI compact, about 18.0 ms vs 17.5 ms rank-max, so the pack edge is not the multi-hundred-ms bottleneck."
+    ],
+    "remaining_pay_side": [
+      "These are shared remaining walls, not MORI-added overhead. The unchanged helper VJP dominates the hot-helper branch: helper_mlp_vjp_to_sorted_x about 283 ms, plus W3/W2/W1/activation autograd VJP about 166/88/82/98 ms rank-max in both torch-ownercompact and MORI-compact timing runs.",
+      "The return/scatter path is also shared: weighted_scatter_tokens is about 81 ms in the torch-ownercompact run and 91 ms in the MORI-compact run, while compact dx index_add is about 34 ms in both. The small difference is not a new MORI mechanism; the two runs had different hot expert choices and remote row counts.",
+      "The normal EP wrapper remains common to both paths: count_all_to_all about 98-107 ms, permute about 69-81 ms, combine wait about 136-156 ms, and weighted_scatter_add about 117-134 ms. MORI compact materialization was only swapping the hot-row materializer edge, not replacing normal EP dispatch/combine.",
+      "Hot-weight forward/reduce transport is not enough to promote by itself; W2 forward all-reduce and W3 backward grad all-reduce remain visible."
+    ],
+    "decision": "Keep owner-compact weight order as the native ABI direction, but do not promote MORI compact materialization as a throughput win by itself. The measured MORI-specific added edge is only the compact-pack adapter, about 1.49 ms init plus 5.30 ms pack rank-max. The selected-order W1/W2/W3 realignment is removed by the owner-compact weight-order change, but the large shared helper VJP, scatter/return, and normal EP wrapper buckets remain. The next code target is native hot/cold/helper dispatcher layout plus compact helper VJP/return, not another pack-kernel tweak."
+  },
+  "blocked_followup": {
+    "attempt": "fixed-seed 8x timing rerun",
+    "status": "blocked_by_active_gpu_jobs",
+    "details": "Both do-sonle5-mi350-gpu and do-vunguyen-mi350-gpu had GPUs 0-3 occupied by other jobs when the seeded rerun was attempted."
+  }
+}

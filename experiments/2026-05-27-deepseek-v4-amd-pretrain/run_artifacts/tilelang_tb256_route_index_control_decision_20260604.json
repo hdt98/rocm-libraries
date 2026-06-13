@@ -1,0 +1,57 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_route_index_control_probe",
+  "created_at": "2026-06-04",
+  "target_shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "topk": 640,
+    "valid_topk": 512,
+    "token_block": 256,
+    "selected_window": 320,
+    "group_panel_size": 512,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "route_pattern": "panel_capacity_random",
+    "fold_backend": "tilelang_panel_dense"
+  },
+  "baseline_retained": {
+    "math_mode": "mfma_reduced",
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "full_final_dkv_median_ms": 7.990410327911377,
+    "producer_trace_median_ms": 7.982801,
+    "fold_trace_median_ms": 0.00642,
+    "read": "This is the retained TileLang tb256/gps512/cap320 candidate."
+  },
+  "slotcache_probe": {
+    "math_mode": "mfma_reduced_slotcache",
+    "result": "compile_rejected",
+    "reason": "Caching PairSlots in shared memory adds 64 int32 entries per CTA and pushes dynamic shared memory above the MI350 per-block limit.",
+    "requested_dynamic_shared_bytes": 164096,
+    "device_dynamic_shared_limit_bytes": 163840,
+    "read": "The retained producer already sits exactly at the LDS limit, so a straightforward shared-memory route-slot cache is not viable at block_d64/gps512."
+  },
+  "premasked_probe": {
+    "math_mode": "mfma_reduced_premasked",
+    "s128_correctness_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_premasked_fold_tilelang_panel_dense_s128_valid512_tb256_gps512_cap320_k64d64_thr512_correct_20260604.json",
+    "s128_max_abs_diff": 1.862645149230957e-08,
+    "s4096_timing_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_premasked_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "s4096_full_final_dkv_median_ms": 8.5331392288208,
+    "s4096_fold_median_ms": 0.0142000000923872,
+    "delta_vs_retained_ms": 0.5427289009094238,
+    "speedup_vs_retained": 0.936401607308758,
+    "decision": "reject",
+    "read": "Pre-zeroing invalid P/dP rows and removing the per-head PairSlots branch from P/dP staging is correct, but slower than the retained producer. The repeated route-index/control load is not the dominant wall."
+  },
+  "decision": {
+    "retain": "mfma_reduced tb256/gps512/cap320",
+    "reject": [
+      "mfma_reduced_slotcache at block_d64/gps512 due LDS capacity",
+      "mfma_reduced_premasked at block_d64/gps512 due S4096 latency regression"
+    ],
+    "next_kernel_work": "Profile or rewrite the TileLang producer body itself: reduce LDS bank conflicts and accumulator-table pressure, not only PairSlots loads. Candidate directions are narrower/striped group_acc layout, split-D or split-panel variants that preserve query-major MFMA reuse, or a different two-stage producer where the first stage emits fewer compact rows without the 512x64 FP32 LDS table."
+  }
+}

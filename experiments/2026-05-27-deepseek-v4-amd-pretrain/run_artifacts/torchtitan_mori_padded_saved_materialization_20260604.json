@@ -1,0 +1,114 @@
+{
+  "artifact": "torchtitan_mori_padded_saved_materialization_20260604",
+  "created_utc": "2026-06-04T14:12:00Z",
+  "status": "not_promoted",
+  "question": "Materialize the isolated saved-intermediate owner-rank VJP win into TorchTitan e2e TFLOPs, and check whether the MORI-EP guide is applied.",
+  "code_changes": {
+    "mori_aiter_moe_py": "Added opt-in TORCHTITAN_MORI_AITER_FORWARD_MODE=padded_saved and TORCHTITAN_MORI_AITER_LOCAL_VJP_MODE=padded_saved. The forward path clones MORI dispatch outputs, builds a padded owner-rank local forward, saves gate/up/hidden/out_compact/source positions, and backward reuses that saved state instead of redispatching x/recomputing local forward.",
+    "launcher": "Added CANARY_MORI_AITER_FORWARD_MODE propagation/visibility in torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh."
+  },
+  "mori_ep_guide_compliance": {
+    "source": "https://github.com/ROCm/mori/blob/main/docs/MORI-EP-GUIDE.md",
+    "applied": [
+      "Uses EpDispatchCombineConfig/EpDispatchCombineOp with IntraNode for single-node EP4/EP8.",
+      "Uses PyTorch process-group based shmem initialization via torch._C._distributed_c10d._register_process_group('default', dist.group.WORLD) and mori.shmem.shmem_torch_process_group_init('default').",
+      "Uses get_dispatch_src_token_pos() to align backward grad dispatch order to forward dispatch order.",
+      "Uses registered combine input buffer when CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered.",
+      "Uses MORI_SHMEM_HEAP_SIZE=32G for target runs; the default 4G heap failed the first S128 smoke."
+    ],
+    "not_fully_applied": [
+      "Retained runs use MORI_EP_LAUNCH_CONFIG_MODE=MANUAL, not AUTO/tuned configs. Current manual knobs are block_num=64, rdma_block_num=32, warp_num_per_block=8; the guide's current AUTO defaults for IntraNode are block_num=128, rdma_block_num=0, warp_per_block=16.",
+      "We have not run the guide's MI350 intra-node calibration/quick tuning matrix for EP4/EP8 and dtype/zero-copy variants.",
+      "The retained IntraNode path uses combined dispatch()/combine(), not split send/recv overlap. Split send/recv exists only in the AsyncLL diagnostic branches.",
+      "We do not use MORI's standard MoE/DeepEP adapter APIs; the TorchTitan bridge manually consumes the 2D dispatch output and prepares combine input."
+    ]
+  },
+  "validation": [
+    {
+      "name": "local syntax",
+      "result": "pass",
+      "commands": [
+        "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+        "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+      ]
+    },
+    {
+      "name": "remote helper parity smoke",
+      "result": "pass",
+      "image": "sonle5/dsv4-tilelang-torchtitan-runtime:20260604",
+      "notes": "Tiny BF16 helper comparison against _compute_local_autograd_vjp completed. Max diffs were BF16-noisy: forward 0.1875, dx 0.2300, dw1 0.2347, dw3 0.0979, dw2 0.1350, dtopk 0.2899."
+    },
+    {
+      "name": "4x S128 distributed smoke",
+      "result": "pass",
+      "run_id": "torchtitan_mori_padded_saved_smoke_4x_s128_20260604c",
+      "shape": "4xMI350, S128, GBS4, FSDP4/EP4, full activation checkpointing",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "notes": "Two steps completed, finite loss, clean process-group teardown. First attempt without MORI_SHMEM_HEAP_SIZE=32G failed before training due to MORI heap exhaustion."
+    }
+  ],
+  "materialized_runs": [
+    {
+      "run_id": "torchtitan_mori_padded_saved_materialized_4x_s4096_gbs64_20260604",
+      "shape": "4xMI350, S4096, GBS64, MBS1, FSDP4/EP4, no activation checkpointing, expandable allocator",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "steps": [
+        {"step": 1, "tflops_per_gpu": 51.47, "tokens_per_gpu_s": 2720, "loss": 12.35778},
+        {"step": 2, "tflops_per_gpu": 95.96, "tokens_per_gpu_s": 5071, "loss": 8.33141},
+        {"step": 3, "tflops_per_gpu": 79.61, "tokens_per_gpu_s": 4207, "loss": 20.74530}
+      ],
+      "peak_logged_memory_gib": 232.12,
+      "read": "Positive 4x materialization signal, but only three steps."
+    },
+    {
+      "run_id": "torchtitan_mori_padded_saved_materialized_8x_s4096_gbs128_20260604",
+      "shape": "8xMI350, S4096, GBS128, MBS1, FSDP8/EP8, no activation checkpointing, expandable allocator, CE2",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "steps": [
+        {"step": 1, "tflops_per_gpu": 44.17, "tokens_per_gpu_s": 2335, "loss": 12.14912},
+        {"step": 2, "tflops_per_gpu": 81.51, "tokens_per_gpu_s": 4308, "loss": 8.35930},
+        {"step": 3, "tflops_per_gpu": 66.14, "tokens_per_gpu_s": 3496, "loss": 15.49861},
+        {"step": 4, "tflops_per_gpu": 49.16, "tokens_per_gpu_s": 2598, "loss": 13.16797},
+        {"step": 5, "tflops_per_gpu": 51.87, "tokens_per_gpu_s": 2741, "loss": 10.33806},
+        {"step": 6, "tflops_per_gpu": 51.76, "tokens_per_gpu_s": 2736, "loss": 8.96011}
+      ],
+      "late_step_average_tflops_per_gpu": 50.93,
+      "peak_logged_memory_gib": 219.94,
+      "baseline_for_comparison": {
+        "run_id": "torchtitan_dsv4_noac_alloc_expand_noprofile6_ep8_s4096_gbs128_20260604",
+        "late_step_average_tflops_per_gpu": 64.91
+      },
+      "read": "Not promotable. Saved-state VJP helps isolated local backward but this padded-training forward mode loses e2e at EP8."
+    },
+    {
+      "run_id": "torchtitan_mori_padded_saved_timing_8x_s4096_gbs128_20260604",
+      "shape": "8xMI350, S4096, GBS128, MBS1, FSDP8/EP8, no activation checkpointing, expandable allocator, CE2, MORI timing enabled",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "steps": [
+        {"step": 2, "tflops_per_gpu": 92.53, "tokens_per_gpu_s": 4890},
+        {"step": 3, "tflops_per_gpu": 71.69, "tokens_per_gpu_s": 3789},
+        {"step": 4, "tflops_per_gpu": 65.56, "tokens_per_gpu_s": 3465}
+      ],
+      "timing_records": 4096,
+      "timing_top_stages": [
+        {"stage": "backward.local_vjp.padded_saved", "sum_gpu_ms": 56049.824, "avg_gpu_ms": 27.368, "max_gpu_ms": 185.383},
+        {"stage": "backward.combine_dx.call", "sum_gpu_ms": 47157.588, "avg_gpu_ms": 23.026, "max_gpu_ms": 175.097},
+        {"stage": "local_padded_saved_vjp.w13_xgrad_gemm_reduce", "sum_gpu_ms": 18345.828, "avg_gpu_ms": 8.958, "max_gpu_ms": 80.982},
+        {"stage": "forward.padded_saved.w13_gemm", "sum_gpu_ms": 16770.842, "avg_gpu_ms": 8.189, "max_gpu_ms": 64.055},
+        {"stage": "local_padded_saved_vjp.w13_wgrad_gemm", "sum_gpu_ms": 14251.357, "avg_gpu_ms": 6.959, "max_gpu_ms": 25.257},
+        {"stage": "forward.padded_saved.w2_gemm", "sum_gpu_ms": 8776.374, "avg_gpu_ms": 4.285, "max_gpu_ms": 61.318},
+        {"stage": "forward.padded_saved.sort_counts", "sum_gpu_ms": 7526.67, "avg_gpu_ms": 3.675, "max_gpu_ms": 867.765},
+        {"stage": "backward.dispatch_grad_output.call", "sum_gpu_ms": 6668.533, "avg_gpu_ms": 3.256, "max_gpu_ms": 85.491},
+        {"stage": "forward.padded_saved.swiglu", "sum_gpu_ms": 5294.924, "avg_gpu_ms": 2.585, "max_gpu_ms": 580.464},
+        {"stage": "forward.padded_saved.route_pack", "sum_gpu_ms": 2885.508, "avg_gpu_ms": 1.409, "max_gpu_ms": 339.607}
+      ],
+      "read": "Timing confirms the padded-saved forward creates new forward route/sort/SwiGLU overhead and still leaves local VJP plus combine_dx as the main timed buckets."
+    }
+  ],
+  "decision": "Do not promote padded_saved as the retained 8x candidate. The next materialization branch should keep the AITER/CK fused forward and expose/save training intermediates from that fused forward, or add a fused training backward that consumes AITER forward internal products, rather than replacing forward with padded owner-rank PyTorch/Triton bookkeeping.",
+  "next_actions": [
+    "Run MORI guide intra-node tuning/AUTO comparison for MI350 EP4/EP8, especially IntraNode block=128 warp=16 rdma=0 versus current manual block=64 warp=8 rdma=32.",
+    "Add an AITER/CK-facing saved-intermediate export path for gate/up/hidden/out or a fused training backward, avoiding the padded forward route-pack/sort path.",
+    "Retain current best sustained 8x baseline as no-AC + expandable allocator at 64.91 TFLOPs/GPU late-step until a candidate beats it in a six-step run."
+  ]
+}

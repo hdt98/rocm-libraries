@@ -1,0 +1,63 @@
+{
+  "dk_scratch": {
+    "abs_max": 2.130731757070784e+25,
+    "finite": false,
+    "mean_abs": 2.1138639865106095e+21,
+    "nonfinite": 139260,
+    "nonzero": 192758
+  },
+  "dv_scratch": {
+    "abs_max": 1.9961783133476757e+28,
+    "finite": false,
+    "mean_abs": 2.8231764703837314e+24,
+    "nonfinite": 139260,
+    "nonzero": 192758
+  },
+  "latency_ms": {
+    "max": 11.148041725158691,
+    "mean": 11.08286902109782,
+    "median": 11.086467742919922,
+    "min": 11.034881591796875
+  },
+  "route_bitset": {
+    "abs_max": 1.0,
+    "finite": true,
+    "mean_abs": 0.5,
+    "nonfinite": 0,
+    "nonzero": 262144
+  },
+  "shape": {
+    "active_tiles": 16,
+    "batch": 4,
+    "dim": 512,
+    "dot_slice_qo": 16,
+    "heads": 64,
+    "input_scale": 0.01,
+    "kv_heads": 1,
+    "kv_seq": 1024,
+    "kv_tiles": 16,
+    "lse_value": 1.0,
+    "num_warps": 4,
+    "query_chunks": 16,
+    "query_seq": 4096,
+    "query_steps_per_chunk": 256,
+    "route_bitset_bytes": 2097152,
+    "route_bitset_pattern": "prefix",
+    "route_bitset_topk": 512,
+    "route_bitset_words": 32,
+    "scale": 0.044194173824159216,
+    "scratch_rows": 16384,
+    "seq_blocks": 4,
+    "softmax_dot_scale": 0.02,
+    "source_rows": 4096,
+    "tile_rows": 64
+  },
+  "sink": {
+    "abs_max": 256.0,
+    "finite": true,
+    "mean_abs": 256.0,
+    "nonfinite": 0,
+    "nonzero": 256
+  },
+  "timed_boundary": "q-chunk D512 score/row-term producer gate only: QK and dO V^T are accumulated over four D128 chunks before row terms while the kernel owns a compressed KV tile and a chunk of q-head/query tiles. P/dP then feed one D128 dK/dV scratch epilogue, not full SharedKV gradients. When route_bitset_topk is set and the module is compiled with ATTN_ROUTE_BITSET_MODE=1, the kernel also preloads the exact forward-known two-word membership sidecar for the current 16-token x 64-group tile and folds its popcount into Sink."
+}

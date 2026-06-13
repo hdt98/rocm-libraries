@@ -1,0 +1,115 @@
+{
+  "artifact": "torchtitan_standard_ep_hotweight_owner_gather_rootcause_20260607",
+  "date": "2026-06-07",
+  "node": "do-vunguyen-mi350-gpu",
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation": 4,
+    "fsdp": 8,
+    "ep": 8,
+    "activation_checkpoint": "none"
+  },
+  "candidate": {
+    "standard_ep_hot_weight_forward_backend": "torch_allgather",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "status": "rejected",
+    "reason": "Owner-sharded allgather does not materialize into e2e throughput because the current dense selected-hot-weight ABI forces padding plus pack/unpack layout conversion, and about half of calls fall back."
+  },
+  "throughput_ab": {
+    "retained_baseline": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607",
+      "steps_2_to_6_tok_per_gpu_s": 8029.0,
+      "steps_2_to_6_tflops_per_gpu": 406.52,
+      "forward_backend": "mori_sdma",
+      "reduce_backend": "mori_sdma"
+    },
+    "candidate": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_torchallgather_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607_retry1",
+      "steps": {
+        "2": {"tok_per_gpu_s": 7746.0, "tflops_per_gpu": 392.18},
+        "3": {"tok_per_gpu_s": 7926.0, "tflops_per_gpu": 401.30},
+        "4": {"tok_per_gpu_s": 8059.0, "tflops_per_gpu": 408.04},
+        "5": {"tok_per_gpu_s": 8030.0, "tflops_per_gpu": 406.57},
+        "6": {"tok_per_gpu_s": 8112.0, "tflops_per_gpu": 410.75}
+      },
+      "steps_2_to_6_tok_per_gpu_s": 7974.6,
+      "steps_2_to_6_tflops_per_gpu": 403.768,
+      "relative_to_retained_baseline_tflops": 0.9932
+    }
+  },
+  "timing_profiles": {
+    "torch_allgather_profile_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_torchallgather_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "mori_sdma_profile_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ep_top8_morisdm_forward_hotweight_timing_8x_s4096_gbs128_mbs4_steps2_20260607",
+    "note": "For MORI SDMA stages, use wall_issue_ms rather than CUDA event gpu_ms because the timing hook records default-stream events while MORI transport uses its own behavior."
+  },
+  "owner_gather_call_mix": {
+    "forward_records": 2304,
+    "successful_torch_allgather_records": 1128,
+    "fallback_torch_allreduce_records": 1176,
+    "successful_fraction": 0.4896,
+    "pad_factor_counts": {
+      "2.0_ok": 1128,
+      "3.0_fallback": 960,
+      "4.0_fallback": 216
+    },
+    "interpretation": "No successful owner-gather call had pad factor 1.0. Successful calls still sent a padded owner-shard payload with two rows per owner rank, so the candidate did not get the low-payload case from the raw primitive microbench."
+  },
+  "per_call_wall_issue_median_ms": {
+    "torch_allgather_success": {
+      "w1": {
+        "plan_owner_slots": 0.020,
+        "allocate_local_shard": 0.027,
+        "pack_owner_shard": 0.027,
+        "allocate_gathered": 0.015,
+        "all_gather_hot_weight": 0.059,
+        "unpack_hot_weight": 0.075,
+        "approx_total": 0.199
+      },
+      "w2": {
+        "plan_owner_slots": 0.018,
+        "allocate_local_shard": 0.033,
+        "pack_owner_shard": 0.033,
+        "allocate_gathered": 0.017,
+        "all_gather_hot_weight": 0.074,
+        "unpack_hot_weight": 0.081,
+        "approx_total": 0.256
+      },
+      "w3": {
+        "plan_owner_slots": 0.019,
+        "allocate_local_shard": 0.026,
+        "pack_owner_shard": 0.025,
+        "allocate_gathered": 0.015,
+        "all_gather_hot_weight": 0.056,
+        "unpack_hot_weight": 0.075,
+        "approx_total": 0.196
+      }
+    },
+    "torch_allgather_fallback_torch_allreduce": {
+      "w1": {"plan_owner_slots": 0.020, "copy_owner": 0.029, "all_reduce_hot_weight": 0.062, "approx_total": 0.111},
+      "w2": {"plan_owner_slots": 0.018, "copy_owner": 0.033, "all_reduce_hot_weight": 0.082, "approx_total": 0.133},
+      "w3": {"plan_owner_slots": 0.019, "copy_owner": 0.027, "all_reduce_hot_weight": 0.055, "approx_total": 0.101}
+    },
+    "retained_mori_sdma": {
+      "w1": {"copy_owner": 0.029, "all_reduce_hot_weight": 0.048, "approx_total": 0.077},
+      "w2": {"copy_owner": 0.033, "all_reduce_hot_weight": 0.063, "approx_total": 0.096},
+      "w3": {"copy_owner": 0.026, "all_reduce_hot_weight": 0.044, "approx_total": 0.070}
+    }
+  },
+  "root_cause": [
+    "The retained MORI SDMA path copies owner rows directly into the final dense selected-hot-weight tensor and reduces that tensor in-place.",
+    "The torch_allgather candidate must first build an owner-sharded padded tensor, allgather it, then unpack rows back into selected order because downstream grouped MLP expects the dense selected-hot-weight ABI.",
+    "The actual top-8 hot expert plans were not one-hot-per-owner. Successful owner-gather calls had pad factor 2.0, and pad factors 3.0 or 4.0 fell back to allreduce.",
+    "Thus the candidate sent equal-or-more effective rows and added pack/unpack bookkeeping; the raw primitive advantage was erased."
+  ],
+  "next_direction": [
+    "Do not promote torch_allgather as a drop-in forward hot-weight backend.",
+    "Keep the standard-EP hot-helper layout as the truth.",
+    "Make hot/cold/helper rows and owner-sharded hot-weight buffers first-class in the dispatcher layout so the helper grouped MLP consumes owner-sharded hot weights directly.",
+    "Avoid reconstructing dense selected-order hot_weight unless a downstream consumer really requires it.",
+    "If owner-sharded movement is retried, gate it on pad factor 1.0 or a direct owner-shard consumer."
+  ]
+}

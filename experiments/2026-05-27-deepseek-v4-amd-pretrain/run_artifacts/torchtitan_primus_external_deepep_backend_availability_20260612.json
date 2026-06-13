@@ -1,0 +1,98 @@
+{
+  "artifact": "torchtitan_primus_external_deepep_backend_availability_20260612",
+  "created_utc": "2026-06-12T15:35:00Z",
+  "question": "Can the no-helper DeepSeek/Qwen baselines be rerun with the Primus-Turbo external DeepEP backend?",
+  "answer": {
+    "retained_no_helper_rows_used_deepep": false,
+    "existing_primus_turbo_no_helper_rows_used": "Primus-Turbo in-tree TurboEPBackend",
+    "external_deepep_20step_run_started": false,
+    "external_deepep_20step_run_blocked": true,
+    "read": "The retained no-helper rows were plain standard EP. The already-completed Primus-Turbo rows use the in-tree TurboEPBackend raw top-k path, not the optional external DeepEPBackend. A true external DEEP_EP run is blocked in the current images because the required deep_ep/deepep package is not installed."
+  },
+  "backend_distinction": {
+    "turbo_ep_backend": {
+      "class": "primus_turbo.pytorch.kernels.moe.moe_dispatch_combine_impl.TurboEPBackend",
+      "source": "sources/wip/primus-turbo/primus_turbo/pytorch/kernels/moe/moe_dispatch_combine_impl.py",
+      "availability": "in-tree, always available",
+      "status": "already measured for no-helper raw top-k EP"
+    },
+    "external_deepep_backend": {
+      "class": "primus_turbo.pytorch.kernels.moe.moe_dispatch_combine_impl.DeepEPBackend",
+      "source": "sources/wip/primus-turbo/primus_turbo/pytorch/kernels/moe/moe_dispatch_combine_impl.py",
+      "selector": "PRIMUS_TURBO_MOE_DISPATCH_COMBINE_BACKEND=DEEP_EP",
+      "availability": "optional external deep_ep package",
+      "status": "not runnable in current images"
+    }
+  },
+  "local_source_checks": {
+    "backend_manager": {
+      "source": "sources/wip/primus-turbo/primus_turbo/pytorch/core/backend.py",
+      "read": "GlobalBackendManager asserts HAVE_DEEP_EP when PRIMUS_TURBO_MOE_DISPATCH_COMBINE_BACKEND=DEEP_EP."
+    },
+    "primus_turbo_deepep_readme": {
+      "source": "sources/wip/primus-turbo/primus_turbo/pytorch/deep_ep/README.md",
+      "read": "Primus-Turbo marks DeepEP experimental and documents hardware support as MI300/gfx942 only."
+    },
+    "primus_uep_bootstrap": {
+      "source": "sources/wip/primus/examples/run_pretrain.sh",
+      "read": "USING_UEP requires both uccl and deep_ep packages before exporting PRIMUS_TURBO_MOE_DISPATCH_COMBINE_BACKEND=DEEP_EP."
+    }
+  },
+  "remote_smokes": [
+    {
+      "node": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "result": {
+        "primus_turbo": true,
+        "deep_ep": false,
+        "deepep": false,
+        "uccl": false,
+        "rocshmem": false
+      },
+      "note": "The import smoke was interrupted after package availability was printed because importing primus_turbo triggered unrelated AITER JIT compilation."
+    },
+    {
+      "node": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "result": {
+        "primus_turbo": true,
+        "deep_ep": false,
+        "deepep": false,
+        "uccl": false,
+        "rocshmem": false
+      },
+      "note": "The import smoke was interrupted after package availability was printed because importing primus_turbo triggered unrelated AITER JIT compilation."
+    },
+    {
+      "node": "do-sonle5-mi350-gpu",
+      "image": "rocm/primus:v26.2",
+      "result": {
+        "primus_turbo": true,
+        "deep_ep": false,
+        "deepep": false,
+        "uccl": false,
+        "rocshmem": false,
+        "have_deep_ep": false,
+        "backend_types": ["CK", "HIPBLASLT", "AITER", "TRITON", "DEEP_EP", "TURBO"]
+      },
+      "note": "The Primus image exposes the DEEP_EP enum but does not include the required external backend package."
+    }
+  ],
+  "node_cleanup": {
+    "do_sonle5_mi350_gpu": "No diagnostic container left running; lighthouse container only.",
+    "do_vunguyen_mi350_gpu": "No diagnostic container left running after import smoke cleanup."
+  },
+  "decision": {
+    "run_external_deepep_baseline_now": false,
+    "why": [
+      "Current images do not have deep_ep/deepep, uccl, or rocshmem installed.",
+      "Primus-Turbo docs mark the experimental DeepEP path as MI300/gfx942-only, while the active nodes are MI350/gfx950.",
+      "Launching a 20-step training job with PRIMUS_TURBO_MOE_DISPATCH_COMBINE_BACKEND=DEEP_EP would fail at backend dependency selection, before producing a fair metric."
+    ],
+    "next_action_if_still_desired": "Build or pull a MI350-compatible image with external deep_ep/uccl/rocSHMEM installed, run a one-step DEEP_EP backend smoke first, then run the same 20-step no-helper MBS ladder."
+  },
+  "related_measured_baseline": {
+    "artifact": "run_artifacts/torchtitan_primus_turbo_nohelper_cross_model_mbs1_mbs8_20step_20260612.json",
+    "read": "Use this as the current Primus-backed no-helper baseline; it is TurboEPBackend, not external DeepEPBackend."
+  }
+}

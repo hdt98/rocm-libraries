@@ -1,0 +1,156 @@
+{
+  "artifact": "torchtitan_flash12_moe_load_balance_comm_rescan_20260606",
+  "date": "2026-06-06",
+  "question": "Check communication source code deeply for a hidden Ascend/MindSpeed load-balancing mechanism that prevents busy experts and congested cross-card communication.",
+  "conclusion": "The visible Ascend/MindSpeed/TorchTitan-NPU communication code is count-aware and layout-aware, but it does not expose a hidden post-router expert reassignment scheduler. Load balance is router-side via expert_bias or debug force-balance; performance comes from count-aware all-to-all, local expert-major permute/padding, compact grouped matmul backward, and overlap scheduling.",
+  "source_evidence": {
+    "ascend_router": [
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/models/deepseek_v4/model/moe.py",
+        "lines": "145-161",
+        "read": "expert_bias affects expert choice; debug moe_force_load_balance overrides selected expert ids."
+      },
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/models/deepseek_v4/model/moe.py",
+        "lines": "168-175",
+        "read": "num_tokens_per_expert is computed after routing and drives downstream communication/layout."
+      }
+    ],
+    "ascend_comm_layout": [
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permute.py",
+        "lines": "124-156",
+        "read": "exchanges num_tokens_per_expert and derives all-to-all input/output splits."
+      },
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permute.py",
+        "lines": "171-204",
+        "read": "after all-to-all, performs a local shuffle from rank-major to expert-major and pads local expert groups."
+      },
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permutation.py",
+        "lines": "12-58",
+        "read": "unpermute autograd saves sorted_indices/restore_shape and calls the NPU grad scatter operator."
+      }
+    ],
+    "ascend_grouped_math": [
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/gmm.py",
+        "lines": "30-73",
+        "read": "torch_npu.npu_grouped_matmul is used for grouped forward, grad_input, and grad_weight."
+      },
+      {
+        "path": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/gmm.py",
+        "lines": "80-103",
+        "read": "expert forward is W13 grouped matmul, npu_swiglu, optional routed-score scale, W2 grouped matmul."
+      }
+    ],
+    "upstream_mindspeed_wrapper": [
+      {
+        "path": "/tmp/mindspeed_npu_moe_token_permute.cpp",
+        "lines": "78-96",
+        "read": "wrapper computes topk/flatten size, allocates sorted_indices/permuted_tokens, and calls aclnnMoeTokenPermute."
+      },
+      {
+        "path": "/tmp/mindspeed_npu_moe_token_permute.cpp",
+        "lines": "99-117",
+        "read": "backward calls aclnnMoeTokenPermuteGrad from saved sorted_indices/topk; no visible reassignment scheduler."
+      },
+      {
+        "path": "/tmp/mindspeed_npu_fused_moe_token_permute.md",
+        "lines": "31-58",
+        "read": "documented equivalent forward is argsort(flatten_indices) then index_select(tokens, sorted_indices // topk)."
+      },
+      {
+        "path": "/tmp/mindspeed_npu_fused_moe_token_unpermute.md",
+        "lines": "86-106",
+        "read": "documented equivalent unpermute is index_copy, optional probability scaling, then sum across topk."
+      }
+    ],
+    "mori_transport": [
+      {
+        "path": "sources/references/mori/src/ops/dispatch_combine/dispatch_combine.cpp",
+        "lines": "145-156",
+        "read": "maxTotalRecvTokens is clamped/reported as capacity; not a load-balancing reassignment."
+      },
+      {
+        "path": "sources/references/mori/src/ops/dispatch_combine/dispatch_combine.cpp",
+        "lines": "190-210",
+        "read": "buffers are sized from worst-case/configured token counts; affects memory/transport capacity."
+      },
+      {
+        "path": "sources/references/mori/src/ops/dispatch_combine/ep_local_expert_count.hpp",
+        "lines": "29-41",
+        "read": "local expert counts are observed by scanning received ids and atomicAdd; no smoothing."
+      }
+    ],
+    "amd_current_dispatch_and_owner_vjp": [
+      {
+        "path": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+        "lines": "274-340",
+        "read": "standard dispatcher has count exchange, all-to-all, and expert-major local permute."
+      },
+      {
+        "path": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+        "lines": "489-518",
+        "read": "TorchAO variant adds expert-group padding for quantized grouped GEMMs."
+      },
+      {
+        "path": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+        "lines": "275-349",
+        "read": "active MORI/AITER path builds or reuses local route metadata by sorting local owner expert ids."
+      },
+      {
+        "path": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+        "lines": "2298-2458",
+        "read": "active owner VJP gathers compact rows, recomputes forward intermediates, and computes dTopK, dgrad/SwiGLU, wgrad, and xgrad through adapter-heavy pieces."
+      }
+    ],
+    "route_order_evidence": [
+      {
+        "path": "run_artifacts/mori_aiter_route_order_random_s4096_4x_20260606.json",
+        "read": "all_ranks_grouped_by_local_expert=false; random route has hundreds of runs per nonempty expert."
+      },
+      {
+        "path": "run_artifacts/mori_aiter_route_order_balanced_s4096_4x_20260606.json",
+        "read": "all_ranks_grouped_by_local_expert=false even under balanced routing; runs_per_nonempty_expert=384.0."
+      }
+    ],
+    "overlap_comparator": [
+      {
+        "path": "sources/wip/primus/primus/modules/trainer/megatron/pre_trainer.py",
+        "lines": "259-270",
+        "read": "Primus split-BW path handles MoE overlap with separate wgrad scheduling."
+      },
+      {
+        "path": "sources/wip/primus/primus/backends/megatron/core/extensions/te_wgrad_store.py",
+        "lines": "7-22",
+        "read": "Primus intercepts delayed TE wgrad closures for pipeline/zero-bubble scheduling."
+      },
+      {
+        "path": "sources/wip/megatron-LM/megatron/core/transformer/moe/experts.py",
+        "lines": "776-810",
+        "read": "Megatron grouped MLP exposes backward_dw for delayed/fused wgrad execution."
+      },
+      {
+        "path": "sources/wip/megatron-LM/megatron/core/transformer/cuda_graphs.py",
+        "lines": "2483-2507",
+        "read": "overlap schedule expands chunk order into layer-wise nodes and optional wgrad nodes."
+      }
+    ]
+  },
+  "mechanism_split": [
+    "router expert-bias or debug force-balance",
+    "count exchange and split-aware all-to-all",
+    "local expert-major token permute and padding",
+    "compact grouped expert forward/backward",
+    "optional overlap of dX return/combine with delayed wgrad"
+  ],
+  "amd_next_rung": [
+    "consume saved forward route metadata",
+    "make local owner rows expert-contiguous in an explicit compact layout",
+    "replace adapter-heavy owner VJP with fused compact grouped training backward for dW13, dW2, dX, and dTopKWeight",
+    "add dX-return and delayed-wgrad overlap after owner VJP tail is shortened"
+  ],
+  "dependency_pin_changes": []
+}

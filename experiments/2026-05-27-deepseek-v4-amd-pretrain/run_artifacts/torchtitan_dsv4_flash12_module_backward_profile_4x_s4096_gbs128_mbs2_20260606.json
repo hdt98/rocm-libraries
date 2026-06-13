@@ -1,0 +1,882 @@
+{
+  "artifact_type": "diagnostic_module_backward_profile",
+  "generated_at": "2026-06-06T00:00:00+07:00",
+  "status": "diagnostic_not_promoted",
+  "run_id": "torchtitan_dsv4_flash12_module_backward_profile_4x_s4096_gbs128_mbs2_20260606c",
+  "raw_paths": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_module_backward_profile_4x_s4096_gbs128_mbs2_20260606c",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_module_backward_profile_4x_s4096_gbs128_mbs2_20260606c/docker-run.log",
+    "remote_sidecar_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/{profile_timing,additive_timing}",
+    "local_copy": "/tmp/dsv4_flash12_module_backward_profile_20260606c"
+  },
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": {
+    "gpu": "MI350",
+    "gpu_count": 4
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash 12-layer ceiling probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": false,
+    "checkpointing": false,
+    "compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ]
+  },
+  "env_focus": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": true,
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": true,
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": true,
+    "CANARY_DSV4_PROFILE_MODULE_BACKWARD": true,
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "step_metrics": {
+    "1": {
+      "rank_count": 4,
+      "loss": {
+        "count": 4,
+        "min": 12.419,
+        "mean": 12.419,
+        "max": 12.419,
+        "p50": 12.419,
+        "p90": 12.419
+      },
+      "grad_norm": {
+        "count": 4,
+        "min": 19.25,
+        "mean": 19.25,
+        "max": 19.25,
+        "p50": 19.25,
+        "p90": 19.25
+      },
+      "memory_gib": {
+        "count": 4,
+        "min": 171.88,
+        "mean": 173.257,
+        "max": 174.69,
+        "p50": 172.74,
+        "p90": 173.72
+      },
+      "tokens_per_gpu_s": {
+        "count": 4,
+        "min": 2471,
+        "mean": 2472.5,
+        "max": 2475,
+        "p50": 2471,
+        "p90": 2473
+      },
+      "node_tokens_s_mean": 9890,
+      "tflops_per_gpu": {
+        "count": 4,
+        "min": 125.12,
+        "mean": 125.19,
+        "max": 125.32,
+        "p50": 125.12,
+        "p90": 125.2
+      },
+      "mfu_pct": {
+        "count": 4,
+        "min": 5.42,
+        "mean": 5.422,
+        "max": 5.43,
+        "p50": 5.42,
+        "p90": 5.42
+      }
+    },
+    "2": {
+      "rank_count": 4,
+      "loss": {
+        "count": 4,
+        "min": 7.669,
+        "mean": 7.669,
+        "max": 7.669,
+        "p50": 7.669,
+        "p90": 7.669
+      },
+      "grad_norm": {
+        "count": 4,
+        "min": 39.75,
+        "mean": 39.75,
+        "max": 39.75,
+        "p50": 39.75,
+        "p90": 39.75
+      },
+      "memory_gib": {
+        "count": 4,
+        "min": 213.64,
+        "mean": 214.225,
+        "max": 214.56,
+        "p50": 214.34,
+        "p90": 214.36
+      },
+      "tokens_per_gpu_s": {
+        "count": 4,
+        "min": 3844,
+        "mean": 3844,
+        "max": 3844,
+        "p50": 3844,
+        "p90": 3844
+      },
+      "node_tokens_s_mean": 15376,
+      "tflops_per_gpu": {
+        "count": 4,
+        "min": 194.64,
+        "mean": 194.64,
+        "max": 194.64,
+        "p50": 194.64,
+        "p90": 194.64
+      },
+      "mfu_pct": {
+        "count": 4,
+        "min": 8.43,
+        "mean": 8.43,
+        "max": 8.43,
+        "p50": 8.43,
+        "p90": 8.43
+      }
+    }
+  },
+  "step2_additive_gpu_ms": {
+    "step": {
+      "count": 4,
+      "min": 34075.594,
+      "mean": 34076.199,
+      "max": 34076.828,
+      "p50": 34076.031,
+      "p90": 34076.344
+    },
+    "microbatch_forward_backward": {
+      "count": 4,
+      "min": 33471.14,
+      "mean": 33481.783,
+      "max": 33490.222,
+      "p50": 33480.132,
+      "p90": 33485.64
+    },
+    "model_forward": {
+      "count": 4,
+      "min": 7156.246,
+      "mean": 7194.766,
+      "max": 7224.558,
+      "p50": 7191.721,
+      "p90": 7206.537
+    },
+    "loss": {
+      "count": 4,
+      "min": 981.848,
+      "mean": 983.146,
+      "max": 985.722,
+      "p50": 982.224,
+      "p90": 982.788
+    },
+    "backward": {
+      "count": 4,
+      "min": 19886.874,
+      "mean": 19887.762,
+      "max": 19889.219,
+      "p50": 19887.266,
+      "p90": 19887.688
+    },
+    "wrapper_residual": {
+      "count": 4,
+      "min": 5385.098,
+      "mean": 5416.11,
+      "max": 5445.403,
+      "p50": 5406.506,
+      "p90": 5427.434
+    },
+    "grad_clip": {
+      "count": 4,
+      "min": 50.489,
+      "mean": 55.387,
+      "max": 61.348,
+      "p50": 53.293,
+      "p90": 56.416
+    },
+    "optimizer_step": {
+      "count": 4,
+      "min": 85.805,
+      "mean": 86.381,
+      "max": 87.453,
+      "p50": 85.882,
+      "p90": 86.383
+    },
+    "accumulated_loss_reduce": {
+      "count": 4,
+      "min": 361.341,
+      "mean": 365.049,
+      "max": 368.913,
+      "p50": 364.053,
+      "p90": 365.888
+    }
+  },
+  "step2_module_backward_envelopes_gpu_ms": {
+    "caveat": "Nested module hooks are envelopes. transformer_block includes attention/moe/norm children; role totals are not additive with each other.",
+    "role_rank_stats": {
+      "attention": {
+        "count": 4,
+        "min": 7128.024,
+        "mean": 7165.335,
+        "max": 7197.094,
+        "p50": 7164.687,
+        "p90": 7171.536
+      },
+      "attention_norm": {
+        "count": 4,
+        "min": 33.13,
+        "mean": 33.387,
+        "max": 33.66,
+        "p50": 33.137,
+        "p90": 33.622
+      },
+      "embedding": {
+        "count": 4,
+        "min": 0.111,
+        "mean": 0.116,
+        "max": 0.118,
+        "p50": 0.117,
+        "p90": 0.117
+      },
+      "ffn_norm": {
+        "count": 4,
+        "min": 30.728,
+        "mean": 30.825,
+        "max": 30.902,
+        "p50": 30.813,
+        "p90": 30.856
+      },
+      "final_norm": {
+        "count": 4,
+        "min": 3.674,
+        "mean": 3.704,
+        "max": 3.756,
+        "p50": 3.687,
+        "p90": 3.701
+      },
+      "moe": {
+        "count": 4,
+        "min": 9446.815,
+        "mean": 9476.787,
+        "max": 9510.14,
+        "p50": 9470.766,
+        "p90": 9479.425
+      },
+      "transformer_block": {
+        "count": 4,
+        "min": 17434.472,
+        "mean": 17469.78,
+        "max": 17493.231,
+        "p50": 17460.565,
+        "p90": 17490.85
+      }
+    },
+    "per_rank": [
+      {
+        "rank": 0,
+        "transformer_block_gpu_ms": 17493.231,
+        "attention_gpu_ms": 7164.687,
+        "moe_gpu_ms": 9510.14,
+        "attention_norm_gpu_ms": 33.622,
+        "ffn_norm_gpu_ms": 30.902,
+        "final_norm_gpu_ms": 3.756,
+        "embedding_gpu_ms": 0.111,
+        "block_named_child_residual_gpu_ms": 753.88,
+        "additive_backward_gpu_ms": 19887.688,
+        "outside_transformer_block_backward_gpu_ms": 2390.59
+      },
+      {
+        "rank": 1,
+        "transformer_block_gpu_ms": 17460.565,
+        "attention_gpu_ms": 7171.536,
+        "moe_gpu_ms": 9446.815,
+        "attention_norm_gpu_ms": 33.137,
+        "ffn_norm_gpu_ms": 30.813,
+        "final_norm_gpu_ms": 3.674,
+        "embedding_gpu_ms": 0.117,
+        "block_named_child_residual_gpu_ms": 778.264,
+        "additive_backward_gpu_ms": 19887.266,
+        "outside_transformer_block_backward_gpu_ms": 2422.91
+      },
+      {
+        "rank": 2,
+        "transformer_block_gpu_ms": 17434.472,
+        "attention_gpu_ms": 7128.024,
+        "moe_gpu_ms": 9470.766,
+        "attention_norm_gpu_ms": 33.13,
+        "ffn_norm_gpu_ms": 30.856,
+        "final_norm_gpu_ms": 3.701,
+        "embedding_gpu_ms": 0.117,
+        "block_named_child_residual_gpu_ms": 771.696,
+        "additive_backward_gpu_ms": 19886.874,
+        "outside_transformer_block_backward_gpu_ms": 2448.584
+      },
+      {
+        "rank": 3,
+        "transformer_block_gpu_ms": 17490.85,
+        "attention_gpu_ms": 7197.094,
+        "moe_gpu_ms": 9479.425,
+        "attention_norm_gpu_ms": 33.66,
+        "ffn_norm_gpu_ms": 30.728,
+        "final_norm_gpu_ms": 3.687,
+        "embedding_gpu_ms": 0.118,
+        "block_named_child_residual_gpu_ms": 749.943,
+        "additive_backward_gpu_ms": 19889.219,
+        "outside_transformer_block_backward_gpu_ms": 2394.564
+      }
+    ],
+    "derived_rank_stats": {
+      "transformer_block_gpu_ms": {
+        "count": 4,
+        "min": 17434.472,
+        "mean": 17469.779,
+        "max": 17493.231,
+        "p50": 17460.565,
+        "p90": 17490.85
+      },
+      "attention_gpu_ms": {
+        "count": 4,
+        "min": 7128.024,
+        "mean": 7165.335,
+        "max": 7197.094,
+        "p50": 7164.687,
+        "p90": 7171.536
+      },
+      "moe_gpu_ms": {
+        "count": 4,
+        "min": 9446.815,
+        "mean": 9476.786,
+        "max": 9510.14,
+        "p50": 9470.766,
+        "p90": 9479.425
+      },
+      "attention_norm_gpu_ms": {
+        "count": 4,
+        "min": 33.13,
+        "mean": 33.387,
+        "max": 33.66,
+        "p50": 33.137,
+        "p90": 33.622
+      },
+      "ffn_norm_gpu_ms": {
+        "count": 4,
+        "min": 30.728,
+        "mean": 30.825,
+        "max": 30.902,
+        "p50": 30.813,
+        "p90": 30.856
+      },
+      "final_norm_gpu_ms": {
+        "count": 4,
+        "min": 3.674,
+        "mean": 3.704,
+        "max": 3.756,
+        "p50": 3.687,
+        "p90": 3.701
+      },
+      "embedding_gpu_ms": {
+        "count": 4,
+        "min": 0.111,
+        "mean": 0.116,
+        "max": 0.118,
+        "p50": 0.117,
+        "p90": 0.117
+      },
+      "block_named_child_residual_gpu_ms": {
+        "count": 4,
+        "min": 749.943,
+        "mean": 763.446,
+        "max": 778.264,
+        "p50": 753.88,
+        "p90": 771.696
+      },
+      "additive_backward_gpu_ms": {
+        "count": 4,
+        "min": 19886.874,
+        "mean": 19887.762,
+        "max": 19889.219,
+        "p50": 19887.266,
+        "p90": 19887.688
+      },
+      "outside_transformer_block_backward_gpu_ms": {
+        "count": 4,
+        "min": 2390.59,
+        "mean": 2414.162,
+        "max": 2448.584,
+        "p50": 2394.564,
+        "p90": 2422.91
+      }
+    },
+    "layer_rank_max_table": [
+      {
+        "layer": 0,
+        "transformer_block_gpu_ms_max": 1884.545,
+        "attention_gpu_ms_max": 839.094,
+        "moe_gpu_ms_max": 978.883,
+        "approximate_block_minus_children_gpu_ms_max": 64.802
+      },
+      {
+        "layer": 1,
+        "transformer_block_gpu_ms_max": 1751.265,
+        "attention_gpu_ms_max": 839.845,
+        "moe_gpu_ms_max": 843.996,
+        "approximate_block_minus_children_gpu_ms_max": 66.646
+      },
+      {
+        "layer": 2,
+        "transformer_block_gpu_ms_max": 1642.604,
+        "attention_gpu_ms_max": 764.556,
+        "moe_gpu_ms_max": 807.84,
+        "approximate_block_minus_children_gpu_ms_max": 65.49
+      },
+      {
+        "layer": 3,
+        "transformer_block_gpu_ms_max": 1172.962,
+        "attention_gpu_ms_max": 332.196,
+        "moe_gpu_ms_max": 776.676,
+        "approximate_block_minus_children_gpu_ms_max": 65.65
+      },
+      {
+        "layer": 4,
+        "transformer_block_gpu_ms_max": 1582.761,
+        "attention_gpu_ms_max": 765.128,
+        "moe_gpu_ms_max": 750.154,
+        "approximate_block_minus_children_gpu_ms_max": 66.34
+      },
+      {
+        "layer": 5,
+        "transformer_block_gpu_ms_max": 1227.457,
+        "attention_gpu_ms_max": 331.525,
+        "moe_gpu_ms_max": 837.203,
+        "approximate_block_minus_children_gpu_ms_max": 64.706
+      },
+      {
+        "layer": 6,
+        "transformer_block_gpu_ms_max": 1625.195,
+        "attention_gpu_ms_max": 767.463,
+        "moe_gpu_ms_max": 791.395,
+        "approximate_block_minus_children_gpu_ms_max": 66.048
+      },
+      {
+        "layer": 7,
+        "transformer_block_gpu_ms_max": 1197.206,
+        "attention_gpu_ms_max": 328.594,
+        "moe_gpu_ms_max": 798.798,
+        "approximate_block_minus_children_gpu_ms_max": 65.022
+      },
+      {
+        "layer": 8,
+        "transformer_block_gpu_ms_max": 1631.364,
+        "attention_gpu_ms_max": 767.828,
+        "moe_gpu_ms_max": 801.695,
+        "approximate_block_minus_children_gpu_ms_max": 65.614
+      },
+      {
+        "layer": 9,
+        "transformer_block_gpu_ms_max": 1130.43,
+        "attention_gpu_ms_max": 330.953,
+        "moe_gpu_ms_max": 737.637,
+        "approximate_block_minus_children_gpu_ms_max": 67.15
+      },
+      {
+        "layer": 10,
+        "transformer_block_gpu_ms_max": 1745.676,
+        "attention_gpu_ms_max": 815.573,
+        "moe_gpu_ms_max": 862.037,
+        "approximate_block_minus_children_gpu_ms_max": 64.681
+      },
+      {
+        "layer": 11,
+        "transformer_block_gpu_ms_max": 987.219,
+        "attention_gpu_ms_max": 347,
+        "moe_gpu_ms_max": 577.529,
+        "approximate_block_minus_children_gpu_ms_max": 57.66
+      }
+    ],
+    "top_label_rank_max": [
+      {
+        "key": "transformer_block|dsv4.layers.0.block",
+        "stats": {
+          "count": 4,
+          "min": 1866.54,
+          "mean": 1874.837,
+          "max": 1884.545,
+          "p50": 1873.818,
+          "p90": 1874.447
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.1.block",
+        "stats": {
+          "count": 4,
+          "min": 1733.88,
+          "mean": 1744.042,
+          "max": 1751.265,
+          "p50": 1743.491,
+          "p90": 1747.534
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.10.block",
+        "stats": {
+          "count": 4,
+          "min": 1702.271,
+          "mean": 1726.915,
+          "max": 1745.676,
+          "p50": 1721.854,
+          "p90": 1737.861
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.2.block",
+        "stats": {
+          "count": 4,
+          "min": 1620.762,
+          "mean": 1632.461,
+          "max": 1642.604,
+          "p50": 1633.093,
+          "p90": 1633.385
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.8.block",
+        "stats": {
+          "count": 4,
+          "min": 1620.921,
+          "mean": 1625.671,
+          "max": 1631.364,
+          "p50": 1624.547,
+          "p90": 1625.852
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.6.block",
+        "stats": {
+          "count": 4,
+          "min": 1607.301,
+          "mean": 1614.252,
+          "max": 1625.195,
+          "p50": 1608.53,
+          "p90": 1615.981
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.4.block",
+        "stats": {
+          "count": 4,
+          "min": 1560.266,
+          "mean": 1570.763,
+          "max": 1582.761,
+          "p50": 1563.752,
+          "p90": 1576.273
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.5.block",
+        "stats": {
+          "count": 4,
+          "min": 1221.618,
+          "mean": 1224.572,
+          "max": 1227.457,
+          "p50": 1224.039,
+          "p90": 1225.177
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.7.block",
+        "stats": {
+          "count": 4,
+          "min": 1180.785,
+          "mean": 1186.096,
+          "max": 1197.206,
+          "p50": 1181.989,
+          "p90": 1184.402
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.3.block",
+        "stats": {
+          "count": 4,
+          "min": 1171.32,
+          "mean": 1172.308,
+          "max": 1172.962,
+          "p50": 1172.313,
+          "p90": 1172.636
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.9.block",
+        "stats": {
+          "count": 4,
+          "min": 1105.227,
+          "mean": 1118.037,
+          "max": 1130.43,
+          "p50": 1106.261,
+          "p90": 1130.228
+        }
+      },
+      {
+        "key": "transformer_block|dsv4.layers.11.block",
+        "stats": {
+          "count": 4,
+          "min": 974.347,
+          "mean": 979.825,
+          "max": 987.219,
+          "p50": 977.599,
+          "p90": 980.136
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.0.moe",
+        "stats": {
+          "count": 4,
+          "min": 966.298,
+          "mean": 970.067,
+          "max": 978.883,
+          "p50": 966.549,
+          "p90": 968.536
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.10.moe",
+        "stats": {
+          "count": 4,
+          "min": 856.14,
+          "mean": 858.612,
+          "max": 862.037,
+          "p50": 857.181,
+          "p90": 859.09
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.1.moe",
+        "stats": {
+          "count": 4,
+          "min": 836.173,
+          "mean": 838.571,
+          "max": 843.996,
+          "p50": 836.362,
+          "p90": 837.751
+        }
+      },
+      {
+        "key": "attention|dsv4.layers.1.attention",
+        "stats": {
+          "count": 4,
+          "min": 827.914,
+          "mean": 834.982,
+          "max": 839.845,
+          "p50": 834.967,
+          "p90": 837.204
+        }
+      },
+      {
+        "key": "attention|dsv4.layers.0.attention",
+        "stats": {
+          "count": 4,
+          "min": 833.59,
+          "mean": 836.572,
+          "max": 839.094,
+          "p50": 835.621,
+          "p90": 837.983
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.5.moe",
+        "stats": {
+          "count": 4,
+          "min": 823.859,
+          "mean": 827.694,
+          "max": 837.203,
+          "p50": 824.426,
+          "p90": 825.286
+        }
+      },
+      {
+        "key": "attention|dsv4.layers.10.attention",
+        "stats": {
+          "count": 4,
+          "min": 776.079,
+          "mean": 799.169,
+          "max": 815.573,
+          "p50": 795.665,
+          "p90": 809.357
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.2.moe",
+        "stats": {
+          "count": 4,
+          "min": 797.408,
+          "mean": 801.132,
+          "max": 807.84,
+          "p50": 799.333,
+          "p90": 799.948
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.8.moe",
+        "stats": {
+          "count": 4,
+          "min": 785.761,
+          "mean": 794.023,
+          "max": 801.695,
+          "p50": 792.378,
+          "p90": 796.257
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.7.moe",
+        "stats": {
+          "count": 4,
+          "min": 784.02,
+          "mean": 788.927,
+          "max": 798.798,
+          "p50": 786.415,
+          "p90": 786.476
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.6.moe",
+        "stats": {
+          "count": 4,
+          "min": 779.56,
+          "mean": 783.658,
+          "max": 791.395,
+          "p50": 781.323,
+          "p90": 782.354
+        }
+      },
+      {
+        "key": "moe|dsv4.layers.3.moe",
+        "stats": {
+          "count": 4,
+          "min": 772.961,
+          "mean": 775.209,
+          "max": 776.676,
+          "p50": 775.142,
+          "p90": 776.057
+        }
+      }
+    ]
+  },
+  "step2_shared_kv_profile_gpu_ms": {
+    "assignment": "Non-module profile records were assigned to the following module_backward flush on the same rank/microbatch; only assigned step 2 is summarized.",
+    "counts": {
+      "records": 640
+    },
+    "by_compress_ratio_and_stage": {
+      "cr128|sharedkv_bwd.grad_attn_sink": {
+        "count": 4,
+        "min": 120.511,
+        "mean": 122.987,
+        "max": 127.41,
+        "p50": 121.648,
+        "p90": 122.379
+      },
+      "cr128|sharedkv_bwd.query_recompute": {
+        "count": 4,
+        "min": 689.493,
+        "mean": 689.941,
+        "max": 690.468,
+        "p50": 689.74,
+        "p90": 690.061
+      },
+      "cr4|sharedkv_bwd.grad_attn_sink": {
+        "count": 4,
+        "min": 128.098,
+        "mean": 142.598,
+        "max": 154.719,
+        "p50": 137.507,
+        "p90": 150.068
+      },
+      "cr4|sharedkv_bwd.query_recompute": {
+        "count": 4,
+        "min": 2327.795,
+        "mean": 2328.654,
+        "max": 2330.665,
+        "p50": 2328.042,
+        "p90": 2328.113
+      }
+    }
+  },
+  "step2_loss_profile_gpu_ms": {
+    "assignment": "Same following module_backward flush assignment as shared-KV records.",
+    "counts": {
+      "records": 64
+    },
+    "by_stage": {
+      "dsv4.loss.chunk_N.backward": {
+        "count": 4,
+        "min": 668.227,
+        "mean": 671.22,
+        "max": 674.002,
+        "p50": 670.076,
+        "p90": 672.575
+      },
+      "dsv4.loss.chunk_N.cross_entropy_forward": {
+        "count": 4,
+        "min": 67.927,
+        "mean": 68.202,
+        "max": 68.706,
+        "p50": 67.999,
+        "p90": 68.177
+      },
+      "dsv4.loss.chunk_N.lm_head_forward": {
+        "count": 4,
+        "min": 221.968,
+        "mean": 224.628,
+        "max": 226.359,
+        "p50": 224.637,
+        "p90": 225.548
+      }
+    }
+  },
+  "interpretation": {
+    "promoted": false,
+    "throughput_read": "Step 2 reaches 3,844 tok/GPU/s and 194.64 TFLOPs/GPU under profiling hooks, below the retained non-profile all-compressed six-step candidate at 4,034.4 tok/GPU/s and 204.27 TFLOPs/GPU.",
+    "main_backward_envelopes": "The nested module hooks name attention (~7.20s rank-max) and MoE (~9.51s rank-max) inside a transformer-block envelope of ~17.49s rank-max. Additive backward is ~19.89s rank-max, leaving ~2.39s rank-max outside the profiled transformer blocks/final norm/embedding, mostly loss/lm-head/FSDP/autograd/optimizer-adjacent backward work not covered by these module hooks.",
+    "attention_read": "Attention module envelope is larger than the shared-KV sidecar (~3.47s rank-max across C4+C128 query+sink) because it also includes dense layers, projections, FSDP/autograd overhead, and module-boundary effects.",
+    "moe_read": "MoE remains the largest child envelope at ~9.51s rank-max. This keeps fused compact owner-rank training backward and dX-return skew/overlap as a primary e2e optimization branch.",
+    "residual_read": "Block minus named children is only ~0.77s rank-max across 12 layers, so the earlier ~8.88s unknown bucket is not a single hidden child inside transformer blocks; after module profiling, the large named buckets are MoE and attention, with remaining outside-block/loss/FSDP-autograd work much smaller but still nontrivial."
+  },
+  "validation": {
+    "run_completed": true,
+    "command_validation_before_run": [
+      "python3 -m py_compile dsv4_profile_timing.py trainer.py parallelize.py",
+      "bash -n launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+    ],
+    "local_hook_smoke": "not_run_successfully_local_mac_lacks_torch"
+  }
+}

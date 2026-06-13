@@ -1,0 +1,91 @@
+{
+  "status": "diagnostic_not_promoted",
+  "run_id": "hipkittens_sharedkv_qm_h64n64_d512_score_gate_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_qm_h64n64_d512_score.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_qm_h64n64_d512_score.py",
+    "reference": "sources/references/hipkittens"
+  },
+  "build": {
+    "target": "hk_sharedkv_qm_h64n64_d512_score",
+    "gpu_target": "CDNA4",
+    "compile_defines": {
+      "ATTN_B": 4,
+      "ATTN_Q_N": 4096,
+      "ATTN_KV_N": 1024,
+      "ATTN_SELECTED": 512,
+      "ATTN_H": 64,
+      "ATTN_H_KV": 1,
+      "ATTN_NUM_WARPS": 4
+    },
+    "resource_usage": {
+      "sgprs": 74,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "sgpr_spills": 0,
+      "vgpr_spills": 0,
+      "occupancy_waves_per_simd": 1
+    }
+  },
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "kv_seq": 1024,
+    "selected": 512,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim": 512,
+    "layout": "Q/dO H-major producer gate; K/V contiguous selected rows",
+    "kernel_owner": "token-major H64 x N64, four H16 warp subtiles",
+    "scratch_output": "1024-tile ring, diagnostic only"
+  },
+  "latency_ms": {
+    "median": 13.0715913772583,
+    "mean": 13.074565982818603,
+    "min": 13.04145336151123,
+    "max": 13.10489273071289,
+    "warmup_iters": 5,
+    "timed_iters": 30
+  },
+  "summaries": {
+    "dk_scratch": {
+      "finite": true,
+      "nonfinite": 0,
+      "nonzero": 8388608,
+      "abs_max": 6.0558319091796875e-05,
+      "mean_abs": 1.0347569514124189e-05
+    },
+    "dv_scratch": {
+      "finite": true,
+      "nonfinite": 0,
+      "nonzero": 8388096,
+      "abs_max": 0.0625,
+      "mean_abs": 0.011783493682742119
+    },
+    "sink": {
+      "finite": true,
+      "nonfinite": 0,
+      "nonzero": 524288,
+      "abs_max": 8.0,
+      "mean_abs": 1.7249202728271484
+    }
+  },
+  "comparison": {
+    "previous_h16n256_producer_b4_ms": 13.035619735717773,
+    "older_qchunk_d512_producer_b4_ms": 10.77,
+    "retained_raw_triton_b1_c4_source_boundary_ms": 11.02,
+    "current_b4_c4_sharedkv_backward_component_ms": 64.47
+  },
+  "read": {
+    "positive": "The corrected HipKittens token-major H64/N64 producer compiles on MI350 with no spills and runs finite at the production B4/S4096/C4 dimensions.",
+    "negative": "It is not a speed path: the producer/scratch gate is 13.07 ms before exact LI selected-slot gather, production dQ, dOriKV, route-aware dCmpKV, and dSinks. It does not improve over the earlier H16/N256 token-major gate and remains slower than the q-chunk D512 producer gate.",
+    "decision": "Do not promote this HipKittens token-major branch. The next SharedKV candidate should preserve the existing Triton H64/N64 source-boundary schedule more directly or move to a lower-level cooperative HIP/CK/rocWMMA kernel that does not require H-major layout conversion."
+  },
+  "commands": {
+    "build": "docker run --rm --entrypoint bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace/exp -w /workspace/exp/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'make hk_sharedkv_qm_h64n64_d512_score ATTN_B=4 ATTN_Q_N=4096 ATTN_KV_N=1024'",
+    "run": "docker run --rm --entrypoint bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace/exp -w /workspace/exp/tools/dsv4_runtime_probe onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'PYTHONPATH=/workspace/exp/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner python3 probe_hipkittens_sharedkv_qm_h64n64_d512_score.py --batch 4 --seq 4096 --kv-seq 1024 --selected 512 --heads 64 --kv-heads 1 --dim 512 --warmup 5 --iters 30'"
+  }
+}

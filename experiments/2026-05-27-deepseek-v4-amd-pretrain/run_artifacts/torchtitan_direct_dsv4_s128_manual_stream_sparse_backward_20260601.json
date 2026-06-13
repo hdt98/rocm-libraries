@@ -1,0 +1,135 @@
+{
+  "artifact": "torchtitan_direct_dsv4_s128_manual_stream_sparse_backward_20260601",
+  "date_local": "2026-06-01",
+  "scope": "TorchTitan DeepSeek-V4 sparse-MLA/LightningIndexer manual_stream diagnostic backward bridge.",
+  "source_snapshot": {
+    "torchtitan_base": "7fcd9beacde733f3ceca4a4da7e2f0518d64f68e",
+    "local_path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan",
+    "changed_files": [
+      "torchtitan/models/deepseek_v4/model.py",
+      "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+    ]
+  },
+  "mode": {
+    "env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=manual_stream",
+    "chunk_env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_STREAM_CHUNK",
+    "launcher_chunk_env": "CANARY_SPARSE_MLA_STREAM_CHUNK",
+    "default_chunk_size": 8,
+    "intent": "Stream selected local-window and LightningIndexer-compressed keys in chunks, save softmax row max/sum plus output, and avoid full selected K/V/probability tensors in the forward save contract.",
+    "saves_from_forward_to_backward": [
+      "q",
+      "k",
+      "v",
+      "compressed_k",
+      "compressed_v",
+      "local_indices",
+      "csa_indices",
+      "invalid mask",
+      "softmax row_max",
+      "softmax row_sum",
+      "attention output"
+    ],
+    "does_not_save_from_forward_to_backward": [
+      "local selected K/V",
+      "compressed selected K/V",
+      "combined selected K/V",
+      "softmax probabilities"
+    ],
+    "still_materializes_transiently": [
+      "chunk-local selected K/V",
+      "chunk-compressed selected K/V",
+      "chunk scores",
+      "chunk probabilities"
+    ],
+    "not_final": "This is a PyTorch diagnostic bridge. It validates the no-full-selected-state trainable contract but is expected to be much slower than a fused sparse MLA/LightningIndexer kernel."
+  },
+  "validation": {
+    "local_py_compile": {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+      "result": "passed"
+    },
+    "launcher_syntax": {
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "result": "passed"
+    },
+    "check_config": {
+      "command": "env CANARY_SPARSE_MLA_BACKWARD_MODE=manual_stream CANARY_SPARSE_MLA_STREAM_CHUNK=2 CANARY_SEQ_LEN=512 CANARY_GBS=64 CANARY_STEPS=1 GPUS_PER_NODE=4 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "result": "passed",
+      "attention_sparse_backward_mode_by_layer": [
+        "manual_stream",
+        "manual_stream",
+        "manual_stream",
+        "manual_stream"
+      ],
+      "attention_compress_ratio_by_layer": [
+        0,
+        0,
+        4,
+        128
+      ]
+    },
+    "remote_container_parity": {
+      "host": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "env": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_STREAM_CHUNK=2",
+      "result": "passed",
+      "check": "Compared _SparseMLAStreamingManualBackward against _SparseMLASplitManualBackward on a mixed-validity CPU sparse pattern.",
+      "outputs_checked": [
+        "output",
+        "q.grad",
+        "k.grad",
+        "v.grad",
+        "compressed_k.grad",
+        "compressed_v.grad"
+      ],
+      "tolerance": {
+        "atol": 2e-5,
+        "rtol": 2e-5
+      },
+      "max_out_abs_diff": 2.384185791015625e-7,
+      "max_grad_abs_diff": {
+        "q": 1.7881393432617188e-7,
+        "k": 1.4901161193847656e-7,
+        "v": 2.384185791015625e-7,
+        "compressed_k": 1.1920928955078125e-7,
+        "compressed_v": 1.1920928955078125e-7
+      }
+    },
+    "one_gpu_smoke": {
+      "host": "do-sonle5-mi350-gpu",
+      "run_id": "torchtitan_direct_dsv4_s128_manual_stream_1xmi350_smoke_20260601",
+      "raw_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_s128_manual_stream_1xmi350_smoke_20260601/docker-run.log",
+      "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_s128_manual_stream_1xmi350_smoke_20260601",
+      "command": "env RUN_ID=torchtitan_direct_dsv4_s128_manual_stream_1xmi350_smoke_20260601 CANARY_SPARSE_MLA_BACKWARD_MODE=manual_stream CANARY_SEQ_LEN=128 CANARY_GBS=1 CANARY_STEPS=1 GPUS_PER_NODE=1 CANARY_EP=1 CANARY_VISIBLE_DEVICES=2 CANARY_SKIP_SINGLE_RANK_FSDP=true CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_REQUIRE_IDLE_GPUS=true launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "command_shape": "TP1_PP1_CP1_FSDP1_EP1_MBS1_GBS1_S128, visible GPU 2, checkpoint disabled, activation_checkpoint=none",
+      "result": "passed",
+      "step": {
+        "loss": 12.19987,
+        "grad_norm": 17.625,
+        "memory_gib": 207.14,
+        "tokens_per_gpu_s": 11,
+        "tflops_per_gpu": 0.14,
+        "mfu": 0.0001
+      },
+      "teardown": "process group destroyed"
+    }
+  },
+  "external_node_state": {
+    "note": "The initial one-GPU run on visible GPU 0 was refused by the launcher because external PIDs 76961 and 76962 were active on GPUs 0 and 1. The validation run used visible GPU 2 and did not disturb those workloads."
+  },
+  "decision": {
+    "status": "diagnostic_streaming_bridge_validated_for_correctness",
+    "preferred_short_sequence_perf_bridge": "manual_split",
+    "why_not_promoted_for_perf": [
+      "The PyTorch streaming loop passed correctness and trainability but ran only 11 tok/s at S128 on 1xMI350.",
+      "manual_split remains the useful short-sequence correctness/perf bridge.",
+      "manual_stream is valuable because it matches the future fused kernel save contract more closely: row stats plus output, not full selected K/V/probs."
+    ],
+    "next": [
+      "Use manual_stream to debug no-full-selected-state semantics at small shapes.",
+      "Replace the Python chunk loops with the retained 1a-style fused sparse MLA/LightningIndexer kernel path before attempting S4096 sparse performance claims.",
+      "Keep guarded dense fallback for S4096 systems smokes until the fused sparse path lands."
+    ]
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,97 @@
+{
+  "status": "candidate_retained",
+  "scope": "sparse_dkv_tilelang_panel_capacity_mfma_reducer",
+  "read": "A concrete TileLang in-CTA compact dKV reducer now works for a DSv4-like topk512 route by packing random selected groups into bounded compressed-group panels. The retained shape uses group_panel_size=128, per-panel capacity=96, topk workspace=768, block_k=32, block_d=64, token_block=32. It has zero route overflow at S4096, preserves the query-major MFMA producer, accumulates by compact group inside the CTA before global writes, and improves the panelized TileLang path from 23.48 ms / 19.65 ms down to 11.60 ms. It is real kernel progress, but still above the retained 8.0-8.8 ms sparse-atomic wall and still uses diagnostic materialized probs/grad_logits rather than the full fused sparse-MLA/LI backward.",
+  "retained_candidate": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps128_cap96_k32d64_timing10_20260604.json",
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "valid_topk": 512,
+    "topk_workspace": 768,
+    "token_block": 32,
+    "group_panel_size": 128,
+    "panel_capacity": 96,
+    "panel_count": 8,
+    "block_k": 32,
+    "block_d": 64,
+    "threads": 256,
+    "panel_overflow_count": 0,
+    "panel_overflow_fraction": 0.0,
+    "active_partial_rows": 131072,
+    "partials_mib": 256.0,
+    "median_ms": 11.599525451660156,
+    "min_ms": 11.562464714050293,
+    "mean_ms": 11.611877536773681,
+    "peak_memory_gib": 2.0117249488830566
+  },
+  "comparison_points": [
+    {
+      "name": "panel_padded_random_sw64_k64d32",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_padded_random_s4096_valid512_tb32_sw64_k64d32_timing10_20260604.json",
+      "median_ms": 23.480326652526855,
+      "read": "64-group panels with full 1024-slot padded workspace; correct but too much padded MFMA/input traffic."
+    },
+    {
+      "name": "panel_padded_random_sw128_k64d32",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_padded_random_s4096_valid512_tb32_sw128_k64d32_timing10_20260604.json",
+      "median_ms": 19.65004062652588,
+      "read": "128-group panels reduce route tile count but still pad to all 1024 group slots."
+    },
+    {
+      "name": "panel_capacity_random_cap96_k32d32",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps128_cap96_k32d32_timing10_20260604.json",
+      "median_ms": 15.826625347137451,
+      "read": "Capacity packing removes 25 percent of padded selected-slot work with zero overflow; D32 still launches twice as many D blocks as the retained D64 shape."
+    },
+    {
+      "name": "panel_capacity_random_cap96_k32d64_tb64",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb64_gps128_cap96_k32d64_timing10_20260604.json",
+      "median_ms": 11.640267372131348,
+      "read": "Token block 64 halves compact partial rows to 128 MiB but is slightly slower than token block 32, so partial write volume is no longer the sole wall."
+    }
+  ],
+  "rejected_or_unretained_variants": [
+    {
+      "shape": "direct topk512, selected_window=512, block_k=64",
+      "status": "tilelang_layout_failure",
+      "reason": "The unpanelized active table grows too large for TileLang layout inference."
+    },
+    {
+      "shape": "group_panel_size=128, panel_capacity=80",
+      "status": "tilelang_layout_failure",
+      "reason": "K40 is not MFMA-divisible by 16; K16 hits a TileLang layout divide-by-zero path."
+    },
+    {
+      "shape": "group_panel_size=128, panel_capacity=64",
+      "status": "route_overflow",
+      "reason": "Fast at S128 but drops about 3.39 percent of selected pairs, so it is not a valid topk512 route."
+    },
+    {
+      "shape": "group_panel_size=128, panel_capacity=96, block_k=48_or_96",
+      "status": "tilelang_warp_partition_failure",
+      "reason": "TileLang chooses unsupported warp partitions for these MFMA tile shapes under the tested thread counts."
+    },
+    {
+      "shape": "group_panel_size=128, panel_capacity=96, block_d=128",
+      "status": "slower_small_gate",
+      "reason": "Correct at S128 but slower than block_d=64."
+    },
+    {
+      "shape": "group_panel_size=128, panel_capacity=96, threads=128",
+      "status": "slower_small_gate",
+      "reason": "Correct at S128 but slower than 256 threads."
+    }
+  ],
+  "gap_read": {
+    "retained_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "candidate_vs_8p8_ms_speedup_needed": 1.318,
+    "candidate_vs_8p0_ms_speedup_needed": 1.45,
+    "next_kernel_work": [
+      "Fuse target_probs/grad_logits production into this TileLang route instead of reading materialized [S,K,H] diagnostic inputs.",
+      "Reduce the 256 MiB compact partial stream, likely with a second in-kernel selected-panel merge or by writing directly into LI/compressor dKV when ownership is unambiguous.",
+      "If TileLang cannot express the needed segmented merge without route padding, move this retained contract to HIP/rocWMMA/CK while keeping the group_panel_size=128/capacity=96 route layout."
+    ]
+  }
+}

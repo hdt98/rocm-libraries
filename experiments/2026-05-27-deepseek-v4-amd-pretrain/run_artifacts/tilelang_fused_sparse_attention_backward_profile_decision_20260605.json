@@ -1,0 +1,185 @@
+{
+  "status": "profiled_rejected",
+  "created_at": "2026-06-05",
+  "scope": "tilelang_sparse_attention_backward_source_boundary_profile_gate",
+  "hardware": "MI350",
+  "runtime": {
+    "node": "do-sonle-kernel",
+    "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "raw_profile_dirs_kept_off_repo": [
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/rocprof_tilelang_atomic_directdq_s4096_b16_20260605",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/rocprof_tilelang_selected_limit_direct_dq_dkv_gp256_20260605",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/rocprof_tilelang_selected_limit_direct_dq_dkv_gp128_20260605",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/rocprof_tilelang_selected_limit_direct_dq_dkv_gp256_tb64_20260605"
+    ]
+  },
+  "baseline_gate": {
+    "artifact": "run_artifacts/sparse_attention_kernel_actual_li_block_shape_sweep_decision_20260605.json",
+    "current_actual_sparse_attention_backward_kernel_ms": 11.134678840637207,
+    "read": "The candidate must beat the actual source-boundary sparse-attention backward kernel, not only a late dKV slice."
+  },
+  "profiled_candidates": {
+    "direct_atomic_source_boundary_tilelang": {
+      "artifact": "run_artifacts/tilelang_fused_sparse_attention_backward_atomic_directdq_s4096_h64_d512_topk512_b16_rocprof_20260605.json",
+      "variant": "atomic_dkv_directdq",
+      "shape": {
+        "seq_len": 4096,
+        "kv_len": 1024,
+        "heads": 64,
+        "dim": 512,
+        "topk": 512,
+        "bwd_block_size": 16,
+        "bwd_threads": 256
+      },
+      "timing_ms": {
+        "tilelang_core_backward_kernel": 75.56649780273438,
+        "preprocess_delta": 0.1740410029888153,
+        "postprocess_dkv_cast": 0.10528100281953812
+      },
+      "atomic_write_model": {
+        "selected_rows": 2097152,
+        "scalar_dkv_atomic_add_elements": 1073741824,
+        "atomic_addx4_calls_modeled": 268435456
+      },
+      "rocprof_top_kernel": {
+        "name": "sparse_mqa_bwd_atomic_dkv_kernel_kernel",
+        "calls": 2,
+        "average_ms": 75.379241,
+        "total_ms": 150.758482,
+        "profile_percentage": 98.99
+      },
+      "decision": "reject",
+      "read": "The direct source-boundary atomic TileLang kernel is dominated by its own atomic dKV write pattern. It is not a bridge or host-copy problem."
+    },
+    "selected_limit_route_owned_gp256_tb32": {
+      "artifact": "run_artifacts/tilelang_selected_limit_direct_dq_dkv_s4096_layer2_gp256_rocprof_20260605.json",
+      "shape": {
+        "seq_len": 4096,
+        "compressed_groups": 1024,
+        "actual_li_topk": 512,
+        "heads": 64,
+        "dim": 512,
+        "group_panel_size": 256,
+        "panel_capacity": 256,
+        "token_block": 32,
+        "block_k": 64,
+        "block_d": 64,
+        "threads": 512
+      },
+      "plan": {
+        "active_rows": 66027,
+        "max_active_groups": 256,
+        "write_reduction_x": 23.813773153406938
+      },
+      "timing_ms": {
+        "direct_source_dq_dkv_kernel": 16.673128128051758,
+        "kernel_only_dkv_reducer": 6.900969982147217,
+        "source_indexed_kernel": 7.729257106781006,
+        "hsk_bf16_source_kernel": 5.9702839851379395,
+        "pack_only": 2.2035369873046875,
+        "pack_plus_kernel": 9.675630569458008
+      },
+      "rocprof_top_kernel_for_direct_boundary": {
+        "name": "mfma_panel_atomic_final_limited_bshd_source_direct_dblocked_dq_prim_kernel",
+        "calls": 2,
+        "average_ms": 17.0003105,
+        "total_ms": 34.000621,
+        "profile_percentage": 21.46
+      },
+      "decision": "reject_against_11p13ms_gate",
+      "read": "This is the profiled 16.7 ms run. The 16.67 ms benchmark timing and 17.00 ms rocprof average are the same generated TileLang direct dQ+dKV kernel measured two ways."
+    },
+    "selected_limit_route_owned_gp128_tb32": {
+      "artifact": "run_artifacts/tilelang_selected_limit_direct_dq_dkv_s4096_layer2_gp128_rocprof_20260605.json",
+      "shape": {
+        "seq_len": 4096,
+        "compressed_groups": 1024,
+        "actual_li_topk": 512,
+        "heads": 64,
+        "dim": 512,
+        "group_panel_size": 128,
+        "panel_capacity": 128,
+        "token_block": 32,
+        "block_k": 64,
+        "block_d": 64,
+        "threads": 512
+      },
+      "plan": {
+        "active_rows": 66027,
+        "max_active_groups": 128,
+        "write_reduction_x": 23.813773153406938
+      },
+      "timing_ms": {
+        "direct_source_dq_dkv_kernel": 20.940439224243164,
+        "kernel_only_dkv_reducer": 6.011247158050537,
+        "source_indexed_kernel": 5.4976420402526855,
+        "hsk_bf16_source_kernel": 6.205647945404053,
+        "pack_only": 2.198338031768799,
+        "pack_plus_kernel": 8.790388107299805
+      },
+      "rocprof_top_kernel_for_direct_boundary": {
+        "name": "mfma_panel_atomic_final_limited_bshd_source_direct_dblocked_dq_prim_kernel",
+        "calls": 2,
+        "average_ms": 21.099762,
+        "total_ms": 42.199524,
+        "profile_percentage": 25.81
+      },
+      "decision": "reject",
+      "read": "Shrinking the group panel improves some dKV-only slices but worsens the fully fused dQ+dKV source-boundary kernel."
+    },
+    "selected_limit_route_owned_gp256_tb64": {
+      "artifact": "run_artifacts/tilelang_selected_limit_direct_dq_dkv_s4096_layer2_gp256_tb64_rocprof_20260605.json",
+      "shape": {
+        "seq_len": 4096,
+        "compressed_groups": 1024,
+        "actual_li_topk": 512,
+        "heads": 64,
+        "dim": 512,
+        "group_panel_size": 256,
+        "panel_capacity": 256,
+        "token_block": 64,
+        "block_k": 64,
+        "block_d": 64,
+        "threads": 512
+      },
+      "plan": {
+        "active_rows": 33268,
+        "max_active_groups": 256,
+        "write_reduction_x": 47.26319586389323
+      },
+      "timing_ms": {
+        "direct_source_dq_dkv_kernel": 17.775232315063477,
+        "kernel_only_dkv_reducer": 7.264380931854248,
+        "source_indexed_kernel": 8.150188446044922,
+        "hsk_bf16_source_kernel": 6.154012203216553,
+        "pack_only": 2.169456958770752,
+        "pack_plus_kernel": 9.35551929473877
+      },
+      "rocprof_top_kernel_for_direct_boundary": {
+        "name": "mfma_panel_atomic_final_limited_bshd_source_direct_dblocked_dq_prim_kernel",
+        "calls": 2,
+        "average_ms": 18.058313,
+        "total_ms": 36.116626,
+        "profile_percentage": 22.01
+      },
+      "decision": "reject",
+      "read": "Doubling token_block roughly doubles modeled write reduction, but the direct fused source-boundary kernel still worsens, indicating the route-owned schedule loses too much query-major reuse/recompute efficiency."
+    }
+  },
+  "decision": {
+    "route_owned_fully_fused_tilelang": "rejected_for_now",
+    "direct_atomic_tilelang": "rejected",
+    "next_kernel_contract": "query_major_source_boundary_producer_with_group_aware_segmented_dkv_epilogue",
+    "why": [
+      "The late dKV-only TileLang reducer can be 6-7 ms, but adding source-boundary recompute and dQ in a route-owned schedule pushes the fused kernel to 16.7-20.9 ms.",
+      "Increasing token_block improves modeled write reduction but does not improve realized fused-kernel latency.",
+      "Direct atomics are catastrophic and profiler-confirmed as kernel-internal.",
+      "The remaining viable direction is to preserve query-major q/dO/prob reuse and add only a local grouped/segmented dKV reduction before global writes."
+    ]
+  },
+  "validation": {
+    "json_summaries_pulled_to_repo": true,
+    "rocprof_kernel_stats_parsed_from_tmp": "/tmp/dsv4_tilelang_profiles_20260605",
+    "raw_rocprof_dirs_copied_to_repo": false
+  }
+}

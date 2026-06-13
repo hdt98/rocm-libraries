@@ -1,0 +1,406 @@
+{
+  "active_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+  "artifact": "sparse_mla_backward_ops_probe",
+  "correctness": {
+    "retained": {
+      "attn_sink": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "csa": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "hca": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "kv": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "ok": true,
+      "out": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      },
+      "q": {
+        "atol": 0.02,
+        "max_abs": 0.0,
+        "ok": true,
+        "rel_l2": 0.0,
+        "rtol": 0.02
+      }
+    }
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "flags": {
+    "bf16_contracts": true,
+    "body_tail_window_grad_reduce": true,
+    "diagonal_window_grad_reduce": true,
+    "direct_compressed_value_out": true,
+    "direct_scores_out": true,
+    "direct_selected_grad_out": true,
+    "prealloc_scores": true,
+    "softmax_dot_triton": true,
+    "softmax_dot_vecdot": false,
+    "softmax_forward_triton": true,
+    "softmax_sinkgrad_triton": false,
+    "split_compressed_branches": true,
+    "triton_window_grad_reduce": false
+  },
+  "primitive_profile": {
+    "csa_grad_from_probs_ms_max": 0.5406849980354309,
+    "csa_grad_from_probs_ms_mean": 0.5314289927482605,
+    "csa_grad_from_probs_ms_median": 0.531844973564148,
+    "csa_grad_from_probs_ms_min": 0.5198450088500977,
+    "csa_grad_probs_ms_max": 0.8608880043029785,
+    "csa_grad_probs_ms_mean": 0.6809659957885742,
+    "csa_grad_probs_ms_median": 0.6304849982261658,
+    "csa_grad_probs_ms_min": 0.6156449913978577,
+    "grad_csa_q_add_ms_max": 0.3128030002117157,
+    "grad_csa_q_add_ms_mean": 0.29233880043029786,
+    "grad_csa_q_add_ms_median": 0.30280300974845886,
+    "grad_csa_q_add_ms_min": 0.2679629921913147,
+    "grad_hca_q_add_ms_max": 0.08412099629640579,
+    "grad_hca_q_add_ms_mean": 0.08170419782400132,
+    "grad_hca_q_add_ms_median": 0.08079999685287476,
+    "grad_hca_q_add_ms_min": 0.08055999875068665,
+    "grad_q_csa_add_ms_max": 0.4648439884185791,
+    "grad_q_csa_add_ms_mean": 0.45355639457702634,
+    "grad_q_csa_add_ms_median": 0.4603250026702881,
+    "grad_q_csa_add_ms_min": 0.4390439987182617,
+    "grad_q_from_window_scores_ms_max": 0.20132200419902802,
+    "grad_q_from_window_scores_ms_mean": 0.19735400080680848,
+    "grad_q_from_window_scores_ms_median": 0.19628199934959412,
+    "grad_q_from_window_scores_ms_min": 0.19356200098991394,
+    "grad_q_hca_add_ms_max": 0.2578029930591583,
+    "grad_q_hca_add_ms_mean": 0.25250659584999086,
+    "grad_q_hca_add_ms_median": 0.25008198618888855,
+    "grad_q_hca_add_ms_min": 0.2478030025959015,
+    "grad_selected_q_add_ms_max": 0.490325003862381,
+    "grad_selected_q_add_ms_mean": 0.4882449984550476,
+    "grad_selected_q_add_ms_median": 0.48956501483917236,
+    "grad_selected_q_add_ms_min": 0.4836849868297577,
+    "hca_grad_from_probs_ms_max": 0.09060099720954895,
+    "hca_grad_from_probs_ms_mean": 0.0890647977590561,
+    "hca_grad_from_probs_ms_median": 0.08936099708080292,
+    "hca_grad_from_probs_ms_min": 0.08632099628448486,
+    "hca_grad_probs_ms_max": 0.09532099962234497,
+    "hca_grad_probs_ms_mean": 0.09391299933195114,
+    "hca_grad_probs_ms_median": 0.09436099976301193,
+    "hca_grad_probs_ms_min": 0.09244100004434586,
+    "intermediate_meta": {
+      "csa_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          1024,
+          512
+        ],
+        "stride": [
+          524288,
+          512,
+          1
+        ]
+      },
+      "csa_grad_probs_base": {
+        "dtype": "float32",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          64,
+          4096,
+          1024
+        ],
+        "stride": [
+          268435456,
+          4194304,
+          1024,
+          1
+        ]
+      },
+      "grad_probs_window_base": {
+        "dtype": "float32",
+        "is_contiguous": false,
+        "shape": [
+          1,
+          64,
+          4096,
+          128
+        ],
+        "stride": [
+          33554432,
+          128,
+          8192,
+          1
+        ]
+      },
+      "grad_selected_base": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          128,
+          512
+        ],
+        "stride": [
+          268435456,
+          65536,
+          512,
+          1
+        ]
+      },
+      "hca_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          32,
+          512
+        ],
+        "stride": [
+          16384,
+          512,
+          1
+        ]
+      },
+      "hca_grad_probs_base": {
+        "dtype": "float32",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          64,
+          4096,
+          32
+        ],
+        "stride": [
+          8388608,
+          131072,
+          32,
+          1
+        ]
+      },
+      "probs_all": {
+        "dtype": "float32",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          64,
+          4096,
+          1185
+        ],
+        "stride": [
+          310640640,
+          4853760,
+          1185,
+          1
+        ]
+      },
+      "q_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          64,
+          512
+        ],
+        "stride": [
+          134217728,
+          32768,
+          512,
+          1
+        ]
+      },
+      "selected_accum": {
+        "dtype": "bfloat16",
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          128,
+          512
+        ],
+        "stride": [
+          268435456,
+          65536,
+          512,
+          1
+        ]
+      }
+    },
+    "modeled_primitive_median_sum_ms": 5.042005963623524,
+    "sink_grad_reduce_ms_max": 0.021801000460982323,
+    "sink_grad_reduce_ms_mean": 0.020848200470209122,
+    "sink_grad_reduce_ms_median": 0.020640000700950623,
+    "sink_grad_reduce_ms_min": 0.020360000431537628,
+    "softmax_backward_scores_split_ms_max": 1.2848520278930664,
+    "softmax_backward_scores_split_ms_mean": 1.2506760120391847,
+    "softmax_backward_scores_split_ms_median": 1.2468119859695435,
+    "softmax_backward_scores_split_ms_min": 1.223971962928772,
+    "sparse_grad_probs_window_ms_max": 0.24156199395656586,
+    "sparse_grad_probs_window_ms_mean": 0.23012219965457917,
+    "sparse_grad_probs_window_ms_median": 0.22492200136184692,
+    "sparse_grad_probs_window_ms_min": 0.2246820032596588,
+    "sparse_grad_selected_from_probs_ms_max": 0.3112030029296875,
+    "sparse_grad_selected_from_probs_ms_mean": 0.2848106026649475,
+    "sparse_grad_selected_from_probs_ms_median": 0.2775219976902008,
+    "sparse_grad_selected_from_probs_ms_min": 0.27628299593925476,
+    "window_grad_reduce_body_tail_ms_max": 0.1507209986448288,
+    "window_grad_reduce_body_tail_ms_mean": 0.14519339799880981,
+    "window_grad_reduce_body_tail_ms_median": 0.1462009996175766,
+    "window_grad_reduce_body_tail_ms_min": 0.14048199355602264
+  },
+  "read": "Backward timing excludes forward graph construction but uses the exact saved-tensor contract produced by the no-kv-cat sparse MLA autograd function. Primitive timings are unfused op timings for prioritizing a fused sparse MLA backward kernel.",
+  "shape": {
+    "batch": 1,
+    "csa_tokens": 1024,
+    "hca_tokens": 32,
+    "heads": 64,
+    "keys_excluding_sink": 1184,
+    "keys_including_sink": 1185,
+    "kv_dim": 512,
+    "seqlen": 4096,
+    "window_size": 128
+  },
+  "tensor_meta": {
+    "attn_invalid_mask": {
+      "dtype": "bool",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        1,
+        4096,
+        1184
+      ],
+      "stride": [
+        4849664,
+        4849664,
+        1184,
+        1
+      ]
+    },
+    "attn_sink": {
+      "dtype": "float32",
+      "is_contiguous": true,
+      "shape": [
+        64
+      ],
+      "stride": [
+        1
+      ]
+    },
+    "csa": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        1024,
+        512
+      ],
+      "stride": [
+        524288,
+        512,
+        1
+      ]
+    },
+    "grad_output": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        64,
+        512
+      ],
+      "stride": [
+        134217728,
+        32768,
+        512,
+        1
+      ]
+    },
+    "hca": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        32,
+        512
+      ],
+      "stride": [
+        16384,
+        512,
+        1
+      ]
+    },
+    "kv": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        512
+      ],
+      "stride": [
+        2097152,
+        512,
+        1
+      ]
+    },
+    "q": {
+      "dtype": "bfloat16",
+      "is_contiguous": true,
+      "shape": [
+        1,
+        4096,
+        64,
+        512
+      ],
+      "stride": [
+        134217728,
+        32768,
+        512,
+        1
+      ]
+    },
+    "sparse_key_indices": {
+      "dtype": "int64",
+      "is_contiguous": true,
+      "shape": [
+        4096,
+        1184
+      ],
+      "stride": [
+        1184,
+        1
+      ]
+    }
+  },
+  "timing": {
+    "backward_ms_max": 5.137968063354492,
+    "backward_ms_mean": 4.694067764282226,
+    "backward_ms_median": 4.601122856140137,
+    "backward_ms_min": 4.5300822257995605
+  },
+  "variant": "split-compressed-triton-softmax"
+}

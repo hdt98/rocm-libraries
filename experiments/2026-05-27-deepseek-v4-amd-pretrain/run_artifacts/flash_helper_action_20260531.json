@@ -1,0 +1,91 @@
+{
+  "created_at": "2026-05-31",
+  "purpose": "Record the explicit DeepSeek-V4-Flash single-layer S=4096 helper action and validation result.",
+  "local_helper": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+  "added_action": "bench-flash-4096",
+  "command": "RUN_TAG=single_layer_flash_s4096_helper_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-flash-4096",
+  "target_host": "do-sonle-kernel",
+  "remote_summary_path": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/single_layer_flash_s4096_helper_20260531/flash_full_layer_s4096_summary.json",
+  "local_summary_path": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_flash_s4096_split_triton_helper_20260531.json",
+  "flash_shape": {
+    "batch": 1,
+    "sequence_length": 4096,
+    "hidden_size": 4096,
+    "num_heads": 64,
+    "kv_dim": 512,
+    "rope_dim": 64,
+    "q_lora_rank": 1024,
+    "o_lora_rank": 1024,
+    "o_groups": 8,
+    "moe_intermediate": 2048,
+    "num_experts": 256,
+    "routed_top_k": 6,
+    "shared_experts": 1,
+    "window_size": 128,
+    "csa_ratio": 4,
+    "hca_ratio": 128
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-split-ch-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "boundary_impl": "separate",
+    "dtype": "bfloat16",
+    "impl": "fp4-packed-sim",
+    "router_override_mode": "learned"
+  },
+  "result": {
+    "status": "passed",
+    "avg_ms": 31.368278223089874,
+    "min_ms": 31.187625019811094,
+    "tokens_per_s": 130577.77576663344,
+    "estimated_tflops": 283.425894130706,
+    "target_avg_ms": 24.9,
+    "avg_ms_over_target": 1.2597702097626456,
+    "target_tokens_per_s": 164497.9919678715,
+    "tokens_per_s_over_target": 0.793794958831364
+  },
+  "validation": {
+    "bash_n": "passed",
+    "git_diff_check": "not_applicable_file_in_untracked_experiment_subtree",
+    "remote_run": "passed",
+    "summary_copied_to_repo_artifact": true
+  },
+  "eight_gpu_gate": {
+    "host": "do-sonle5-mi350-gpu",
+    "status": "blocked_by_active_gpu_processes",
+    "guard_command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+    "active_processes": [
+      {
+        "pid": 3336400,
+        "name": "python",
+        "gpu": 1,
+        "vram_bytes": 167383355392
+      },
+      {
+        "pid": 3336399,
+        "name": "python",
+        "gpu": 1,
+        "vram_bytes": 167383355392
+      },
+      {
+        "pid": 3745773,
+        "name": "python3",
+        "gpu": 0,
+        "vram_bytes": 0
+      },
+      {
+        "pid": 3335962,
+        "name": "pt_elastic",
+        "gpu": 0,
+        "vram_bytes": 0
+      },
+      {
+        "pid": 3745774,
+        "name": "python3",
+        "gpu": 0,
+        "vram_bytes": 0
+      }
+    ]
+  },
+  "next_moe_lever": "The current MoE evidence points at compact-native grouped training GEMM efficiency for ragged expert batches rather than another dispatch/combine-only wrapper."
+}

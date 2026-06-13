@@ -1,0 +1,93 @@
+{
+  "artifact": "sharedkv_compressed_dkv_flat_gemm_floor_summary_20260602",
+  "created_date": "2026-06-02",
+  "status": "flat_gemm_is_viable_but_not_materially_faster_than_bmm_mixed_floor",
+  "scope": "DeepSeek-V4 shared latent-KV sparse MLA backward compressed-prefix dKV accumulation",
+  "source_probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py",
+  "remote_workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 0,
+    "csa_count": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "kv_len": 5120
+  },
+  "reference_context": {
+    "query_major_atomic_compressed_only_ms": 11.017240524291992,
+    "head_batched_bmm_mixed_ms": 7.065645217895508,
+    "head_batched_bmm_mixed_peak_gib": 5.851562976837158,
+    "head_batched_bmm_bf16_ms": 4.756993770599365,
+    "head_batched_bmm_bf16_peak_gib": 4.319336414337158,
+    "head_batched_bmm_bf16_s128_max_abs_diff": 0.2010364532470703
+  },
+  "s128_correctness": {
+    "mixed": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s128_mixed_20260602.json",
+      "status": "passed",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "max_abs_diff": 0.1440563201904297,
+      "median_ms": 0.4481619894504547,
+      "peak_gib": 0.17331361770629883
+    },
+    "bf16": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s128_bf16_20260602.json",
+      "status": "passed",
+      "math_dtype": "bfloat16",
+      "bmm_input_dtype": "bfloat16",
+      "max_abs_diff": 0.1984710693359375,
+      "median_ms": 0.4183630049228668,
+      "peak_gib": 0.16818666458129883
+    }
+  },
+  "s4096_timing": {
+    "mixed_full": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_20260602.json",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "seq_chunk": 0,
+      "median_ms": 7.052491188049316,
+      "peak_gib": 5.602539539337158,
+      "checksum_norm": 1848.9169921875
+    },
+    "mixed_chunk1024": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_chunk1024_20260602.json",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "seq_chunk": 1024,
+      "median_ms": 7.6899847984313965,
+      "peak_gib": 3.729004383087158,
+      "checksum_norm": 1848.899658203125
+    },
+    "mixed_chunk512": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_mixed_chunk512_20260602.json",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "seq_chunk": 512,
+      "median_ms": 7.783565998077393,
+      "peak_gib": 3.416504383087158,
+      "checksum_norm": 1848.8848876953125
+    },
+    "bf16_full": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_flat_gemm_floor_s4096_bf16_20260602.json",
+      "math_dtype": "bfloat16",
+      "bmm_input_dtype": "bfloat16",
+      "seq_chunk": 0,
+      "median_ms": 4.727312088012695,
+      "peak_gib": 4.101074695587158,
+      "checksum_norm": 1848.9873046875
+    }
+  },
+  "commands": {
+    "s128_mixed": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 128 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --accum-mode flat_gemm --warmup-iters 1 --timed-iters 3 --json",
+    "s128_bf16": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 128 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype bf16 --bmm-input-dtype bf16 --accum-mode flat_gemm --warmup-iters 1 --timed-iters 3 --json",
+    "s4096_mixed": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 4096 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --accum-mode flat_gemm --warmup-iters 1 --timed-iters 5 --skip-correctness --skip-reference-timing --json",
+    "s4096_mixed_chunks": "same command with --seq-chunk 1024 and --seq-chunk 512",
+    "s4096_bf16": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 4096 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype bf16 --bmm-input-dtype bf16 --accum-mode flat_gemm --warmup-iters 1 --timed-iters 5 --skip-correctness --skip-reference-timing --json"
+  },
+  "read": "Flattening heads and sequence into one HS row dimension gives a viable MFMA-friendly compressed dKV floor but does not materially beat the head-batched BMM mixed floor. Full S4096 mixed flat-GEMM is 7.05 ms versus 7.07 ms for BMM, with peak memory 5.60 GiB versus 5.85 GiB. Chunk1024/chunk512 flat-GEMM are 7.69/7.78 ms and 3.73/3.42 GiB, slightly lower memory than equivalent BMM chunks and less bend at chunk512. The useful new signal is pure BF16: S128 flat-GEMM passes the 0.2 tolerance at max diff 0.198, where the earlier BF16 BMM point missed by 0.001, and S4096 BF16 flat-GEMM is 4.73 ms with 4.10 GiB peak. The production path should still be a fused streaming MFMA compressed-dKV kernel; flat-GEMM mainly clarifies that direct head reduction and BF16 accumulation are viable design choices."
+}

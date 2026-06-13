@@ -1,0 +1,92 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_weightedscatter_scoretorch_nodecheck_20260611",
+  "created_utc": "2026-06-11T00:00:00Z",
+  "purpose": "Check whether the fresh no-mHC/current-source standard EP failure is a bad MI350 node or an isolated weighted-scatter Triton backward issue.",
+  "node": "do-sonle5-mi350-gpu",
+  "hardware": {
+    "gpus": 8,
+    "gpu_type": "AMD Instinct MI350X VF"
+  },
+  "shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpoint_mode": "none",
+    "use_hyper_connections": false,
+    "moe_balanced_moe_mode": "execute",
+    "moe_balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "torch",
+    "standard_ep_hot_weight_reduce_backend": "torch",
+    "standard_ep_normal_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "weighted_scatter_bwd_score_mode": "torch"
+  },
+  "retained_nomhc_node_baseline": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_nomhc_current_nodecheck_20260611.json",
+    "shape": "MBS8/GA2/GBS128/S4096 attention-only AC, no mHC",
+    "status": "completed",
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 8365.8,
+      "tflops_per_gpu": 423.562
+    },
+    "peak_logged_memory_gib": 256.87,
+    "post_run_rocm_smi": "0% allocated VRAM"
+  },
+  "ungarded_current_source_triton_score_attempt": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_tritonbwd_bounds_step1_8x_s4096_gbs128_20260611_retry",
+    "status": "failed",
+    "failure": {
+      "phase": "first backward",
+      "primary_marker": "HSA memory access fault",
+      "backend": "normal standard-EP combine weighted_scatter_add triton_bwd",
+      "read": "The first row-bounds guard was insufficient; the fault remained before any throughput metric."
+    }
+  },
+  "scoretorch_one_step_gate": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_tritonbwd_scoretorch_real2_step1_8x_s4096_gbs128_20260611",
+    "status": "completed",
+    "steps_completed": 1,
+    "step_1": {
+      "loss": 12.32697,
+      "grad_norm": 19.125,
+      "tok_per_gpu_s_range": [2004.0, 2010.0],
+      "tflops_per_gpu_range": [101.5, 101.75],
+      "peak_logged_memory_gib_range": [153.99, 156.0]
+    }
+  },
+  "scoretorch_six_step_gate": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_tritonbwd_scoretorch_steps6_8x_s4096_gbs128_20260611",
+    "status": "completed",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_tritonbwd_scoretorch_steps6_8x_s4096_gbs128_20260611",
+    "steps": [
+      {"step": 1, "tok_per_gpu_s": 1995.0, "tflops_per_gpu": 101.05, "memory_gib_rankmax": 156.47},
+      {"step": 2, "tok_per_gpu_s": 7944.0, "tflops_per_gpu": 402.20, "memory_gib_rankmax": 195.31},
+      {"step": 3, "tok_per_gpu_s": 7951.0, "tflops_per_gpu": 402.55, "memory_gib_rankmax": 195.31},
+      {"step": 4, "tok_per_gpu_s": 8122.0, "tflops_per_gpu": 411.24, "memory_gib_rankmax": 195.31},
+      {"step": 5, "tok_per_gpu_s": 8165.0, "tflops_per_gpu": 413.40, "memory_gib_rankmax": 195.31},
+      {"step": 6, "tok_per_gpu_s": 8150.0, "tflops_per_gpu": 412.63, "memory_gib_rankmax": 195.31}
+    ],
+    "steps_2_to_6_mean": {
+      "tok_per_gpu_s": 8066.4,
+      "tflops_per_gpu": 408.404
+    },
+    "steps_4_to_6_mean": {
+      "tok_per_gpu_s": 8145.6667,
+      "tflops_per_gpu": 412.4233
+    },
+    "peak_logged_memory_gib": 195.31
+  },
+  "source_patch": {
+    "scatter_add": "TORCHTITAN_WEIGHTED_SCATTER_BWD_SCORE_MODE=torch keeps Triton grad_src but computes grad_scores with a Torch gather/sum fallback.",
+    "launcher": "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE passes the mode into the container."
+  },
+  "read": "The node is healthy: the retained no-mHC baseline completes, ROCm SMI returns idle, and the current MBS4 no-mHC standard EP graph completes six steps once only the Triton score-gradient atomic path is disabled. The isolated fault is the normal-combine Triton weighted-scatter backward score-gradient reduction/atomic, not mHC, the hot-helper scatter path, or a bad MI350 node."
+}

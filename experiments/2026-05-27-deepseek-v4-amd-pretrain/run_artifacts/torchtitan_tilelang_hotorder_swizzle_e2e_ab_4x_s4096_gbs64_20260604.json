@@ -1,0 +1,124 @@
+{
+  "artifact": "torchtitan_tilelang_hotorder_swizzle_e2e_ab_4x_s4096_gbs64_20260604",
+  "created_at": "2026-06-04",
+  "purpose": "Materialized TorchTitan 4xMI350 throughput A/B for the retained TileLang selected-limit sparse-dKV bridge versus hot slot ordering plus accumulator slot swizzle.",
+  "target": {
+    "shape": "4xMI350 TP1 PP1 CP1 FSDP4 EP4 MBS1 S4096 GBS64",
+    "target_tflops_per_gpu": 277.0,
+    "target_step_time_s": 4.48,
+    "read": "The same 277 TFLOPs/GPU per-GPU gate applies to the 4x slice; node tokens/s and step time normalize by GBS."
+  },
+  "common_runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "visible_devices": "0,1,2,3",
+    "steps_requested": 3,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "full",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "runs": {
+    "control_selected_limit": {
+      "run_id": "torchtitan_dsv4_tilelang_ab_control_4x_s4096_gbs64_steps3_20260604",
+      "slot_order": "default",
+      "accum_slot_swizzle": "default",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_ab_control_4x_s4096_gbs64_steps3_20260604",
+      "remote_docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_ab_control_4x_s4096_gbs64_steps3_20260604/docker-run.log",
+      "status": "completed_clean_process_group_teardown",
+      "step_metrics": {
+        "step1": {
+          "loss": 12.28834,
+          "grad_norm": 13.1875,
+          "tokens_per_gpu_s_range": [1834, 1837],
+          "tflops_per_gpu_range": [34.70, 34.75],
+          "peak_logged_memory_gib_range": [76.45, 79.34],
+          "note": "warmup and first-use effects"
+        },
+        "step2": {
+          "loss": 8.56204,
+          "grad_norm": 21.875,
+          "tokens_per_gpu_s": 4169,
+          "tflops_per_gpu": 78.88,
+          "peak_logged_memory_gib_range": [107.12, 119.56],
+          "ratio_to_target": 0.2848,
+          "speedup_needed_to_target": 3.51
+        },
+        "step3": {
+          "loss": 18.30431,
+          "grad_norm": 39.75,
+          "tokens_per_gpu_s": 3379,
+          "tflops_per_gpu": 63.93,
+          "peak_logged_memory_gib_range": [124.42, 144.27],
+          "ratio_to_target": 0.2308
+        }
+      }
+    },
+    "hot_order_swizzle1": {
+      "run_id": "torchtitan_dsv4_tilelang_ab_hotorder_swizzle1_4x_s4096_gbs64_steps3_20260604",
+      "slot_order": "hot",
+      "accum_slot_swizzle": 1,
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_ab_hotorder_swizzle1_4x_s4096_gbs64_steps3_20260604",
+      "remote_docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_ab_hotorder_swizzle1_4x_s4096_gbs64_steps3_20260604/docker-run.log",
+      "status": "completed_clean_process_group_teardown",
+      "step_metrics": {
+        "step1": {
+          "loss": 12.28725,
+          "grad_norm": 12.875,
+          "tokens_per_gpu_s_range": [1873, 1875],
+          "tflops_per_gpu_range": [35.44, 35.47],
+          "peak_logged_memory_gib_range": [76.41, 76.61],
+          "note": "warmup and first-use effects"
+        },
+        "step2": {
+          "loss": 8.08408,
+          "grad_norm": 23.75,
+          "tokens_per_gpu_s": 3975,
+          "tflops_per_gpu": 75.22,
+          "peak_logged_memory_gib_range": [106.40, 126.48],
+          "ratio_to_target": 0.2716,
+          "speedup_needed_to_target": 3.68
+        },
+        "step3": {
+          "loss": 21.84599,
+          "grad_norm": 24.0,
+          "tokens_per_gpu_s": 3523,
+          "tflops_per_gpu": 66.66,
+          "peak_logged_memory_gib_range": [110.66, 144.78],
+          "ratio_to_target": 0.2406
+        }
+      }
+    }
+  },
+  "comparison": {
+    "best_step2_tflops_per_gpu": {
+      "run": "control_selected_limit",
+      "value": 78.88
+    },
+    "best_step3_tflops_per_gpu": {
+      "run": "hot_order_swizzle1",
+      "value": 66.66
+    },
+    "step2_delta_hot_vs_control_percent": -4.64,
+    "step3_delta_hot_vs_control_percent": 4.27,
+    "read": "The hot-order plus swizzle isolated kernel tweak does not produce a clear e2e throughput uplift. It loses the cleaner post-warmup step-2 comparison and only recovers a small step-3 difference while both runs remain far below the 277 TFLOPs/GPU target."
+  },
+  "decision": {
+    "retained_e2e_candidate_from_this_ab": "control_selected_limit",
+    "retained_tflops_per_gpu": 78.88,
+    "promote_hot_order_swizzle1": false,
+    "reason": "The isolated TileLang selected-limit kernel improvement is too small and late in the sparse-MLA backward boundary to dominate TorchTitan e2e throughput; bridge/materialization, MoE backward, activation checkpointing, and loss/lm-head work still hide or erase it.",
+    "next_action": "Do not spend more time on slot-order-only TileLang tweaks as a primary TFLOPs lever. The next TileLang branch must move earlier in the sparse-MLA backward boundary so it consumes q, dO, compressed/shared KV, LI indices, output/LSE, and sink directly, or shift back to the larger e2e walls such as MoE backward skew and activation-checkpoint recompute."
+  },
+  "commands": {
+    "control": "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_ab_control_4x_s4096_gbs64_steps3_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "hot_order_swizzle1": "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_ab_hotorder_swizzle1_4x_s4096_gbs64_steps3_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_SHAREDKV_TILELANG_SLOT_ORDER=hot CANARY_SHAREDKV_TILELANG_ACCUM_SLOT_SWIZZLE=1 CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  }
+}

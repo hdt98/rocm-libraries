@@ -1,0 +1,54 @@
+{
+  "artifact": "sparse_mla_sasg_detached_scatter_decision_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Actual-LI compressed dKV SASG-style split: Cube345/dot-K partial producer followed by a detached Triton ScatterAdd/reduce kernel.",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py",
+    "change": "Added _scatteradd_partials_reduce_kernel and wired single, chunked sequential, and ping-pong stream variants that use a standalone Triton ScatterAdd/reduce stage instead of partials.sum(dim=1)."
+  },
+  "rerun_commands": {
+    "s128_smoke": "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/sources/wip/torchtitan:/workspace/tools/dsv4_runtime_probe -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py --seq-len 128 --layer-id 2 --seq-chunk 16 --pipeline-chunk-tokens 64 --block-d 16 --block-h 64 --block-k 32 --warmup-iters 1 --timed-iters 3 --correctness-atol 0.2 --summary-path /workspace/run_artifacts/sparse_mla_sasg_detached_scatter_s128_layer2_20260603.json --json",
+    "s4096_timing": "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/sources/wip/torchtitan:/workspace/tools/dsv4_runtime_probe -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --pipeline-chunk-tokens 512 --block-d 16 --block-h 64 --block-k 64 --warmup-iters 1 --timed-iters 3 --correctness-atol 0.2 --allow-large-materialization --include-dotk-atomic --summary-path /workspace/run_artifacts/sparse_mla_sasg_detached_scatter_s4096_layer2_20260603.json --json"
+  },
+  "results": {
+    "s128": {
+      "artifact": "run_artifacts/sparse_mla_sasg_detached_scatter_s128_layer2_20260603.json",
+      "status": "passed",
+      "max_abs_diff_vs_full_partial_reduce": 0.000003814697265625,
+      "single_full_emit_reduce_ms": 0.10856100171804428,
+      "single_full_emit_detached_scatter_ms": 0.07452099770307541,
+      "chunked_pingpong_stream_detached_scatter_ms": 1.211737036705017
+    },
+    "s4096_layer2": {
+      "artifact": "run_artifacts/sparse_mla_sasg_detached_scatter_s4096_layer2_20260603.json",
+      "status": "passed",
+      "shape": {
+        "seq_len": 4096,
+        "topk": 512,
+        "heads": 64,
+        "dim": 512,
+        "compressed_groups": 1024,
+        "seq_chunk": 32,
+        "pipeline_chunk_tokens": 512
+      },
+      "max_abs_diff_vs_full_partial_reduce": 0.00000762939453125,
+      "single_full_emit_reduce_ms": 9.270206451416016,
+      "single_full_emit_detached_scatter_ms": 8.75416088104248,
+      "chunked_sequential_emit_reduce_ms": 9.37764835357666,
+      "chunked_sequential_emit_detached_scatter_ms": 9.471049308776855,
+      "chunked_pingpong_stream_overlap_ms": 12.862245559692383,
+      "chunked_pingpong_stream_detached_scatter_ms": 10.159777641296387,
+      "workspace_gib": {
+        "probs": 0.5,
+        "grad_logits": 0.5,
+        "peak_single_full_emit_detached_scatter": 2.190920829772949
+      }
+    }
+  },
+  "decision": "Detaching ScatterAdd into a standalone Triton kernel is correct and gives a small single-shot reduction-stage win over PyTorch sum, but it does not close the S4096 sparse-attention backward gap. The S4096 split remains about 8.75 ms because the producer still writes a dense per-seq-tile partial slab with the raw KxD contribution volume. Host-level ping-pong overlap is negative at this granularity. Keep this as a clean decomposition/measurement rung, but the next production kernel still needs in-tile grouped or segmented accumulation that reduces repeated compressed-group contributions before global memory, ideally fused with the query-major sparse MLA/LI backward body.",
+  "ascend_mapping": {
+    "producer": "Cube345-style dKV contribution math emits partial rows.",
+    "detached_scatter": "Standalone Triton ScatterAdd/reduce kernel consumes partial rows and accumulates grad_kv.",
+    "gap": "The AMD split mimics the Ascend stage boundary, but not yet the Ascend CV-pipeline behavior or tile-local coalesced accumulation efficiency."
+  }
+}

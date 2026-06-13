@@ -1,0 +1,195 @@
+{
+  "schema": "torchtitan_dsv4_flash12_profile_c128_scaling.v1",
+  "created_at": "2026-06-06T00:00:00+07:00",
+  "purpose": "Profile the 8xMI350 flash_12layer_ceiling_probe MBS4 full-AC shape and compare C128 handling, token/TFLOP scaling, the retained 4-layer baseline, and the Ascend SASG source implementation.",
+  "profile_run": {
+    "run_id": "torchtitan_dsv4_flash12_scalechunk4096_8x_s4096_gbs128_mbs4_heap144_fullac_profile_steps2_20260606",
+    "host": "do-vunguyen-mi350-gpu",
+    "status": "completed_two_steps_diagnostic_not_promoted",
+    "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_scalechunk4096_8x_s4096_gbs128_mbs4_heap144_fullac_profile_steps2_20260606/docker-run.log",
+    "profile_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profile_timing/torchtitan_dsv4_flash12_scalechunk4096_8x_mbs4_profile_20260606.jsonl",
+    "additive_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/additive_timing/torchtitan_dsv4_flash12_scalechunk4096_8x_mbs4_profile_20260606.jsonl",
+    "mori_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/mori_timing/torchtitan_dsv4_flash12_scalechunk4096_8x_mbs4_profile_20260606.jsonl"
+  },
+  "shape": {
+    "model": "DeepSeek-V4-Flash 12-layer ceiling probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "full",
+    "mori_heap": "144G",
+    "compress_ratio_allowlist": "4,128",
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "env": {
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_SCALE_CHUNK_ROWS": "4096"
+  },
+  "profile_step2_metrics": {
+    "tokens_per_gpu_s": 2421,
+    "node_tokens_s": 19368,
+    "tflops_per_gpu": 122.56,
+    "peak_logged_memory_gib": 124.37,
+    "note": "Diagnostic hooks are intrusive. Use this run for attribution only, not as the retained throughput baseline."
+  },
+  "profile_step2_additive_rank_max_seconds": {
+    "step_train_step": 25.5215,
+    "microbatch_forward_backward": 24.2967,
+    "model_forward": 3.0572,
+    "loss": 0.3473,
+    "backward": 17.6649,
+    "wrapper_residual": 3.2273,
+    "grad_clip": 0.0632,
+    "optimizer_step": 0.0478,
+    "accumulated_loss_reduce": 1.1114
+  },
+  "profile_step2_sharedkv_rank_max_seconds": {
+    "cr4": {
+      "total": 1.2254,
+      "query_recompute": 1.1547,
+      "grad_attn_sink": 0.0708,
+      "calls_per_rank": 20,
+      "selected_keys_per_call": 640,
+      "layers": [2, 4, 6, 8, 10]
+    },
+    "cr128": {
+      "total": 0.4329,
+      "query_recompute": 0.3568,
+      "grad_attn_sink": 0.0782,
+      "calls_per_rank": 20,
+      "selected_keys_per_call": 160,
+      "layers": [3, 5, 7, 9, 11]
+    }
+  },
+  "profile_step2_module_backward_rank_max_seconds": {
+    "transformer_block_envelope": 17.4888,
+    "moe": 13.8427,
+    "attention": 3.5812,
+    "attention_norm": 0.0203,
+    "ffn_norm": 0.017,
+    "final_norm": 0.0019
+  },
+  "profile_step2_mori_rank_max_seconds": {
+    "backward_local_vjp_aiter_compact": 4.1188,
+    "backward_combine_dx_call": 3.8679,
+    "local_vjp_wgrad": 1.735,
+    "local_vjp_dgrad_swiglu": 0.8782,
+    "local_vjp_xgrad": 0.8106,
+    "local_vjp_forward_recompute": 0.4542,
+    "local_vjp_dtopk_weight": 0.1199,
+    "dispatch_x_call": 0.2825,
+    "dispatch_grad_output_call": 0.112
+  },
+  "profile_step2_mori_shape_pressure": {
+    "local_vjp_assignments_mean": 98304,
+    "local_vjp_assignments_max": 266566,
+    "local_vjp_padded_rows_mean": 1095946.58,
+    "local_vjp_padded_rows_max": 3124320,
+    "local_vjp_padding_multiplier_mean": 11.1528,
+    "local_vjp_padding_multiplier_max": 21.2469,
+    "recv_count_mean": 72669.26,
+    "recv_count_max": 129980
+  },
+  "throughput_scaling_comparison": {
+    "retained_4layer_4x": {
+      "artifact": "run_artifacts/torchtitan_mori_saved_dispatch_reuse_ab_20260605.json",
+      "tokens_per_gpu_s": 12570.33,
+      "node_tokens_s": 50281.32,
+      "tflops_per_gpu": 237.19,
+      "derived_gflop_per_token": 18.87
+    },
+    "retained_12layer_4x": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+      "tokens_per_gpu_s": 4034.4,
+      "node_tokens_s": 16137.6,
+      "tflops_per_gpu": 204.272,
+      "derived_gflop_per_token": 50.63256,
+      "token_drop_vs_4layer_pct": -67.9,
+      "tflop_drop_vs_4layer_pct": -13.9
+    },
+    "retained_12layer_8x_mbs2": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_8x_s4096_gbs128_mbs2_heap96_20260606.json",
+      "tokens_per_gpu_s": 2857.8,
+      "node_tokens_s": 22862.4,
+      "tflops_per_gpu": 144.686,
+      "derived_gflop_per_token": 50.63,
+      "per_gpu_token_delta_vs_12layer_4x_pct": -29.16
+    },
+    "retained_12layer_8x_mbs4_fullac": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_scalechunk_8x_mbs4_fullac_20260606.json",
+      "tokens_per_gpu_s": 2675.33,
+      "node_tokens_s": 21402.67,
+      "tflops_per_gpu": 135.45,
+      "derived_gflop_per_token": 50.63,
+      "per_gpu_token_delta_vs_12layer_8x_mbs2_pct": -6.39,
+      "per_gpu_token_delta_vs_12layer_4x_pct": -33.7
+    },
+    "read": "Within one model, TorchTitan TFLOPs/GPU is consistent with tok/GPU/s times GFLOP/token. The scaling problem is lower achieved TFLOPs/GPU on 12-layer and especially on 8x EP8, not FLOP/token accounting."
+  },
+  "c128_source_audit": {
+    "amd_current_behavior": {
+      "model_py_lines": [
+        "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:1808",
+        "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:1831",
+        "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:2042",
+        "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:2054"
+      ],
+      "read": "C128 is functionally handled by the same shared-KV backend. At S=4096 it has groups=32 and actual_topk=min(512,32)=32, so selected_keys is window128 + topk32 = 160. No new K512 kernel shape is required for C128."
+    },
+    "ascend_current_behavior": {
+      "wrapper_lines": [
+        "sources/references/ascend-cann-dsv4-image-cann900-v30/mindspeed_ops/npu_sparse_attn_shared_kv.py:119",
+        "sources/references/ascend-cann-dsv4-image-cann900-v30/mindspeed_ops/npu_sparse_attn_shared_kv.py:124"
+      ],
+      "read": "The Ascend wrapper sets topk=0 and cmp_sparse_indices=None when cmp_ratio != 4. So the recipe path treats C4 as sparse-indexed, while C128 does not enter the same sparse top-k selected-index path."
+    },
+    "cann_grad_output_contract": {
+      "cpp_lines": [
+        "sources/references/ascend-cann-dsv4-image-cann900-v30/mindspeed_ops/csrc/cann/npu_sparse_attn_shared_kv.cpp:125",
+        "sources/references/ascend-cann-dsv4-image-cann900-v30/mindspeed_ops/csrc/cann/npu_sparse_attn_shared_kv.cpp:138"
+      ],
+      "read": "Ascend grad allocates and returns dQuery, dOriKv, dCmpKv, and dSinks; dCmpKv exists for cmpRatio > 1."
+    }
+  },
+  "ascend_sasg_source_audit": {
+    "pipeline_lines": [
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h:202",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h:245",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h:282",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h:307"
+    ],
+    "scatter_lines": [
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h:853",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h:945"
+    ],
+    "read": "SASG does not remove the dKV scatter/add stage. It gathers selected KV, pipelines Cube12/Process/Cube345 between AIC and AIV, then ScatterAdd reads mm4/mm5 workspaces, applies scale plus dv contribution, and atomically writes dCmpKv/dOriKv. The key difference is pipelined/fused staging, not a separate high-level scatter kernel."
+  },
+  "decision": {
+    "c128_kernel_code": "No crash-fix or K512 kernel change is required for C128 because the AMD backend clamps actual_topk to 32 groups at S4096. A recipe-faithfulness/perf patch is still worth doing: bypass LI sparse-index routing for cmp_ratio=128 to match the Ascend wrapper's topk=0 / sparse-indices=None behavior.",
+    "scaling_root_cause": "The 8x MBS4 profile points first to MoE/EP owner-rank backward and combine_dx skew. Shared-KV C128 is only about 0.43s rank-max in step 2, C4 is about 1.23s, while MoE is about 13.84s inside the transformer-block envelope.",
+    "next_actions": [
+      "Keep 8x MBS2 as the retained 8x baseline; MBS4 full-AC is fit-valid but slower.",
+      "Patch or gate C128 to match Ascend's non-sparse-index path, then A/B for memory and small attention savings.",
+      "Prioritize fused compact MORI/AITER owner-rank training backward and EP8 skew/overlap before further MBS scaling.",
+      "Continue the separate C4 sparse-attention dKV accumulation rewrite, but do not blame C128 for the current 8x scaling collapse."
+    ]
+  }
+}

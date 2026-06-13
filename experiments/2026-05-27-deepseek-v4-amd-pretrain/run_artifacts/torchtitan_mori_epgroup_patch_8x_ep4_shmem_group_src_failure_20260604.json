@@ -1,0 +1,50 @@
+{
+  "artifact_type": "torchtitan_dsv4_8x_mi350_run_failure",
+  "created_at": "2026-06-04",
+  "run_id": "torchtitan_mori_epgroup_patch_8x_s4096_gbs128_ep4_noac_steps6_20260604",
+  "status": "failed_before_step_1",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "shape": {
+    "gpus": 8,
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 4
+  },
+  "runtime_knobs": {
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "allocator": "expandable_segments:True",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "profile_sharedkv_backward": false,
+    "chunked_ce_num_chunks": 2,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G"
+  },
+  "result": {
+    "completed_steps": 0,
+    "metrics_logged": false,
+    "old_guard_status": "passed",
+    "failure": "MORI SHMEM process-group init called dist.broadcast_object_list(..., src=0, group=ep_group); global rank 0 is not part of the second EP4 subgroup containing global ranks 4-7.",
+    "first_observed_exception": "ValueError: Global rank 0 is not part of group <torch.distributed.distributed_c10d.ProcessGroup object ...>",
+    "interpretation": "EP4-on-8 no longer fails on the TorchTitan bridge world-size guard. The next blocker is MORI's torch-process-group SHMEM bootstrap assuming global rank 0 belongs to every group.",
+    "next_action": "Initialize MORI SHMEM with shmem_get_unique_id plus an EP-local group_src=0 broadcast, then rerun the same 8x FSDP8/EP4 no-AC six-step gate."
+  },
+  "paths": {
+    "raw_logs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_epgroup_patch_8x_s4096_gbs128_ep4_noac_steps6_20260604",
+    "outputs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_8x_s4096_gbs128_ep4_noac_steps6_20260604"
+  },
+  "command": "env TARGET_HOST=do-sonle5-mi350-gpu IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_SHAREDKV_BACKWARD_MODE=explicit_pytorch CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_SHMEM_HEAP_SIZE=32G RUN_ID=torchtitan_mori_epgroup_patch_8x_s4096_gbs128_ep4_noac_steps6_20260604 MASTER_PORT=29662 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+}

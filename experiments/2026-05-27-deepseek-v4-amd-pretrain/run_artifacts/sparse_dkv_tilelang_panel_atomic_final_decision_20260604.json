@@ -1,0 +1,55 @@
+{
+  "status": "not_latency_promoted",
+  "scope": "sparse_dkv_tilelang_panel_atomic_final",
+  "read": "A compact-final TileLang dKV variant now works: it keeps the query-major MFMA contribution body and in-CTA compact group reduction, then atomic-adds reduced compact rows directly into final [groups, D] dKV instead of writing a compact partial-row stream. S128 correctness passes against a final-dKV PyTorch oracle. At S4096, however, the best final-atomic variant is 11.72 ms, slightly slower than the retained compact-partial producer at 11.60 ms. This means the current TileLang candidate is no longer dominated by final partial-row HBM output alone; contribution/body plus local accumulation are the active wall. The final-atomic path remains useful for memory and integration shape because it writes a 2 MiB final dKV instead of a 128-256 MiB partial workspace.",
+  "correctness_gate": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s128_valid512_tb32_gps128_cap96_k32d64_correct_20260604.json",
+    "seq_len": 128,
+    "shape": "group_panel_size=128 capacity=96 topk_workspace=768 token_block=32 block_k=32 block_d=64 threads=256",
+    "panel_overflow_count": 0,
+    "max_abs_diff": 1.30385160446167e-8,
+    "mean_abs_diff": 1.4635568312826308e-9,
+    "median_ms": 0.47524499893188477
+  },
+  "s4096_results": [
+    {
+      "name": "final_atomic_tb32",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s4096_valid512_tb32_gps128_cap96_k32d64_timing10_20260604.json",
+      "token_block": 32,
+      "active_partial_rows_avoided": 131072,
+      "modeled_reduced_atomic_rows": 131072,
+      "final_output_mib": 2.0,
+      "would_have_partial_workspace_mib": 256.0,
+      "median_ms": 11.736348152160645,
+      "min_ms": 11.713027000427246,
+      "peak_memory_gib": 1.7641658782958984
+    },
+    {
+      "name": "final_atomic_tb64",
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s4096_valid512_tb64_gps128_cap96_k32d64_timing10_20260604.json",
+      "token_block": 64,
+      "active_partial_rows_avoided": 65536,
+      "modeled_reduced_atomic_rows": 65536,
+      "final_output_mib": 2.0,
+      "would_have_partial_workspace_mib": 128.0,
+      "median_ms": 11.715291023254395,
+      "min_ms": 11.706991195678711,
+      "peak_memory_gib": 1.7639198303222656
+    }
+  ],
+  "comparison": {
+    "retained_compact_partial_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps128_cap96_k32d64_timing10_20260604.json",
+    "retained_compact_partial_median_ms": 11.599525451660156,
+    "retained_compact_partial_workspace_mib": 256.0,
+    "best_final_atomic_median_ms": 11.715291023254395,
+    "best_final_atomic_vs_compact_partial_delta_ms": 0.11576557159423828,
+    "best_final_atomic_vs_compact_partial_speedup": 0.9901197593807117,
+    "retained_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "read": "Reduced final atomics remove the partial workspace but do not improve latency. Keep the compact-partial producer as the latency retained TileLang candidate; keep final-atomic as an integration/memory branch."
+  },
+  "next_kernel_work": [
+    "Fuse LI target_probs and grad_logits production into the retained TileLang producer so it stops reading materialized [S,K,H] diagnostic tensors.",
+    "Reduce contribution/body time rather than only output traffic: fewer padded selected slots, better MFMA tile legality than K32 for capacity96, or HIP/rocWMMA/CK control for segmented reduction without TileLang padding.",
+    "If integrating before the latency target is reached, use final-atomic mode to avoid the compact partial workspace, but do not count it as a speed win."
+  ]
+}

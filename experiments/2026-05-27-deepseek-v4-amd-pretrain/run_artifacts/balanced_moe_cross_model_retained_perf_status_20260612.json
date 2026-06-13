@@ -1,0 +1,179 @@
+{
+  "artifact": "balanced_moe_cross_model_retained_perf_status_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Machine-readable retained standard-EP top-8 hot-helper coverage for DeepSeek, Qwen, and Kimi robustness gates.",
+  "policy": {
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "parallelism": "TP1/PP1/CP1/FSDP8/EP8",
+    "activation_checkpointing": "selective attention_only",
+    "loss": "ChunkedCELoss CE8",
+    "optimizer": "AdamW",
+    "steps": "20 non-profiled steps where a retained throughput row exists",
+    "cold_step_policy": "exclude step 1 from retained windows"
+  },
+  "models": {
+    "deepseek_v4_flash_12layer": {
+      "status": "retained_feature_evidence",
+      "reduced_topology": "12 layers, 256 routed experts, top-k 6, first-12 compress ratios [1,1,4,128,4,128,4,128,4,128,4,128]",
+      "artifacts": [
+        "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs1_mbs2_ce8_ladder_20step_20260612.json",
+        "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hothelper_mbs_ladder_20step_nockpt_20260612.json"
+      ],
+      "default_retained_window": "steps_13_to_20",
+      "rows": [
+        {
+          "micro_batch_size": 1,
+          "no_helper_tokens_per_gpu_s": 3822.38,
+          "top8_helper_tokens_per_gpu_s": 4202.72,
+          "uplift_pct": 9.95,
+          "no_helper_tflops_per_gpu": 189.24,
+          "top8_helper_tflops_per_gpu": 208.07,
+          "peak_memory_delta_gib": -10.35
+        },
+        {
+          "micro_batch_size": 2,
+          "no_helper_tokens_per_gpu_s": 4321.64,
+          "top8_helper_tokens_per_gpu_s": 5254.38,
+          "uplift_pct": 21.58,
+          "no_helper_tflops_per_gpu": 213.95,
+          "top8_helper_tflops_per_gpu": 260.13,
+          "peak_memory_delta_gib": -24.98
+        },
+        {
+          "micro_batch_size": 4,
+          "no_helper_tokens_per_gpu_s": 5058.13,
+          "top8_helper_tokens_per_gpu_s": 6550.0,
+          "uplift_pct": 29.49,
+          "no_helper_tflops_per_gpu": 231.66,
+          "top8_helper_tflops_per_gpu": 299.99,
+          "peak_memory_delta_gib": -48.87
+        },
+        {
+          "micro_batch_size": 8,
+          "no_helper_result": "fails_before_first_metric",
+          "top8_helper_tokens_per_gpu_s": 8632.78,
+          "top8_helper_tflops_per_gpu": 395.37,
+          "top8_helper_peak_logged_memory_gib": 256.19,
+          "read": "Top-8 helper changes the fit boundary at MBS8."
+        }
+      ]
+    },
+    "qwen3_5_397b_a17b_reduced_8layer": {
+      "status": "retained_cross_model_evidence",
+      "reduced_topology": "8 layers, 512 routed experts, top-k 10 plus one shared expert, hidden 4096, GQA 32Q/2KV, head_dim 256",
+      "artifacts": [
+        "run_artifacts/torchtitan_qwen397b_a17b_standard_ep_hothelper_mbs1_mbs8_20step_20260612.json"
+      ],
+      "default_retained_window": "steps_2_to_20",
+      "rows": [
+        {
+          "micro_batch_size": 1,
+          "no_helper_tokens_per_gpu_s": 7857.68,
+          "top8_helper_tokens_per_gpu_s": 8379.57,
+          "uplift_pct": 6.64,
+          "no_helper_tflops_per_gpu": 134.54,
+          "top8_helper_tflops_per_gpu": 143.48,
+          "no_helper_peak_logged_memory_gib": 137.96,
+          "top8_helper_peak_logged_memory_gib": 136.19
+        },
+        {
+          "micro_batch_size": 2,
+          "no_helper_tokens_per_gpu_s": 10058.39,
+          "top8_helper_tokens_per_gpu_s": 11174.09,
+          "uplift_pct": 11.09,
+          "no_helper_tflops_per_gpu": 172.23,
+          "top8_helper_tflops_per_gpu": 191.33,
+          "no_helper_peak_logged_memory_gib": 171.06,
+          "top8_helper_peak_logged_memory_gib": 148.93
+        },
+        {
+          "micro_batch_size": 4,
+          "no_helper_tokens_per_gpu_s": 12106.35,
+          "top8_helper_tokens_per_gpu_s": 13914.22,
+          "uplift_pct": 14.93,
+          "no_helper_tflops_per_gpu": 207.29,
+          "top8_helper_tflops_per_gpu": 238.25,
+          "no_helper_peak_logged_memory_gib": 226.01,
+          "top8_helper_peak_logged_memory_gib": 178.09
+        },
+        {
+          "micro_batch_size": 8,
+          "no_helper_tokens_per_gpu_s": 12683.54,
+          "top8_helper_tokens_per_gpu_s": 15833.91,
+          "uplift_pct": 24.84,
+          "no_helper_tflops_per_gpu": 217.18,
+          "top8_helper_tflops_per_gpu": 271.12,
+          "no_helper_peak_logged_memory_gib": 281.42,
+          "top8_helper_peak_logged_memory_gib": 242.22
+        }
+      ]
+    },
+    "kimi_k2_6_reduced_6layer": {
+      "status": "retained_perf_gate_mbs1_mbs2",
+      "reduced_topology": "target 6 layers, 384 routed experts, top-k 8 plus one shared expert, moe_intermediate_size 2048, MLA, native hidden 7168 with hidden 4096 fallback if needed",
+      "artifacts": [
+        "run_artifacts/torchtitan_kimi_k2_6_standard_ep_hothelper_primus_turbo_mbs1_20step_20260612.json",
+        "run_artifacts/torchtitan_kimi_k2_6_standard_ep_hothelper_primus_turbo_mbs1_mbs2_20step_20260612.json",
+        "run_artifacts/torchtitan_kimi_k2_6_primus_turbo_nohelper_mbs4_failure_20260612.json",
+        "run_artifacts/torchtitan_kimi_k2_6_standard_ep_top8_helper_mbs4_failure_20260613.json"
+      ],
+      "default_retained_window": "steps_2_to_20",
+      "abi_shape_gate": "tools/check_balanced_moe_model_shapes.py",
+      "rows": [
+        {
+          "micro_batch_size": 1,
+          "no_helper_tokens_per_gpu_s": 4319.89,
+          "top8_helper_tokens_per_gpu_s": 4556.47,
+          "uplift_pct": 5.48,
+          "no_helper_tflops_per_gpu": 140.85,
+          "top8_helper_tflops_per_gpu": 148.57,
+          "no_helper_peak_logged_memory_gib": 204.02,
+          "top8_helper_peak_logged_memory_gib": 205.03,
+          "primus_turbo_no_helper_tokens_per_gpu_s": 4836.63,
+          "primus_turbo_no_helper_tflops_per_gpu": 157.7,
+          "primus_turbo_no_helper_peak_logged_memory_gib": 198.02,
+          "primus_turbo_vs_plain_pct": 11.96,
+          "primus_turbo_vs_top8_helper_pct": 6.15
+        },
+        {
+          "micro_batch_size": 2,
+          "no_helper_tokens_per_gpu_s": 5059.56,
+          "top8_helper_tokens_per_gpu_s": 5449.39,
+          "uplift_pct": 7.7,
+          "no_helper_tflops_per_gpu": 164.97,
+          "top8_helper_tflops_per_gpu": 177.68,
+          "no_helper_peak_logged_memory_gib": 252.78,
+          "top8_helper_peak_logged_memory_gib": 252.78,
+          "primus_turbo_no_helper_tokens_per_gpu_s": 5704.93,
+          "primus_turbo_no_helper_tflops_per_gpu": 186.01,
+          "primus_turbo_no_helper_peak_logged_memory_gib": 240.77,
+          "primus_turbo_vs_plain_pct": 12.76,
+          "primus_turbo_vs_top8_helper_pct": 4.69
+        }
+      ],
+      "failed_rows": [
+        {
+          "micro_batch_size": 4,
+          "variant": "primus_turbo_no_helper_raw_topk",
+          "result": "fails_before_first_metric",
+          "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES in first backward with 258 MB free",
+          "artifact": "run_artifacts/torchtitan_kimi_k2_6_primus_turbo_nohelper_mbs4_failure_20260612.json"
+        },
+        {
+          "micro_batch_size": 4,
+          "variant": "standard_ep_top8_helper",
+          "result": "fails_before_first_metric",
+          "failure": "16 GiB allocation OOM in first backward",
+          "artifact": "run_artifacts/torchtitan_kimi_k2_6_standard_ep_top8_helper_mbs4_failure_20260613.json"
+        }
+      ],
+      "retained_perf_required": false,
+      "throughput_proxy_allowed": false,
+      "blocking_reason": null,
+      "required_next_action": "Find a lower-memory Kimi native-hidden-7168 MBS4 variant, or explicitly choose a reduced Kimi fallback shape, before claiming Kimi highest-MBS hot-helper behavior."
+    }
+  },
+  "promotion_read": "DeepSeek and Qwen have retained standard-EP top-8 hot-helper ladders. Kimi now has real MBS1/MBS2 retained gates: top-8 helper beats plain standard EP, while Primus-Turbo raw top-k no-helper is faster and lower-memory at both MBS points. Kimi MBS4 fails before first metric for both raw TurboEP no-helper and standard-EP top-8 helper on the native-hidden-7168 attention-only AC surface, so Kimi highest-MBS behavior remains open."
+}

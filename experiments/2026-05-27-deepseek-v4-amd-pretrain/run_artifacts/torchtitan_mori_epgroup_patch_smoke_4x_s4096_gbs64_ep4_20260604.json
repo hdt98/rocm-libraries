@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "artifact_kind": "patch_regression_smoke",
+  "run_id": "torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604",
+  "status": "passed_1_step",
+  "purpose": "Verify the MORI+AITER bridge still works after switching SHMEM initialization from the global default process group to the current rank's EP process group.",
+  "shape": {
+    "hardware": "4xMI350",
+    "visible_devices": "0,1,2,3",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "steps": 1,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "moe_comm_backend": "mori",
+    "moe_forward_mode": "aiter",
+    "moe_backward_mode": "routed",
+    "moe_local_vjp_mode": "padded",
+    "moe_local_vjp_swiglu_backend": "triton",
+    "mori_shmem_heap_size": "32G",
+    "profiling": "disabled"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.27277,
+      "grad_norm": 11.5625,
+      "tflops_per_gpu_range": [
+        49.97,
+        50.08
+      ],
+      "tokens_per_gpu_s_range": [
+        2641,
+        2647
+      ],
+      "memory_gib_range": [
+        70.44,
+        74.85
+      ],
+      "mfu_percent_range": [
+        2.16,
+        2.17
+      ]
+    }
+  ],
+  "raw_artifacts": {
+    "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604",
+    "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604",
+    "remote_log_size": "36K",
+    "remote_output_size": "828K",
+    "structured_logs": [
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604/structured_logs/training.global_rank_0.20260604-161627-TIE9VE.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604/structured_logs/training.global_rank_1.20260604-161627-H3OSTG.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604/structured_logs/training.global_rank_2.20260604-161627-VQD77Z.jsonl",
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_mori_epgroup_patch_smoke_4x_s4096_gbs64_ep4_step1_20260604/structured_logs/training.global_rank_3.20260604-161627-3ALUVE.jsonl"
+    ]
+  },
+  "read": [
+    "The patched bridge gets through model build, MORI dispatch, AITER fused MoE forward, routed MoE backward, and clean process-group teardown for the existing 4x/FSDP4/EP4 S4096 shape.",
+    "This is a regression smoke only. It does not prove the requested 8x/FSDP8/EP4 submesh shape because the EP group still covers the whole local process group in this 4x run."
+  ],
+  "next_action": "Retry the same no-AC explicit shared-KV 8x/FSDP8/EP4 target shape after the active two-GPU external probe releases GPUs 6-7.",
+  "dependency_pin_changes": []
+}

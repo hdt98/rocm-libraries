@@ -1,0 +1,80 @@
+{
+  "artifact": "tilelang_sparse_mqa_bwd_dkv_compute_nowrite_decision_20260604",
+  "date": "2026-06-04",
+  "scope": "TileLang DSv4 sparse-MQA backward diagnostic that restores dKV contribution math while skipping global dKV writeback.",
+  "runtime": {
+    "node": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "gpu": "MI350X/gfx950",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "tilelang": "0.1.7.post3+cuda.gita55a8230"
+  },
+  "code": {
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py",
+    "diagnostic_kernel": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+    "variant": "dkv_compute_nowrite_directdq"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "kv_len": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "dtype": "bfloat16",
+    "forward_state": "synthetic",
+    "block_size": 16,
+    "threads": 256
+  },
+  "timings_ms": {
+    "no_dkv_directdq_core": {
+      "artifact": "tilelang_sparse_mqa_bwd_nodkv_directdq_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_synthetic_20260604.json",
+      "median_ms": 2.1869380474090576
+    },
+    "dkv_compute_nowrite_core_timing20": {
+      "artifact": "tilelang_sparse_mqa_bwd_dkv_compute_nowrite_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_timing20_synthetic_20260604.json",
+      "median_ms": 2.2741994857788086,
+      "min_ms": 2.2624990940093994,
+      "mean_ms": 2.289369535446167
+    },
+    "straight_reference_atomic_best_full_width": {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_thr256_synthetic_20260604.json",
+      "median_ms": 28.085914611816406
+    },
+    "current_triton_sparse_atomic_dkv_wall": {
+      "artifact": "sparse_dkv_compact_micro_partial_store_decision_20260603.json",
+      "median_ms": 8.006924390792847
+    }
+  },
+  "deltas_ms": {
+    "adding_dkv_contribution_math_without_write": 0.08726143836975098,
+    "straight_atomic_minus_dkv_compute_nowrite": 25.811715126037598,
+    "triton_atomic_wall_minus_dkv_compute_nowrite": 5.732724905014038
+  },
+  "write_model": {
+    "selected_rows": 2097152,
+    "scalar_dkv_atomic_add_elements": 1073741824,
+    "atomic_addx4_calls_modeled": 268435456
+  },
+  "decision": {
+    "tilelang_path_status": "promoted_for_reduced_writeback_rewrite",
+    "promote_straight_atomic_reference": false,
+    "read": [
+      "TileLang full-shape QK, softmax-backward, dQ, dAttnSink, and dKV contribution GEMMs fit and run in 2.27 ms when global dKV writes are removed.",
+      "The dKV contribution GEMMs add only about 0.09 ms over the no-dKV diagnostic, so the producer math is not the bottleneck in this schedule.",
+      "The straight reference remains slow because its per-token CTA emits per-selected T.atomic_addx4 dKV writes and must split heads at full width."
+    ],
+    "next_kernel_contract": [
+      "Do not keep sweeping the straight reference.",
+      "Start from the direct H64/D512 TileLang schedule for QK/softmax-backward/dQ.",
+      "Rewrite only the dKV write path: either extend the producer to own a token window with tile-local segmented accumulation by compressed group, or emit compact keyed partial rows for a small final reducer.",
+      "A same-token-only reducer is not enough because the current CTA owns one token and duplicate compressed groups inside one token's selected block are rare."
+    ],
+    "promotion_gate": "At S4096/H64/D512/topk512, the full dQ+dKV backward candidate must beat the 8.01 ms current Triton sparse-atomic dKV wall; a useful first TileLang target is dQ/no-write 2.19 ms plus reduced dKV writeback under roughly 5.7 ms."
+  },
+  "commands": [
+    "python3 tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py --bwd-variant dkv_compute_nowrite_directdq --seq-len 4096 --kv-len 1024 --heads 64 --dim 512 --topk 512 --bwd-block-size 16 --bwd-threads 256 --forward-state synthetic --warmup-iters 5 --timed-iters 20 --skip-full-interface --summary-path run_artifacts/tilelang_sparse_mqa_bwd_dkv_compute_nowrite_s4096_kv1024_topk512_h64_d512_direct_b16_thr256_timing20_synthetic_20260604.json --json"
+  ],
+  "dependency_pin_changes": []
+}

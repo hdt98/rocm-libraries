@@ -1,0 +1,74 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_kernelmodule_steps20_8x_s4096_gbs128_20260610",
+  "artifact": "torchtitan_dsv4_flash12_mori_native_autocap_heap32_kernelmodule_failure_8x_s4096_gbs128_20260610",
+  "host": "do-sonle5-mi350-gpu",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_kernelmodule_steps20_8x_s4096_gbs128_20260610/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_rolesplit_reusefwd_heap32_kernelmodule_steps20_8x_s4096_gbs128_20260610",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12
+  },
+  "env": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "auto",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": 32,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "result": {
+    "status": "failed",
+    "completed_steps": 4,
+    "failure_phase": "after_step4_next_backward_or_collective_setup",
+    "failure": "MORI static heap exhausted while allocating another aligned 16 GiB compact handle/buffer",
+    "heap_error": "Out of heap memory! Requested: 17179869184 bytes (aligned), Current heap size: 34359738368 bytes",
+    "read": "Pinned sparse module plus auto-cap heap32 reaches step 4, then tries to allocate another 16 GiB MORI role/capacity buffer. This rejects auto-cap heap32 as a 20-step default and points to capacity-bucket churn or unreleased active handle residency."
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.28998,
+      "grad_norm": 13.125,
+      "tok_per_gpu_s": 1067,
+      "tflops_per_gpu": 54.03,
+      "rank_max_memory_gib": 197.41
+    },
+    {
+      "step": 2,
+      "loss": 9.05454,
+      "grad_norm": 24.25,
+      "tok_per_gpu_s": 5709,
+      "tflops_per_gpu": 289.04,
+      "rank_max_memory_gib": 233.4
+    },
+    {
+      "step": 3,
+      "loss": 17.1474,
+      "grad_norm": 39.75,
+      "tok_per_gpu_s": 6124,
+      "tflops_per_gpu": 310.05,
+      "rank_max_memory_gib": 234.74
+    },
+    {
+      "step": 4,
+      "loss": 16.01858,
+      "grad_norm": 44.0,
+      "tok_per_gpu_s": 6718,
+      "tflops_per_gpu": 340.15,
+      "rank_max_memory_gib": 234.74
+    }
+  ],
+  "decision": "Do not promote. Do not hide this by raising heap in auto-cap mode; the source fix should make handle/capacity residency bounded and avoid stale capacity buckets."
+}

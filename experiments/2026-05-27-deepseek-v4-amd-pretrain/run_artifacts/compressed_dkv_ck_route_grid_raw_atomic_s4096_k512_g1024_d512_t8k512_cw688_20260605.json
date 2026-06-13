@@ -1,0 +1,98 @@
+{
+  "artifact": "compressed_dkv_ck_route_grid_raw_atomic_probe",
+  "scope": "diagnostic_materialized_probs_gradlogits_ck_mfma_route_grid_raw_atomic",
+  "arch": "gfx950",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip": "7.2.26015-fc0010cf6a",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "seq_len": 4096,
+    "topk": 512,
+    "selected_rows": 2097152,
+    "h_dim": 64,
+    "d_dim": 512,
+    "token_block": 8,
+    "selected_block": 512,
+    "group_count": 1024,
+    "route_pattern": "clustered_unique",
+    "cluster_width": 688,
+    "k_tile": 16,
+    "d_tile": 16,
+    "mfma_k": 32,
+    "accumulator_lane_map": "mode6: m=(lane>>4)*4+i, n=lane&15"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 22.466650038957596,
+  "extension_dir": "/tmp/dsv4_compressed_dkv_ck_route_grid_raw_atomic",
+  "write_model": {
+    "token_tiles": 512,
+    "selected_tiles": 1,
+    "d_blocks": 32,
+    "raw_scalar_writes": 1073741824,
+    "grouped_scalar_writes_if_tile_reduced": 180355072,
+    "tile_group_rows": 352256,
+    "min_tile_groups": 688,
+    "max_tile_groups": 688,
+    "modeled_tile_reduction_x": 5.953488372093023
+  },
+  "parity": {
+    "skipped": true
+  },
+  "timing_ms": {
+    "ck_raw_atomic": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "samples_ms": [
+        5.653255939483643,
+        5.6358160972595215,
+        5.587934970855713,
+        5.624936103820801,
+        5.60389518737793
+      ],
+      "median_ms": 5.624936103820801,
+      "mean_ms": 5.6211676597595215,
+      "min_ms": 5.587934970855713,
+      "max_ms": 5.653255939483643
+    },
+    "ck_contrib_sink": {
+      "warmup_iters": 2,
+      "timed_iters": 5,
+      "samples_ms": [
+        5.919658184051514,
+        5.8859782218933105,
+        6.142820835113525,
+        6.027979850769043,
+        6.041100025177002
+      ],
+      "median_ms": 6.027979850769043,
+      "mean_ms": 6.003507423400879,
+      "min_ms": 5.8859782218933105,
+      "max_ms": 6.142820835113525
+    },
+    "raw_minus_contrib_sink_ms": -0.4030437469482422,
+    "contrib_sink_vs_raw_ratio": 1.0716530356095015,
+    "comparison_floors_from_prior_artifacts": {
+      "rocwmma_route_grid_raw_atomic_best_ms": 8.432,
+      "triton_sparse_attention_boundary_full_ms": 11.13,
+      "note": "These are retained reference floors, not measured in this run."
+    }
+  },
+  "tensor_stats": {
+    "candidate": {
+      "norm": 6298.1806640625,
+      "max_abs": 42.617774963378906,
+      "mean_abs": 6.933981895446777
+    },
+    "sink": {
+      "norm": 41213.35546875,
+      "max_abs": 212.3114013671875,
+      "mean_abs": 32.10724639892578
+    },
+    "reference": null
+  },
+  "read": "This probe tests the HIP/CK producer surface needed for the cooperative sparse-attention backward rewrite. It still uses raw global dKV atomics and diagnostic materialized P/scaled-dP, so it is not an e2e TFLOPs candidate by itself. A successful result would promote this CK/MFMA fragment owner as the base for an in-kernel group-aware dKV epilogue that consumes the score/contribution tile before HBM."
+}

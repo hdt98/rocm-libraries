@@ -1,0 +1,71 @@
+{
+  "artifact": "normalized_target_reconcile_20260531",
+  "date": "2026-05-31",
+  "reason": "Reconcile experiment README, recipe, and runtime target comparisons with the active thread objective's 28.8% MFU normalized target.",
+  "single_layer_target_basis": {
+    "normalized_layer_tokens_per_s": 128100,
+    "layers": 43,
+    "end_to_end_tokens_per_gpu_s": 2980,
+    "target_mfu": 0.288,
+    "s1024_target_ms": 8.0,
+    "s2048_target_ms": 16.0,
+    "s4096_target_ms": 32.0
+  },
+  "eight_gpu_target": {
+    "per_gpu_tokens_per_s": 2980,
+    "node_tokens_per_s_rounded": 23850,
+    "effective_batch": {
+      "mbs": 1,
+      "sequence_length": 4096,
+      "gbs": 128,
+      "tokens_per_step": 524288
+    },
+    "step_time_s_at_gbs128": 22.0,
+    "per_gpu_tflops": 662,
+    "node_pflops": 5.30
+  },
+  "legacy_anchor_replaced_for_reporting": {
+    "source_doc_tokens_per_gpu_s": 1100,
+    "source_doc_node_tokens_per_s_on_8_gpu": 8800,
+    "source_doc_step_time_s_at_gbs128": 59.6,
+    "read": "Kept as reference context only; not the active pass/fail target for this thread."
+  },
+  "current_single_layer_best_vs_normalized_target": {
+    "s2048": {
+      "artifact": "paired_compact_reduce_full_layer_s2048_20260531.json",
+      "avg_ms": 52.328626019880176,
+      "target_ms": 16.0,
+      "time_gap_multiplier": 3.270539126242511,
+      "tokens_per_s": 39137.2783077076,
+      "target_tokens_per_s": 128100,
+      "throughput_fraction_of_target": 0.30552129826469633
+    },
+    "s4096": {
+      "artifact": "single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+      "avg_ms": 76.57323967820655,
+      "target_ms": 32.0,
+      "time_gap_multiplier": 2.3929137399439546,
+      "tokens_per_s": 53491.27211037617,
+      "target_tokens_per_s": 128100,
+      "throughput_fraction_of_target": 0.41757433341433387
+    }
+  },
+  "current_8gpu_proxy_vs_normalized_target": {
+    "artifact": "torchtitan_canary_runtime.yaml",
+    "model": "DeepSeek-V3 16B as DeepSeek-V4-style integration proxy",
+    "clean_step_average_tokens_per_gpu_s": 7000.5,
+    "clean_step_average_node_tokens_per_s": 56004,
+    "clean_step_average_step_time_s_at_gbs128": 9.36,
+    "clean_step_average_reported_tflops_per_gpu": 125.41,
+    "tokens_per_gpu_ratio_to_target": 2.35,
+    "node_tokens_ratio_to_target": 2.35,
+    "step_time_ratio_to_target": 0.43,
+    "reported_tflops_ratio_to_target": 0.19,
+    "caveat": "The 8-GPU canary is an integration proxy, not final DSv4-Flash; TorchTitan reported MI350X MFU via an A100 fallback, so MFU is not authoritative."
+  },
+  "files_reconciled": [
+    "README.md",
+    "recipe.yaml",
+    "run_artifacts/torchtitan_canary_runtime.yaml"
+  ]
+}

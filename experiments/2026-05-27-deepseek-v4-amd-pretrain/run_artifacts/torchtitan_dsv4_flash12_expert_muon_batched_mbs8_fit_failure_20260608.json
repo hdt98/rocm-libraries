@@ -1,0 +1,100 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_batched_mbs8_fit_failure_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_mbs8_8x_s4096_gbs128_steps3_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_mbs8_8x_s4096_gbs128_steps3_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_chunk4_mbs8_8x_s4096_gbs128_steps3_20260608",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "MORI_ENABLE_SDMA": "1",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+    "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+    "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+    "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "result": "rejected_fit_failure_after_step1",
+  "step1": {
+    "loss": 12.47667,
+    "grad_norm": 19.75,
+    "tokens_per_gpu_s_range": [1627, 1631],
+    "tflops_per_gpu_range": [82.40, 82.57],
+    "memory_gib_min": 250.82,
+    "memory_gib_max": 255.35
+  },
+  "failure": {
+    "phase": "next backward after first logged step",
+    "first_failed_rank": 3,
+    "local_rank": 3,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "message": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "detail": "Available Free mem : 0 MB",
+    "stack_top": "torch.autograd.backward -> trainer.forward_backward_step"
+  },
+  "comparison": {
+    "retained_adamw_mbs4": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+      "peak_logged_memory_gib": 193.80,
+      "status": "retained"
+    },
+    "batched_muon_mbs4": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_batched_chunk4_followup_20260608.json",
+      "steps_2_to_3_tokens_per_gpu_s_mean": 7346.0,
+      "steps_2_to_3_tflops_per_gpu_mean": 371.93,
+      "peak_logged_memory_gib": 176.29,
+      "status": "completed_3_steps_not_promoted"
+    },
+    "adamw_mbs8_fit_failure": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_mbs8_fit_failure_8x_s4096_gbs128_20260607.json",
+      "step1_peak_logged_memory_gib": 259.68,
+      "status": "rejected_fit_failure_after_step1"
+    },
+    "batched_muon_mbs8_vs_adamw_mbs8_step1_peak_delta_gib": -4.33
+  },
+  "read": "Batched expert-Muon reduces MBS8 step-1 peak memory versus AdamW by about 4.3 GiB, but this is far below the headroom needed to make MBS8 viable. The run still reaches zero free HBM and aborts in the next backward before step 2. Therefore the memory saved by dropping AdamW's second moment is not enough to unlock MBS8 for the current no-AC flash_12layer_ceiling_probe.",
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "next_action": "Do not spend more promotion time on expert-Muon MBS8. To unlock larger MBS, target activation/backward memory or optimizer-state swap/offload that preserves fast AdamW semantics; otherwise continue MoE/EP and sparse-MLA performance work at MBS4."
+  },
+  "post_run_node_state": {
+    "rocm_smi_after_wait": "all GPUs 0% use and 0% VRAM after approximately 30 seconds",
+    "active_training_processes": "none found"
+  }
+}

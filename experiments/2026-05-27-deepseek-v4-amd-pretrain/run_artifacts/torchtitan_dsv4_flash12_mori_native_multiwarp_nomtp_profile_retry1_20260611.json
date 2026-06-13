@@ -1,0 +1,224 @@
+{
+  "run_group": "torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_retry1_20260611",
+  "date": "2026-06-11",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "diagnostic_profile_only_not_promoted",
+  "question": "Does the MindSpeed-style hot-helper path matter for fitting larger MBS, and why does native MORI not yet promote over standard owner-compact?",
+  "short_answer": "Without hot-helper, larger MBS is not mathematically impossible, but it is currently a bad fit path: all hot rows stay in the normal EP dispatch/combine buffers and the hottest owner-rank VJP. Hot-helper removes hot rows from the normal token collective, computes those rows on helper/source ranks, and reduces only hot expert dW back to owners. That changes both memory pressure and skew.",
+  "profile_scope": {
+    "model": "DeepSeek-V4 Flash 12-layer reduced probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "none",
+    "mtp": false,
+    "hyper_connections": false,
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "weighted_scatter_score_mode": "torch",
+    "sparse_mla_backward": "shared_kv_query_recompute"
+  },
+  "preflight_failure": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+    "result": "failed_before_metric",
+    "cause": "missing TORCHTITAN_DSV4_SPARSE_MLA_SHARED_KV_KERNEL_MODULE / TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE env",
+    "fix": "reran with torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend"
+  },
+  "matched_runs": {
+    "standard_owner_compact": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "compact_collective_backend": "torch",
+      "source_scatter_backend": "materialize",
+      "step_2": {
+        "tokens_per_gpu_s": 6695,
+        "tflops_per_gpu": 306.60,
+        "peak_logged_memory_gib": 195.63,
+        "loss": 9.69171,
+        "grad_norm": 26.125
+      },
+      "additive_rankmax_ms": {
+        "train_step": 8277.614,
+        "microbatch_forward_backward": 2100.842,
+        "model_forward": 615.695,
+        "loss": 94.333,
+        "backward": 1398.871,
+        "optimizer_step": 45.202,
+        "grad_clip": 26.170
+      }
+    },
+    "native_mori_compact": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "compact_collective_backend": "mori_native",
+      "source_scatter_backend": "triton_flat",
+      "mori_shmem_heap_size": "32G",
+      "step_2": {
+        "tokens_per_gpu_s": 6248,
+        "tflops_per_gpu": 286.16,
+        "peak_logged_memory_gib": 195.97,
+        "loss": 10.74579,
+        "grad_norm": 33.5
+      },
+      "additive_rankmax_ms": {
+        "train_step": 8941.908,
+        "microbatch_forward_backward": 2275.015,
+        "model_forward": 700.523,
+        "loss": 92.017,
+        "backward": 1487.691,
+        "optimizer_step": 45.004,
+        "grad_clip": 27.546
+      }
+    }
+  },
+  "native_vs_standard": {
+    "step_2_tokens_per_gpu_s_delta_pct": -6.68,
+    "step_2_tflops_per_gpu_delta_pct": -6.67,
+    "train_step_rankmax_delta_ms": 664.294,
+    "microbatch_forward_backward_rankmax_delta_ms": 174.173,
+    "model_forward_rankmax_delta_ms": 84.828,
+    "backward_rankmax_delta_ms": 88.820,
+    "peak_logged_memory_delta_gib": 0.34
+  },
+  "stage_deltas_step2_rankmax_ms": [
+    {
+      "stage": "standard_ep.combine.mori_native_compact.launch",
+      "standard_ms": 0.0,
+      "native_ms": 517.326,
+      "delta_ms": 517.326,
+      "calls_native": 48
+    },
+    {
+      "stage": "standard_ep.dispatch.mori_native_compact.launch",
+      "standard_ms": 0.0,
+      "native_ms": 216.101,
+      "delta_ms": 216.101,
+      "calls_native": 48
+    },
+    {
+      "stage": "standard_ep.combine.all_to_all_wait",
+      "standard_ms": 236.285,
+      "native_ms": 0.0,
+      "delta_ms": -236.285,
+      "calls_standard": 48
+    },
+    {
+      "stage": "standard_ep.hot_split.broadcast_hot_weights",
+      "standard_ms": 366.356,
+      "native_ms": 194.732,
+      "delta_ms": -171.624,
+      "calls": 48
+    },
+    {
+      "stage": "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight",
+      "standard_ms": 254.983,
+      "native_ms": 80.565,
+      "delta_ms": -174.417,
+      "calls": 48
+    },
+    {
+      "stage": "standard_ep.dispatch.permute",
+      "standard_ms": 111.768,
+      "native_ms": 0.0,
+      "delta_ms": -111.768,
+      "calls_standard": 48
+    },
+    {
+      "stage": "standard_ep.combine.unpermute",
+      "standard_ms": 67.707,
+      "native_ms": 0.0,
+      "delta_ms": -67.707,
+      "calls_standard": 48
+    },
+    {
+      "stage": "standard_ep.dispatch.mori_native_compact.init",
+      "standard_ms": 0.0,
+      "native_ms": 19.573,
+      "delta_ms": 19.573,
+      "calls_native": 48
+    },
+    {
+      "stage": "standard_ep.dispatch.count_all_to_all",
+      "standard_ms": 184.454,
+      "native_ms": 169.482,
+      "delta_ms": -14.971,
+      "calls": 48
+    },
+    {
+      "stage": "standard_ep.combine.weighted_scatter_add",
+      "standard_ms": 119.602,
+      "native_ms": 110.211,
+      "delta_ms": -9.392,
+      "calls": 48
+    },
+    {
+      "stage": "standard_ep.dispatch.all_to_all",
+      "standard_ms": 8.158,
+      "native_ms": 0.0,
+      "delta_ms": -8.158,
+      "calls_standard": 48
+    },
+    {
+      "stage": "standard_ep.combine.all_to_all",
+      "standard_ms": 6.194,
+      "native_ms": 0.0,
+      "delta_ms": -6.194,
+      "calls_standard": 48
+    }
+  ],
+  "native_compact_capacity": {
+    "dispatch": {
+      "records": 768,
+      "active_peer_rows_max": 98304,
+      "remote_max_peer_rows_max": 11624,
+      "capacity_peer_rows": {
+        "1": 192,
+        "8192": 48,
+        "16384": 528
+      },
+      "capacity_over_active_median": 1.06235,
+      "capacity_over_active_p95": 1.69431
+    },
+    "combine": {
+      "records": 384,
+      "active_peer_rows_max": 98304,
+      "remote_max_peer_rows_max": 11624,
+      "capacity_peer_rows": {
+        "1": 96,
+        "8192": 24,
+        "16384": 264
+      },
+      "capacity_over_active_median": 1.06235,
+      "capacity_over_active_p95": 1.69355
+    },
+    "read": "Capacity bucketing is tight enough that the regression is not primarily over-allocation. The launch/body path, especially native compact combine, is the wall."
+  },
+  "read": {
+    "mori_buys": [
+      "removes standard dispatch permute and combine unpermute",
+      "reduces all-to-all wait in this profile window",
+      "reduces hot-weight broadcast / W2 forward hot-weight transport",
+      "slightly reduces count exchange and weighted scatter"
+    ],
+    "mori_pays": [
+      "native compact combine launch/body adds about 517 ms rank-max across 48 calls",
+      "native compact dispatch launch/body adds about 216 ms rank-max across 48 calls",
+      "native compact init/metadata is small by comparison"
+    ],
+    "next_source_target": "Collapse the native compact ABI so MORI writes the final expert-major receive and compact return/source-order layouts directly, instead of staging symmetric native compact buffers and then adapting back into ordinary TorchTitan outputs."
+  },
+  "artifacts": {
+    "remote_native_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611/docker-run.log",
+    "remote_standard_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ownercompact_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611/docker-run.log",
+    "remote_native_profile": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+    "remote_standard_profile": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_standard_ownercompact_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+    "local_compare_json": "/tmp/dsv4_mori_native_profile_retry1_20260611/profile_compare_step2.json"
+  },
+  "validation": [
+    "native and standard runs completed two metric steps",
+    "profile_timing.jsonl and additive_timing.jsonl pulled locally",
+    "summarize_profile_timing_jsonl.py parsed step 2 with rank-max stage deltas"
+  ]
+}

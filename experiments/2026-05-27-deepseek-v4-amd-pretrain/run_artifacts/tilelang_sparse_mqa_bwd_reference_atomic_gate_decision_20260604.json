@@ -1,0 +1,90 @@
+{
+  "artifact": "tilelang_sparse_mqa_bwd_reference_atomic_gate_decision_20260604",
+  "scope": "straight_vendored_tilelang_dsv4_sparse_mqa_backward_atomic_gate",
+  "date": "2026-06-04",
+  "runtime": {
+    "node": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "gpu": "MI350X/gfx950",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "tilelang": "0.1.7.post3+cuda.gita55a8230"
+  },
+  "tool": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_mqa_bwd_reference.py",
+  "reference_files": [
+    "sources/references/miles-deepseek-v4-pr1045/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_fwd.py",
+    "sources/references/miles-deepseek-v4-pr1045/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py"
+  ],
+  "baseline_for_comparison": {
+    "artifact": "actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+    "shape": "S4096,H64,D512,topk512,actual LI layer-2 compressed route",
+    "median_ms": 8.006924390792847,
+    "read": "Current Triton dot_k_atomic sparse dKV wall. It consumes materialized probs/grad_logits and atomically writes one KxD contribution per valid selected compressed group."
+  },
+  "compile_failures": [
+    {
+      "shape": "S128,kv512,H64,D512,topk512,forward_state=tilelang,fwd_block_i=64",
+      "kernel": "vendored TileLang forward",
+      "failure": "Requested dynamic shared memory 206848 exceeds device limit 163840 for main_kernel",
+      "read": "The matching vendored forward cannot launch at D512/H64 on MI350 without splitting or reducing the schedule."
+    },
+    {
+      "shape": "S128,kv512,H64,D512,topk512,forward_state=synthetic,bwd_block_size=32",
+      "kernel": "vendored TileLang backward",
+      "failure": "Requested dynamic shared memory 204800 exceeds device limit 163840 for sparse_mqa_bwd_kernel_kernel",
+      "read": "The straight backward atomic reference cannot launch at the target H64/D512 shape."
+    },
+    {
+      "shape": "S128,kv512,H64,D512,topk512,forward_state=synthetic,bwd_block_size=16",
+      "kernel": "vendored TileLang backward",
+      "failure": "Requested dynamic shared memory 219104 exceeds device limit 163840 for sparse_mqa_bwd_kernel_kernel",
+      "read": "Reducing selected block size did not fix shared-memory pressure; it made the generated schedule larger."
+    }
+  ],
+  "successful_timing_points": [
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s128_kv512_topk512_d256_synthetic_20260604.json",
+      "shape": "S128,kv512,H64,D256,topk512",
+      "core_backward_median_ms": 0.44320300221443176,
+      "preprocess_delta_median_ms": 0.02056100033223629,
+      "postprocess_dkv_cast_median_ms": 0.02287999913096428,
+      "modeled_scalar_atomic_add_elements": 16777216
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_d256_synthetic_20260604.json",
+      "shape": "S4096,kv1024,H64,D256,topk512",
+      "core_backward_median_ms": 7.592505931854248,
+      "preprocess_delta_median_ms": 0.12756100296974182,
+      "postprocess_dkv_cast_median_ms": 0.02419999986886978,
+      "modeled_scalar_atomic_add_elements": 536870912,
+      "read": "This already nearly equals the D512 Triton sparse-atomic wall while only covering half of D."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h32_d512_synthetic_20260604.json",
+      "shape": "S4096,kv1024,H32,D512,topk512",
+      "core_backward_median_ms": 14.051605224609375,
+      "preprocess_delta_median_ms": 0.07420100271701813,
+      "postprocess_dkv_cast_median_ms": 0.03332100063562393,
+      "modeled_scalar_atomic_add_elements": 1073741824,
+      "read": "A simple two-way head split for H64/D512 was expected to land around 28.1 ms before integration overhead."
+    },
+    {
+      "artifact": "tilelang_sparse_mqa_bwd_reference_s4096_kv1024_topk512_h64_d512_headsplit32_synthetic_20260604.json",
+      "shape": "S4096,kv1024,H64,D512,topk512,head_split=32",
+      "core_backward_median_ms": 28.111255645751953,
+      "preprocess_delta_median_ms": 0.17356200516223907,
+      "postprocess_dkv_cast_median_ms": 0.03172000125050545,
+      "modeled_scalar_atomic_add_elements": 1073741824,
+      "read": "Concrete target-width head-split timing confirms the estimate: the straight atomic-add TileLang reference scales to about 28 ms at H64/D512, not to the 7.59 ms half-D point."
+    }
+  ],
+  "decision": {
+    "promote_straight_tilelang_reference": false,
+    "why": [
+      "The vendored reference cannot compile at the target H64/D512 shape on MI350 because dynamic shared-memory demand exceeds the device limit.",
+      "The fitting split points are not fast enough: D256 S4096 is 7.59 ms for half-D, H32/D512 S4096 is 14.05 ms for half-heads, and the measured H64/D512 head-split path is 28.11 ms.",
+      "The concrete head-split target-width path is slower than the current 8.01 ms Triton sparse-atomic wall and far from the desired sparse-backward envelope."
+    ],
+    "next": "Use TileLang only as a rewrite surface if we can change the schedule: split Q/dO/KV staging to fit MI350 shared memory, preserve query-major MFMA contribution production, and add in-producer segmented/grouped dKV reduction before global atomics. Do not integrate the straight T.atomic_addx4 reference into TorchTitan."
+  }
+}

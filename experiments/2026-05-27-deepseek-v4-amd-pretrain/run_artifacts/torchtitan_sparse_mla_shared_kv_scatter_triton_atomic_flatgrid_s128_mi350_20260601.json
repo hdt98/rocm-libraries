@@ -1,0 +1,290 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "include_triton_atomic": true,
+  "parity": {
+    "index_add_flat": {
+      "checksum": 0.0389925017952919,
+      "max_abs_diff_vs_index_add_flat": 0.0
+    },
+    "scatter_add_dim1": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 1.9073486328125e-05
+    },
+    "split_index_add": {
+      "checksum": 0.0389925055205822,
+      "max_abs_diff_vs_index_add_flat": 1.9073486328125e-05
+    },
+    "triton_atomic_bm16_bd32": {
+      "checksum": 0.038992490619421005,
+      "max_abs_diff_vs_index_add_flat": 1.71661376953125e-05
+    },
+    "triton_atomic_bm16_bd64": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 1.71661376953125e-05
+    },
+    "triton_atomic_bm32_bd32": {
+      "checksum": 0.038992494344711304,
+      "max_abs_diff_vs_index_add_flat": 1.9073486328125e-05
+    },
+    "triton_atomic_bm32_bd64": {
+      "checksum": 0.0389925017952919,
+      "max_abs_diff_vs_index_add_flat": 1.9073486328125e-05
+    }
+  },
+  "peak_memory_allocated_bytes": 85237760,
+  "peak_memory_allocated_gib": 0.07938385009765625,
+  "ranked_by_median_ms": [
+    {
+      "mean_ms": 0.12440033505360286,
+      "median_ms": 0.07996000349521637,
+      "method": "triton_atomic_bm16_bd64"
+    },
+    {
+      "mean_ms": 0.12277433276176453,
+      "median_ms": 0.0899209976196289,
+      "method": "triton_atomic_bm32_bd32"
+    },
+    {
+      "mean_ms": 0.15517466515302658,
+      "median_ms": 0.12156099826097488,
+      "method": "triton_atomic_bm32_bd64"
+    },
+    {
+      "mean_ms": 0.15497466176748276,
+      "median_ms": 0.1480409950017929,
+      "method": "triton_atomic_bm16_bd32"
+    },
+    {
+      "mean_ms": 0.37160299221674603,
+      "median_ms": 0.32992300391197205,
+      "method": "index_add_flat"
+    },
+    {
+      "mean_ms": 0.35534966985384625,
+      "median_ms": 0.34032300114631653,
+      "method": "scatter_add_dim1"
+    },
+    {
+      "mean_ms": 0.3459630012512207,
+      "median_ms": 0.3415229916572571,
+      "method": "split_index_add"
+    }
+  ],
+  "read": "This is a PyTorch-only bridge probe for dKV scatter-add. Passing parity here does not make the shared-KV backend production-ready; it tells us whether a cheap PyTorch replacement exists before writing the fused output-row kernel.",
+  "scope": "sparse_mla_shared_latent_kv_dkv_scatter_pytorch_variants",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "kv_len": 160,
+    "local_count": 128,
+    "selected_count": 160,
+    "seq_len": 128,
+    "values_gib": 0.0390625
+  },
+  "status": "passed",
+  "timed_iters": 3,
+  "timings": {
+    "index_add_flat": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.46204298734664917,
+        "mean_ms": 0.37160299221674603,
+        "median_ms": 0.32992300391197205,
+        "min_ms": 0.3228429853916168,
+        "samples_ms": [
+          0.46204298734664917,
+          0.32992300391197205,
+          0.3228429853916168
+        ],
+        "stdev_ms": 0.07840329205387248
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.5024290876463056,
+        "mean_ms": 0.39725568300733965,
+        "median_ms": 0.34853897523134947,
+        "min_ms": 0.3407989861443639,
+        "samples_ms": [
+          0.5024290876463056,
+          0.34853897523134947,
+          0.3407989861443639
+        ],
+        "stdev_ms": 0.09116501873131168
+      }
+    },
+    "scatter_add_dim1": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.38540300726890564,
+        "mean_ms": 0.35534966985384625,
+        "median_ms": 0.34032300114631653,
+        "min_ms": 0.34032300114631653,
+        "samples_ms": [
+          0.38540300726890564,
+          0.34032300114631653,
+          0.34032300114631653
+        ],
+        "stdev_ms": 0.0260269536699468
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.40959008038043976,
+        "mean_ms": 0.37590569506088894,
+        "median_ms": 0.3599580377340317,
+        "min_ms": 0.35816896706819534,
+        "samples_ms": [
+          0.40959008038043976,
+          0.3599580377340317,
+          0.35816896706819534
+        ],
+        "stdev_ms": 0.029185245488582374
+      }
+    },
+    "split_index_add": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.35540300607681274,
+        "mean_ms": 0.3459630012512207,
+        "median_ms": 0.3415229916572571,
+        "min_ms": 0.3409630060195923,
+        "samples_ms": [
+          0.35540300607681274,
+          0.3415229916572571,
+          0.3409630060195923
+        ],
+        "stdev_ms": 0.00818007728013608
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.38083805702626705,
+        "mean_ms": 0.3663316989938418,
+        "median_ms": 0.3593090223148465,
+        "min_ms": 0.35884801764041185,
+        "samples_ms": [
+          0.38083805702626705,
+          0.3593090223148465,
+          0.35884801764041185
+        ],
+        "stdev_ms": 0.012564989011182779
+      }
+    },
+    "triton_atomic_bm16_bd32": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.25116199254989624,
+        "mean_ms": 0.15497466176748276,
+        "median_ms": 0.1480409950017929,
+        "min_ms": 0.06572099775075912,
+        "samples_ms": [
+          0.25116199254989624,
+          0.1480409950017929,
+          0.06572099775075912
+        ],
+        "stdev_ms": 0.09291473208881691
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.32418896444141865,
+        "mean_ms": 0.18895630879948536,
+        "median_ms": 0.16297900583595037,
+        "min_ms": 0.07970095612108707,
+        "samples_ms": [
+          0.32418896444141865,
+          0.16297900583595037,
+          0.07970095612108707
+        ],
+        "stdev_ms": 0.12429686944993865
+      }
+    },
+    "triton_atomic_bm16_bd64": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.219200998544693,
+        "mean_ms": 0.12440033505360286,
+        "median_ms": 0.07996000349521637,
+        "min_ms": 0.0740400031208992,
+        "samples_ms": [
+          0.219200998544693,
+          0.07996000349521637,
+          0.0740400031208992
+        ],
+        "stdev_ms": 0.08215312501585781
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.24962006136775017,
+        "mean_ms": 0.14433668305476507,
+        "median_ms": 0.0951599795371294,
+        "min_ms": 0.08823000825941563,
+        "samples_ms": [
+          0.24962006136775017,
+          0.0951599795371294,
+          0.08823000825941563
+        ],
+        "stdev_ms": 0.09124389534223011
+      }
+    },
+    "triton_atomic_bm32_bd32": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.2048809975385666,
+        "mean_ms": 0.12277433276176453,
+        "median_ms": 0.0899209976196289,
+        "min_ms": 0.07352100312709808,
+        "samples_ms": [
+          0.2048809975385666,
+          0.0899209976196289,
+          0.07352100312709808
+        ],
+        "stdev_ms": 0.07157770781057725
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.2748289844021201,
+        "mean_ms": 0.1558726653456688,
+        "median_ms": 0.10484002996236086,
+        "min_ms": 0.0879489816725254,
+        "samples_ms": [
+          0.2748289844021201,
+          0.10484002996236086,
+          0.0879489816725254
+        ],
+        "stdev_ms": 0.10336479700883454
+      }
+    },
+    "triton_atomic_bm32_bd64": {
+      "cuda_event": {
+        "enabled": true,
+        "max_ms": 0.2313620001077652,
+        "mean_ms": 0.15517466515302658,
+        "median_ms": 0.12156099826097488,
+        "min_ms": 0.11260099709033966,
+        "samples_ms": [
+          0.2313620001077652,
+          0.12156099826097488,
+          0.11260099709033966
+        ],
+        "stdev_ms": 0.06613208684801651
+      },
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.2593100070953369,
+        "mean_ms": 0.17411564476788044,
+        "median_ms": 0.13692793436348438,
+        "min_ms": 0.12610899284482002,
+        "samples_ms": [
+          0.2593100070953369,
+          0.13692793436348438,
+          0.12610899284482002
+        ],
+        "stdev_ms": 0.07397852325629731
+      }
+    }
+  },
+  "triton_available": true,
+  "warmup_iters": 1
+}

@@ -1,0 +1,95 @@
+{
+  "deferred_forward_loss": 0.0,
+  "deferred_grad_norms": {
+    "index_k": 0.0009901180164888501,
+    "index_q": 0.0009951784741133451,
+    "weights": 0.0008209228399209678
+  },
+  "device": "cuda",
+  "direct_grad_norms": {
+    "index_k": 0.0009904385078698397,
+    "index_q": 0.000995120732113719,
+    "weights": 0.0008209228399209678
+  },
+  "direct_loss": 0.016794897615909576,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {
+    "index_k": 9.5367431640625e-07,
+    "index_q": 2.384185791015625e-07,
+    "weights": 3.725290298461914e-09
+  },
+  "li_kl_backend": "triton_tl_dot",
+  "li_kl_chunk_size": 0,
+  "li_kl_chunk_size_arg": null,
+  "max_grad_diff": 9.5367431640625e-07,
+  "parity_skipped": false,
+  "read": "The deferred Ascend-style public wrapper intentionally returns a zero scalar in forward, then recomputes the selected sparse LI KL objective in backward and matches the direct oracle parameter gradients.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 64,
+    "groups": 32,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 32,
+    "seq_len": 128,
+    "shared_main_k": true,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.5484039783477783,
+      "mean_ms": 0.49683066209157306,
+      "median_ms": 0.4972440004348755,
+      "min_ms": 0.44484400749206543,
+      "samples_ms": [
+        0.5484039783477783,
+        0.4972440004348755,
+        0.44484400749206543
+      ],
+      "stdev_ms": 0.05178122272936937
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 0.0009901180164888501,
+      "index_q": 0.0009951784741133451,
+      "weights": 0.0008209228399209678
+    },
+    "li_kl_backend": "triton_tl_dot",
+    "li_kl_chunk_size": 0,
+    "li_kl_chunk_size_arg": null,
+    "li_kl_chunk_size_env": null,
+    "li_kl_max_selected_main_k_elements_env": null,
+    "peak_memory_allocated_bytes": 180495360,
+    "peak_memory_allocated_gib": 0.16809940338134766,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle with the selected TorchTitan LI KL backend.",
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.6073829717934132,
+      "mean_ms": 0.5377886506418387,
+      "median_ms": 0.5298110190778971,
+      "min_ms": 0.4761719610542059,
+      "samples_ms": [
+        0.6073829717934132,
+        0.5298110190778971,
+        0.4761719610542059
+      ],
+      "stdev_ms": 0.06596828244564648
+    },
+    "warmup_iters": 1
+  },
+  "top_indices_equal": true,
+  "top_indices_shape": [
+    1,
+    128,
+    32
+  ]
+}

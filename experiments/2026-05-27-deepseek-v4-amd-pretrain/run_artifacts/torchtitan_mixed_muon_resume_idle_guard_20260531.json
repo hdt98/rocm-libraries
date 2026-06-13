@@ -1,0 +1,79 @@
+{
+  "status": "guard_prevented_contaminated_8x_resume",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+  "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+  "exit_code": 1,
+  "rechecks": [
+    {
+      "checked_at_utc": "2026-05-31T07:09:05Z",
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+      "exit_code": 1,
+      "blocking_kfd_pids": [
+        3336400,
+        3336399,
+        3335962
+      ],
+      "action": "did_not_launch_resume_or_kill_external_workload"
+    },
+    {
+      "checked_at_utc": "2026-05-31T07:39:07Z",
+      "command": "rocm-smi --showpids on do-sonle5-mi350-gpu",
+      "exit_code": 1,
+      "blocking_kfd_pids": [
+        3336400,
+        3336399,
+        3335962
+      ],
+      "action": "did_not_launch_resume_or_kill_external_workload"
+    },
+    {
+      "checked_at_utc": "2026-05-31T07:42:59Z",
+      "command": "rocm-smi --showpids on do-sonle5-mi350-gpu",
+      "exit_code": 1,
+      "blocking_kfd_pids": [
+        3336400,
+        3336399,
+        3335962
+      ],
+      "action": "did_not_launch_resume_or_kill_external_workload"
+    }
+  ],
+  "latest_run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "resume_checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+  "blocking_kfd_processes": [
+    {
+      "pid": 3336400,
+      "process": "python",
+      "gpu": 1,
+      "vram_bytes": 167383355392,
+      "command": "/opt/venv/bin/python -u primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    },
+    {
+      "pid": 3336399,
+      "process": "python",
+      "gpu": 1,
+      "vram_bytes": 167383355392,
+      "command": "/opt/venv/bin/python -u primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    },
+    {
+      "pid": 3335962,
+      "process": "pt_elastic",
+      "gpu": 0,
+      "vram_bytes": 0,
+      "command": "/opt/venv/bin/python /opt/venv/bin/torchrun --nproc_per_node 2 --nnodes 1 --node_rank 0 --master_addr 10.130.0.2 --master_port 29551 --local-ranks-filter 0 primus/cli/main.py train pretrain --config examples/torchtitan/configs/MI300X/llama3.1_8B-BF16-TP2-pretrain.yaml --model.hf_assets_path /home/tanth/Primus/data/torchtitan/Llama-3.1-8B --backend_path /workspace/Primus/third_party/torchtitan --fault_tolerance.enable --fault_tolerance.replica_id=0 --fault_tolerance.group_size=2 --fault_tolerance.min_replica_size=1 --fault_tolerance.process_group_timeout_ms=30000 --job.dump_folder=output/torchft_test --training.steps=20000"
+    }
+  ],
+  "launcher_guard": {
+    "name": "CANARY_REQUIRE_IDLE_GPUS",
+    "default": true,
+    "behavior": "real run-save, run-resume, and run-perf actions call rocm-smi --showpids and refuse to start when any KFD process other than gpuagent is present",
+    "override": "CANARY_REQUIRE_IDLE_GPUS=false"
+  },
+  "next_command_when_idle": "env CANARY_OPTIMIZER_MODE=mixed-muon-adamw RESUME_LOAD_STEP=1 RESUME_STEPS=2 CANARY_GBS=8 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh run-resume",
+  "caveats": [
+    "This artifact is not a failed canary; the real resume was intentionally not launched.",
+    "The active workload appears external and was left untouched."
+  ]
+}

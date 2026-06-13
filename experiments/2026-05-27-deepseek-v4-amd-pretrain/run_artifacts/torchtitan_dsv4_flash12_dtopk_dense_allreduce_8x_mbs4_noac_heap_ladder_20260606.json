@@ -1,0 +1,112 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_mbs4_noac_heap_ladder_20260606",
+  "date": "2026-06-06",
+  "status": "rejected_mbs4_noac_heap_ladder",
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": "8xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "target": "flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false
+  },
+  "common_env": {
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": 1,
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": 1,
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": 1,
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": 0
+  },
+  "attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap96_noac_steps6_20260606",
+      "mori_shmem_heap_size": "96G",
+      "result": "failed_before_step1",
+      "failure": {
+        "kind": "mori_static_heap_exhausted",
+        "requested_bytes_aligned": 1081081856,
+        "current_heap_size_bytes": 103079215104
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap96_noac_steps6_20260606/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap112_noac_steps6_20260606",
+      "mori_shmem_heap_size": "112G",
+      "result": "failed_before_step1",
+      "failure": {
+        "kind": "mori_static_heap_exhausted",
+        "requested_bytes_aligned": 1073741824,
+        "current_heap_size_bytes": 120259084288
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap112_noac_steps6_20260606/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap128_noac_steps6_20260606",
+      "mori_shmem_heap_size": "128G",
+      "result": "failed_before_step1",
+      "failure": {
+        "kind": "mori_static_heap_exhausted",
+        "requested_bytes_aligned": 1081081856,
+        "current_heap_size_bytes": 137438953472
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap128_noac_steps6_20260606/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap144_noac_steps6_20260606",
+      "mori_shmem_heap_size": "144G",
+      "result": "completed_step1_then_failed_before_step2_metrics",
+      "step1": {
+        "tokens_per_gpu_s_mean": 1593.375,
+        "node_tokens_s_mean": 12747.0,
+        "tflops_per_gpu_mean": 80.6825,
+        "loss": 12.46294,
+        "grad_norm": 18.375,
+        "peak_logged_memory_gib": 125.33
+      },
+      "failure": {
+        "kind": "hsa_out_of_resources_after_step1",
+        "available_free_memory_mb": 96,
+        "observed_stack_boundary": "mori/ops/dispatch_combine.py DispatchCombineOp construction via _get_or_create_mori_backward_ops during mori_aiter_grouped_experts_forward",
+        "read": "Static heap was large enough to enter training, but left too little real HSA headroom for later MORI dispatch/combine op creation. Logged PyTorch memory stayed around 125 GiB, so this failure is hidden MORI/static-heap plus runtime resource pressure rather than ordinary reported tensor memory alone."
+      },
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs4_heap144_noac_steps6_20260606/docker-run.log"
+    }
+  ],
+  "comparison": {
+    "stable_8x_mbs2_dense_dtopk_artifact": "run_artifacts/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_20260606.json",
+    "stable_8x_mbs2_steps_2_to_6_tokens_per_gpu_s": 3358.4,
+    "stable_8x_mbs2_steps_2_to_6_tflops_per_gpu": 170.046,
+    "stable_8x_mbs2_peak_logged_memory_gib": 141.86,
+    "heap144_step1_delta_vs_stable_8x_mbs2_tokens_per_gpu_pct": -52.55,
+    "heap144_step1_delta_vs_stable_8x_mbs2_tflops_pct": -52.55,
+    "caveat": "Step 1 is warmup and is not a promotion metric, but it is the only measured point before the heap144 failure. It is already far below the stable MBS2 sustained baseline."
+  },
+  "decision": {
+    "promote": false,
+    "read": "EP8 does create visible tensor-memory room at MBS2, but the current MORI/AITER owner-backward path cannot harvest it as MBS4 throughput. Heap96/112/128 fail on MORI static heap before step 1; heap144 reaches step 1 then aborts with HSA out-of-resources while constructing/caching MORI backward dispatch/combine ops. Larger MBS is therefore not the next lever until MORI workspace/op lifetime and compact owner-VJP memory pressure are reduced."
+  }
+}

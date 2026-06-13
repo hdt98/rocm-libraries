@@ -1,0 +1,51 @@
+{
+  "status": "retained_full_output_candidate",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_final_output",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "shape": {
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "valid_topk": 512,
+    "token_block": 32,
+    "group_panel_size": 256,
+    "panel_capacity": 160,
+    "topk_workspace": 640,
+    "block_k": 32,
+    "block_d": 64
+  },
+  "compact_producer_plus_final_fold": {
+    "math_mode": "mfma_reduced",
+    "fold_final_dkv": true,
+    "fold_implementation": "torch.index_add_ diagnostic over compact partial rows",
+    "panel_overflow_count_s4096": 0,
+    "partial_workspace_mib": 256.0,
+    "final_output_mib": 2.0,
+    "s128_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_full_output_median_ms": 10.956138610839844,
+    "s4096_fold_only_median_ms": 0.22918249666690826,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s128_valid512_tb32_gps256_cap160_k32d64_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "compact_producer_only": {
+    "s4096_median_ms": 10.712961196899414,
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_capacity_random_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "direct_final_reduced_atomic": {
+    "math_mode": "mfma_panel_atomic_final",
+    "final_output_mib": 2.0,
+    "s128_correctness_max_abs_diff": 1.4901161193847656e-08,
+    "s4096_median_ms": 11.473388671875,
+    "artifact_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s128_valid512_tb32_gps256_cap160_k32d64_correct_20260604.json",
+    "artifact_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_panel_atomic_final_s4096_valid512_tb32_gps256_cap160_k32d64_timing10_20260604.json"
+  },
+  "comparison": {
+    "fold_overhead_vs_producer_only_ms": 0.2431774139404297,
+    "folded_path_speedup_vs_direct_final_atomic_x": 1.047216363111608,
+    "folded_path_margin_vs_direct_final_atomic_ms": 0.5172500610351562
+  },
+  "read": "The usable final-dKV path for the current TileLang compact producer is now measured. Producer plus PyTorch index_add_ final fold is 10.956 ms at S4096, and the fold itself is only 0.229 ms, so the direct reduced-atomic final-output branch remains slower despite its smaller memory footprint. Retain compact producer plus final fold as the current full-output TileLang branch. It still does not beat the 8.0-8.8 ms sparse-atomic wall, and the next speed lever remains fusing LI derivative/prob production and reducing producer-side work rather than replacing the final fold with reduced atomics."
+}

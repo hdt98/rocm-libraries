@@ -1,0 +1,141 @@
+{
+  "artifact": "single_layer_profile_2048",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "run_tag": "retained_profile_2048_20260531T2250Z",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_2048_20260531T2250Z",
+  "shape": {
+    "batch": 1,
+    "seqlen": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16"
+  },
+  "implementation": {
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "rmsnorm_save_policy": "saved-accum",
+    "fixed_router": false
+  },
+  "commands": {
+    "block_profile": "RUN_TAG=retained_profile_2048_20260531T2250Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh profile-blocks-2048",
+    "rocprof": "RUN_TAG=retained_profile_2048_20260531T2250Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-2048"
+  },
+  "raw_artifacts": {
+    "block_profile_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_2048_20260531T2250Z/full_layer_s2048_profile_blocks/summary.json",
+    "rocprof_torch_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_2048_20260531T2250Z/rocprof_s2048_region_1iter/torch_summary/summary.json",
+    "rocprof_kernel_stats": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_2048_20260531T2250Z/rocprof_s2048_region_1iter/trace_kernel_stats.csv",
+    "rocprof_domain_stats": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_profile_2048_20260531T2250Z/rocprof_s2048_region_1iter/trace_domain_stats.csv"
+  },
+  "block_profile": {
+    "note": "This is a one-iteration profiling pass; use the retained benchmark artifact for canonical pass/fail timing.",
+    "phase_ms": {
+      "forward": 18.776098964735866,
+      "loss": 0.0996199669316411,
+      "backward": 37.05959301441908
+    },
+    "phase_total_ms": 55.935311946086586,
+    "tokens_per_s": 36613.72268691325,
+    "estimated_tflops": 174.0609581028925,
+    "target_ms": 43.3,
+    "gap_to_target_ms": 12.635311946086582,
+    "forward_subsystems": {
+      "attention_ms": 5.253594019450247,
+      "attention_share_of_forward": 0.2798022118075342,
+      "moe_ms": 12.50446098856628,
+      "moe_share_of_forward": 0.6659775820340211,
+      "boundary_ms": 0.5554568488150835,
+      "boundary_share_of_forward": 0.029583187107093383
+    },
+    "attention_backward_segmented_ms": {
+      "attention_dgrad": 6.969478097744286,
+      "attention_wgrad": 7.258905912749469,
+      "sparse_mla_dgrad_qkv": 3.1932899728417397,
+      "sparse_mla_sink_wgrad": 3.1383699970319867,
+      "q_path_dgrad": 1.6457750461995602,
+      "q_path_wgrad": 1.7858350183814764,
+      "out_proj_dgrad": 1.188216032460332,
+      "out_proj_wgrad": 0.869118026457727,
+      "csa_dgrad": 0.6278780056163669,
+      "csa_wgrad": 0.5740569904446602,
+      "hca_dgrad": 0.5860489327460527,
+      "hca_wgrad": 0.5723080830648541
+    },
+    "traffic_estimate_bucket_totals_bytes": {
+      "attention_activations": 2493005824,
+      "boundary_activations": 340924480,
+      "gradient_edges": 1663582208,
+      "moe_activations": 678551552,
+      "parameter_gradients": 51383666184
+    },
+    "moe_segmented_caveat": "The segmented autograd.grad MoE aggregate in this profile is not comparable to normal loss.backward: the routed wgrad aggregate reported 13.2 s. Use the isolated MoE probe and full-layer timing sweeps for MoE implementation ranking."
+  },
+  "rocprof_selected_region": {
+    "phase_ms": {
+      "forward": 19.517967011779547,
+      "loss": 0.10261998977512121,
+      "backward": 37.216061959043145
+    },
+    "phase_total_ms": 56.83664896059781,
+    "tokens_per_s": 36033.08846409616,
+    "estimated_tflops": 171.30063378419126,
+    "domain_stats": {
+      "kernel_dispatch_calls": 487,
+      "kernel_dispatch_total_ms": 53.16223,
+      "marker_api_calls": 18,
+      "marker_api_total_ms": 75.779329
+    },
+    "top_kernel_stats_by_total_duration": [
+      {
+        "name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32",
+        "calls": 3,
+        "total_ms": 17.345287,
+        "avg_ms": 5.781762333333,
+        "percentage": 32.63
+      },
+      {
+        "name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64",
+        "calls": 3,
+        "total_ms": 9.156248,
+        "avg_ms": 3.052082666667,
+        "percentage": 17.22
+      },
+      {
+        "name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64",
+        "calls": 3,
+        "total_ms": 9.118449,
+        "avg_ms": 3.039483,
+        "percentage": 17.15
+      },
+      {
+        "name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64",
+        "calls": 3,
+        "total_ms": 1.155411,
+        "avg_ms": 0.385137,
+        "percentage": 2.17
+      },
+      {
+        "name_prefix": "void at::native::indexFuncLargeIndex",
+        "calls": 2,
+        "total_ms": 1.02981,
+        "avg_ms": 0.514905,
+        "percentage": 1.94
+      },
+      {
+        "name_prefix": "_masked_softmax_inplace_kernel",
+        "calls": 1,
+        "total_ms": 0.695726,
+        "avg_ms": 0.695726,
+        "percentage": 1.31
+      },
+      {
+        "name_prefix": "_softmax_bwd_scores_kernel",
+        "calls": 1,
+        "total_ms": 0.615846,
+        "avg_ms": 0.615846,
+        "percentage": 1.16
+      }
+    ]
+  },
+  "conclusion": "At B=1 S=2048, normal backward remains the largest phase. Attention backward is balanced between dgrad and wgrad at roughly 7 ms each, and sparse MLA forward/backward softmax kernels are visible but not the dominant total-duration kernels. The biggest measured kernel time is still GEMM-family work, while 487 dispatches suggest launch-count reduction or deeper fused MoE/GEMM work is more promising than another attention selector swap."
+}

@@ -1,0 +1,418 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "candidate_norm": null,
+    "checked": false,
+    "dkv_atol": 1.0,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "passed": null,
+    "reference_norm": null
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "gate": {
+    "beats_retained_gate": false,
+    "candidate_full_ms": 14.294575691223145,
+    "candidate_vs_retained_speedup_x": 0.7789458211646461,
+    "dkv_only_full_ms": 7.482830047607422,
+    "dkv_only_global_accum_ms": 1.7946958541870117,
+    "dkv_only_sink_ms": 5.68813419342041,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "measured_parallel_split_beats_retained_gate": false,
+    "measured_parallel_split_selected_dq_union_dkv_ms": 16.26499366760254,
+    "measured_parallel_split_vs_retained_speedup_x": 0.6845806538602395,
+    "measured_split_beats_retained_gate": true,
+    "measured_split_selected_dq_union_dkv_ms": 10.740462303161621,
+    "measured_split_vs_retained_speedup_x": 1.0367058405597989,
+    "parallel_split_vs_serial_split_speedup_x": 0.6603422369942284,
+    "retained_single_token_full_ms": 11.1347,
+    "split_schedule_beats_matched_single_token": true,
+    "split_schedule_candidate_ms": 9.473122000694275,
+    "split_schedule_vs_matched_single_token_speedup_x": 1.1692812653292168
+  },
+  "layer_id": 2,
+  "prototype": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "block_u": 256,
+    "known_limitations": [
+      "union BLOCK_T=4 implements both full dQ+dKV and dKV-only timing modes; the optional split-selected-dq measurement keeps union groups out of dQ",
+      "union path keeps the token/query-major source boundary but changes the selected operand axis to compressed-group union rows",
+      "union sidecar assumes at most one selected slot per token/group; duplicate_token_group_hits must remain zero",
+      "promotion gate is the full source-boundary dQ+dKV latency versus the retained 11.13 ms sparse-attention backward boundary"
+    ],
+    "local_grouping": "compressed-group union operand rows with token->union selected-slot sidecar; the dot output is union_group x D directly",
+    "same_kernel_selected_dq_grouped_dkv": false,
+    "token_block": 4,
+    "union_operand": true
+  },
+  "read": "Actual LI source-boundary Triton BLOCK_T=4 union operand gate. This keeps the query-major source boundary and measures whether compressed-group union rows can serve a group-aware dKV epilogue before HBM. When --measure-split-selected-dq-union-dkv is set, the promoted metric is the two-launch full boundary that keeps dQ on the selected-slot query-major path and applies union only to dKV. The parallel split flag issues those two launches on separate streams with explicit stream dependencies.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_query_recompute_token4_profile",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "status": "not_checked",
+  "tile_write_model": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 264084480,
+    "coalesced_unique_groups": 515790,
+    "d_block": 128,
+    "d_blocks_per_full_dim": 4,
+    "nonempty_tiles": 1024,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 3.04843444037302,
+    "selected_block": 512,
+    "tiles": 1024,
+    "token_block": 4,
+    "unique_groups_per_tile": {
+      "max": 973,
+      "mean": 503.701171875,
+      "p50": 512.5,
+      "p90": 886.699951171875,
+      "p99": 954.77001953125
+    },
+    "valid_pairs_per_tile": {
+      "max": 2048,
+      "mean": 1535.5,
+      "p50": 2046.5,
+      "p90": 2048.0,
+      "p99": 2048.0
+    }
+  },
+  "timing": {
+    "dkv_only_full": {
+      "checksum_norm": 1920.5003662109375,
+      "event": {
+        "enabled": true,
+        "max_ms": 7.576430797576904,
+        "mean_ms": 7.495927265712193,
+        "median_ms": 7.482830047607422,
+        "min_ms": 7.4631500244140625,
+        "samples_ms": [
+          7.576430797576904,
+          7.513669967651367,
+          7.4905900955200195,
+          7.47150993347168,
+          7.482830047607422,
+          7.4631500244140625,
+          7.4733099937438965
+        ],
+        "stdev_ms": 0.03911039775363773
+      },
+      "label": "query_recompute_token4_union_dkv_only_full",
+      "peak_memory_allocated_bytes": 1715697664,
+      "peak_memory_allocated_gib": 1.5978679656982422,
+      "wall": {
+        "enabled": true,
+        "max_ms": 7.6579691376537085,
+        "mean_ms": 7.521736568638256,
+        "median_ms": 7.498410064727068,
+        "min_ms": 7.479100022464991,
+        "samples_ms": [
+          7.6579691376537085,
+          7.53247900865972,
+          7.507469970732927,
+          7.487288909032941,
+          7.498410064727068,
+          7.479100022464991,
+          7.489438867196441
+        ],
+        "stdev_ms": 0.06254336138361538
+      }
+    },
+    "dkv_only_sink": {
+      "checksum_norm": 12642.663269042969,
+      "event": {
+        "enabled": true,
+        "max_ms": 6.157137870788574,
+        "mean_ms": 5.746294294084821,
+        "median_ms": 5.68813419342041,
+        "min_ms": 5.559291839599609,
+        "samples_ms": [
+          5.712734222412109,
+          6.157137870788574,
+          5.900815963745117,
+          5.68813419342041,
+          5.6346940994262695,
+          5.57125186920166,
+          5.559291839599609
+        ],
+        "stdev_ms": 0.21418163575713317
+      },
+      "label": "query_recompute_token4_union_dkv_only_sink",
+      "peak_memory_allocated_bytes": 1705218560,
+      "peak_memory_allocated_gib": 1.5881085395812988,
+      "wall": {
+        "enabled": true,
+        "max_ms": 6.195093039423227,
+        "mean_ms": 5.769859367449369,
+        "median_ms": 5.704423878341913,
+        "min_ms": 5.575523944571614,
+        "samples_ms": [
+          5.754943937063217,
+          6.195093039423227,
+          5.919283023104072,
+          5.704423878341913,
+          5.6513037998229265,
+          5.588443949818611,
+          5.575523944571614
+        ],
+        "stdev_ms": 0.2207519765492366
+      }
+    },
+    "full": {
+      "checksum_norm": 1199.3489074707031,
+      "event": {
+        "enabled": true,
+        "max_ms": 15.208944320678711,
+        "mean_ms": 14.431136812482562,
+        "median_ms": 14.294575691223145,
+        "min_ms": 14.221614837646484,
+        "samples_ms": [
+          14.355376243591309,
+          15.208944320678711,
+          14.390695571899414,
+          14.277134895324707,
+          14.26961612701416,
+          14.294575691223145,
+          14.221614837646484
+        ],
+        "stdev_ms": 0.3475422270857287
+      },
+      "label": "query_recompute_token4_union_full",
+      "peak_memory_allocated_bytes": 2252568064,
+      "peak_memory_allocated_gib": 2.097867488861084,
+      "wall": {
+        "enabled": true,
+        "max_ms": 15.298856887966394,
+        "mean_ms": 14.475594108392086,
+        "median_ms": 14.310951111838222,
+        "min_ms": 14.282639836892486,
+        "samples_ms": [
+          14.442840125411749,
+          15.298856887966394,
+          14.411449898034334,
+          14.29491094313562,
+          14.287509955465794,
+          14.310951111838222,
+          14.282639836892486
+        ],
+        "stdev_ms": 0.36862574275932536
+      }
+    },
+    "split_selected_dq_union_dkv": {
+      "checksum_norm": 1199.3489074707031,
+      "event": {
+        "enabled": true,
+        "max_ms": 10.792463302612305,
+        "mean_ms": 10.7306729725429,
+        "median_ms": 10.740462303161621,
+        "min_ms": 10.649499893188477,
+        "samples_ms": [
+          10.778502464294434,
+          10.792463302612305,
+          10.706582069396973,
+          10.740462303161621,
+          10.697059631347656,
+          10.750141143798828,
+          10.649499893188477
+        ],
+        "stdev_ms": 0.049799335654676195
+      },
+      "label": "split_selected_dq_token2_no_dkv_plus_union_token4_dkv_only_full",
+      "peak_memory_allocated_bytes": 2263052288,
+      "peak_memory_allocated_gib": 2.1076316833496094,
+      "wall": {
+        "enabled": true,
+        "max_ms": 10.823030956089497,
+        "mean_ms": 10.757351626775094,
+        "median_ms": 10.757690062746406,
+        "min_ms": 10.665531968697906,
+        "samples_ms": [
+          10.823030956089497,
+          10.809679049998522,
+          10.722970124334097,
+          10.757690062746406,
+          10.756539180874825,
+          10.76602004468441,
+          10.665531968697906
+        ],
+        "stdev_ms": 0.05282169206586069
+      }
+    },
+    "split_selected_dq_union_dkv_parallel_streams": {
+      "checksum_norm": 1199.3489074707031,
+      "event": {
+        "enabled": true,
+        "max_ms": 16.561315536499023,
+        "mean_ms": 16.256364549909318,
+        "median_ms": 16.26499366760254,
+        "min_ms": 16.04703140258789,
+        "samples_ms": [
+          16.561315536499023,
+          16.32979393005371,
+          16.26499366760254,
+          16.315073013305664,
+          16.16311264038086,
+          16.113231658935547,
+          16.04703140258789
+        ],
+        "stdev_ms": 0.17073929108129338
+      },
+      "label": "parallel_streams_split_selected_dq_token2_no_dkv_plus_union_token4_dkv_only_full",
+      "peak_memory_allocated_bytes": 2263052288,
+      "peak_memory_allocated_gib": 2.1076316833496094,
+      "wall": {
+        "enabled": true,
+        "max_ms": 16.591415042057633,
+        "mean_ms": 16.28066639282874,
+        "median_ms": 16.283714910969138,
+        "min_ms": 16.069035045802593,
+        "samples_ms": [
+          16.591415042057633,
+          16.34995499625802,
+          16.283714910969138,
+          16.35344489477575,
+          16.183894826099277,
+          16.13320503383875,
+          16.069035045802593
+        ],
+        "stdev_ms": 0.17443673778661437
+      }
+    }
+  },
+  "timing_deltas": {
+    "enabled": false
+  },
+  "union_route_stats": {
+    "covered_selected_pairs": 1572352,
+    "duplicate_token_group_hits": 0,
+    "max_members_per_group": 4,
+    "members_per_group_hist": {
+      "1": 48504,
+      "2": 107203,
+      "3": 130890,
+      "4": 229193
+    },
+    "nonempty_union_memberships": 515790,
+    "read": "union_route_slots maps token x union-group to a selected slot. It is the forward-known sidecar for the union-gather operand reformulation; duplicate_token_group_hits should stay zero for exact one-slot-per-token/group correctness.",
+    "workspace_bytes": 31883264,
+    "workspace_mib": 30.40625
+  },
+  "union_workspace": {
+    "active_groups_bytes": 3985408,
+    "active_groups_shape": [
+      1,
+      1024,
+      1,
+      973
+    ],
+    "union_route_slots_bytes": 31883264,
+    "union_route_slots_mib": 30.40625,
+    "union_route_slots_shape": [
+      1,
+      1024,
+      1,
+      4,
+      973
+    ]
+  }
+}

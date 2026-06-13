@@ -1,0 +1,77 @@
+{
+  "scope": "actual_li_rocwmma_sparse_dkv_segmented_reducer_next_branch",
+  "date": "2026-06-04",
+  "context": {
+    "closed_previous_branch": "TileLang dblocked_grouped_source",
+    "tilelang_decision_artifact": "run_artifacts/tilelang_grouped_d_dblock_sweep_decision_20260604.json",
+    "read": "TileLang grouped-D direct-source did not become viable when D-block reuse was increased, so the sparse-dKV ladder returns to the HIP/rocWMMA route-grid surface."
+  },
+  "baseline_correction": {
+    "issue": "Two prior actual-LI rocWMMA pair-slot artifacts showed raw_atomic around 46 ms versus 10 ms for the same nominal S4096/T32/K512 shape.",
+    "root_cause": "The 46 ms artifact used invalid selected slots encoded as group 0. The raw_atomic kernel still issued zero-valued atomics into group 0 for invalid slots. The default invalid sentinel is -1, which skips invalid slots and is the meaningful raw baseline.",
+    "debug_contaminated_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t32k512_timing_20260603.json",
+    "clean_refresh_artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_atomic_s4096_layer2_t32k512_default_invalid_refresh_20260604.json"
+  },
+  "clean_refresh": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "token_block": 32,
+      "selected_block": 512,
+      "valid_compressed_selections": 1572352,
+      "invalid_group_value": -1
+    },
+    "route_model": {
+      "raw_scalar_writes": 805044224,
+      "grouped_scalar_writes": 33806848,
+      "modeled_write_reduction_x": 23.813051840857806,
+      "k16_unique_valid_route_contract": true,
+      "compact_rows": 66029,
+      "max_active_groups": 1024,
+      "dense_slot_overhead_x": 1.9850671674567235
+    },
+    "timing_ms": {
+      "contrib_sink": 8.949967384338379,
+      "raw_atomic": 10.058097839355469,
+      "raw_minus_contrib_sink": 1.1081304550170898,
+      "compact_pairslot_atomic": 18.528579711914062
+    },
+    "parity_against_raw": {
+      "raw_vs_compact_pairslot_atomic_max_abs_diff": 0.000102996826171875,
+      "reference_skipped": true
+    }
+  },
+  "decision": {
+    "promote_current_pairslot_kernel": false,
+    "why": [
+      "The clean raw atomic rocWMMA baseline is about 10.06 ms, not the invalid-group-zero 46 ms debug number.",
+      "Pair-slot metadata is correct and compact, and it models 23.8x fewer global writes.",
+      "The current pair-slot kernel still takes 18.53 ms because it performs one local table update per selected contribution plus dense active-slot initialization/emission.",
+      "The selected-row dKV write delta in clean raw_atomic is only about 1.11 ms over contrib_sink, so reducing global atomics alone cannot pay for a heavy local reducer."
+    ],
+    "keep": [
+      "Actual-LI pair_slots or equivalent compact route metadata.",
+      "Query-major rocWMMA/MFMA contribution production.",
+      "The clean invalid_group_value=-1 contract for raw and compact comparisons."
+    ],
+    "reject": [
+      "Using invalid_group_zero raw timings as a baseline.",
+      "Dense active_group x D local tables as the production reducer.",
+      "More shape sweeps of compact_pairslot_atomic unless the reducer topology changes."
+    ],
+    "next_kernel_contract": [
+      "Keep the query-major MFMA contribution tile.",
+      "Do not write selected-row partials to global memory.",
+      "Do not accumulate every selected contribution into a dense active-group LDS table.",
+      "Use warp/lane/block segmented reduction over sparse pair slots, or a CK/rocPRIM-style segmented reducer, so only touched-group segments are initialized and reduced.",
+      "Beat the clean raw_atomic 10.06 ms and the retained Triton sparse-atomic wall around 8.0-8.8 ms before any TorchTitan e2e promotion."
+    ]
+  },
+  "dependency_pin_changes": []
+}

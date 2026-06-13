@@ -1,0 +1,60 @@
+{
+  "artifact": "sparse_mla_source_boundary_ck_sharedkv_score_decision",
+  "created_at": "2026-06-05",
+  "status": "ck_shared_kv_score_patch_validated_but_not_promoted",
+  "question": "Can the same-workgroup D512 score-page source-boundary rung become competitive by replacing the rocWMMA score/contribution fragments with CK Tile MFMA while preserving selected-KV D reuse in LDS?",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "valid_pairs": 1572352
+  },
+  "code_changes": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+    "harness": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "change": "Added SCORE_PAGE_SCORE_CK_SHARED_KV=1. The CK score producer now stages each selected-KV D32 tile once in LDS and shares it across the four H16 score waves before advancing D, instead of each CK score wave reloading selected KV from global memory."
+  },
+  "source_artifacts": {
+    "ck_sharedkv_score_only": "run_artifacts/sparse_mla_source_boundary_ck_score_sharedkv_mode0_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+    "ck_sharedkv_score_plus_ck_contrib": "run_artifacts/sparse_mla_source_boundary_ck_score_sharedkv_contrib_mode1_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+    "prior_rocwmma_multiwave": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_decomposition_20260605.json",
+    "prior_direct_global_ck_score": "run_artifacts/sparse_mla_source_boundary_ck_score_mode0_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json",
+    "prior_direct_global_ck_contrib": "run_artifacts/sparse_mla_source_boundary_ck_contrib_mode1_s4096_layer2_sc16_sb64_bd512_thr256_timing3_20260605.json"
+  },
+  "timing_ms": {
+    "ck_sharedkv_score_only": 16.78736114501953,
+    "ck_sharedkv_score_plus_ck_contrib_sink": 36.690399169921875,
+    "prior_direct_global_ck_score_only": 32.70266342163086,
+    "prior_direct_global_ck_contrib_sink": 38.06447982788086,
+    "prior_rocwmma_multiwave_score_only": 15.390443801879883,
+    "prior_rocwmma_multiwave_score_plus_contrib_sink": 33.47657012939453,
+    "prior_rocwmma_multiwave_full_dkv_atomic": 43.82099533081055,
+    "triton_full_sparse_attention_backward_boundary": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.80629825592041
+  },
+  "read": {
+    "what_worked": "LDS KV-D reuse fixed the earlier CK score pathology: score-only improved from 32.70 ms to 16.79 ms.",
+    "what_did_not_work": "The CK shared-KV score path is still slower than the rocWMMA multiwave score-only path, and CK score plus CK contribution is 36.69 ms versus the rocWMMA multiwave 33.48 ms contribution-sink anchor.",
+    "why_this_is_not_e2e": "The tested kernel is dKV-only/source-boundary diagnostic. It does not produce the full dQ+dKV backward contract and is slower than the current 11.13 ms Triton full sparse-attention backward boundary."
+  },
+  "decision": {
+    "promote_to_torchtitan_e2e": false,
+    "reject_more_extension_of_this_rung": true,
+    "next_kernel_shape": "Move off the rocWMMA score-page bring-up CTA. Build a custom HIP/CK/MFMA source-boundary owner that preserves query-major q/dO reuse, uses explicit MFMA fragments for QK, dO.V, dQ, and dKV contribution, and adds a token-tile/group-aware dKV epilogue before global memory.",
+    "specific_next_edit": "Prototype the query-major token-tile no-HSK compact reducer instead of adding more SCORE_PAGE_* variants: CTA/block ownership should include several tokens and one head block so dKV groups can be reduced locally, while score/prob/scaled-dP remains consumed before HBM."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "scp tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "scp tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+    "docker run ... probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 16 --selected-block 64 --block-d 512 --threads 256 --hip-define SCORE_PAGE_MODE=0 --hip-define SCORE_PAGE_MULTI_WAVE=1 --hip-define SCORE_PAGE_THREADS=256 --hip-define SCORE_PAGE_SCORE_CK=1 --hip-define SCORE_PAGE_SCORE_CK_SHARED_KV=1 --skip-correctness ...",
+    "docker run ... probe_sparse_mla_source_boundary_hip_coop.py --seq-len 4096 --layer-id 2 --seq-chunk 16 --selected-block 64 --block-d 512 --threads 256 --hip-define SCORE_PAGE_MODE=1 --hip-define SCORE_PAGE_MULTI_WAVE=1 --hip-define SCORE_PAGE_THREADS=256 --hip-define SCORE_PAGE_SCORE_CK=1 --hip-define SCORE_PAGE_SCORE_CK_SHARED_KV=1 --hip-define SCORE_PAGE_CONTRIB_CK=1 --skip-correctness ..."
+  ],
+  "dependency_pin_changes": []
+}

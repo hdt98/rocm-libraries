@@ -1,0 +1,1055 @@
+{
+  "all_tiles": [
+    {
+      "empty_tiles": 192,
+      "max_segment_count_per_tile": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 9.334134615384615,
+        "min": 2.0,
+        "p50": 9.0,
+        "p90": 13.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 832,
+      "pair_weighted_segment_count_mean": 4.775733423559101,
+      "pairs_per_tile": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1889.8461538461538,
+        "min": 28.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 78048,
+        "count_gt32": 0,
+        "count_le16": 466675,
+        "count_le2": 186544,
+        "count_le32": 466675,
+        "count_le4": 362044,
+        "count_le8": 454439,
+        "pair_share_ge16": 0.023200911755128624,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.12665866167372192,
+        "pairs": 1572352,
+        "segments": 466675
+      },
+      "segment_count_per_group": {
+        "count": 466675,
+        "max": 16.0,
+        "mean": 3.3692655488294854,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 6.0,
+        "p99": 11.0
+      },
+      "segments_per_tile": {
+        "count": 832,
+        "max": 920.0,
+        "mean": 560.9074519230769,
+        "min": 4.0,
+        "p50": 595.0,
+        "p90": 849.0,
+        "p99": 902.6899999999999
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 3.3692655488294854,
+      "tile_p50_segment_count": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 4.115384615384615,
+        "min": 1.0,
+        "p50": 3.0,
+        "p90": 7.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 832,
+        "max": 16.0,
+        "mean": 6.1766826923076925,
+        "min": 1.0,
+        "p50": 5.0,
+        "p90": 10.0,
+        "p99": 16.0
+      },
+      "tiles": 1024,
+      "token_block": 16,
+      "total_group_segments": 466675,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 64,
+      "max_segment_count_per_tile": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 12.580357142857142,
+        "min": 2.0,
+        "p50": 12.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 448,
+      "pair_weighted_segment_count_mean": 7.9245919488765875,
+      "pairs_per_tile": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3509.714285714286,
+        "min": 28.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 5893,
+        "count_gt32": 0,
+        "count_le16": 252710,
+        "count_le2": 19862,
+        "count_le32": 252710,
+        "count_le4": 81326,
+        "count_le8": 206767,
+        "pair_share_ge16": 0.09418756105503094,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.4456648384076848,
+        "pairs": 1572352,
+        "segments": 252710
+      },
+      "segment_count_per_group": {
+        "count": 252710,
+        "max": 16.0,
+        "mean": 6.221961932650073,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 10.0,
+        "p99": 16.0
+      },
+      "segments_per_tile": {
+        "count": 448,
+        "max": 1016.0,
+        "mean": 564.0848214285714,
+        "min": 4.0,
+        "p50": 577.5,
+        "p90": 930.0,
+        "p99": 1004.0
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 6.221961932650073,
+      "tile_p50_segment_count": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 7.703125,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 448,
+        "max": 16.0,
+        "mean": 9.741071428571429,
+        "min": 1.0,
+        "p50": 9.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tiles": 512,
+      "token_block": 16,
+      "total_group_segments": 252710,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 15.72265625,
+        "min": 13.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "nonempty_tiles": 256,
+      "pair_weighted_segment_count_mean": 12.911607578964507,
+      "pairs_per_tile": {
+        "count": 256,
+        "max": 8192.0,
+        "mean": 6142.0,
+        "min": 28.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 233,
+        "count_gt32": 0,
+        "count_le16": 131545,
+        "count_le2": 276,
+        "count_le32": 131545,
+        "count_le4": 1153,
+        "count_le8": 23528,
+        "pair_share_ge16": 0.37893804949527843,
+        "pair_share_ge32": 0.0,
+        "pair_share_ge8": 0.9475384646694888,
+        "pairs": 1572352,
+        "segments": 131545
+      },
+      "segment_count_per_group": {
+        "count": 131545,
+        "max": 16.0,
+        "mean": 11.952959063438367,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "segments_per_tile": {
+        "count": 256,
+        "max": 1024.0,
+        "mean": 513.84765625,
+        "min": 4.0,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.8
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 11.952959063438367,
+      "tile_p50_segment_count": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 13.5546875,
+        "min": 8.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tile_p90_segment_count": {
+        "count": 256,
+        "max": 16.0,
+        "mean": 14.578125,
+        "min": 9.0,
+        "p50": 16.0,
+        "p90": 16.0,
+        "p99": 16.0
+      },
+      "tiles": 256,
+      "token_block": 16,
+      "total_group_segments": 131545,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 96,
+      "max_segment_count_per_tile": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 15.576923076923077,
+        "min": 3.0,
+        "p50": 14.0,
+        "p90": 22.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 416,
+      "pair_weighted_segment_count_mean": 8.78641042209378,
+      "pairs_per_tile": {
+        "count": 416,
+        "max": 4096.0,
+        "mean": 3779.6923076923076,
+        "min": 120.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 6966,
+        "count_gt32": 0,
+        "count_le16": 241576,
+        "count_le2": 22842,
+        "count_le32": 246905,
+        "count_le4": 82844,
+        "count_le8": 197052,
+        "pair_share_ge16": 0.09042377279387821,
+        "pair_share_ge32": 0.020840117225659396,
+        "pair_share_ge8": 0.4854033956773038,
+        "pairs": 1572352,
+        "segments": 246905
+      },
+      "segment_count_per_group": {
+        "count": 246905,
+        "max": 32.0,
+        "mean": 6.368246896579656,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 11.0,
+        "p99": 21.0
+      },
+      "segments_per_tile": {
+        "count": 416,
+        "max": 1015.0,
+        "mean": 593.5216346153846,
+        "min": 8.0,
+        "p50": 610.5,
+        "p90": 932.5,
+        "p99": 1000.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 6.368246896579656,
+      "tile_p50_segment_count": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 8.194711538461538,
+        "min": 1.0,
+        "p50": 6.0,
+        "p90": 14.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 416,
+        "max": 32.0,
+        "mean": 11.134615384615385,
+        "min": 2.0,
+        "p50": 9.0,
+        "p90": 18.0,
+        "p99": 32.0
+      },
+      "tiles": 512,
+      "token_block": 32,
+      "total_group_segments": 246905,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 32,
+      "max_segment_count_per_tile": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 22.571428571428573,
+        "min": 3.0,
+        "p50": 21.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 224,
+      "pair_weighted_segment_count_mean": 15.284437581406708,
+      "pairs_per_tile": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 524,
+        "count_gt32": 0,
+        "count_le16": 106420,
+        "count_le2": 1110,
+        "count_le32": 127436,
+        "count_le4": 4045,
+        "count_le8": 32111,
+        "pair_share_ge16": 0.35711023994627156,
+        "pair_share_ge32": 0.08647427548029958,
+        "pair_share_ge8": 0.9218114010094431,
+        "pairs": 1572352,
+        "segments": 127436
+      },
+      "segment_count_per_group": {
+        "count": 127436,
+        "max": 32.0,
+        "mean": 12.338365924856399,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 19.0,
+        "p99": 32.0
+      },
+      "segments_per_tile": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 12.338365924856399,
+      "tile_p50_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 15.366071428571429,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 18.294642857142858,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "total_group_segments": 127436,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 30.453125,
+        "min": 24.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 128,
+      "pair_weighted_segment_count_mean": 25.579777301774666,
+      "pairs_per_tile": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 115,
+        "count_gt32": 0,
+        "count_le16": 9021,
+        "count_le2": 120,
+        "count_le32": 66029,
+        "count_le4": 172,
+        "count_le8": 353,
+        "pair_share_ge16": 0.9493561238196028,
+        "pair_share_ge32": 0.35116818625854773,
+        "pair_share_ge8": 0.9993226707505698,
+        "pairs": 1572352,
+        "segments": 66029
+      },
+      "segment_count_per_group": {
+        "count": 66029,
+        "max": 32.0,
+        "mean": 23.813051840857806,
+        "min": 1.0,
+        "p50": 23.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "segments_per_tile": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "tile_p50_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 26.984375,
+        "min": 16.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 28.546875,
+        "min": 20.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "total_group_segments": 66029,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 48,
+      "max_segment_count_per_tile": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 26.89903846153846,
+        "min": 6.0,
+        "p50": 23.0,
+        "p90": 41.30000000000001,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 208,
+      "pair_weighted_segment_count_mean": 16.745965280039076,
+      "pairs_per_tile": {
+        "count": 208,
+        "max": 8192.0,
+        "mean": 7559.384615384615,
+        "min": 496.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 627,
+        "count_gt32": 2444,
+        "count_le16": 102002,
+        "count_le2": 1409,
+        "count_le32": 122663,
+        "count_le4": 5067,
+        "count_le8": 33518,
+        "pair_share_ge16": 0.3973486852816672,
+        "pair_share_ge32": 0.07663233169163139,
+        "pair_share_ge8": 0.9177086301286226,
+        "pairs": 1572352,
+        "segments": 125107
+      },
+      "segment_count_per_group": {
+        "count": 125107,
+        "max": 64.0,
+        "mean": 12.568057742572359,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 20.0,
+        "p99": 41.0
+      },
+      "segments_per_tile": {
+        "count": 208,
+        "max": 1023.0,
+        "mean": 601.4759615384615,
+        "min": 16.0,
+        "p50": 614.5,
+        "p90": 942.0,
+        "p99": 1022.0
+      },
+      "selected_block": 128,
+      "tile_local_write_reduction_x": 12.568057742572359,
+      "tile_p50_segment_count": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 16.317307692307693,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 28.30000000000001,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 208,
+        "max": 64.0,
+        "mean": 20.591346153846153,
+        "min": 3.0,
+        "p50": 17.0,
+        "p90": 34.30000000000001,
+        "p99": 64.0
+      },
+      "tiles": 256,
+      "token_block": 64,
+      "total_group_segments": 125107,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 16,
+      "max_segment_count_per_tile": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 41.044642857142854,
+        "min": 7.0,
+        "p50": 37.5,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 112,
+      "pair_weighted_segment_count_mean": 29.911003388554217,
+      "pairs_per_tile": {
+        "count": 112,
+        "max": 16384.0,
+        "mean": 14038.857142857143,
+        "min": 496.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 182,
+        "count_gt32": 9779,
+        "count_le16": 12985,
+        "count_le2": 309,
+        "count_le32": 54482,
+        "count_le4": 626,
+        "count_le8": 1406,
+        "pair_share_ge16": 0.9236621316346467,
+        "pair_share_ge32": 0.3088907572859004,
+        "pair_share_ge8": 0.9970477348583523,
+        "pairs": 1572352,
+        "segments": 64261
+      },
+      "segment_count_per_group": {
+        "count": 64261,
+        "max": 64.0,
+        "mean": 24.468215558425793,
+        "min": 1.0,
+        "p50": 22.0,
+        "p90": 37.0,
+        "p99": 64.0
+      },
+      "segments_per_tile": {
+        "count": 112,
+        "max": 1024.0,
+        "mean": 573.7589285714286,
+        "min": 16.0,
+        "p50": 583.5,
+        "p90": 940.4000000000001,
+        "p99": 1021.24
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 24.468215558425793,
+      "tile_p50_segment_count": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 30.571428571428573,
+        "min": 2.0,
+        "p50": 25.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 112,
+        "max": 64.0,
+        "mean": 34.919642857142854,
+        "min": 4.0,
+        "p50": 30.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tiles": 128,
+      "token_block": 64,
+      "total_group_segments": 64261,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 59.171875,
+        "min": 44.0,
+        "p50": 64.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "nonempty_tiles": 64,
+      "pair_weighted_segment_count_mean": 50.79074024137089,
+      "pairs_per_tile": {
+        "count": 64,
+        "max": 32768.0,
+        "mean": 24568.0,
+        "min": 496.0,
+        "p50": 32504.0,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 62,
+        "count_gt32": 29595,
+        "count_le16": 328,
+        "count_le2": 65,
+        "count_le32": 3679,
+        "count_le4": 95,
+        "count_le8": 165,
+        "pair_share_ge16": 0.9985047877320091,
+        "pair_share_ge32": 0.9519624104526213,
+        "pair_share_ge8": 0.9996883649462716,
+        "pairs": 1572352,
+        "segments": 33274
+      },
+      "segment_count_per_group": {
+        "count": 33274,
+        "max": 64.0,
+        "mean": 47.254673318506946,
+        "min": 1.0,
+        "p50": 45.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "segments_per_tile": {
+        "count": 64,
+        "max": 1024.0,
+        "mean": 519.90625,
+        "min": 16.0,
+        "p50": 520.0,
+        "p90": 922.5,
+        "p99": 1013.29
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 47.254673318506946,
+      "tile_p50_segment_count": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 53.6875,
+        "min": 32.0,
+        "p50": 62.0,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tile_p90_segment_count": {
+        "count": 64,
+        "max": 64.0,
+        "mean": 56.171875,
+        "min": 37.0,
+        "p50": 63.5,
+        "p90": 64.0,
+        "p99": 64.0
+      },
+      "tiles": 64,
+      "token_block": 64,
+      "total_group_segments": 33274,
+      "total_pairs": 1572352
+    }
+  ],
+  "artifact": "actual_li_tile_segment_lengths",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "best_by_write_reduction": {
+    "empty_tiles": 0,
+    "max_segment_count_per_tile": {
+      "count": 64,
+      "max": 64.0,
+      "mean": 59.171875,
+      "min": 44.0,
+      "p50": 64.0,
+      "p90": 64.0,
+      "p99": 64.0
+    },
+    "nonempty_tiles": 64,
+    "pair_weighted_segment_count_mean": 50.79074024137089,
+    "pairs_per_tile": {
+      "count": 64,
+      "max": 32768.0,
+      "mean": 24568.0,
+      "min": 496.0,
+      "p50": 32504.0,
+      "p90": 32768.0,
+      "p99": 32768.0
+    },
+    "segment_count_histogram": {
+      "count_eq1": 62,
+      "count_gt32": 29595,
+      "count_le16": 328,
+      "count_le2": 65,
+      "count_le32": 3679,
+      "count_le4": 95,
+      "count_le8": 165,
+      "pair_share_ge16": 0.9985047877320091,
+      "pair_share_ge32": 0.9519624104526213,
+      "pair_share_ge8": 0.9996883649462716,
+      "pairs": 1572352,
+      "segments": 33274
+    },
+    "segment_count_per_group": {
+      "count": 33274,
+      "max": 64.0,
+      "mean": 47.254673318506946,
+      "min": 1.0,
+      "p50": 45.0,
+      "p90": 64.0,
+      "p99": 64.0
+    },
+    "segments_per_tile": {
+      "count": 64,
+      "max": 1024.0,
+      "mean": 519.90625,
+      "min": 16.0,
+      "p50": 520.0,
+      "p90": 922.5,
+      "p99": 1013.29
+    },
+    "selected_block": 512,
+    "tile_local_write_reduction_x": 47.254673318506946,
+    "tile_p50_segment_count": {
+      "count": 64,
+      "max": 64.0,
+      "mean": 53.6875,
+      "min": 32.0,
+      "p50": 62.0,
+      "p90": 64.0,
+      "p99": 64.0
+    },
+    "tile_p90_segment_count": {
+      "count": 64,
+      "max": 64.0,
+      "mean": 56.171875,
+      "min": 37.0,
+      "p50": 63.5,
+      "p90": 64.0,
+      "p99": 64.0
+    },
+    "tiles": 64,
+    "token_block": 64,
+    "total_group_segments": 33274,
+    "total_pairs": 1572352
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "A group segment is one unique compressed group inside a token x selected tile. The segment count is the number of selected rows that would be reduced before one dKV write. High pair_share_ge16 supports warp/block segmented reduction; many count<=1 segments would mean the route is too sparse to coalesce profitably.",
+  "retained_tiles": [
+    {
+      "empty_tiles": 32,
+      "max_segment_count_per_tile": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 22.571428571428573,
+        "min": 3.0,
+        "p50": 21.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 224,
+      "pair_weighted_segment_count_mean": 15.284437581406708,
+      "pairs_per_tile": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 524,
+        "count_gt32": 0,
+        "count_le16": 106420,
+        "count_le2": 1110,
+        "count_le32": 127436,
+        "count_le4": 4045,
+        "count_le8": 32111,
+        "pair_share_ge16": 0.35711023994627156,
+        "pair_share_ge32": 0.08647427548029958,
+        "pair_share_ge8": 0.9218114010094431,
+        "pairs": 1572352,
+        "segments": 127436
+      },
+      "segment_count_per_group": {
+        "count": 127436,
+        "max": 32.0,
+        "mean": 12.338365924856399,
+        "min": 1.0,
+        "p50": 11.0,
+        "p90": 19.0,
+        "p99": 32.0
+      },
+      "segments_per_tile": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "selected_block": 256,
+      "tile_local_write_reduction_x": 12.338365924856399,
+      "tile_p50_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 15.366071428571429,
+        "min": 1.0,
+        "p50": 12.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 224,
+        "max": 32.0,
+        "mean": 18.294642857142858,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "total_group_segments": 127436,
+      "total_pairs": 1572352
+    },
+    {
+      "empty_tiles": 0,
+      "max_segment_count_per_tile": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 30.453125,
+        "min": 24.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "nonempty_tiles": 128,
+      "pair_weighted_segment_count_mean": 25.579777301774666,
+      "pairs_per_tile": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "segment_count_histogram": {
+        "count_eq1": 115,
+        "count_gt32": 0,
+        "count_le16": 9021,
+        "count_le2": 120,
+        "count_le32": 66029,
+        "count_le4": 172,
+        "count_le8": 353,
+        "pair_share_ge16": 0.9493561238196028,
+        "pair_share_ge32": 0.35116818625854773,
+        "pair_share_ge8": 0.9993226707505698,
+        "pairs": 1572352,
+        "segments": 66029
+      },
+      "segment_count_per_group": {
+        "count": 66029,
+        "max": 32.0,
+        "mean": 23.813051840857806,
+        "min": 1.0,
+        "p50": 23.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "segments_per_tile": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "tile_p50_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 26.984375,
+        "min": 16.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tile_p90_segment_count": {
+        "count": 128,
+        "max": 32.0,
+        "mean": 28.546875,
+        "min": 20.0,
+        "p50": 32.0,
+        "p90": 32.0,
+        "p99": 32.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "total_group_segments": 66029,
+      "total_pairs": 1572352
+    }
+  ],
+  "scope": "Tile-local compressed-group segment lengths for dKV grouped reducers.",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "analyzed"
+}

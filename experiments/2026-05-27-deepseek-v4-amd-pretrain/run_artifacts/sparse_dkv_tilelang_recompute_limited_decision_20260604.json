@@ -1,0 +1,64 @@
+{
+  "status": "tilelang_recompute_limited_valid_but_not_speed_candidate",
+  "scope": "compressed dKV sparse-MLA backward producer for actual TorchTitan LI boundary",
+  "kernel_mode": "mfma_panel_atomic_final_recompute_limited",
+  "source_file": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+  "read": "A concrete TileLang fused-recompute dKV producer now works: it consumes real q, dO, output, lse, compressed KV, and packed group ids, recomputes sparse-MLA probabilities and scaled grad-logits inside the producer, and writes final [groups, D] dKV without materialized [S, topk, H] probability slabs in timing-only S4096 runs. It is not a performance promotion because the current all-in-one schedule recomputes QK and dO.KV once per output D-block owner.",
+  "boundary_correctness": {
+    "s128": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_recompute_limited_s128_tb16_cap32_20260604.json",
+      "max_abs_diff_vs_materialized_reference": 0.014758706092834473,
+      "mean_abs_diff_vs_materialized_reference": 0.0009687854908406734,
+      "median_ms": 1.5625319480895996,
+      "materialized_probs_grad_logits_for_reference": true
+    },
+    "s512": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_recompute_limited_s512_tb16_cap128_k64d64_20260604.json",
+      "max_abs_diff_vs_materialized_reference": 0.01452791690826416,
+      "mean_abs_diff_vs_materialized_reference": 0.00044945720583200455,
+      "median_ms": 4.378714084625244,
+      "materialized_probs_grad_logits_for_reference": true
+    },
+    "interpretation": "The BF16 MFMA recompute path agrees with the existing materialized-probability oracle to about 1.5e-2 max absolute error at S128/S512. The drift is from BF16 MFMA recompute versus the fp32 PyTorch materialization oracle, not from route packing."
+  },
+  "s4096_timing": {
+    "baseline_materialized_input_selected_limit": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+      "median_ms": 6.910138130187988,
+      "materialized_probs_bytes": 536870912,
+      "materialized_grad_logits_bytes": 536870912,
+      "read": "Fast retained producer, but it consumes prebuilt per-head probabilities and scaled grad-logits."
+    },
+    "recompute_cap512_blockd64": {
+      "status": "compile_failed_shared_memory",
+      "requested_dynamic_shared_memory_bytes": 180224,
+      "device_dynamic_shared_memory_limit_bytes": 163840,
+      "read": "The full 512-group panel with block_d=64 does not fit once qk, dO.KV, softmax-dot, and final group reducer state are colocated."
+    },
+    "recompute_cap512_blockd32": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_recompute_limited_s4096_tb16_cap512_k64d32_thr512_20260604.json",
+      "median_ms": 236.68565368652344,
+      "materialized_probs_grad_logits": false,
+      "panel_overflow_count": 0
+    },
+    "recompute_cap256_blockd64": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_recompute_limited_s4096_tb16_gp256_cap256_k64d64_thr512_20260604.json",
+      "median_ms": 130.39727783203125,
+      "materialized_probs_grad_logits": false,
+      "panel_overflow_count": 0
+    },
+    "recompute_cap128_blockd64": {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_recompute_limited_s4096_tb16_gp128_cap128_k64d64_thr512_20260604.json",
+      "median_ms": 89.06778717041016,
+      "materialized_probs_grad_logits": false,
+      "panel_overflow_count": 0,
+      "slowdown_vs_retained_materialized_input_x": 12.889436577440327
+    }
+  },
+  "decision": {
+    "promote_for_integration": false,
+    "retain_as_contract_gate": true,
+    "why": "The mode proves the slab-free TileLang input contract and target-shape route viability, but the all-in-one CTA schedule repeats full-D probability recompute for every D-block. The best S4096 timing, 89.07 ms, is 12.89x slower than the retained materialized-input producer and far above the sparse-backward target envelope.",
+    "next_kernel_step": "Prototype a two-level TileLang schedule where qk, dO.KV, softmax probability, and scaled grad-logit are computed once per token/selected tile, then reused across D-block dKV accumulation. Candidate structures are token-selected outer recompute with inner D-block final atomics, or a compact P/dP tile workspace small enough to stay on-chip or stream once per selected tile. Do not pursue the current d_block-owned all-in-one recompute schedule further except as a correctness oracle."
+  }
+}

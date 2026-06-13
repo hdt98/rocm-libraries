@@ -1,0 +1,254 @@
+{
+  "artifact": "torchtitan_tilelang_lowintrusion_profile_8x_s4096_gbs128_20260604b",
+  "created_at": "2026-06-04",
+  "status": "completed_profile_negative_for_tilelang_bridge_promotion",
+  "purpose": "Measure the materialized 8xMI350 end-to-end TFLOPs and bottleneck split for the current selected-limit TileLang compressed-dKV bridge at the target S4096/GBS128 shape.",
+  "run": {
+    "run_id": "torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b",
+    "host": "do-sonle5-mi350-gpu",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b",
+    "remote_docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/docker-run.log",
+    "status": "completed_3_steps",
+    "process_groups_destroyed": true
+  },
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "gradient_accumulation_steps": 16,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "steps_requested": 3,
+    "steps_completed": 3
+  },
+  "active_path": {
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_shmem_heap_size": "32G"
+  },
+  "profile_knobs": {
+    "torch_profiler_trace": false,
+    "sharedkv_backward_timing": true,
+    "mori_aiter_timing": true,
+    "additive_timing": true,
+    "read": "This is a low-intrusion timing profile, but it still inserts timing synchronizations. Use it for bottleneck ranking, not as a promoted throughput baseline."
+  },
+  "materialized_step_metrics_rank0_log": [
+    {
+      "step": 1,
+      "tokens_per_gpu_s_range": [
+        1522,
+        1524
+      ],
+      "tflops_per_gpu_range": [
+        28.81,
+        28.84
+      ],
+      "peak_logged_memory_gib_range": [
+        48.5,
+        49.1
+      ],
+      "read": "Warmup and first-use effects."
+    },
+    {
+      "step": 2,
+      "tokens_per_gpu_s": 2883,
+      "tflops_per_gpu": 54.54,
+      "peak_logged_memory_gib_range": [
+        62.37,
+        72.60
+      ]
+    },
+    {
+      "step": 3,
+      "tokens_per_gpu_s": 2687,
+      "tflops_per_gpu": 50.85,
+      "peak_logged_memory_gib_range": [
+        71.00,
+        104.69
+      ]
+    }
+  ],
+  "target_comparison": {
+    "target_tflops_per_gpu": 277.0,
+    "profiled_step2_tflops_per_gpu": 54.54,
+    "profiled_step3_tflops_per_gpu": 50.85,
+    "profiled_step2_ratio_to_target": 0.1969,
+    "profiled_step3_ratio_to_target": 0.1836,
+    "profiled_step2_speedup_needed_to_target": 5.0788,
+    "profiled_step3_speedup_needed_to_target": 5.4474,
+    "retained_8x_full_ac_anchor_tflops_per_gpu": 58.71,
+    "selected_limit_no_profile_step2_tflops_per_gpu": 57.89,
+    "selected_limit_no_profile_step4_tflops_per_gpu": 47.56,
+    "no_activation_checkpoint_short_step2_tflops_per_gpu": 89.09,
+    "no_activation_checkpoint_status": "not_promoted_unstable_longer_run_failed_entering_step4_backward",
+    "read": "The best current TileLang bridge is not the best materialized candidate. Its profiled 8x throughput is below the retained full-AC anchor, and the no-profile selected-limit run only tied/decayed rather than improving it."
+  },
+  "additive_timing_step3_rank_max_ms": {
+    "rank_step_wall": 24384.338,
+    "step.train_step": 24383.765,
+    "train_step.microbatch_forward_backward": 24015.669,
+    "forward_backward.model_forward": 2239.980,
+    "forward_backward.loss": 473.867,
+    "forward_backward.backward": 16791.973,
+    "microbatch_forward_backward_residual": 4509.846,
+    "train_step.accumulated_loss_reduce": 300.931,
+    "train_step.optimizer_step": 17.216,
+    "train_step.grad_clip": 19.021,
+    "read": "Backward dominates the step. The residual inside microbatch_forward_backward remains a large opaque systems/wrapper boundary and survives the TileLang dKV bridge."
+  },
+  "sharedkv_sparse_attention_profile": {
+    "stage_rank_median_ms_per_call": {
+      "sharedkv_bwd.compressed_tilelang": 12.138,
+      "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 8.207,
+      "sharedkv_bwd.compressed.plan_b0": 2.573,
+      "sharedkv_bwd.gather_selected_kv_fp32": 2.000,
+      "sharedkv_bwd.grad_logits_terms": 2.255,
+      "sharedkv_bwd.local_scatter": 2.075,
+      "sharedkv_bwd.local_dkv_math": 1.722,
+      "sharedkv_bwd.grad_q": 1.435,
+      "sharedkv_bwd.scores_qk": 1.248,
+      "sharedkv_bwd.probs": 0.570,
+      "sharedkv_bwd.grad_attn_sink": 0.694,
+      "sharedkv_bwd.compressed.pack_hsk_b0": 0.496,
+      "sharedkv_bwd.compressed.group_prepare": 0.217
+    },
+    "stage_rank_median_total_ms_over_profile": {
+      "sharedkv_bwd.compressed_tilelang": 6869.766,
+      "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 6248.671,
+      "sharedkv_bwd.compressed.plan_b0": 294.887,
+      "sharedkv_bwd.gather_selected_kv_fp32": 208.469,
+      "sharedkv_bwd.grad_logits_terms": 225.621,
+      "sharedkv_bwd.local_scatter": 200.094,
+      "sharedkv_bwd.local_dkv_math": 183.257,
+      "sharedkv_bwd.grad_q": 141.850,
+      "sharedkv_bwd.scores_qk": 137.768,
+      "sharedkv_bwd.probs": 55.206,
+      "sharedkv_bwd.grad_attn_sink": 66.701
+    },
+    "read": "TileLang gives a real local compressed-dKV body around 8.2 ms per call, but the current integration is still a late dKV replacement. It leaves selected-KV/probs/grad-logits/materialization and separate dQ/QK/PV/local-scatter work around the TileLang body, so the kernel-only improvement does not materialize into e2e TFLOPs."
+  },
+  "mori_moe_profile": {
+    "stage_rank_median_ms_per_call": {
+      "combine_dx": 18.253,
+      "local_vjp_recompute_forward": 7.579,
+      "local_vjp_wgrad": 6.634,
+      "local_vjp_xgrad_reduce": 5.233,
+      "local_vjp_w2_dgrad_swiglu": 3.018,
+      "local_vjp_pack_scatter": 2.644,
+      "dispatch_grad_inputs": 3.254
+    },
+    "stage_rank_median_total_ms_over_profile": {
+      "backward.local_vjp.padded": 7278.897,
+      "combine_dx": 5397.379,
+      "local_vjp_recompute_forward": 2103.251,
+      "local_vjp_wgrad": 1718.382,
+      "local_vjp_xgrad_reduce": 1450.357,
+      "local_vjp_pack_scatter": 935.033,
+      "local_vjp_w2_dgrad_swiglu": 913.568,
+      "dispatch_x.call": 577.670,
+      "dispatch_grad_output.call": 134.926,
+      "align_grad_output": 1140.738
+    },
+    "local_vjp_total_ms_by_rank": {
+      "rank0": 5296.162,
+      "rank1": 9140.944,
+      "rank2": 6638.124,
+      "rank3": 7370.120,
+      "rank4": 8460.056,
+      "rank5": 9830.819,
+      "rank6": 7187.674,
+      "rank7": 5543.884
+    },
+    "combine_dx_total_ms_by_rank": {
+      "rank0": 7372.468,
+      "rank1": 3936.014,
+      "rank2": 6029.325,
+      "rank3": 5282.162,
+      "rank4": 4242.111,
+      "rank5": 3272.493,
+      "rank6": 5487.713,
+      "rank7": 7090.768
+    },
+    "skew_read": "Ranks with lower owner VJP totals wait more in combine_dx. The combine_dx wall is mostly peer-arrival skew from imbalanced owner-rank VJP, not raw MORI combine compute."
+  },
+  "loss_profile": {
+    "dsv4.loss.chunked_ce_loss_rank_median_total_ms": 4987.418,
+    "loss_chunk_backward_rank_median_total_ms": 4476.070,
+    "loss_lm_head_forward_rank_median_total_ms": 347.596,
+    "loss_cross_entropy_forward_rank_median_total_ms": 163.911,
+    "read": "CE2 helps but loss/lm-head remains a named multi-second subsystem in the profiled 8x target-shape run."
+  },
+  "bottleneck_ladder_from_materialized_profile": [
+    {
+      "rank": 1,
+      "target": "backward_and_moe_vjp_skew",
+      "evidence": "Step3 backward is 16.792s of a 24.384s step. MORI local owner VJP rank-median total is 7.279s and combine_dx rank-median total is 5.397s, with rank-tail skew.",
+      "next_optimization": "Attack owner-rank routed MoE VJP and dX return overlap first: reduce padded recompute, save or expose forward intermediates safely, fuse W2 dgrad/SwiGLU/W13-W2 wgrad/xgrad where possible, and chunk/overlap dX return once route identity is safe."
+    },
+    {
+      "rank": 2,
+      "target": "microbatch_forward_backward_residual",
+      "evidence": "Step3 microbatch fwd/bwd residual is about 4.510s after subtracting model_forward/loss/backward.",
+      "next_optimization": "Instrument this wrapper boundary more deeply before changing kernels; it is large enough to erase isolated kernel wins."
+    },
+    {
+      "rank": 3,
+      "target": "loss_lm_head_ce2_path",
+      "evidence": "Profiled dsv4.loss.chunked_ce_loss rank-median total is about 4.987s, with loss backward about 4.476s.",
+      "next_optimization": "Keep CE/lm-head as a separate e2e lever: sharded/fused vocab loss, better chunking, or lm-head gradient handling."
+    },
+    {
+      "rank": 4,
+      "target": "sparse_mla_backward_boundary",
+      "evidence": "TileLang compressed-dKV body is about 8.207 ms per call and 6.249s total over the profile, but the bridge does not improve materialized 8x TFLOPs.",
+      "next_optimization": "If continuing TileLang, port/fuse the whole sparse-MLA backward boundary so TileLang consumes q, dO, shared/compressed KV, LI indices, output, lse, and sink directly instead of acting as a late dKV-only replacement."
+    }
+  ],
+  "decision": {
+    "best_current_materialized_stable_candidate": {
+      "artifact": "run_artifacts/torchtitan_current_8x_performance_scoreboard_20260603.json",
+      "run_id": "torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603",
+      "tflops_per_gpu": 58.71,
+      "status": "stable_retained_anchor"
+    },
+    "best_current_tilelang_e2e_candidate": {
+      "artifact": "run_artifacts/torchtitan_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604.json",
+      "run_id": "torchtitan_dsv4_tilelang_selected_limit_8x_s4096_gbs128_steps4_20260604",
+      "best_step_tflops_per_gpu": 57.89,
+      "last_step_tflops_per_gpu": 47.56,
+      "status": "completed_negative_for_promotion"
+    },
+    "this_profile": {
+      "best_step_tflops_per_gpu": 54.54,
+      "last_step_tflops_per_gpu": 50.85,
+      "status": "profiled_negative_for_tilelang_bridge_promotion"
+    },
+    "read": "The best materialized TFLOPs number is still the retained 8x full-AC anchor at 58.71 TFLOPs/GPU. The current TileLang dKV bridge is promising locally but not promoted because it does not improve e2e throughput. The short no-AC 89.09 TFLOPs/GPU result is not stable and remains a memory/lifetime branch, not the baseline."
+  },
+  "commands_run": [
+    "ssh do-sonle5-mi350-gpu python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/profiling --steady-after-call-id 0 --dsv4-steady-after-call-id 0 --pretty",
+    "ssh do-sonle5-mi350-gpu python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/profiling --steady-after-call-id 0 --pretty",
+    "ssh do-sonle5-mi350-gpu find /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/profiling -maxdepth 2 -type f",
+    "ssh do-sonle5-mi350-gpu head -n 20 /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/profiling/additive_timing.jsonl",
+    "ssh do-sonle5-mi350-gpu tail -n 20 /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604b/profiling/additive_timing.jsonl"
+  ],
+  "dependency_pin_changes": []
+}

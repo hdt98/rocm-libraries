@@ -1,0 +1,127 @@
+{
+  "artifact": "mori_asyncll_route_key_alignment_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "TorchTitan MORI+AITER routed backward AsyncLL staged dX/dTopk route-key alignment gate",
+  "shape": {
+    "gpu": "MI350",
+    "gpus": 4,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "activation_checkpointing": "full"
+  },
+  "common_knobs": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "model": "deepseek_v4 flash_4layer",
+    "checkpoint_enable": false,
+    "dsa_indexer_loss_coeff": 0,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": 1,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "none",
+    "mori_aiter_assume_identical_dispatch_order": false,
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_tuple": [64, 32, 8],
+    "mori_shmem_heap_size": "32G"
+  },
+  "code_changes": {
+    "torchtitan_mori_aiter_moe": {
+      "path": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "change": "Added route-key reorder using (src_pos, packed_ids) and improved first-mismatch diagnostics for AsyncLL staged route alignment."
+    },
+    "launcher": {
+      "path": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "change": "Added CANARY_DEBUG_SEED passthrough to --debug.seed so route-alignment A/Bs can be pinned."
+    },
+    "probe": {
+      "path": "tools/dsv4_runtime_probe/probe_mori_asyncll_route_order.py",
+      "change": "Standalone AsyncLL route-order probe retained as route metadata reference."
+    }
+  },
+  "runs": {
+    "asyncll_unseeded_routekey_debug": {
+      "run_id": "torchtitan_dsv4_asyncll_dx_routekey_debug_4x_s4096_gbs4_20260603",
+      "dx_return_mode": "asyncll_staged",
+      "debug_seed": null,
+      "result": "pass",
+      "loss_step1": 12.31336,
+      "grad_norm_step1": 11.0625,
+      "read": "Passes one unseeded S4096 step with strict route-key alignment, but this is not a parity proof because the matching sync unseeded reference used different random/data state.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_asyncll_dx_routekey_debug_4x_s4096_gbs4_20260603/docker-run.log"
+    },
+    "sync_unseeded_reference": {
+      "run_id": "torchtitan_dsv4_sync_dx_routekey_ref_4x_s4096_gbs4_20260603",
+      "dx_return_mode": "sync",
+      "debug_seed": null,
+      "result": "pass",
+      "loss_step1": 12.25010,
+      "grad_norm_step1": 10.6875,
+      "read": "Confirms the retained sync path is healthy, but loss/grad differ from the unseeded AsyncLL run, so the pair is not a deterministic parity gate.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_sync_dx_routekey_ref_4x_s4096_gbs4_20260603/docker-run.log"
+    },
+    "asyncll_seeded_routekey": {
+      "run_id": "torchtitan_dsv4_asyncll_dx_routekey_seeded_4x_s4096_gbs4_20260603",
+      "dx_return_mode": "asyncll_staged",
+      "debug_seed": 20260603,
+      "result": "fail",
+      "failure": {
+        "type": "RuntimeError",
+        "message": "grad_output MORI route-key set mismatch",
+        "rank2": {
+          "rows": 16314,
+          "first_mismatch": 1336,
+          "src_mismatch": [
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0]
+          ],
+          "dst_mismatch": [
+            [1, 21, 6, 155, 97, 161, 219],
+            [3, 7, 98, 104, 14, 137, 57],
+            [4, 207, 168, 196, 175, 145, 21],
+            [5, 216, 176, 21, 234, 239, 172]
+          ]
+        },
+        "rank3": {
+          "rows": 15897,
+          "first_mismatch": 1214,
+          "src_mismatch": [
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0]
+          ],
+          "dst_mismatch": [
+            [0, 37, 120, 199, 123, 210, 219],
+            [1, 21, 6, 155, 97, 161, 219],
+            [2, 254, 246, 234, 57, 19, 198],
+            [4, 207, 168, 196, 175, 145, 21]
+          ]
+        }
+      },
+      "read": "The learned-router long-sequence AsyncLL split-handle path is not route-key safe. The saved x dispatch metadata has zero packed ids for early route keys, while grad/topk dispatch metadata has real top-k ids.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_asyncll_dx_routekey_seeded_4x_s4096_gbs4_20260603/docker-run.log"
+    },
+    "sync_seeded_reference": {
+      "run_id": "torchtitan_dsv4_sync_dx_seeded_ref_4x_s4096_gbs4_20260603",
+      "dx_return_mode": "sync",
+      "debug_seed": 20260603,
+      "result": "pass",
+      "loss_step1": 12.23368,
+      "grad_norm_step1": 11.0,
+      "read": "The retained sync registered-combine path passes under the same fixed seed, local VJP, activation-checkpointing, and route settings.",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_sync_dx_seeded_ref_4x_s4096_gbs4_20260603/docker-run.log"
+    }
+  },
+  "conclusion": {
+    "status": "current_split_handle_asyncll_rejected_for_production",
+    "read": "Simple route-key alignment by (src_pos, packed_ids) is insufficient for integrated learned-router S4096. The current AsyncLL staged dX implementation should stay diagnostic-only; the next overlap attempt needs either a shared MORI route/order handle or explicit dispatched payload/source metadata that gives x, grad_output, and top-k dummy the same route keys.",
+    "retained_runtime_path": "sync registered combine with routed padded VJP",
+    "next_branch": "Build a real route metadata contract for AsyncLL staged dX, then rerun the seeded S4096 parity gate before any throughput A/B."
+  }
+}

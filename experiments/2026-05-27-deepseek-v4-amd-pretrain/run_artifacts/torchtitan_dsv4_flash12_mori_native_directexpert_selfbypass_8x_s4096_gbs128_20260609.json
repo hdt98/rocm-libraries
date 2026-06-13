@@ -1,0 +1,171 @@
+{
+  "name": "torchtitan_dsv4_flash12_mori_native_directexpert_selfbypass_8x_s4096_gbs128_20260609",
+  "date": "2026-06-09",
+  "status": "completed_not_promoted",
+  "host": "do-sonle5-mi350-gpu",
+  "host_ip_used": "165.245.166.41",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12,
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "common_env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": 65536,
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_BLOCKS": 64,
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WARPS": 8,
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": false,
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_CHECKPOINT_ENABLE": false
+  },
+  "source_changes_under_test": [
+    {
+      "component": "TorchTitan standard EP",
+      "files": [
+        "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py"
+      ],
+      "change": "Skip Torch row-gather permute when MORI native dispatch already writes expert-major rows; keep _permute_indices only as the combine sidecar."
+    },
+    {
+      "component": "MORI native compact dispatch",
+      "files": [
+        "sources/references/mori/src/ops/dispatch_combine/intranode.hpp"
+      ],
+      "change": "Use recvCountsRankMajor to write received compact rows directly in expert-major order."
+    },
+    {
+      "component": "MORI native compact dispatch/combine",
+      "files": [
+        "sources/references/mori/src/ops/dispatch_combine/intranode.hpp"
+      ],
+      "change": "Bypass symmetric staging for self-rank compact rows and copy self rows directly to the final compact output."
+    }
+  ],
+  "runs": {
+    "retained_current_best_reference": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "result": "retained",
+      "steps_2_to_20_tokens_per_gpu_s_mean": 8518.84,
+      "steps_2_to_20_tflops_per_gpu_mean": 431.31,
+      "peak_logged_memory_gib": 251.97
+    },
+    "previous_native_multiblock_no_prereset": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_genbarrier_noprereset_8x_s4096_gbs128_20260609.json",
+      "run_id": "torchtitan_dsv4_flash12_mori_native_genbarrier_noprereset_mbs8_steps2_heap32_cap65536_20260609",
+      "result": "completed_two_steps_not_promoted",
+      "step2_tokens_per_gpu_s": 6852,
+      "step2_tflops_per_gpu": 346.9,
+      "step2_loss": 8.94092,
+      "step2_grad_norm": 54.5,
+      "step2_peak_logged_memory_gib": 221.97
+    },
+    "direct_expert_major": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "remote_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "local_profile_copy": "/tmp/dsv4_mori_native_directexpert_20260609/profiles",
+      "result": "completed_two_steps_not_promoted",
+      "step2_tokens_per_gpu_s": 6830,
+      "step2_tflops_per_gpu": 345.82,
+      "step2_loss": 9.28446,
+      "step2_grad_norm": 65.5,
+      "step2_peak_logged_memory_gib": 222.8
+    },
+    "direct_expert_major_plus_self_rank_bypass": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_selfbypass_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_selfbypass_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "remote_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_selfbypass_directexpert_mbs8_steps2_heap32_cap65536_20260609",
+      "local_profile_copy": "/tmp/dsv4_mori_native_selfbypass_20260609/profiles",
+      "result": "completed_two_steps_not_promoted",
+      "step2_tokens_per_gpu_s": 6853,
+      "step2_tflops_per_gpu": 346.98,
+      "step2_loss": 8.05079,
+      "step2_grad_norm": 51.75,
+      "step2_peak_logged_memory_gib": 223.99
+    }
+  },
+  "step2_profile_comparison_ms": {
+    "method": "Per rank/kind streams split in half; first half treated as step 1 warmup/JIT, second half treated as step 2.",
+    "stages": {
+      "standard_ep.dispatch.mori_native_compact.launch": {
+        "previous_native_no_prereset": {"median": 17.777, "p95": 19.971, "rankmax_total": 431.704},
+        "direct_expert_major": {"median": 18.549, "p95": 20.601, "rankmax_total": 444.847},
+        "self_rank_bypass": {"median": 19.288, "p95": 21.363, "rankmax_total": 453.855}
+      },
+      "standard_ep.combine.mori_native_compact.launch": {
+        "previous_native_no_prereset": {"median": 17.005, "p95": 19.984, "rankmax_total": 413.123},
+        "direct_expert_major": {"median": 17.7, "p95": 18.913, "rankmax_total": 413.124},
+        "self_rank_bypass": {"median": 18.602, "p95": 20.221, "rankmax_total": 431.234}
+      },
+      "standard_ep.dispatch.permute": {
+        "previous_native_no_prereset": {"median": 0.644, "p95": 1.363, "rankmax_total": 17.958},
+        "direct_expert_major": {"median": 0.216, "p95": 1.02, "rankmax_total": 9.332},
+        "self_rank_bypass": {"median": 0.211, "p95": 1.11, "rankmax_total": 10.159}
+      },
+      "standard_ep.dispatch.count_all_to_all": {
+        "previous_native_no_prereset": {"median": 2.846, "p95": 6.63, "rankmax_total": 96.735},
+        "direct_expert_major": {"median": 3.371, "p95": 7.665, "rankmax_total": 116.622},
+        "self_rank_bypass": {"median": 3.014, "p95": 7.067, "rankmax_total": 107.26}
+      },
+      "standard_ep.combine.weighted_scatter_add": {
+        "previous_native_no_prereset": {"median": 4.045, "p95": 5.04, "rankmax_total": 102.694},
+        "direct_expert_major": {"median": 4.125, "p95": 4.938, "rankmax_total": 102.331},
+        "self_rank_bypass": {"median": 4.385, "p95": 5.129, "rankmax_total": 106.378}
+      },
+      "standard_ep.combine.mori_native_compact.init": {
+        "previous_native_no_prereset": {"median": 2.058, "p95": 7.239, "rankmax_total": 95.822},
+        "direct_expert_major": {"median": 1.918, "p95": 6.313, "rankmax_total": 91.048},
+        "self_rank_bypass": {"median": 1.769, "p95": 5.415, "rankmax_total": 62.497}
+      }
+    }
+  },
+  "read": {
+    "what_mori_bought": [
+      "Direct expert-major native dispatch removes the Torch-side row gather: dispatch.permute median drops from 0.644 ms to about 0.21 ms and rank-max total from 17.958 ms to about 9-10 ms in the step-2 window.",
+      "The self-rank bypass removes local staging for self rows and improves combine init rank-max from 91.048 ms to 62.497 ms versus direct expert-major, but this is not a throughput-scale edge."
+    ],
+    "what_still_blocks_promotion": [
+      "The native compact dispatch/combine launch medians remain about 18-19 ms per call, with step-2 rank-max totals around 454 ms dispatch and 431 ms combine for the self-bypass gate.",
+      "The current MORI Python ABI allocates ordinary torch.empty outputs, while peer-visible data movement still uses MORI symmetric staging buffers. Remote rows are still copied into staging and then pulled into the output tensor.",
+      "Self-rank traffic is not the wall. The self-bypass run is essentially tied with the previous native no-prereset gate and remains far below the retained standard-EP current best."
+    ],
+    "decision": "Native source progress, but not a throughput promotion. Do not return to raw route_mask dispatch or post-plan materializer knobs. The next source target is to collapse the output/staging ABI: either make the compact receive/expert-major output MORI-owned and directly consumable by AITER/helper grouped MLP, or build a compact-row transport primitive that writes each remote row once into the final compact layout while preserving the saved standard-EP hot/cold/helper partition."
+  },
+  "validations": [
+    {
+      "command": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py tools/probe_standard_ep_mori_native_compact_parity.py sources/references/mori/python/mori/ops/dispatch_combine.py",
+      "result": "passed locally before production gate"
+    },
+    {
+      "command": "git diff --check -- sources/references/mori/src/ops/dispatch_combine/intranode.hpp sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py tools/probe_standard_ep_mori_native_compact_parity.py",
+      "result": "passed locally before production gate"
+    },
+    {
+      "command": "remote cmake --build build_hotcold --target mori_ops_kernels --clean-first -j 16 && cmake --build build_hotcold -j 16",
+      "result": "passed; refreshed libmori_ops.so, libmori_pybinds.so, and gfx950 ep_intranode.hsaco"
+    },
+    {
+      "command": "torchrun --standalone --nproc_per_node=4 tools/probe_standard_ep_mori_native_compact_parity.py --hidden-dim 16 --rows-per-peer 4 --local-experts 2 --dtype bf16 --block-num 64 --warp-per-block 8",
+      "result": "passed on MI350 after self-rank bypass"
+    }
+  ],
+  "dependency_pin_changes": []
+}

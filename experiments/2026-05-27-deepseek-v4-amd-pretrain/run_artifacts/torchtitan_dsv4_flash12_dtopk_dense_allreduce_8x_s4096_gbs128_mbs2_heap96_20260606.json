@@ -1,0 +1,120 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_20260606",
+  "date": "2026-06-06",
+  "status": "completed_8x_ep8_scaling_check_not_4x_replacement",
+  "host": "do-vunguyen-mi350-gpu",
+  "hardware": "8xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "target": "flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "run": {
+    "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_steps6_moriimg_20260606",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_steps6_moriimg_20260606",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_steps6_moriimg_20260606/docker-run.log",
+    "env": {
+      "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+      "CANARY_SHAREDKV_BLOCK_H": 64,
+      "CANARY_SHAREDKV_BLOCK_N": 64,
+      "CANARY_SHAREDKV_BLOCK_D": 128,
+      "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": true,
+      "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": true,
+      "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+      "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+      "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+      "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+      "CANARY_MORI_AITER_XGRAD_MODE": "full",
+      "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": 0,
+      "CANARY_MORI_SHMEM_HEAP_SIZE": "96G",
+      "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+      "CANARY_CHECKPOINT_ENABLE": false,
+      "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+    },
+    "steps": {
+      "1": {
+        "tokens_per_gpu_s": 1418,
+        "tflops_per_gpu": 71.8,
+        "loss": 12.33691,
+        "grad_norm": 17.875,
+        "max_logged_memory_gib": 90.84
+      },
+      "2": {
+        "tokens_per_gpu_s": 3473,
+        "tflops_per_gpu": 175.85,
+        "loss": 8.8639,
+        "grad_norm": 121.5,
+        "max_logged_memory_gib": 135.15
+      },
+      "3": {
+        "tokens_per_gpu_s": 3492,
+        "tflops_per_gpu": 176.82,
+        "loss": 10.70709,
+        "grad_norm": 141.0,
+        "max_logged_memory_gib": 135.15
+      },
+      "4": {
+        "tokens_per_gpu_s": 3470,
+        "tflops_per_gpu": 175.71,
+        "loss": 33.84219,
+        "grad_norm": 82.0,
+        "max_logged_memory_gib": 135.15
+      },
+      "5": {
+        "tokens_per_gpu_s": 3098,
+        "tflops_per_gpu": 156.83,
+        "loss": 10.86775,
+        "grad_norm": 24.125,
+        "max_logged_memory_gib": 141.86
+      },
+      "6": {
+        "tokens_per_gpu_s": 3259,
+        "tflops_per_gpu": 165.02,
+        "loss": 9.03666,
+        "grad_norm": 32.5,
+        "max_logged_memory_gib": 141.86
+      }
+    },
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 3358.4,
+      "node_tokens_s_mean": 26867.2,
+      "tflops_per_gpu_mean": 170.046,
+      "peak_logged_memory_gib": 141.86
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s_mean": 3275.67,
+      "tflops_per_gpu_mean": 165.85
+    }
+  },
+  "comparison": {
+    "previous_8x_mbs2_anchor_artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_8x_s4096_gbs128_mbs2_heap96_20260606.json",
+    "previous_8x_steps_2_to_6_tokens_per_gpu_s": 2857.8,
+    "previous_8x_steps_2_to_6_tflops_per_gpu": 144.686,
+    "uplift_vs_previous_8x_tokens_per_gpu_pct": 17.52,
+    "uplift_vs_previous_8x_tflops_pct": 17.53,
+    "current_4x_dtopk_dense_allreduce_tokens_per_gpu_s": 4327.0,
+    "current_4x_dtopk_dense_allreduce_tflops_per_gpu": 219.082,
+    "per_gpu_delta_vs_current_4x_tokens_pct": -22.39,
+    "per_gpu_delta_vs_current_4x_tflops_pct": -22.38
+  },
+  "failed_preflight": {
+    "run_id": "torchtitan_dsv4_flash12_dtopk_dense_allreduce_8x_s4096_gbs128_mbs2_heap96_steps6_20260606",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "result": "failed_before_step_metrics",
+    "root_cause": "base image does not include the MORI Python module",
+    "error": "ModuleNotFoundError: No module named 'mori'"
+  },
+  "decision": {
+    "promote_as_8x_scaling_check": true,
+    "replace_4x_current_candidate": false,
+    "read": "Dense dTopK return survives EP8 and materially improves the previous 8x MBS2 anchor, but EP8 still loses about 22.4% per-GPU throughput versus the 4x dense-return candidate. Keep the MoE/EP ladder focused on fused compact owner-rank training backward, owner-rank skew, and dX return overlap rather than dTopK return alone."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "artifact": "sparse_mla_sasg_selected_row_scatter_decision_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Reference-informed SASG split for actual-LI compressed dKV: selected-row Cube345 partial workspace plus detached ScatterAdd by top-k index.",
+  "ascend_reference": {
+    "sasg_main": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h",
+    "cube4_dk": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube4.h",
+    "cube5_dv": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube5.h",
+    "scatter_add": "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h",
+    "read": "Ascend SASG Cube345 emits mm4/mm5 selected-row workspaces. VecOp::ScatterAdd drains those workspaces in 16-row chunks, scales dk, adds dv, resolves ori/cmp top-k index, and atomically copies into the KV-gradient workspace with ping-pong MTE/V events."
+  },
+  "amd_probe": {
+    "file": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py",
+    "added": [
+      "_selected_row_partial_store_kernel",
+      "_selected_row_scatteradd_kernel",
+      "selected_row_emit",
+      "selected_row_scatteradd_reduce",
+      "run_selected_row_emit_scatter"
+    ],
+    "contract": "Producer writes dense selected-row partials [B, S, topk, D] in fp32. Detached ScatterAdd reads selected rows plus safe_groups/valid and atomically accumulates [B, compressed_groups, D]."
+  },
+  "rerun_commands": {
+    "s128_smoke": "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/sources/wip/torchtitan:/workspace/tools/dsv4_runtime_probe -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py --seq-len 128 --layer-id 2 --seq-chunk 16 --pipeline-chunk-tokens 64 --block-d 16 --block-h 64 --block-k 32 --scatter-block-pairs 128 --warmup-iters 1 --timed-iters 3 --correctness-atol 0.2 --summary-path /workspace/run_artifacts/sparse_mla_sasg_selected_row_scatter_s128_layer2_20260603.json --json",
+    "s4096_timing": "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/sources/wip/torchtitan:/workspace/tools/dsv4_runtime_probe -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_sasg_overlap_probe.py --seq-len 4096 --layer-id 2 --seq-chunk 32 --pipeline-chunk-tokens 512 --block-d 16 --block-h 64 --block-k 64 --scatter-block-pairs 128 --warmup-iters 1 --timed-iters 3 --correctness-atol 0.2 --allow-large-materialization --include-dotk-atomic --summary-path /workspace/run_artifacts/sparse_mla_sasg_selected_row_scatter_s4096_layer2_20260603.json --json"
+  },
+  "results": {
+    "s128": {
+      "artifact": "run_artifacts/sparse_mla_sasg_selected_row_scatter_s128_layer2_20260603.json",
+      "status": "passed",
+      "max_abs_diff_vs_group_partial_reference": 0.0000152587890625,
+      "selected_row_emit_scatter_ms": 0.07696100324392319,
+      "selected_row_emit_only_ms": 0.05316099897027016,
+      "selected_row_scatter_only_ms": 0.04332000017166138,
+      "single_full_emit_detached_group_scatter_ms": 0.0750809982419014
+    },
+    "s4096_layer2": {
+      "artifact": "run_artifacts/sparse_mla_sasg_selected_row_scatter_s4096_layer2_20260603.json",
+      "status": "passed",
+      "shape": {
+        "seq_len": 4096,
+        "topk": 512,
+        "heads": 64,
+        "dim": 512,
+        "compressed_groups": 1024,
+        "seq_chunk": 32,
+        "scatter_block_pairs": 128
+      },
+      "max_abs_diff_vs_group_partial_reference": 0.0001373291015625,
+      "selected_row_emit_scatter_ms": 16.75473976135254,
+      "selected_row_emit_only_ms": 6.587327003479004,
+      "selected_row_scatter_only_ms": 9.98497200012207,
+      "selected_row_scatter_fraction_of_total": 0.5959490951422588,
+      "single_full_emit_detached_group_scatter_ms": 8.823838233947754,
+      "single_full_emit_group_reduce_ms": 9.147801399230957,
+      "chunked_pingpong_group_detached_scatter_ms": 10.184889793395996,
+      "peak_selected_row_emit_scatter_gib": 9.94092082977295
+    }
+  },
+  "decision": "The literal Ascend-style selected-row split is correct but negative as a standalone AMD wrapper: S4096 selected-row emit+scatter is 16.75 ms, with ScatterAdd alone around 9.98 ms, while the grouped partial detached ScatterAdd path is 8.82 ms. This confirms the Ascend win is not just the stage boundary; it depends on device-side CV pipeline overlap and compact row handling. For AMD, do not promote a dense selected-row partial workspace. The next viable rung remains in-tile grouped/segmented accumulation before global memory, ideally inside the query-major sparse MLA/LI backward kernel, so the Scatter stage receives already-coalesced compressed-group rows rather than raw selected rows.",
+  "next_kernel_contract": {
+    "keep": "Query-major selected-key dot/MFMA schedule and no selected-KV saved-state materialization.",
+    "change": "Within each query/selected/D tile, reduce duplicate compressed groups before global writes.",
+    "avoid": [
+      "dense [B,S,topk,D] selected-row fp32 slabs",
+      "host-level ping-pong overlap",
+      "group-major row-wise recompute"
+    ],
+    "target_gate": "Beat the retained active-list dot_k_atomic/direct sparse-atomic wall around 8.4-8.8 ms at S4096 layer2 topk512, then approach the 7.05 ms mixed flat-GEMM floor without multi-GiB dense route materialization."
+  }
+}

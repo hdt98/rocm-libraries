@@ -1,0 +1,74 @@
+{
+  "policy": {
+    "default": "Muon for trainable matrix weights; AdamW for embeddings, LM head, norms, biases, vectors, scalars, and non-matrix leftovers.",
+    "rank2_reference": "Megatron emerging optimizer default routes non-embedding/output rank-2 params to Muon and nonlinear/embedding params to Adam.",
+    "router_gate": "Muon rank-2 matrix",
+    "torch_titan_grouped_experts": "Treat rank-3 moe.experts.{w1,w2,w3} as Muon batched matrices because they are resident expert weight matrices."
+  },
+  "sample": "deepseek-v3-16b",
+  "schema": "dsv4_optimizer_preflight.v1",
+  "source_references": [
+    "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "sources/wip/megatron-LM/megatron/core/optimizer/emerging_optimizers.py",
+    "sources/wip/megatron-LM/megatron/core/optimizer/layer_wise_optimizer.py",
+    "sources/references/megatron-lm-deepseek-v4-pr28/megatron/core/optimizer/muon.py"
+  ],
+  "summary": {
+    "families": {
+      "adamw_exception": {
+        "bf16_parameter_bytes": 839113728,
+        "elements": 419556864,
+        "optimizer": "AdamW",
+        "parameter_count": 84
+      },
+      "expert_batched_matrix": {
+        "bf16_parameter_bytes": 28789702656,
+        "elements": 14394851328,
+        "optimizer": "Muon",
+        "parameter_count": 78
+      },
+      "matrix": {
+        "bf16_parameter_bytes": 1784152064,
+        "elements": 892076032,
+        "optimizer": "Muon",
+        "parameter_count": 215
+      }
+    },
+    "groups": {
+      "AdamW": {
+        "bf16_parameter_bytes": 839113728,
+        "elements": 419556864,
+        "parameter_count": 84
+      },
+      "Muon": {
+        "bf16_parameter_bytes": 30573854720,
+        "elements": 15286927360,
+        "parameter_count": 293
+      }
+    },
+    "reasons": {
+      "embedding_or_lm_head": 2,
+      "grouped_expert_batched_matrix": 78,
+      "rank2_non_embedding_matrix": 215,
+      "rmsnorm_or_norm": 82
+    },
+    "warnings": [
+      "TorchTitan grouped experts are rank-3 resident tensors; Megatron's current LayerWise predicate only tags rank-2 params, so TorchTitan Muon needs a batched-matrix/flattened view or explicit grouped-expert handling.",
+      "TorchTitan OptimizersContainer currently resolves one optimizer class for all param groups; this split needs mixed optimizer-class support, not only regex lr/weight_decay overrides."
+    ]
+  },
+  "torchtitan_regex_surface": {
+    "adamw_exception_patterns": [
+      "(^|\\.)tok_embeddings\\.",
+      "(^|\\.)(lm_head|output|output_layer)\\.weight$",
+      "(^|\\.)(attention_norm|ffn_norm|q_norm|kv_norm|norm)\\.",
+      "\\.bias$",
+      "(^|\\.)(expert_bias|e_score_correction_bias)$"
+    ],
+    "current_gap": "ParamGroupConfig can override AdamW hyperparameters but cannot choose Muon for a subset while keeping AdamW for exceptions.",
+    "muon_candidate_patterns": [
+      "fallback trainable rank-2 parameters after AdamW exceptions",
+      "(^|\\.)moe\\.experts\\.(w1|w2|w3)$ for rank-3 grouped expert matrices"
+    ]
+  }
+}

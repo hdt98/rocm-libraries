@@ -1,0 +1,113 @@
+{
+  "artifact": "hipblaslt_grouped_gemm_owner_shape",
+  "created_at": "2026-06-02",
+  "ok": true,
+  "read": "Benchmarks hipBLASLt GroupedGemm as a reusable ROCm-library substrate for the owner-rank MoE VJP GEMM family. Operand packing, SwiGLU, router/top-k gradients, MORI dispatch/combine backward, and token reduce are intentionally outside the timed grouped-GEMM call.",
+  "route_stats": {
+    "assignments_to_owner_rank": 24695,
+    "expected_assignments_uniform": 24576.0,
+    "expert_start": 0,
+    "expert_stop": 32,
+    "local_experts": 32,
+    "max_per_local_expert": 816,
+    "mean_per_local_expert": 771.71875,
+    "min_per_local_expert": 708,
+    "owner_rank": 0,
+    "padded_rows_local_max": 26112,
+    "padding_multiplier_local_max": 1.0573800364446244,
+    "source_tokens_all_ranks": 32768,
+    "tokens_per_rank": 4096,
+    "topk": 6,
+    "total_experts": 256,
+    "world_size": 8
+  },
+  "scope": "row_major_grouped_A_Bt_raw_gemm_floor_for_owner_rank_moe_vjp",
+  "shape": {
+    "arch": "gfx950",
+    "dtype": "float16",
+    "experts": 256,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "local_experts": 32,
+    "tokens_per_rank": 4096,
+    "topk": 6,
+    "world_size": 8
+  },
+  "sources_checked": [
+    "https://github.com/ROCm/rocm-libraries/tree/main/projects/hipblaslt/clients/samples",
+    "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/16_hipblaslt_groupedgemm_ext/sample_hipblaslt_groupedgemm_ext.cpp",
+    "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/17_hipblaslt_groupedgemm_fixed_mk_ext/sample_hipblaslt_groupedgemm_fixed_mk_ext.cpp"
+  ],
+  "stages": [
+    {
+      "a_shape": [
+        32,
+        816,
+        4096
+      ],
+      "b_shape": [
+        32,
+        2048,
+        4096
+      ],
+      "checks": {
+        "atol": 0.75,
+        "dtype": "torch.float16",
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "ok": true,
+        "pct_close": 100.0,
+        "rel_l2": 0.0,
+        "rtol": 0.03,
+        "shape": [
+          32,
+          816,
+          2048
+        ]
+      },
+      "flops": 438086664192.0,
+      "hipblaslt_grouped_tflops_median": 86.40846020586972,
+      "hipblaslt_kernel_name": "Cijk_Alik_Bljk_HHS_BH_Bias_HA_S_SAV_UserArgs_MT16x16x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_GRVWB4_GSUAMB_GLS0_ISA950_IU1_K1_LDSTI0_LBSPPA128_LBSPPB128_LBSPPM0_LPA4_LPB4_LPM0_LRVW4_LWPMn1_MIAV0_MIWT1_1_MO40_NTn1_NTA0_NTB0_NTC0_NTD0_NTM0_NEPBS16_NLCA1_NLCB1_ONLL1_PGR2_PLR1_PKA1_SIA3_SS0_SPO0_SRVW4_SSO0_SVW4_SK0_SKFTR0_SKXCCM0_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA1_WSGRB1_WS64_WG16_4_1",
+      "hipblaslt_plan_init_ms": 1477.7888390235603,
+      "hipblaslt_solution_name": "Cijk_Alik_Bljk_HHS_BH_Bias_GG_HA_S_SAV_UserArgs_MT16x16x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_GRVWB4_GSU1_GSUAMB_GSUC0_GSUWGMRR0_GLS0_ISA950_IU1_K1_LDSTI0_LBSPPA128_LBSPPB128_LBSPPM0_LPA4_LPB4_LPM0_LRVW4_LWPMn1_MIAV0_MIWT1_1_MO40_NTn1_NTA0_NTB0_NTC0_NTD0_NTM0_NEPBS16_NLCA1_NLCB1_ONLL1_PGR2_PLR1_PKA1_SIA3_SS0_SU0_SUM0_SUS64_SPO0_SRVW4_SSO0_SVW4_SK0_SKFTR0_SKXCCM0_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA1_WSGRB1_WS64_WG16_4_1_WGM1_WGMXCC1_WGMXCCGn1",
+      "hipblaslt_vs_torch_median_speedup": 0.10524125747780994,
+      "hipblaslt_workspace_bytes": 7680,
+      "out_shape": [
+        32,
+        816,
+        2048
+      ],
+      "stage": "forward_gate",
+      "timing_ms": {
+        "forward_gate_hipblaslt_grouped_abt_iters": 3,
+        "forward_gate_hipblaslt_grouped_abt_max_ms": 5.299354076385498,
+        "forward_gate_hipblaslt_grouped_abt_mean_ms": 5.101111729939778,
+        "forward_gate_hipblaslt_grouped_abt_median_ms": 5.069951057434082,
+        "forward_gate_hipblaslt_grouped_abt_min_ms": 4.934030055999756,
+        "forward_gate_hipblaslt_grouped_abt_samples_ms": [
+          5.299354076385498,
+          5.069951057434082,
+          4.934030055999756
+        ],
+        "forward_gate_hipblaslt_grouped_abt_warmup": 1,
+        "forward_gate_torch_bmm_abt_iters": 3,
+        "forward_gate_torch_bmm_abt_max_ms": 0.5616880059242249,
+        "forward_gate_torch_bmm_abt_mean_ms": 0.5320876836776733,
+        "forward_gate_torch_bmm_abt_median_ms": 0.5335680246353149,
+        "forward_gate_torch_bmm_abt_min_ms": 0.5010070204734802,
+        "forward_gate_torch_bmm_abt_samples_ms": [
+          0.5616880059242249,
+          0.5010070204734802,
+          0.5335680246353149
+        ],
+        "forward_gate_torch_bmm_abt_warmup": 1
+      },
+      "torch_bmm_tflops_median": 821.0511949088874
+    }
+  ],
+  "versions": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  }
+}

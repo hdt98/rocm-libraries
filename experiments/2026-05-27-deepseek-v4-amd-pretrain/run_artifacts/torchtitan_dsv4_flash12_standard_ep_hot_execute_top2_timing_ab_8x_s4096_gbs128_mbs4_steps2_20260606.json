@@ -1,0 +1,212 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_ab_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "kind": "standard_ep_hot_expert_execute_timing_ab",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_two_timing_gates_min_reduction_rejected_for_throughput",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "code_change": {
+    "token_dispatcher": "Added opt-in TORCHTITAN_MOE_BALANCED_MOE_MIN_REDUCTION_PCT / TORCHTITAN_MORI_AITER_BALANCED_MOE_MIN_REDUCTION_PCT gate. Execute-mode hot split is skipped when the modeled max-load reduction is below the threshold.",
+    "launcher": "Added CANARY_MOE_BALANCED_MOE_MIN_REDUCTION_PCT / CANARY_MORI_AITER_BALANCED_MOE_MIN_REDUCTION_PCT pass-through and header echo."
+  },
+  "runs": {
+    "top2_no_threshold_timing": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_8x_s4096_gbs128_mbs4_steps2_20260606",
+      "env": {
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+        "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 2,
+        "CANARY_MOE_BALANCED_MOE_MIN_REDUCTION_PCT": "unset",
+        "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_8x_s4096_gbs128_mbs4_steps2_20260606/mori_aiter_timing.jsonl"
+      },
+      "step_metrics": {
+        "1": {
+          "tokens_per_gpu_s": 1873.0,
+          "tflops_per_gpu": 94.84,
+          "loss": 12.28183,
+          "grad_norm": 19.625,
+          "peak_logged_memory_gib": 153.49
+        },
+        "2": {
+          "tokens_per_gpu_s": 7455.0,
+          "tflops_per_gpu": 377.45,
+          "loss": 8.88594,
+          "grad_norm": 60.25,
+          "peak_logged_memory_gib": 195.02
+        }
+      },
+      "sidecar_summary": {
+        "records": 768,
+        "call_records": 96,
+        "rank_records_per_call": 8,
+        "modeled_reduction_pct": {
+          "min": -3.9796632462922523,
+          "p50": 13.814491421011791,
+          "mean": 14.367050734565316,
+          "max": 44.89798689922726
+        },
+        "calls_ge_10pct": 58,
+        "calls_lt_10pct": 38,
+        "negative_or_zero_calls": 11,
+        "remote_hot_rows_total": {
+          "min": 21917,
+          "p50": 37653.0,
+          "mean": 73949.55208333333,
+          "max": 188106
+        },
+        "selected_rows_total": {
+          "min": 24627,
+          "p50": 42643.5,
+          "mean": 84480.30208333333,
+          "max": 214745
+        },
+        "owner_load_max_before": {
+          "min": 113544,
+          "p50": 145702.5,
+          "mean": 159840.94791666666,
+          "max": 257613
+        },
+        "owner_load_max_after": {
+          "min": 103909,
+          "p50": 122179.5,
+          "mean": 132885.20833333334,
+          "max": 201841
+        },
+        "selected_owner_counts": {
+          "0": 26,
+          "1": 23,
+          "2": 35,
+          "3": 11,
+          "4": 15,
+          "5": 14,
+          "6": 44,
+          "7": 24
+        },
+        "top_selected_experts": [[94, 8], [8, 8], [224, 8], [196, 7], [202, 7], [38, 6], [212, 5], [95, 5], [7, 5], [253, 4], [147, 4], [189, 4]]
+      }
+    },
+    "top2_min10_timing": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_timing_8x_s4096_gbs128_mbs4_steps2_20260606",
+      "env": {
+        "CANARY_MOE_COMM_BACKEND": "standard",
+        "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+        "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 2,
+        "CANARY_MOE_BALANCED_MOE_MIN_REDUCTION_PCT": 10,
+        "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_timing_8x_s4096_gbs128_mbs4_steps2_20260606/mori_aiter_timing.jsonl"
+      },
+      "step_metrics": {
+        "1": {
+          "tokens_per_gpu_s": 1882.0,
+          "tflops_per_gpu": 95.28,
+          "loss": 12.36743,
+          "grad_norm": 19.75,
+          "peak_logged_memory_gib": 152.16
+        },
+        "2": {
+          "tokens_per_gpu_s": 7448.0,
+          "tflops_per_gpu": 377.12,
+          "loss": 9.23491,
+          "grad_norm": 62.75,
+          "peak_logged_memory_gib": 191.01
+        }
+      },
+      "sidecar_summary": {
+        "records": 768,
+        "call_records": 96,
+        "rank_records_per_call": 8,
+        "modeled_reduction_pct": {
+          "min": -4.191717791411042,
+          "p50": 14.37033881271335,
+          "mean": 14.936278467356594,
+          "max": 39.38795812970912
+        },
+        "calls_ge_10pct": 64,
+        "calls_lt_10pct": 32,
+        "inferred_execute_calls": 64,
+        "inferred_skipped_calls": 32,
+        "negative_or_zero_calls": 5,
+        "remote_hot_rows_total": {
+          "min": 22742,
+          "p50": 52489.0,
+          "mean": 69801.38541666667,
+          "max": 149793
+        },
+        "selected_rows_total": {
+          "min": 25823,
+          "p50": 60053.5,
+          "mean": 79757.14583333333,
+          "max": 171529
+        },
+        "owner_load_max_before": {
+          "min": 118622,
+          "p50": 150192.5,
+          "mean": 163654.89583333334,
+          "max": 257137
+        },
+        "owner_load_max_after": {
+          "min": 105904,
+          "p50": 131157.5,
+          "mean": 136253.5625,
+          "max": 203328
+        },
+        "selected_owner_counts": {
+          "0": 12,
+          "1": 37,
+          "2": 28,
+          "3": 32,
+          "4": 17,
+          "5": 19,
+          "6": 19,
+          "7": 28
+        },
+        "top_selected_experts": [[74, 12], [233, 8], [58, 8], [36, 8], [118, 5], [65, 4], [80, 4], [154, 4], [60, 4], [39, 4], [109, 4], [225, 4]]
+      }
+    }
+  },
+  "comparison": {
+    "top2_min10_vs_no_threshold_timing": {
+      "tokens_per_gpu_s_delta": -7.0,
+      "tokens_per_gpu_s_delta_pct": -0.09,
+      "tflops_per_gpu_delta": -0.33,
+      "tflops_per_gpu_delta_pct": -0.09,
+      "peak_logged_memory_delta_gib": -4.01
+    },
+    "top2_actual_no_sidecar": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_actual_8x_s4096_gbs128_mbs4_steps2_20260606.json",
+      "step2_tokens_per_gpu_s": 7550.0,
+      "step2_tflops_per_gpu": 382.26,
+      "step2_peak_logged_memory_gib": 194.87
+    },
+    "current_best_sustained_12layer_baseline": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_stage1_recompute_cached12_8x_s4096_gbs128_mbs4_heap96_steps6_20260606.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 7211.2,
+      "steps_2_to_6_tflops_per_gpu_mean": 363.916,
+      "read": "The standard-EP hot-expert branch is still a two-step diagnostic; it is not promoted over the six-step cached12 baseline."
+    }
+  },
+  "source_artifacts": {
+    "top2_no_threshold_timing_remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_8x_s4096_gbs128_mbs4_steps2_20260606",
+    "top2_no_threshold_timing_remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_8x_s4096_gbs128_mbs4_steps2_20260606/docker-run.log",
+    "top2_no_threshold_timing_remote_sidecar": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_timing_8x_s4096_gbs128_mbs4_steps2_20260606/mori_aiter_timing.jsonl",
+    "top2_min10_timing_remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_timing_8x_s4096_gbs128_mbs4_steps2_20260606",
+    "top2_min10_timing_remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_timing_8x_s4096_gbs128_mbs4_steps2_20260606/docker-run.log",
+    "top2_min10_timing_remote_sidecar": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_min10_timing_8x_s4096_gbs128_mbs4_steps2_20260606/mori_aiter_timing.jsonl"
+  },
+  "read": "The standard-EP top2 hot-expert branch has real modeled row-movement opportunity: the no-threshold timing run sees median modeled max-load relief of 13.81% and mean relief of 14.37%, with about 73.95k remote-hot rows per call on average. But the current implementation does not convert that into higher e2e throughput. Adding a min-reduction gate at 10% skips about one third of candidate execute calls and lowers peak logged memory by about 4.01 GiB, but step-2 throughput drops slightly from 7,455 to 7,448 tok/GPU/s. Decision: keep the threshold as an opt-in diagnostic/lower-overhead knob, not a promoted branch. The next hot-expert optimization needs more than selection filtering: reduce hot-weight broadcast/reduce overhead, record actual executed hot rows, and compare against the stronger MORI/AITER stage1_recompute_cached12 baseline."
+}

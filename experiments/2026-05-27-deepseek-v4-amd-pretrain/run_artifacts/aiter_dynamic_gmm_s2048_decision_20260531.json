@@ -1,0 +1,59 @@
+{
+  "artifact": "aiter_dynamic_gmm_s2048_decision_20260531",
+  "decision": "do_not_promote_aiter_dynamic_grouped_gmm_for_s2048_full_layer",
+  "reason": "Compact non-uniform AITER grouped GEMM/TGMM is correct for the probed BF16 contractions, but it does not beat the retained padded torch.bmm path at DSv4 S2048 row counts.",
+  "source_artifacts": {
+    "aiter_transposed_view_with_checks": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_dynamic_s2048_transposed_view_20260531.json",
+    "aiter_transposed_wgrad_layout_sweep": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_dynamic_s2048_transposed_wgrad_20260531.json",
+    "aiter_contiguous_wgrad_layout_sweep": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_dynamic_s2048_contiguous_wgrad_20260531.json",
+    "padded_compact_reduce_bridge_probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/dynamic_moe_bridge_ops_compact_reduce_gpu_s2048_20260531.json"
+  },
+  "shape": {
+    "tokens": 2048,
+    "assignments": 12288,
+    "experts": 384,
+    "topk": 6,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF"
+  },
+  "correctness": {
+    "transposed_view_checked": true,
+    "ok": true,
+    "max_abs_observed": 0.015625,
+    "pct_close_observed": 100.0,
+    "atol": 0.25,
+    "rtol": 0.025
+  },
+  "route_stats": {
+    "assignments": 12288,
+    "max_per_expert": 47,
+    "min_per_expert": 15,
+    "mean_per_expert": 32.0,
+    "padded_rows_global_max": 18048,
+    "padding_multiplier_global_max": 1.46875
+  },
+  "median_ms": {
+    "aiter_gmm_dgrad_w2_compact_transposed_view": 7.30626106262207,
+    "retained_padded_bmm_out_dgrad_w2": 3.57997989654541,
+    "aiter_gmm_xgrad_w1w3_pair_compact_transposed_view": 13.909919738769531,
+    "retained_padded_baddbmm_xgrad_w1w3_pair": 7.086366176605225,
+    "aiter_nptgmm_wgrad_w2_transposed_view": 5.905736923217773,
+    "retained_padded_bmm_wgrad_w2": 5.549757957458496,
+    "aiter_nptgmm_wgrad_w1_transposed_view": 5.809016227722168,
+    "retained_padded_bmm_wgrad_w1": 5.425357818603516,
+    "retained_padded_bmm_wgrad_w3": 5.458116054534912
+  },
+  "layout_read": {
+    "transposed_view_is_supported": true,
+    "transposed_view_nptgmm_w2_ms": 5.905736923217773,
+    "contiguous_nptgmm_w2_ms": 7.296191215515137,
+    "transposed_view_nptgmm_w1_ms": 5.809016227722168,
+    "contiguous_nptgmm_w1_ms": 7.235432147979736,
+    "materializing_transposed_lhs_copy_w2_ms": 0.41116398572921753,
+    "materializing_transposed_lhs_copy_w1_ms": 0.18884199857711792,
+    "read": "The real transposed-view lhs layout is already the faster AITER TGMM input. Materializing the lhs is not the missing win."
+  },
+  "next_action": "Keep retained compact-reduce as the baseline. The next S2048 optimization should be a custom compact/tile grouped MoE training kernel or another path that reduces padded work without paying AITER's non-uniform grouped-GEMM overhead."
+}

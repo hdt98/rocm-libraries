@@ -1,0 +1,78 @@
+{
+  "artifact": "compressed_dkv_route_grid_contrib_sampled_decision_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Refined contribution-vs-write split for the actual-LI-like compressed dKV rocWMMA route-grid probe on 1xMI350.",
+  "source_artifacts": {
+    "s64_smoke": "run_artifacts/compressed_dkv_rocwmma_route_grid_contrib_sampled_s64_smoke_20260602.json",
+    "s4096_timing": "run_artifacts/compressed_dkv_rocwmma_route_grid_contrib_sampled_s4096_t8k512_cw688_20260602.json",
+    "previous_split_sweep": "run_artifacts/compressed_dkv_rocwmma_route_grid_split_sweep_summary_20260602.json",
+    "next_contract": "run_artifacts/compressed_dkv_mfma_segmented_reducer_next_contract_20260602.json"
+  },
+  "probe_change": {
+    "file": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+    "change": "Replace the contrib_sink shared-memory checksum reduction with one sampled scalar per route tile, and add --skip-grouped-atomic so raw-vs-contribution timing can avoid already-rejected grouped branches.",
+    "why": "The prior checksum sink added diagnostic reduction overhead. The sampled sink keeps the rocWMMA contribution tile live through store_matrix_sync while minimizing the non-dKV-write side work."
+  },
+  "s64_smoke": {
+    "shape": {
+      "seq_len": 64,
+      "topk": 32,
+      "h_dim": 64,
+      "d_dim": 512,
+      "group_count": 32,
+      "token_block": 8,
+      "selected_block": 32,
+      "route_pattern": "random_unique"
+    },
+    "parity": {
+      "raw_atomic_allclose": true,
+      "raw_atomic_max_abs_diff": 0.0000019073486328125
+    },
+    "timing_ms": {
+      "raw_atomic_median": 0.047359999269247055,
+      "contrib_sink_median": 0.01947999931871891,
+      "raw_minus_contrib_sink": 0.027879999950528145,
+      "contrib_sink_vs_raw_ratio": 0.4113175595289364
+    },
+    "read": "The sampled sink is now a plausible low-overhead diagnostic at tiny shape: it is much cheaper than raw atomics and raw atomic parity passes against the reference."
+  },
+  "s4096_actual_li_like_timing": {
+    "shape": {
+      "seq_len": 4096,
+      "topk": 512,
+      "h_dim": 64,
+      "d_dim": 512,
+      "group_count": 1024,
+      "token_block": 8,
+      "selected_block": 512,
+      "route_pattern": "clustered_unique",
+      "cluster_width": 688
+    },
+    "write_model": {
+      "raw_scalar_writes": 1073741824,
+      "grouped_scalar_writes": 180355072,
+      "modeled_write_reduction_x": 5.953488372093023,
+      "k16_unique_route_contract": true
+    },
+    "timing_ms": {
+      "raw_atomic_median": 8.44373607635498,
+      "contrib_sink_median": 8.018570899963379,
+      "raw_minus_contrib_sink": 0.42516517639160156,
+      "contrib_sink_vs_raw_ratio": 0.9496472683955396
+    },
+    "read": "For the split token_block=8 rocWMMA route-grid schedule, final global atomic writes are not the only wall. The per-selected contribution body itself is already about 95% of raw_atomic time, so coalescing final writes without changing the contribution schedule cannot move this branch toward the 4.7-7.1 ms MFMA floors."
+  },
+  "decision": {
+    "status": "raw_final_atomic_only_fix_rejected_for_this_route_grid_body",
+    "refined_diagnosis": "The problematic unit is the selected-row accumulation algorithm: it produces KxD contributions for every selected token/group row, stores them through a route-grid body, and then writes dKV. The target-shape sampled split says the route-grid contribution production dominates this particular HIP/rocWMMA branch, while the final global atomic delta is only about 0.43 ms.",
+    "implication_for_next_kernel": "The next implementation must be MFMA-shaped at the group/tile level, not merely a wrapper that computes every selected contribution then coalesces the last write. It should aggregate selected rows into group/D16 work while preserving query-major reuse and avoiding selected-KV/prob/dense-route slabs.",
+    "keep_from_previous_contract": [
+      "Preserve the query-major sparse-MLA/LI no-selected-state contract.",
+      "Avoid dense [H,S,G] route materialization and materialized selected partial slabs.",
+      "Use active-group metadata only if it stays sub-ms.",
+      "Beat the split raw-atomic floor of about 8.43 ms before promoting."
+    ],
+    "next_branch": "Build or prototype the 32x256/D16 materialized-prob smoke from the MFMA segmented reducer contract with contribution generation and tile-local/group-level accumulation fused together, then test S128/S512 parity before S4096 timing."
+  },
+  "dependency_pin_changes": []
+}

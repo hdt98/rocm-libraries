@@ -1,0 +1,164 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 1.3438008791924454,
+    "dense_slots_after_compaction": 2112928,
+    "nonempty_tiles": 128,
+    "seq_chunk": 32,
+    "tiles": 128,
+    "unique_groups_max": 1024,
+    "unique_groups_mean_all_tiles": 515.8515625,
+    "unique_groups_mean_nonempty": 515.8515625,
+    "unique_groups_total": 66029,
+    "valid_pairs": 1572352
+  },
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "correctness": {
+    "count_max_abs_diff": 0,
+    "count_sum_candidate": 66029,
+    "count_sum_reference": 66029,
+    "flag_mismatch_count": 0,
+    "passed": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "read": "Triton probe for the in-kernel route-compaction primitive: detect which compressed groups are active in each query tile and group block. This measures route metadata work only; it does not compute scores, probabilities, or dKV.",
+  "scope": "sparse_mla_shared_latent_kv_actual_li_active_groups_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "group_block": 64,
+    "heads": 64,
+    "selected_block": 64,
+    "seq_chunk": 32,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "status": "ok",
+  "timing": {
+    "active_group_flags": {
+      "checksum_count_sum": 66029.0,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.8849700093269348,
+        "mean_ms": 0.8740493456522623,
+        "median_ms": 0.8771690130233765,
+        "min_ms": 0.8600090146064758,
+        "samples_ms": [
+          0.8849700093269348,
+          0.8771690130233765,
+          0.8600090146064758
+        ],
+        "stdev_ms": 0.01276957547213261
+      },
+      "label": "triton_active_group_flags",
+      "peak_memory_allocated_bytes": 1114787840,
+      "peak_memory_allocated_gib": 1.0382270812988281,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.932278111577034,
+        "mean_ms": 0.9011197835206985,
+        "median_ms": 0.8942452259361744,
+        "min_ms": 0.8768360130488873,
+        "samples_ms": [
+          0.932278111577034,
+          0.8942452259361744,
+          0.8768360130488873
+        ],
+        "stdev_ms": 0.028353152007993515
+      }
+    }
+  },
+  "workspace": {
+    "counts_bytes": 8192,
+    "flags_bytes": 131072
+  }
+}

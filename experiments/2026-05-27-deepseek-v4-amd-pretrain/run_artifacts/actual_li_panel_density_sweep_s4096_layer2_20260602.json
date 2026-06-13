@@ -1,0 +1,56 @@
+{
+  "artifact": "actual_li_panel_density_sweep_s4096_layer2_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Stats-only fixed-panel density sweep for the actual TorchTitan LightningIndexer layer-2 compressed dKV route.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_panel_bmm_floor.py --stats-only",
+  "remote_run": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "image_id": "sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012",
+    "device": "HIP_VISIBLE_DEVICES=4"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "head_dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "source_artifacts": [
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc16_gp64_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc16_gp128_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc16_gp256_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc16_gp512_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp16_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp32_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp64_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp128_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp256_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc32_gp512_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc64_gp64_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc64_gp128_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc64_gp256_20260602.json",
+    "run_artifacts/actual_li_panel_density_s4096_layer2_sc64_gp512_20260602.json"
+  ],
+  "sweep_rows": [
+    {"seq_chunk": 16, "group_panel": 64, "nonempty_panels": 2176, "dense_slot_overhead_x": 1.4171279713448388, "density_mean": 0.7056525735294118, "density_p50": 0.671875, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 16, "group_panel": 128, "nonempty_panels": 1152, "dense_slot_overhead_x": 1.5004884402474763, "density_mean": 0.6664496527777778, "density_p50": 0.640625, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 16, "group_panel": 256, "nonempty_panels": 640, "dense_slot_overhead_x": 1.6672093780527515, "density_mean": 0.5998046875, "density_p50": 0.5972900390625, "density_p90": 0.9973632812500001, "density_p99": 1.0},
+    {"seq_chunk": 16, "group_panel": 512, "nonempty_panels": 384, "dense_slot_overhead_x": 2.000651253663302, "density_mean": 0.4998372395833333, "density_p50": 0.5, "density_p90": 0.8599365234375, "density_p99": 0.98232177734375},
+    {"seq_chunk": 32, "group_panel": 16, "nonempty_panels": 4160, "dense_slot_overhead_x": 1.3546076196678607, "density_mean": 0.7382211538461538, "density_p50": 0.701171875, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 32, "group_panel": 32, "nonempty_panels": 2112, "dense_slot_overhead_x": 1.37544773689352, "density_mean": 0.7270359848484849, "density_p50": 0.68798828125, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 32, "group_panel": 64, "nonempty_panels": 1088, "dense_slot_overhead_x": 1.4171279713448388, "density_mean": 0.7056525735294118, "density_p50": 0.673095703125, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 32, "group_panel": 128, "nonempty_panels": 576, "dense_slot_overhead_x": 1.5004884402474763, "density_mean": 0.6664496527777778, "density_p50": 0.644775390625, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 32, "group_panel": 256, "nonempty_panels": 320, "dense_slot_overhead_x": 1.6672093780527515, "density_mean": 0.5998046875, "density_p50": 0.597900390625, "density_p90": 0.9936279296875001, "density_p99": 1.0},
+    {"seq_chunk": 32, "group_panel": 512, "nonempty_panels": 192, "dense_slot_overhead_x": 2.000651253663302, "density_mean": 0.4998372395833333, "density_p50": 0.5, "density_p90": 0.8579956054687501, "density_p99": 0.9788690185546876},
+    {"seq_chunk": 64, "group_panel": 64, "nonempty_panels": 544, "dense_slot_overhead_x": 1.4171279713448388, "density_mean": 0.7056525735294118, "density_p50": 0.66552734375, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 64, "group_panel": 128, "nonempty_panels": 288, "dense_slot_overhead_x": 1.5004884402474763, "density_mean": 0.6664496527777778, "density_p50": 0.64483642578125, "density_p90": 1.0, "density_p99": 1.0},
+    {"seq_chunk": 64, "group_panel": 256, "nonempty_panels": 160, "dense_slot_overhead_x": 1.6672093780527515, "density_mean": 0.5998046875, "density_p50": 0.593475341796875, "density_p90": 0.9870361328124999, "density_p99": 1.0},
+    {"seq_chunk": 64, "group_panel": 512, "nonempty_panels": 96, "dense_slot_overhead_x": 2.000651253663302, "density_mean": 0.4998372395833333, "density_p50": 0.5, "density_p90": 0.856231689453125, "density_p99": 0.9839508056640625}
+  ],
+  "read": "Fixed compressed-group panels are not ruled out by density alone. For the D16 query-tile candidate with seq_chunk=32, group_panel=64 has 1.417x dense-slot overhead with 1088 nonempty panels, while group_panel=128 has 1.500x overhead with 576 panels. group_panel=16 and 32 waste less work but create 4160 and 2112 panels, respectively. group_panel=512 wastes 2.001x dense slots and matches the earlier slow panel-BMM branch. This points to a fused fixed-panel D16 accumulator as a simpler first implementation branch beside dynamic unique-group compaction: try group_panel=64 or 128 inside a single fused kernel, not a PyTorch panel scatter+BMM loop."
+}

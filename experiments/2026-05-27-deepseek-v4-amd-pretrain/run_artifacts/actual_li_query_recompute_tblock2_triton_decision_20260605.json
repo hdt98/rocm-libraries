@@ -1,0 +1,89 @@
+{
+  "artifact": "actual_li_query_recompute_tblock2_triton_decision",
+  "date": "2026-06-05",
+  "scope": "Actual LI source-boundary Triton sparse-MLA backward BLOCK_T=2 gate",
+  "question": "Can Triton process more than one token per CTA/program and use the forward-known compressed-group sidecar to reduce dKV atomics locally while preserving the retained H64/N64/D128 query-major loop?",
+  "shape": {
+    "device": "1xMI350",
+    "layer_id": 2,
+    "seq_len": 4096,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128,
+    "topk": 512,
+    "compressed_groups": 1024
+  },
+  "new_tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py",
+  "candidate": {
+    "name": "triton_query_recompute_token2_adjacent_group_sidecar",
+    "artifact": "run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+    "first_uncorrected_artifact": "run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_timing3_20260605.json",
+    "sidecar_guard_artifact": "run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_timing3_sidecarguard_20260605.json",
+    "correctness": "not_checked_for_timing_gate",
+    "timing_ms": {
+      "full": 11.80587387084961,
+      "no_dkv": 3.6465420722961426,
+      "dkv_reduce_sink": 4.889669895172119,
+      "sink_minus_no_dkv": 1.2431278228759766,
+      "full_minus_sink": 6.91620397567749,
+      "full_minus_no_dkv": 9.159331798553467,
+      "dkv_only_sink": 3.0649380683898926,
+      "dkv_only_full": 10.71346664428711,
+      "dkv_only_global_accum": 7.648528575897217
+    },
+    "mechanism": "One Triton program owns two adjacent query tokens and one head block. It recomputes source-boundary QK/probs/scaled-dP for both tokens, uses the compressed-group ids from the forward-known indices sidecar, folds token1 dKV rows into token0 when their selected groups match inside the same selected window, and only then issues final dKV atomic_add.",
+    "known_limitations": [
+      "Only BLOCK_T=2 is implemented.",
+      "The local group sidecar reduction is a dense N-by-N route mask inside the epilogue.",
+      "It reduces adjacent-token duplicate groups across the same selected window but does not build a wider active-group table."
+    ]
+  },
+  "split_schedule_probe": {
+    "question": "Can dQ stay on the retained single-token fast schedule while only dKV uses the token-block/group-aware schedule?",
+    "model": "matched_single_token_no_dkv + token2_dkv_only_full",
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "token2_dkv_only_full_ms": 10.71346664428711,
+    "split_schedule_candidate_ms": 12.703758597373962,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "split_minus_matched_single_token_full_ms": 1.6270145177841187,
+    "split_vs_matched_single_token_speedup_x": 0.8719265243185238,
+    "promoted": false,
+    "read": "Two independent Triton schedules do not work here. The dKV-only schedule removes dQ live-state pressure, but as a separate kernel it still reloads/recomputes source-boundary QK/probs/scaled-dP from HBM and lands at 10.71 ms. Added to the retained single-token dQ/no-dKV producer, the split sum is 12.70 ms, slower than the 11.08 ms matched single-kernel baseline."
+  },
+  "matched_retained_baseline": {
+    "name": "triton_query_recompute_single_token",
+    "artifact": "run_artifacts/actual_li_query_recompute_single_token_triton_s4096_layer2_h64n64d128_timing3_rerun_20260605.json",
+    "correctness": "not_checked_for_timing_gate",
+    "timing_ms": {
+      "full": 11.076744079589844,
+      "no_dkv": 1.990291953086853,
+      "dkv_reduce_sink": 2.7719359397888184,
+      "sink_minus_no_dkv": 0.7816439867019653,
+      "full_minus_sink": 8.304808139801025,
+      "full_minus_no_dkv": 9.08645212650299
+    }
+  },
+  "comparison": {
+    "candidate_minus_baseline_full_ms": 0.7291297912597656,
+    "candidate_vs_baseline_speedup_x": 0.9382400829251538,
+    "global_dkv_accumulation_delta_ms": -1.3886041641235352,
+    "producer_no_dkv_delta_ms": 1.6562501192092896,
+    "dkv_compute_and_local_reducer_delta_ms": 0.46148383617401123,
+    "read": "The token-block sidecar reduces the approximate global dKV accumulation wall, from 8.30 ms to 6.92 ms. The win is erased because the two-token source-boundary producer is slower before dKV writes enter: no_dKV rises from 1.99 ms to 3.65 ms, and the local dKV compute/reducer slice rises from 0.78 ms to 1.24 ms. Moving route-sidecar setup behind the no_dKV guard did not materially change this, so the slowdown is not just metadata contamination."
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "BLOCK_T=2 Triton source-boundary local grouping misses both gates: the single-kernel path is 11.81 ms versus the matched retained 11.08 ms, and the split-schedule estimate is 12.70 ms. It should not be wired into TorchTitan or followed by e2e TFLOPs measurement.",
+    "block_t4_read": "A blind BLOCK_T=4 version is not the next useful branch because BLOCK_T=2 already shows the producer live-state problem: it doubles the live dQ accumulator footprint from four HxD chunks to eight HxD chunks and slows the no-dKV producer by about 1.66 ms. BLOCK_T=4 would further multiply that pressure unless paired with a different score/D-parallel schedule.",
+    "recompute_read": "The user's decomposition is architecturally right: dQ does not need global dKV atomics and should stay on the fast single-token path while dKV gets group-aware reduction. But recompute is only cheap if the second schedule can consume hot q/dO/score/prob state before HBM. As two independent Triton launches, dKV-only still reloads/recomputes the source boundary from HBM and is 10.71 ms.",
+    "next_kernel_direction": "Keep the fast single-token H64/N64/D128 source-boundary producer for dQ, but find a same-workgroup or persistent producer-consumer dKV epilogue that consumes score/prob/scaled-dP before HBM. This points back to HIP/CK/rocWMMA cooperative scheduling or a Triton tiny score-page design with immediate consumption and preserved D parallelism."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_query_recompute_tblock_triton.py --seq-len 4096 --layer-id 2 --block-h 64 --block-n 64 --block-d 128 --token-block 2 --warmup-iters 1 --timed-iters 3 --skip-correctness --summary-path run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_query_recompute_profile.py --seq-len 4096 --layer-id 2 --block-h 64 --block-n 64 --block-d 128 --warmup-iters 1 --timed-iters 3 --skip-correctness --summary-path run_artifacts/actual_li_query_recompute_single_token_triton_s4096_layer2_h64n64d128_timing3_rerun_20260605.json"
+  ]
+}

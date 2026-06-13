@@ -1,0 +1,88 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "intermediate_max_abs_diff": {
+    "head_logits_valid": 3.814697265625e-06,
+    "li_logits_valid": 3.814697265625e-06,
+    "target_probs_valid": 5.960464477539063e-08
+  },
+  "kernel": {
+    "block_d_index": 64,
+    "block_d_main": 64,
+    "block_k": 64,
+    "read": "Prototype exact SLIG backward schedule. It materializes compact main logits and per-head LI logits, not selected main-K tensors; it reduces LI logits explicitly, honors the reference KL clamp, then computes d_query_index, d_key_index, and d_weights with Triton atomics.",
+    "workspace": {
+      "head_logits_bytes": 4096,
+      "li_active_p_bytes": 128,
+      "li_logits_bytes": 1024,
+      "main_logits_bytes": 4096,
+      "p_bytes": 1024,
+      "row_count": 29
+    }
+  },
+  "max_abs_diff": {
+    "index_k": 1.2369127944111824e-10,
+    "index_q": 1.546140993013978e-10,
+    "weights": 7.275957614183426e-11
+  },
+  "oracle": {
+    "grad_norms": {
+      "index_k": 0.0010991898598149419,
+      "index_q": 0.0010714215459302068,
+      "weights": 0.0010836073197424412
+    },
+    "loss": 0.004991963040083647,
+    "row_count": 29.0
+  },
+  "scope": "triton_sparse_lightning_indexer_grad_kl_loss_prototype",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 8,
+    "head_dim": 32,
+    "main_head_dim": 64,
+    "main_heads": 4,
+    "n_heads": 4,
+    "seq_len": 32,
+    "topk": 8
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.626725971698761,
+      "mean_ms": 0.3663099904855092,
+      "median_ms": 0.2432820051908493,
+      "min_ms": 0.22892199456691742,
+      "samples_ms": [
+        0.626725971698761,
+        0.2432820051908493,
+        0.22892199456691742
+      ],
+      "stdev_ms": 0.22564111976704374
+    },
+    "peak_memory_allocated_bytes": 159525376,
+    "peak_memory_allocated_gib": 0.14856958389282227,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.671647023409605,
+      "mean_ms": 0.4019790406649311,
+      "median_ms": 0.27461000718176365,
+      "min_ms": 0.25968009140342474,
+      "samples_ms": [
+        0.671647023409605,
+        0.27461000718176365,
+        0.25968009140342474
+      ],
+      "stdev_ms": 0.23365859985130738
+    },
+    "warmup_iters": 1
+  },
+  "triton_grad_norms": {
+    "index_k": 0.0010991898598149419,
+    "index_q": 0.001071421429514885,
+    "weights": 0.0010836073197424412
+  }
+}

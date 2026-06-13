@@ -1,0 +1,67 @@
+{
+  "device": "cuda",
+  "kernel": {
+    "block_k": 32,
+    "read": "Given target_probs from the sparse MLA attention target and index_logits from the LI logits tile, this kernel computes the clamp-aware KL derivative d_index_logits. It intentionally does not build target_probs; production should source those from the attention recompute/softmax path.",
+    "workspace": {
+      "d_index_logits_bytes": 16384,
+      "index_logits_bytes": 16384,
+      "row_count": 125,
+      "target_probs_bytes": 16384
+    }
+  },
+  "max_abs_diff": 1.8189894035458565e-12,
+  "reference": {
+    "active_fraction": 0.4921875,
+    "norm": 3.676009873743169e-05,
+    "row_count": 125.0
+  },
+  "scope": "triton_sparse_lightning_indexer_kl_derivative_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 32,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_edges": 2016
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.27548399567604065,
+      "mean_ms": 0.09937759935855865,
+      "median_ms": 0.05576099827885628,
+      "min_ms": 0.048840999603271484,
+      "samples_ms": [
+        0.27548399567604065,
+        0.06760100275278091,
+        0.05576099827885628,
+        0.04920100048184395,
+        0.048840999603271484
+      ],
+      "stdev_ms": 0.0987386218700452
+    },
+    "peak_memory_allocated_bytes": 102400,
+    "peak_memory_allocated_gib": 9.5367431640625e-05,
+    "timed_iters": 5,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.36432803608477116,
+      "mean_ms": 0.1296574017032981,
+      "median_ms": 0.0704789999872446,
+      "min_ms": 0.06531109102070332,
+      "samples_ms": [
+        0.36432803608477116,
+        0.08221995085477829,
+        0.0704789999872446,
+        0.06594893056899309,
+        0.06531109102070332
+      ],
+      "stdev_ms": 0.1313601143863758
+    },
+    "warmup_iters": 1
+  },
+  "triton_norm": 3.6760091461474076e-05
+}

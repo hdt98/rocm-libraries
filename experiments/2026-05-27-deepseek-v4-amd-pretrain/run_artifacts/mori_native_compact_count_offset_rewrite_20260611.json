@@ -1,0 +1,58 @@
+{
+  "artifact": "mori_native_compact_count_offset_rewrite_20260611",
+  "date_utc": "2026-06-11",
+  "scope": "Native MORI standard-EP compact dispatch/combine kernel-body count-offset cleanup.",
+  "changed_files": [
+    "sources/references/mori/src/ops/dispatch_combine/intranode.hpp"
+  ],
+  "source_change": {
+    "dispatch_kernel": "Reordered the recv-count metadata path to carry expertMajorBase and expertSrcPrefix cumulatively instead of recomputing them from recv_counts_rank_major inside each source/expert copy region.",
+    "combine_kernel": "Applied the same cumulative expertMajorBase/expertSrcPrefix rewrite to the native compact combine path.",
+    "safety": "Rank-level count assertions remain outside the per-row copy loop; per-region bounds assertions remain in the copy loop.",
+    "what_did_not_change": [
+      "No route-mask adapter was added.",
+      "No TorchTitan standard-EP fallback behavior was changed.",
+      "No dependency pin changed.",
+      "No throughput promotion was claimed."
+    ]
+  },
+  "remote_validation": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_source": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori",
+    "clean_rebuild": {
+      "command": "cmake --build build --clean-first -j$(nproc)",
+      "result": "passed",
+      "note": "A plain ninja build initially reported no work to do, so a clean rebuild was used to force the header change through compilation."
+    },
+    "library_import_smoke": {
+      "command": "from mori.ops import BalancedMoeCompactDispatchOutput, EpDispatchCombineOp; from mori import cpp",
+      "result": "passed",
+      "observed": "BalancedMoeCompactDispatchOutput True True"
+    },
+    "unit_tests": {
+      "command": "python -m pytest -q tests/python/ops/test_balanced_moe.py",
+      "result": "passed",
+      "summary": "6 passed in 0.94s"
+    },
+    "native_compact_training_smoke": {
+      "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_4xmi350_20260611T051618Z",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+      "visible_devices": "4,5,6,7",
+      "mori_import_mode": "remote",
+      "compact_collective_backend": "mori_native",
+      "source_scatter_backend": "triton_flat",
+      "mtp_modules": 1,
+      "hyper_connections": false,
+      "result": "passed_one_step",
+      "loss": 15.87641,
+      "grad_norm": 17.375,
+      "logged_memory_gib": 189.77,
+      "tokens_per_gpu_s": 4,
+      "tflops_per_gpu": 0.11,
+      "read": "ABI/autograd correctness smoke only; S128 one-step timing includes startup/JIT overhead and is not a perf promotion."
+    }
+  },
+  "decision": "Keep patch and use the next MBS4 native compact A/B to measure whether dispatch/combine body cost moves against the current count-aware native branch."
+}

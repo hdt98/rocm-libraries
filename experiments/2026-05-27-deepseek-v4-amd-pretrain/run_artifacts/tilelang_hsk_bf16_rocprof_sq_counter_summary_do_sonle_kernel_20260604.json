@@ -1,0 +1,108 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_rocprof_sq_counter_summary",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "raw_profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_hsk_bf16_rocpctr_sq_20260604",
+  "profile_method": "prewarm TileLang kernels in the same container, then rocprofv3 --pmc SQ_WAVES SQ_INSTS_LDS SQ_INSTS_VMEM_RD SQ_INSTS_VMEM_WR SQ_LDS_BANK_CONFLICT with kernel include regex for mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim_kernel",
+  "benchmark_artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_counter_sq_do_sonle_kernel_20260604.json",
+  "benchmark_hsk_bf16_source_kernel_ms": 5.164727210998535,
+  "dispatch_count": 2,
+  "duration_ms_samples": [
+    5.132567,
+    5.053687
+  ],
+  "duration_ms_median": 5.093127,
+  "kernel_dispatch_static": {
+    "kernel_name": "mfma_panel_atomic_final_limited_bshd_source_hsk_bf16_scaled_prim_kernel",
+    "grid_size_flat": 2097152,
+    "workgroup_size_flat": 512,
+    "lds_block_size": 0,
+    "scratch_size": 0,
+    "vgpr_count": 76,
+    "sgpr_count": 48
+  },
+  "counter_medians": {
+    "SQ_INSTS_LDS": 217475704.0,
+    "SQ_INSTS_VMEM_RD": 39248824.0,
+    "SQ_INSTS_VMEM_WR": 1052344.0,
+    "SQ_LDS_BANK_CONFLICT": 330771584.0,
+    "SQ_WAVES": 32768.0
+  },
+  "counter_samples": {
+    "SQ_INSTS_LDS": {
+      "samples": [
+        217475704.0,
+        217475704.0
+      ],
+      "mean": 217475704.0,
+      "median": 217475704.0,
+      "min": 217475704.0,
+      "max": 217475704.0
+    },
+    "SQ_INSTS_VMEM_RD": {
+      "samples": [
+        39248824.0,
+        39248824.0
+      ],
+      "mean": 39248824.0,
+      "median": 39248824.0,
+      "min": 39248824.0,
+      "max": 39248824.0
+    },
+    "SQ_INSTS_VMEM_WR": {
+      "samples": [
+        1052344.0,
+        1052344.0
+      ],
+      "mean": 1052344.0,
+      "median": 1052344.0,
+      "min": 1052344.0,
+      "max": 1052344.0
+    },
+    "SQ_LDS_BANK_CONFLICT": {
+      "samples": [
+        330771584.0,
+        330771584.0
+      ],
+      "mean": 330771584.0,
+      "median": 330771584.0,
+      "min": 330771584.0,
+      "max": 330771584.0
+    },
+    "SQ_WAVES": {
+      "samples": [
+        32768.0,
+        32768.0
+      ],
+      "mean": 32768.0,
+      "median": 32768.0,
+      "min": 32768.0,
+      "max": 32768.0
+    }
+  },
+  "derived_ratios": {
+    "SQ_INSTS_LDS_per_wave": 6636.831787109375,
+    "SQ_INSTS_VMEM_RD_per_wave": 1197.779052734375,
+    "SQ_INSTS_VMEM_WR_per_wave": 32.114990234375,
+    "SQ_LDS_BANK_CONFLICT_per_wave": 10094.34765625,
+    "SQ_WAVES_per_wave": 1.0,
+    "lds_bank_conflict_per_lds_inst": 1.5209587917922087,
+    "vmem_wr_per_vmem_rd_inst": 0.026812115440707218
+  },
+  "read": "The source-fed TileLang kernel is not dominated by a large count of VMEM write instructions in SQ counters. Per dispatch it issues ~217M LDS instructions and ~331M LDS bank-conflict events, versus ~39M VMEM read instructions and ~1.05M VMEM write instructions. That points the next kernel rewrite at the in-CTA LDS active-group accumulation/reduction layout as well as final atomics, not only global write count.",
+  "tcc_counter_pass": {
+    "status": "inconclusive_no_output",
+    "attempted_counters": [
+      "TCC_EA_RDREQ",
+      "TCC_EA_WRREQ",
+      "TCC_EA_WRREQ_64B",
+      "TCC_EA_WRREQ_STALL",
+      "TCC_HIT",
+      "TCC_MISS"
+    ],
+    "note": "SSH timed out during the TCC pass and no counter CSV or benchmark JSON was left behind; do not use it as evidence."
+  },
+  "next": "Try a TileLang/HIP variant that changes the local active-group accumulator layout to reduce LDS bank conflicts: e.g., split active rows across smaller panels, swizzle LDS rows/banks, or do warp-local reductions before shared-memory accumulation. Keep HSK BF16 source feeding and cached/static routing; do not spend effort on the materialized pack bridge."
+}

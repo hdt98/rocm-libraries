@@ -1,0 +1,98 @@
+{
+  "artifact": "torchtitan_mori_native_weighted_output_backward_gate_20260612",
+  "date": "2026-06-12",
+  "node": "do-vunguyen-mi350-gpu",
+  "node_role": "diagnostic idle 8xMI350 node",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "model_config": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "activation_checkpoint": "none",
+    "chunked_ce_num_chunks": 8,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute"
+  },
+  "baseline_control": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_weighted_output_torchbwd_realfalse2_noprofile_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612",
+    "standard_ep_mori_native_compact_weighted_output": true,
+    "standard_ep_mori_native_compact_weighted_output_backward": false,
+    "step_2": {
+      "tok_per_gpu_s": 5783,
+      "tflops_per_gpu": 286.31,
+      "peak_memory_gib": 212.01,
+      "loss": 11.37012
+    },
+    "step_3": {
+      "tok_per_gpu_s": 6042,
+      "tflops_per_gpu": 299.14,
+      "peak_memory_gib": 212.01,
+      "loss": 15.20485
+    },
+    "steps_2_3_mean": {
+      "tok_per_gpu_s": 5912.5,
+      "tflops_per_gpu": 292.725
+    }
+  },
+  "candidate": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_weighted_output_nativebwd_noprofile_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612",
+    "standard_ep_mori_native_compact_weighted_output": true,
+    "standard_ep_mori_native_compact_weighted_output_backward": true,
+    "step_2": {
+      "tok_per_gpu_s": 5554,
+      "tflops_per_gpu": 274.98,
+      "peak_memory_gib": 211.46,
+      "loss": 11.51555
+    },
+    "step_3": {
+      "tok_per_gpu_s": 5857,
+      "tflops_per_gpu": 289.95,
+      "peak_memory_gib": 211.46,
+      "loss": 15.28371
+    },
+    "steps_2_3_mean": {
+      "tok_per_gpu_s": 5705.5,
+      "tflops_per_gpu": 282.465
+    },
+    "delta_vs_control": {
+      "tok_per_gpu_s": -207.0,
+      "tok_per_gpu_s_pct": -3.50,
+      "tflops_per_gpu": -10.26,
+      "tflops_per_gpu_pct": -3.51
+    }
+  },
+  "timed_diagnostic": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_weighted_output_nativebwd_mbs4_noac_steps3_8x_s4096_gbs128_vu_20260612",
+    "note": "Profile timing was intentionally intrusive and should not be used as throughput comparison.",
+    "step_2": {
+      "tok_per_gpu_s": 4795,
+      "tflops_per_gpu": 237.37
+    },
+    "step_3": {
+      "tok_per_gpu_s": 5998,
+      "tflops_per_gpu": 296.94
+    },
+    "post_warmup_rankmax_stage_ms_steps_2_3": {
+      "standard_ep.combine.mori_native_compact.launch": 3570.632,
+      "standard_ep.dispatch.mori_native_compact.backward_combine": 1947.846,
+      "standard_ep.combine.mori_native_compact.weighted_output_backward_native_scatter": 1190.359,
+      "standard_ep.combine.mori_native_compact.weighted_output_backward_dispatch": 1149.299,
+      "standard_ep_hot_weight.w3.backward.all_reduce_grad_hot_weight": 860.413,
+      "standard_ep.dispatch.mori_native_compact.launch": 372.343,
+      "standard_ep.hot_split.weighted_scatter_tokens": 223.562
+    }
+  },
+  "controls_and_caveats": [
+    "The first attempted false-control was invalid because the launcher did not propagate CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WEIGHTED_OUTPUT_BACKWARD into the remote script. The launcher now forwards it, and the valid control summary echoed false.",
+    "The timed diagnostic proves the native backward branch is active, but its throughput is lower because the timing hooks synchronize many small stages.",
+    "This is a 3-step diagnostic, not a promotion or stability run."
+  ],
+  "decision": "Reject native weighted-output backward as a throughput promotion in the current TorchTitan graph. Keep the primitive for isolated correctness, but default off for materialized perf. The next MORI-native target remains collapsing the output/return ABI around the owner-compact hot/cold/helper layout rather than replacing only the weighted-output backward scatter."
+}

@@ -1,0 +1,95 @@
+{
+  "status": "measured",
+  "date": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "gpu": "MI350 visible device 0",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "tool": "tools/dsv4_runtime_probe/benchmark_torchtitan_sparse_mla_forward.py",
+  "scope": "TorchTitan DeepSeek-V4 Flash layer-2 sparse MLA attention module forward",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "hidden_dim": 4096,
+    "layer_id": 2,
+    "dtype": "bf16",
+    "compressed_groups": 1024,
+    "selected_keys": 640,
+    "estimated_selected_state_elements": 171798691840
+  },
+  "target": {
+    "attention_forward_ms": 3.6,
+    "source": "single-MI350 1a attention-forward anchor in experiment objective"
+  },
+  "correctness_anchor": {
+    "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk128_blockv512_mi350_bf16_20260601.json",
+    "reference_mode": "manual_stream",
+    "candidate_mode": "fused",
+    "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+    "status": "passed",
+    "max_output_abs_diff": 0.00390625,
+    "output_atol": 0.01,
+    "cuda_event_mean_ms": 98.74849395751953,
+    "target_ratio": 27.43013721042209,
+    "peak_memory_allocated_gib": 11.340640544891357,
+    "requires_grad": true
+  },
+  "no_grad_sweep": [
+    {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk64_blockv512_nograd_mi350_bf16_20260601.json",
+      "block_keys": 64,
+      "block_v": 512,
+      "cuda_event_mean_ms": 88.04192810058593,
+      "target_ratio": 24.456091139051647,
+      "peak_memory_allocated_gib": 6.923720359802246
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk128_blockv512_nograd_mi350_bf16_20260601.json",
+      "block_keys": 128,
+      "block_v": 512,
+      "cuda_event_mean_ms": 98.70820465087891,
+      "target_ratio": 27.41894573635525,
+      "peak_memory_allocated_gib": 6.923720359802246
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk256_blockv512_nograd_mi350_bf16_20260601.json",
+      "block_keys": 256,
+      "block_v": 512,
+      "cuda_event_mean_ms": 125.77490921020508,
+      "target_ratio": 34.93747478061252,
+      "peak_memory_allocated_gib": 6.923720359802246
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk64_blockv128_nograd_mi350_bf16_20260601.json",
+      "block_keys": 64,
+      "block_v": 128,
+      "cuda_event_mean_ms": 120.12048110961913,
+      "target_ratio": 33.36680030822754,
+      "peak_memory_allocated_gib": 6.923720359802246
+    },
+    {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_triton_forward_chunked_forward_timing_s4096_blockk64_blockv256_nograd_mi350_bf16_20260601.json",
+      "block_keys": 64,
+      "block_v": 256,
+      "cuda_event_mean_ms": 142.58506469726564,
+      "target_ratio": 39.60696241590712,
+      "peak_memory_allocated_gib": 6.923720359802246
+    }
+  ],
+  "best_observed_no_grad": {
+    "block_keys": 64,
+    "block_v": 512,
+    "cuda_event_mean_ms": 88.04192810058593,
+    "target_ratio": 24.456091139051647
+  },
+  "interpretation": [
+    "The current Triton-forward ABI candidate is correctness-useful but not performance-close: best observed S4096 forward is 88.04 ms, still 24.46x slower than the 3.6 ms anchor.",
+    "Training-graph forward at block_keys=128/block_v=512 is essentially the same latency as no-grad at the same tile shape, so autograd bookkeeping is not the main latency source.",
+    "Reducing block_v below the full 512 value dimension makes latency much worse, consistent with the backend blocker that score work may be repeated across value tiles.",
+    "Increasing block_keys above 64 hurts latency at S4096; the current kernel is likely register/occupancy sensitive and still far from the final fused sparse MLA/LightningIndexer schedule."
+  ],
+  "next_actions": [
+    "Keep block_v=512 and block_keys=64 as the current Triton-forward timing baseline.",
+    "Optimize the actual fused sparse MLA/LI kernel schedule rather than relying on the current ABI bring-up backend.",
+    "Profile the S4096 block_keys=64/block_v=512 run with rocprof/omniperf to attribute time across Triton kernels and surrounding LI/index/gather/projection work."
+  ]
+}

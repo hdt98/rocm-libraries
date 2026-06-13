@@ -1,0 +1,150 @@
+{
+  "status": "pass",
+  "date": "2026-06-02",
+  "host": "do-sonle5-mi350-gpu",
+  "visible_devices": "4,5,6,7",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source_root": "/local/data/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan",
+  "source_root_note": "/local/data/sonle5/dsv4_pretrain_canary_20260527 is a compatibility symlink to /scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "bridge_activation": {
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": "1",
+    "mori_aiter_backward_mode": "routed",
+    "env": {
+      "TORCHTITAN_DSV4_MOE_COMM_BACKEND": "mori",
+      "TORCHTITAN_EXPERIMENTAL_MORI_AITER_MOE": "1",
+      "TORCHTITAN_MORI_AITER_BACKWARD_MODE": "routed"
+    }
+  },
+  "code_changes": {
+    "torchtitan_bridge": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py now keeps the reference backward as default and adds opt-in routed backward using separate MORI handles for saved activation routing, grad_output routing, and FP32/top-k-width dTopkWeight combine. Packed rows are aligned by get_dispatch_src_token_pos() before local owned-expert PyTorch VJP and before MORI combine.",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh now propagates CANARY_MORI_AITER_BACKWARD_MODE to TORCHTITAN_MORI_AITER_BACKWARD_MODE and records the selected mode in check-config/run metadata."
+  },
+  "static_validation": [
+    {
+      "name": "bridge_py_compile",
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "status": "pass"
+    },
+    {
+      "name": "launcher_bash_n",
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "status": "pass"
+    },
+    {
+      "name": "launcher_check_source",
+      "command": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+      "status": "pass"
+    },
+    {
+      "name": "remote_check_config",
+      "command": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed GPUS_PER_NODE=4 CANARY_EP=4 CANARY_GBS=64 CANARY_SEQ_LEN=128 CANARY_STEPS=1 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "status": "pass",
+      "observed": {
+        "model_spec": "deepseek_v4 flash_4layer",
+        "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+        "moe_score_before_experts": false,
+        "router_score_func": "sqrtsoftplus",
+        "mori_aiter_backward_mode": "routed",
+        "attention_compress_ratio_by_layer": [0, 0, 4, 128],
+        "attention_sparse_backward_mode_by_layer": ["manual", "manual", "manual", "manual"]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs4_noaux_20260602",
+      "shape": {
+        "gpus": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "tp": 1,
+        "pp": 1,
+        "cp": 1,
+        "local_batch_size": 1,
+        "global_batch_size": 4,
+        "gradient_accumulation_steps": 1,
+        "sequence_length": 128
+      },
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0,
+      "checkpoint_enable": false,
+      "result": {
+        "loss": 12.26246,
+        "grad_norm": 12.25,
+        "memory_gib_range": [80.84, 80.85],
+        "tokens_per_gpu_per_second": 7,
+        "tflops_per_gpu": 0.08,
+        "mfu_percent": 0.0,
+        "checkpoint_dir_present": false,
+        "process_group_destroyed": true,
+        "training_completed": true
+      },
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs4_noaux_20260602/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs64_liaux_20260602",
+      "shape": {
+        "gpus": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "tp": 1,
+        "pp": 1,
+        "cp": 1,
+        "local_batch_size": 1,
+        "global_batch_size": 64,
+        "gradient_accumulation_steps": 16,
+        "sequence_length": 128
+      },
+      "activation_checkpoint_mode": "none",
+      "dsa_indexer_loss_coeff": 0.001,
+      "checkpoint_enable": false,
+      "result": {
+        "loss": 12.23692,
+        "grad_norm": 9.1875,
+        "memory_gib_range": [87.83, 87.84],
+        "tokens_per_gpu_per_second": 55,
+        "tflops_per_gpu": 0.70,
+        "mfu_percent": 0.03,
+        "checkpoint_dir_present": false,
+        "process_group_destroyed": true,
+        "training_completed": true
+      },
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs64_liaux_20260602/docker-run.log"
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs64_liaux_acfull_20260602",
+      "shape": {
+        "gpus": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "tp": 1,
+        "pp": 1,
+        "cp": 1,
+        "local_batch_size": 1,
+        "global_batch_size": 64,
+        "gradient_accumulation_steps": 16,
+        "sequence_length": 128
+      },
+      "activation_checkpoint_mode": "full",
+      "dsa_indexer_loss_coeff": 0.001,
+      "checkpoint_enable": false,
+      "result": {
+        "loss": 12.27134,
+        "grad_norm": 9.25,
+        "memory_gib_range": [83.79, 83.79],
+        "tokens_per_gpu_per_second_range": [55, 56],
+        "tflops_per_gpu": 0.70,
+        "mfu_percent": 0.03,
+        "checkpoint_dir_present": false,
+        "process_group_destroyed": true,
+        "training_completed": true
+      },
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_bwd_4x_s128_gbs64_liaux_acfull_20260602/docker-run.log"
+    }
+  ],
+  "interpretation": {
+    "what_this_proves": "The production TorchTitan MORI+AITER bridge can now run an opt-in MORI-routed backward path through direct DeepSeek-V4 Flash 4-layer training with FSDP4/EP4, gradient accumulation, LI aux enabled, and full activation checkpointing.",
+    "what_this_does_not_prove": "This is not final MoE backward performance. The routed path still uses a local PyTorch VJP for owned experts, so throughput is intentionally far below the target and below the earlier reference-backward integration runs."
+  }
+}

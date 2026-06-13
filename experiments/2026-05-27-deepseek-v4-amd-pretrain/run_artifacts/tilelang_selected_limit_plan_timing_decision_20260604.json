@@ -1,0 +1,65 @@
+{
+  "status": "legacy_plan_retained_direct_plan_rejected",
+  "scope": "tilelang_selected_limit_actual_li_route_metadata_timing",
+  "date": "2026-06-04",
+  "read": "The previous static plan wall around 180 ms was a cold PyTorch/ROCm artifact; warmed plan timing is the relevant bridge metric. A direct device planner was implemented and validated, but it is slower than the existing vectorized legacy planner on the target S4096 actual-LI route.",
+  "implementation": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "new_function": "_prepare_selected_limit_plan_direct_device",
+    "toggle": "TILELANG_SELECTED_LIMIT_DIRECT_PLAN",
+    "retained_default": "0"
+  },
+  "correctness_gate": {
+    "artifact": "run_artifacts/tilelang_selected_limit_direct_plan_actual_li_s128_layer2_gp32_20260604.json",
+    "max_abs_diff_vs_torch_reference": 0.00000762939453125,
+    "source_vs_packed_max_abs_diff": 0.0,
+    "read": "Direct-plan metadata is semantically correct on the S128 actual-LI layer-2 boundary, but correctness alone does not justify using it."
+  },
+  "target_shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "active_rows": 131543,
+    "write_reduction_x": 11.953140798066032
+  },
+  "legacy_plan_default": {
+    "artifact": "run_artifacts/tilelang_selected_limit_legacy_plan_actual_li_s4096_layer2_gp512_20260604.json",
+    "direct_plan_env": "0",
+    "cold_static_plan_wall_ms": 180.21903606131673,
+    "warmed_plan_median_ms": 1.5457359552383423,
+    "packed_kernel_only_median_ms": 6.180221080780029,
+    "source_indexed_kernel_median_ms": 7.282271862030029,
+    "pack_only_median_ms": 2.0101799964904785,
+    "pack_plus_kernel_median_ms": 8.192240715026855
+  },
+  "direct_plan_candidate": {
+    "artifact": "run_artifacts/tilelang_selected_limit_direct_plan_actual_li_s4096_layer2_gp512_20260604.json",
+    "direct_plan_env": "1",
+    "cold_static_plan_wall_ms": 182.58783500641584,
+    "warmed_plan_median_ms": 10.107420921325684,
+    "packed_kernel_only_median_ms": 6.192019939422607,
+    "source_indexed_kernel_median_ms": 7.289912223815918,
+    "pack_only_median_ms": 2.005620002746582,
+    "pack_plus_kernel_median_ms": 8.176881790161133
+  },
+  "decision": {
+    "keep_direct_plan": false,
+    "keep_direct_plan_as_opt_in_diagnostic": true,
+    "route_metadata_is_current_lead_wall": false,
+    "next": [
+      "Keep the legacy selected-limit route planner as the retained default.",
+      "Treat warmed route planning as about 1.55 ms, not 180 ms cold-start.",
+      "Focus next on eliminating materialized P/scaled-dP slabs and their 2.0 ms packing path, or on feeding P/scaled-dP adjacent to the selected-limit dKV body without selected-state slabs."
+    ]
+  }
+}

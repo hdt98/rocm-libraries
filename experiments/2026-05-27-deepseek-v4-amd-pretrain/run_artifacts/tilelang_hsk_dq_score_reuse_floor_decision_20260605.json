@@ -1,0 +1,52 @@
+{
+  "scope": "tilelang_hsk_dq_score_reuse_floor_decision",
+  "date": "2026-06-05",
+  "artifact": "run_artifacts/tilelang_hsk_dq_score_reuse_floor_s4096_layer2_gp256_tb32_k64_d64_20260605.json",
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "packed_topk": 1024,
+    "token_block": 32,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512
+  },
+  "timing_ms": {
+    "hsk_bf16_score_reuse_dq_floor": 2.027456045150757,
+    "hsk_bf16_materialized_dkv_floor": 5.939167022705078,
+    "hsk_bf16_dq_plus_dkv_floor": 7.966623067855835,
+    "direct_source_recompute_only": 9.092472076416016,
+    "direct_source_dq_only": 14.241393089294434,
+    "direct_source_dq_dkv_full": 16.570850372314453
+  },
+  "memory_context": {
+    "grad_logits_scaled_hsk_bf16_mib": 256.0,
+    "probs_hsk_bf16_mib": 256.0,
+    "dq_out_mib": 512.0,
+    "read": "Saving full scaled-dP or probability slabs from forward can avoid backward recompute, but it adds large activation HBM traffic and memory pressure at S4096. Row stats such as lse are already the Flash-style low-memory saved state."
+  },
+  "read": "The first wall in the current route-owned/direct-source TileLang family is score/probability recompute and schedule replay, not intrinsic dQ math or final dKV write. Once scaled-dP is materialized, output-owned sparse dQ is about 2.03 ms, and dQ plus the existing bf16 HSK dKV reducer is about 7.97 ms. This beats the 16.57 ms direct-source TileLang route-owned boundary and falls below the 8.806 ms sparse-atomic dKV wall, but it relies on materialized score slabs and is therefore a diagnostic floor, not a production path.",
+  "decision": {
+    "save_full_softmax_from_forward_as_default": false,
+    "why_not": "Full P/scaled-dP saved activations are too memory-heavy for the intended training path and conflict with the no-selected-state sparse-MLA contract, especially with activation checkpointing.",
+    "promote_next_kernel_contract": "query_major_score_reuse_dq_dkv_epilogue",
+    "next_kernel_requirement": "Compute QK/PV, softmax row terms, and scaled-dP once inside a token/head/query-major backward CTA, then reuse that state for dQ and a group-aware dKV epilogue before global memory.",
+    "closed_or_demoted": [
+      "route-owned D-blocked recompute as final schedule",
+      "metadata-load-only explanation for the 16 ms wall",
+      "forward-saved full softmax as the default production fix"
+    ]
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py do-sonle-kernel:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle-kernel 'docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size=64g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/work/tools/dsv4_runtime_probe -e TILELANG_CACHE_DIR=/work/cache/tilelang_hsk_dq_score_reuse_20260605 -e PYTORCH_ROCM_ARCH=gfx950 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/work -w /work rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full python3 tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py --device cuda --dtype bfloat16 --seq-len 4096 --groups 1024 --heads 64 --dim 512 --layer-id 2 --group-panel-size 256 --panel-capacity 256 --token-block 32 --block-k 64 --block-d 64 --threads 512 --input-layout bshd --plan-on-device --skip-group-filter --include-direct-source-dq-dkv --include-hsk-bf16-dq --warmup-iters 2 --timed-iters 3 --output-json /work/run_artifacts/tilelang_hsk_dq_score_reuse_floor_s4096_layer2_gp256_tb32_k64_d64_20260605.json'"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "run_id": "single_layer_moe_variant_sweep_s2048_goal_cont_20260531",
+  "date": "2026-05-31",
+  "branch": "sonle5_dsv4_amd_pretrain",
+  "single_gpu_host": "do-sonle-kernel",
+  "shape": {
+    "batch": 1,
+    "sequence": 2048,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "topk": 6,
+    "experts": 384
+  },
+  "target": {
+    "development_ms": 43.3,
+    "development_tokens_per_s": 47300
+  },
+  "command": "env RUN_TAG=retained_moe_variant_sweep_s2048_goal_cont_20260531T0725Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-moe-sweep-2048",
+  "source_artifact_dir": "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531",
+  "source_artifacts": [
+    "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531/compact_reduce.json",
+    "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531/compact_scatter.json",
+    "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531/dynamic_bmm_out.json",
+    "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531/no_mask_bmm_out.json",
+    "run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531/no_mask_dense.json"
+  ],
+  "variants_ranked_by_avg_ms": [
+    {
+      "artifact": "compact_reduce.json",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 52.76586099838217,
+      "min_ms": 52.09138698410243,
+      "tokens_per_s": 38812.974170227084,
+      "estimated_tflops": 184.51615883645897,
+      "moe_gate_grad_norm": 0.0001744238252285868,
+      "delta_vs_best_avg_ms": 0.0,
+      "status": "best_in_sweep"
+    },
+    {
+      "artifact": "compact_scatter.json",
+      "moe_impl": "grouped-expert-batches-dynamic-compact-scatter-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 52.88526097623011,
+      "min_ms": 52.26068093907088,
+      "tokens_per_s": 38725.34544020682,
+      "estimated_tflops": 184.09957348033186,
+      "moe_gate_grad_norm": 0.00017442391254007816,
+      "delta_vs_best_avg_ms": 0.11939997784793377,
+      "status": "trails_best"
+    },
+    {
+      "artifact": "no_mask_dense.json",
+      "moe_impl": "grouped-expert-batches-dynamic-no-mask-dense-wgrad",
+      "avg_ms": 53.438910050317645,
+      "min_ms": 52.69784911070019,
+      "tokens_per_s": 38324.13494346385,
+      "estimated_tflops": 182.19222622528258,
+      "moe_gate_grad_norm": 0.00017442210810258985,
+      "delta_vs_best_avg_ms": 0.6730490519354717,
+      "status": "trails_best"
+    },
+    {
+      "artifact": "dynamic_bmm_out.json",
+      "moe_impl": "grouped-expert-batches-dynamic-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 53.51542433102926,
+      "min_ms": 52.83405992668122,
+      "tokens_per_s": 38269.340579862146,
+      "estimated_tflops": 181.93173483770346,
+      "moe_gate_grad_norm": 0.00017442271928302944,
+      "delta_vs_best_avg_ms": 0.7495633326470852,
+      "status": "trails_best"
+    },
+    {
+      "artifact": "no_mask_bmm_out.json",
+      "moe_impl": "grouped-expert-batches-dynamic-no-mask-bmm-out-dgrad-dense-wgrad",
+      "avg_ms": 53.55038164028277,
+      "min_ms": 53.05215297266841,
+      "tokens_per_s": 38244.35862581064,
+      "estimated_tflops": 181.8129710918077,
+      "moe_gate_grad_norm": 0.00017442394164390862,
+      "delta_vs_best_avg_ms": 0.784520641900599,
+      "status": "trails_best"
+    }
+  ],
+  "best": {
+    "artifact": "compact_reduce.json",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "avg_ms": 52.76586099838217,
+    "min_ms": 52.09138698410243,
+    "tokens_per_s": 38812.974170227084,
+    "estimated_tflops": 184.51615883645897,
+    "gap_to_development_target_ms": 9.465860998382176,
+    "avg_ms_over_target_ratio": 1.2186111085076716,
+    "tokens_per_s_over_target_ratio": 0.8205702784403189
+  },
+  "read": "The retained compact-reduce learned-router MoE bridge remains the best measured PyTorch-level variant for S2048. Compact scatter and no-mask alternatives do not recover the 9.47 ms gap to the 43.3 ms development target, so the next optimization surface remains a fused compact grouped-MoE training kernel for routed expert dgrad/wgrad rather than another wrapper-level variant."
+}

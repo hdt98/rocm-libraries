@@ -1,0 +1,275 @@
+{
+  "artifact": "sparse_mla_source_boundary_hip_coop_decision",
+  "date": "2026-06-05",
+  "status": "source_boundary_build_carrier_validated_but_scalar_replay_schedules_rejected",
+  "source_file": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+  "goal": "Move sparse-MLA backward toward a HIP/CK/rocWMMA cooperative producer-consumer kernel where the score/prob/dP tile is consumed before any HBM score slab.",
+  "rocwmma_extension_attempt": {
+    "status": "compile_rejected_in_current_torch_extension_tuple",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "extension_dirs": [
+      "/work/torch_extensions/source_boundary_hip_coop_20260605",
+      "/work/torch_extensions/source_boundary_hip_coop_20260605b"
+    ],
+    "symptom": "rocWMMA include path pulled both hip/amd_detail/amd_warp_sync_functions.h and hip/amd_detail/amd_warp_sync_functions_hip.h, causing duplicate definitions such as __hip_readfirstlane, __syncwarp, __ballot_sync, and shuffle/reduce helpers.",
+    "mitigation_tried": "Split PyTorch/PyBind C++ from the HIP translation unit and retried with -UHIP_ENABLE_WARP_SYNC_BUILTINS.",
+    "standalone_hipcc_check": {
+      "raw_kernel_path": "/work/torch_extensions/source_boundary_hip_coop_20260605b/source_boundary_hip_coop_sources_v1/kernel.hip",
+      "command_shape": "/opt/rocm-7.2.0/bin/hipcc --offload-arch=gfx950 -std=c++17 -c -x hip kernel.hip",
+      "status": "passed",
+      "note": "Compiling the PyTorch-preprocessed kernel_hip.hip failed because it includes hip/hip_runtime_hip.h, but compiling the raw kernel.hip directly succeeds."
+    },
+    "read": "The previous Torch/Thrust all-in-one failure is gone, and raw standalone hipcc can compile the rocWMMA source. The blocker is PyTorch's JIT extension hipify/injected-flag path, so the next rocWMMA/CK implementation should use standalone HIP object packaging, CK, or a custom build carrier instead of torch.utils.cpp_extension load(..., cuda_sources=[rocwmma_source]) directly."
+  },
+  "pure_hip_source_boundary_result": {
+    "artifact": "run_artifacts/sparse_mla_source_boundary_hip_coop_s4096_layer2_sc32_sb64_bd16_thr256_20260605c.json",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "device": "AMD Instinct MI350X VF",
+    "shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "compress_ratio": 4,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "valid_pairs": 1572352
+    },
+    "tile": {
+      "seq_chunk": 32,
+      "selected_block": 64,
+      "block_d": 16,
+      "threads": 256
+    },
+    "timing_ms": {
+      "event_median": 8217.6962890625,
+      "wall_median": 8217.872225912288,
+      "build_seconds": 24.73249635612592,
+      "peak_memory_gib": 1.5664114952087402
+    },
+    "contract": {
+      "source_boundary": true,
+      "materialized_probs_grad_logits": false,
+      "hip_source_headers": [
+        "hip/hip_runtime.h",
+        "cstdint",
+        "cmath"
+      ],
+      "formula": "dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * dO[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]"
+    },
+    "gate": {
+      "triton_full_sparse_attention_backward_ms": 11.13,
+      "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+      "passed": false
+    }
+  },
+  "prebuilt_object_carrier_followup": {
+    "status": "carrier_validated_but_schedule_still_rejected",
+    "patch": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py now supports --hip-build-mode prebuilt_object, which compiles raw HIP with hipcc -fPIC and links the object into the Torch C++ wrapper.",
+    "pure_hip_scalar_prebuilt": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_hip_coop_prebuilt_pure_s4096_layer2_sc32_sb64_bd16_thr256_20260605b.json",
+      "kernel_source_flavor": "pure_hip_scalar_prebuilt",
+      "event_median_ms": 7540.19287109375,
+      "read": "Confirms the raw HIP object carrier works. The scalar D16 replay body remains deeply rejected."
+    },
+    "rocwmma_source_boundary_prebuilt": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_hip_coop_prebuilt_rocwmma_s4096_layer2_sc32_sb64_bd16_thr256_20260605.json",
+      "kernel_source_flavor": "rocwmma_source_boundary_prebuilt",
+      "external_hip_source_path": "/work/torch_extensions/source_boundary_hip_coop_20260605b/source_boundary_hip_coop_sources_v1/kernel.hip",
+      "event_median_ms": 8007.0302734375,
+      "read": "Bypassing PyTorch hipify lets rocWMMA source compile, link, and run. The schedule is still rejected because it recomputes QK, dO.V, probability, and scaled-dP for every D16 tile before the rocWMMA contribution step."
+    },
+    "build_read": "The build blocker is solved for future rocWMMA/CK experiments: use raw hipcc object packaging or CK, not torch.utils.cpp_extension cuda_sources hipify, when the HIP source includes rocWMMA."
+  },
+  "score_reuse_d64_followup": {
+    "status": "scalar_score_reuse_still_rejected",
+    "artifact": "run_artifacts/sparse_mla_source_boundary_hip_coop_score_d64_s4096_layer2_sc32_sb64_bd64_thr256_20260605.json",
+    "kernel_source_flavor": "score_reuse_d64_scalar",
+    "shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "compress_ratio": 4,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "valid_pairs": 1572352
+    },
+    "tile": {
+      "seq_chunk": 32,
+      "selected_block": 64,
+      "block_d": 64,
+      "threads": 256,
+      "k_tile": 16,
+      "h_tile": 16
+    },
+    "timing_ms": {
+      "event_median": 2042.3009033203125,
+      "wall_median": 2042.469621868804,
+      "build_seconds": 25.199337971163914,
+      "peak_memory_gib": 1.5664114952087402
+    },
+    "route_stats": {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 234828288,
+      "route_atomic_reduction_x": 3.428225069715621
+    },
+    "gate": {
+      "triton_full_sparse_attention_backward_ms": 11.13,
+      "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+      "passed": false
+    },
+    "read": "Computing score/prob/scaled-dP once for a wider D64 CTA cuts scalar replay versus D16, but it is still seconds-scale. This rejects scalar score reuse as the main route and keeps the target on an MFMA/CK-style producer-consumer score page with group-aware epilogue."
+  },
+  "rocwmma_score_page_d512_followup": {
+    "status": "builds_and_runs_but_misses_sparse_attention_gate",
+    "artifacts": [
+      "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_s4096_layer2_sc32_sb64_bd512_thr64_20260605.json",
+      "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json"
+    ],
+    "source_file": "tools/dsv4_runtime_probe/source_boundary_score_page_rocwmma_d512.hip",
+    "kernel_source_flavor": "rocwmma_score_page_d512",
+    "shape": {
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "compress_ratio": 4,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "valid_pairs": 1572352
+    },
+    "tile": {
+      "seq_chunk": 32,
+      "selected_block": 64,
+      "block_d": 512,
+      "threads": 64,
+      "k_tile": 16,
+      "h_tile": 16
+    },
+    "timing_ms": {
+      "single_sample_event": 105.8189468383789,
+      "timing5_event_median": 105.11160278320312,
+      "timing5_event_min": 104.8423843383789,
+      "timing5_event_max": 105.63058471679688,
+      "timing5_event_stdev": 0.3199894844548823,
+      "build_seconds": 27.072737153153867,
+      "peak_memory_gib": 1.5664114952087402
+    },
+    "comparison": {
+      "vs_scalar_d64_score_reuse_x": 19.431709236194948,
+      "vs_scalar_d16_prebuilt_x": 71.73384148404843,
+      "vs_triton_full_sparse_attention_backward_x": 9.443988830476471,
+      "triton_full_sparse_attention_backward_ms": 11.13,
+      "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041
+    },
+    "read": "This is the first source-boundary rung that actually uses a workgroup-local score/prob/scaled-dP page and rocWMMA producer-consumer math. It proves the mechanism by cutting the scalar D64 path from 2042 ms to 105 ms, but it is still not a promoted sparse-attention backward candidate: it only returns dKV, uses global atomics, and remains about 9.4x slower than the current Triton full sparse-attention boundary."
+  },
+  "rocwmma_score_page_d512_decomposition": {
+    "status": "same_kernel_split_complete",
+    "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_decomposition_20260605.json",
+    "mode_artifacts": {
+      "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode0_scoreonly_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json",
+      "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode1_contribsink_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json",
+      "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_mode2_full_s4096_layer2_sc32_sb64_bd512_thr64_timing5_20260605.json"
+    },
+    "timing_ms": {
+      "score_page_only": 32.56945037841797,
+      "score_plus_contrib_sink": 62.316837310791016,
+      "full_dkv_atomic": 105.42322540283203,
+      "contribution_sweep_delta": 29.747386932373047,
+      "dkv_global_write_atomic_delta": 43.106388092041016
+    },
+    "read": "The 105 ms wall is not only the final dKV atomic/write path. The score-page producer alone is already 32.57 ms and the contribution sweep adds 29.75 ms before dKV atomics add 43.11 ms. Therefore the next branch should be a CK/MFMA production schedule that improves the score producer and contribution sweep, while also replacing the global-atomic dKV epilogue."
+  },
+  "rocwmma_score_page_d512_tile_sweep": {
+    "status": "retains_sc16_sb64_as_best_simple_tile",
+    "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_tile_sweep_20260605.json",
+    "best": {
+      "seq_chunk": 16,
+      "selected_block": 64,
+      "event_median_ms": 66.47088623046875,
+      "improvement_x_vs_sc32_sb64": 1.5860142705265906,
+      "vs_triton_full_sparse_attention_backward_x": 5.972227872459007
+    },
+    "rejected_simple_tiles": [
+      {
+        "seq_chunk": 8,
+        "selected_block": 64,
+        "event_median_ms": 67.2119369506836,
+        "read": "Slightly loses to 16x64 despite more CTAs."
+      },
+      {
+        "seq_chunk": 16,
+        "selected_block": 32,
+        "event_median_ms": 72.6686782836914,
+        "read": "More CTAs but lower selected-panel coalescing."
+      },
+      {
+        "seq_chunk": 8,
+        "selected_block": 16,
+        "event_median_ms": 85.90275573730469,
+        "read": "Too little in-tile route reduction and too many small panels."
+      }
+    ],
+    "read": "The original 32x64 CTA serialized too much work. Simple tiling can cut the bring-up kernel to 66.47 ms, but that is still about 6x slower than the current Triton full sparse-attention backward gate. This keeps the path as a design probe, not a promoted latency candidate."
+  },
+  "rocwmma_score_page_d512_reusekv": {
+    "status": "retained_bringup_improvement_not_promoted",
+    "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_decomposition_20260605.json",
+    "mode_artifacts": {
+      "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode0_scoreonly_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json",
+      "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode1_contribsink_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json",
+      "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_reusekv_mode2_full_s4096_layer2_sc16_sb64_bd512_thr64_timing5_20260605.json"
+    },
+    "mechanism": "Flip score-page production from h0->d0 to d0->h0 so one selected-KV D16 tile is reused across all four H16 head blocks before advancing D.",
+    "timing_ms": {
+      "score_page_only": 17.300220489501953,
+      "score_plus_contrib_sink": 51.82865905761719,
+      "full_dkv_atomic": 59.252864837646484,
+      "contribution_sweep_delta": 34.528438568115234,
+      "dkv_global_write_atomic_delta": 7.424205780029297
+    },
+    "comparison": {
+      "improvement_x_vs_previous_best_simple_tile": 1.1218172558002002,
+      "full_vs_triton_full_sparse_attention_backward_x": 5.323707532582793
+    },
+    "read": "The KV-D reuse variant is the best current rocWMMA bring-up kernel at 59.25 ms. It also shifts the attribution: final dKV global atomic/write delta is now about 7.42 ms, while score+contribution is still 51.83 ms. That makes producer/contribution scheduling the next dominant target."
+  },
+  "rocwmma_score_page_d512_multiwave": {
+    "status": "best_rocwmma_bringup_point_not_promoted",
+    "artifact": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_decomposition_20260605.json",
+    "mode_artifacts": {
+      "score_page_only": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode0_scoreonly_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json",
+      "score_plus_contrib_sink": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode1_contribsink_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json",
+      "full_dkv_atomic": "run_artifacts/sparse_mla_source_boundary_rocwmma_score_page_d512_multiwave_mode2_full_s4096_layer2_sc16_sb64_bd512_thr256_timing5_20260605.json"
+    },
+    "mechanism": "Keep the D512 score page and KV-D reuse, but use a 256-thread CTA with four wavefronts: one wavefront per H16 head block for score-page production and one wavefront per D16 contribution consumer for four consecutive D blocks.",
+    "timing_ms": {
+      "score_page_only": 15.390443801879883,
+      "score_plus_contrib_sink": 33.47657012939453,
+      "full_dkv_atomic": 43.82099533081055,
+      "contribution_sweep_delta": 18.08612632751465,
+      "dkv_global_write_atomic_delta": 10.344425201416016
+    },
+    "comparison": {
+      "score_page_improvement_x_vs_reusekv": 1.150729767911522,
+      "score_plus_contrib_improvement_x_vs_reusekv": 1.5482147422827873,
+      "full_improvement_x_vs_reusekv": 1.3521531599960437,
+      "full_vs_triton_full_sparse_attention_backward_x": 3.9371963459847754
+    },
+    "read": "The four-wave variant validates the same-workgroup score-page producer/consumer mechanism and is the best current rocWMMA bring-up at 43.82 ms, but it is still dKV-only and about 3.94x slower than the 11.13 ms full Triton sparse-attention backward boundary. Do not run e2e TFLOPs from this variant; use it as evidence for a lower-level CK/HIP/MFMA cooperative rewrite."
+  },
+  "decision": {
+    "rejected": "Scalar pure-HIP D16 replay and D64 score-reuse source-boundary schedules.",
+    "retained": "Source-boundary no-HBM-slab contract, split-source HIP extension build surface, and the same-workgroup D512 score-page producer-consumer mechanism as a bring-up rung. The best bring-up point is now 16x64 with SCORE_PAGE_REUSE_KV_D=1, SCORE_PAGE_MULTI_WAVE=1, and SCORE_PAGE_THREADS=256 at 43.82 ms.",
+    "next_kernel_shape": "Keep the D512 score page idea, the 16x64 simple-tiling lesson, KV-D reuse, and the four-wave same-workgroup producer/consumer lesson, but stop extending this rocWMMA dKV-only emitter. Build a production full-boundary cooperative kernel that returns dQ+dKV, uses CK/custom-HIP MFMA for QK, dO.V, and contribution math with better occupancy/reuse than the current rocWMMA bring-up, and adds a grouped/segmented dKV epilogue before global writes.",
+    "implementation_options": [
+      "CK tile or custom HIP kernel with explicit MFMA fragments and a shared score/prob/dP page.",
+      "Standalone rocWMMA/hipcc build outside the current PyTorch extension header path, if we still want rocWMMA fragments.",
+      "Persistent workgroup design that owns token tile plus selected tile and fans a small score page to D-block consumers without an HBM score slab."
+    ]
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "run_id": "torchtitan_dsv4_drop_original_loss_ab_ep8_s4094096_gbs128_20260603",
+  "created_at": "2026-06-03",
+  "purpose": "Localize the full-AC forward/backward wrapper residual by returning a detached loss and explicitly deleting the original graph-bearing loss before returning from forward_backward_step.",
+  "shape": {
+    "hardware": "8xMI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "parallelism": {
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "dp_replicate": 1,
+      "dp_shard": 8,
+      "fsdp": 8,
+      "ep": 8
+    }
+  },
+  "settings": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enabled": false,
+    "chunked_ce_num_chunks": 2,
+    "structured_logging": false,
+    "profile_dense_linear_backward": true,
+    "profile_ac_blocks": true,
+    "return_detached_loss": true,
+    "drop_original_loss_before_return": true,
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_shmem_heap_size": "32G"
+  },
+  "remote_artifacts": {
+    "output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_drop_original_loss_ab_ep8_s4094096_gbs128_20260603",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_drop_original_loss_ab_ep8_s4094096_gbs128_20260603/docker-run.log",
+    "timing_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_drop_original_loss_ab_ep8_s4094096_gbs128_20260603/timing",
+    "local_parse_copy": "/tmp/dsv4_drop_original_loss_ab_ep8_s4094096_gbs128_20260603/timing"
+  },
+  "step_log_metrics": {
+    "step1": {
+      "loss": 12.15477,
+      "grad_norm": 11.25,
+      "tokens_per_gpu_s_range": [
+        1993,
+        1998
+      ],
+      "tflops_per_gpu_range": [
+        37.7,
+        37.81
+      ],
+      "max_memory_gib": 67.52
+    },
+    "step2": {
+      "loss": 9.20598,
+      "grad_norm": 22.625,
+      "tokens_per_gpu_s": 2852,
+      "tflops_per_gpu": 53.97,
+      "mfu_percent": 2.34,
+      "max_memory_gib": 112.93
+    }
+  },
+  "additive_step2": {
+    "records": 8,
+    "step_wall_ms": {
+      "mean": 21419.214,
+      "max": 21420.055
+    },
+    "phase_means_ms": {
+      "microbatch_forward_backward": 21347.015,
+      "forward_backward_call": 21343.342,
+      "model_forward": 2274.87,
+      "loss": 469.938,
+      "backward": 13762.667,
+      "drop_original_loss": 4822.692,
+      "return_loss": 0.672,
+      "release_tensors": 0.462
+    },
+    "phase_maxima_ms": {
+      "microbatch_forward_backward": 21353.737,
+      "forward_backward_call": 21350.415,
+      "model_forward": 2316.257,
+      "loss": 470.916,
+      "backward": 13762.992,
+      "drop_original_loss": 4886.071,
+      "return_loss": 0.864,
+      "release_tensors": 0.531
+    },
+    "derived_means_ms": {
+      "old_wrapper_residual": 4839.54,
+      "call_boundary_residual_after_named_drop": 4.832,
+      "outer_after_call_residual": 2.854,
+      "named_minor_forward_backward_overhead": 8.343
+    },
+    "derived_maxima_ms": {
+      "old_wrapper_residual": {
+        "rank": 5,
+        "value": 4905.414
+      },
+      "drop_original_loss": {
+        "rank": 5,
+        "value": 4886.071
+      },
+      "call_boundary_residual_after_named_drop": {
+        "rank": 5,
+        "value": 5.39
+      },
+      "outer_after_call_residual": {
+        "rank": 5,
+        "value": 4.179
+      }
+    }
+  },
+  "comparison": {
+    "full_ac_callboundary_control": {
+      "artifact": "run_artifacts/torchtitan_callboundary_release_ep8_s4096_gbs128_20260603.json",
+      "step2_tflops_per_gpu": 54.12,
+      "forward_ms": 2302,
+      "loss_ms": 470,
+      "backward_ms": 13654,
+      "call_boundary_residual_mean_ms": 4557.808,
+      "call_boundary_residual_max_ms": 4605.25
+    },
+    "return_detached_loss_only": {
+      "artifact": "run_artifacts/torchtitan_return_detached_loss_probe_ep8_s4096_gbs128_20260603.json",
+      "step2_tflops_per_gpu": 53.3,
+      "return_loss_max_ms": 0.896,
+      "call_boundary_residual_mean_ms": 4849.883,
+      "call_boundary_residual_max_ms": 4916.281
+    },
+    "drop_original_loss_probe": {
+      "step2_tflops_per_gpu": 53.97,
+      "drop_original_loss_mean_ms": 4822.692,
+      "drop_original_loss_max_ms": 4886.071,
+      "call_boundary_residual_mean_ms": 4.832,
+      "call_boundary_residual_max_ms": 5.39
+    }
+  },
+  "read": "The hidden fwd/bwd wrapper wall is the lifetime release of the original graph-bearing loss, not the detached scalar return. Explicitly deleting loss before return moves the previous 4.6-4.9s residual into the named forward_backward.drop_original_loss phase and collapses the remaining call-boundary residual to about 5 ms. This is diagnostic, not a throughput improvement: step 2 is still only 53.97 TFLOPs/GPU. The next production branch should reduce or avoid this graph-free path through FSDP/autograd/checkpoint tensor lifetime changes, not by returning a detached loss alone."
+}

@@ -1,0 +1,111 @@
+{
+  "artifact": "rocm_libraries_moe_backward_source_scan_20260602",
+  "created_at": "2026-06-02",
+  "question": "Does ROCm/rocm-libraries have a backward MoE kernel we can use or port for the current MoE GEMM/BMM-family backward wall?",
+  "rocm_libraries": {
+    "repo": "https://github.com/ROCm/rocm-libraries",
+    "local_sparse_clone": "/tmp/rocm-libraries",
+    "local_head": "0d228e92e5c3a1896f17a28acf3eb300e474fa41",
+    "note": "Local partial-clone content grep hit GitHub promisor fetch failures, so the decision uses local tree-index search plus upstream GitHub source pages for the specific relevant paths."
+  },
+  "relevant_source_surfaces": [
+    {
+      "surface": "CK Tile fused MoE",
+      "paths": [
+        "projects/composablekernel/example/ck_tile/15_fused_moe",
+        "projects/composablekernel/include/ck_tile/ops/fused_moe"
+      ],
+      "what_exists": "Forward fused MoE block: MoE sorting plus two group-GEMMs, activation, top-k weighting, scatter/gather, atomic accumulation for the second GEMM, pre-shuffled weights, and micro-kernel pipeline.",
+      "backward_fit": "Not a ready training backward kernel. It is valuable as a forward schedule and layout/packing reference, but it does not expose dW1/dW2/dW3, dX, SwiGLU backward, top-k/router-weight gradients, or combine/dispatch backward as a public backward API.",
+      "primary_urls": [
+        "https://github.com/ROCm/rocm-libraries/tree/main/projects/composablekernel/example/ck_tile/15_fused_moe",
+        "https://github.com/ROCm/rocm-libraries/tree/develop/projects/composablekernel/example/ck_tile/15_fused_moe"
+      ]
+    },
+    {
+      "surface": "CK Tile MoE sorting",
+      "paths": [
+        "projects/composablekernel/example/ck_tile/13_moe_sorting"
+      ],
+      "what_exists": "Rearranges token top-k expert assignments into expert-contiguous token/weight lists for efficient expert GEMM.",
+      "backward_fit": "Useful for forward dispatch layout and possibly backward expert grouping, but it is not a complete autograd-safe MORI dispatch/combine backward.",
+      "primary_urls": [
+        "https://github.com/ROCm/rocm-libraries/tree/develop/projects/composablekernel/example/ck_tile/13_moe_sorting"
+      ]
+    },
+    {
+      "surface": "CK grouped GEMM and grouped GEMM multi-D",
+      "paths": [
+        "projects/composablekernel/client_example/22_grouped_gemm",
+        "projects/composablekernel/example/ck_tile/17_grouped_gemm",
+        "projects/composablekernel/example/15_grouped_gemm",
+        "projects/composablekernel/example/59_grouped_gemm_multi_ABD"
+      ],
+      "what_exists": "Generic grouped GEMM examples/APIs for multiple independent GEMMs with different shapes, including fixed-NK examples and fused elementwise/multi-D variants.",
+      "backward_fit": "Best reusable ROCm-library substrate for MoE training math. Can express per-expert dgrad and wgrad GEMMs if we provide packed per-expert activations/gradients and choose efficient layouts. It will not by itself compute SwiGLU backward, router/top-k gradients, or dispatch/combine gradients.",
+      "primary_urls": [
+        "https://github.com/ROCm/rocm-libraries/tree/main/projects/composablekernel/example/ck_tile/17_grouped_gemm",
+        "https://github.com/ROCm/rocm-libraries/tree/develop/projects/composablekernel/client_example/22_grouped_gemm"
+      ]
+    },
+    {
+      "surface": "CK FlatMM / MoE FlatMM",
+      "paths": [
+        "projects/composablekernel/example/ck_tile/18_flatmm",
+        "projects/composablekernel/include/ck_tile/ops/flatmm"
+      ],
+      "what_exists": "Flat/preshuffled GEMM variants, including grouped and MoE flatmm examples.",
+      "backward_fit": "Potentially relevant for pre-shuffled expert-weight layouts and ragged expert GEMM efficiency. It is not a turnkey MoE backward implementation.",
+      "primary_urls": [
+        "https://github.com/ROCm/rocm-libraries/tree/develop/projects/composablekernel/example/ck_tile/18_flatmm"
+      ]
+    },
+    {
+      "surface": "hipBLASLt grouped GEMM extension",
+      "paths": [
+        "projects/hipblaslt/clients/samples/16_gemm_grouped_ext",
+        "projects/hipblaslt/clients/samples/17_fixed_mk_gemm_grouped_ext",
+        "projects/hipblaslt/clients/bench"
+      ],
+      "what_exists": "GroupedGemm extension API and grouped-GEMM samples using per-group problem descriptors and device UserArguments.",
+      "backward_fit": "Good benchmark substrate for plain per-expert dgrad/wgrad contractions. Less attractive for fused training VJP because elementwise SwiGLU/router/combine logic remains outside the GEMM call.",
+      "primary_urls": [
+        "https://github.com/ROCm/rocm-libraries/tree/main/projects/hipblaslt/clients/samples",
+        "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/16_hipblaslt_groupedgemm_ext/sample_hipblaslt_groupedgemm_ext.cpp",
+        "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/17_hipblaslt_groupedgemm_fixed_mk_ext/sample_hipblaslt_groupedgemm_fixed_mk_ext.cpp"
+      ]
+    },
+    {
+      "surface": "hipBLASLt gradient epilogues",
+      "paths": [
+        "projects/hipblaslt/clients/samples/11_gemm_bgradb",
+        "projects/hipblaslt/clients/samples/12_gemm_dgelu_bgrad"
+      ],
+      "what_exists": "Dense GEMM epilogue samples for bias gradient and dGELU+bias-gradient.",
+      "backward_fit": "Useful precedent that hipBLASLt supports some backward-style epilogues, but not DSv4 SwiGLU MoE backward and not ragged grouped expert routing."
+    }
+  ],
+  "tree_index_negative_check": {
+    "command": "git -C /tmp/rocm-libraries ls-tree -r --name-only HEAD | rg -i 'moe.*(bwd|backward|grad)|((bwd|backward|grad).*moe)|fused_moe.*(bwd|backward|grad)|moe.*wgrad|moe.*dgrad'",
+    "result": "no path matches in the tree index"
+  },
+  "decision": {
+    "has_turnkey_moe_training_backward": false,
+    "best_near_term_candidate": "Benchmark CK Tile grouped/flat GEMM or hipBLASLt GroupedGemm for owner-rank per-expert dgrad/wgrad contractions at our EP8 shape, then integrate only if it beats the padded PyTorch/Triton-SwiGLU owner-rank VJP baseline.",
+    "not_enough_by_itself": [
+      "CK Tile fused_moe forward path",
+      "hipBLASLt grouped GEMM alone",
+      "hipBLASLt dGELU/bias-gradient epilogues"
+    ]
+  },
+  "amd_mapping": {
+    "current_wall": "MoE backward GEMM/BMM-family work dominates the non-attention backward remainder. Current owner-rank VJP evidence is about 7.50 ms padded torch, 6.43 ms with Triton SwiGLU, 5.39 ms ideal saved gate/up/hidden, and 4.77 ms ideal saved compact expert output.",
+    "work_to_port_or_build": [
+      "Use ROCm grouped GEMM as a math backend for W2 dgrad, W1/W3 xgrad, and W1/W2/W3 wgrad over ragged per-expert token counts.",
+      "Keep MORI dispatch/combine backward and router/top-k gradients in the TorchTitan autograd shell until a fused backward exists.",
+      "Fuse or inline SwiGLU backward around grouped GEMM boundaries; generic grouped GEMM will not solve that part alone.",
+      "Test CK Tile fused_moe/flatmm schedules as layout and micro-kernel references for a custom training backward path."
+    ],
+    "first_probe": "Build a benchmark-only grouped-GEMM owner-rank VJP probe for the existing DSv4 EP8 shape before touching TorchTitan integration."
+  }
+}

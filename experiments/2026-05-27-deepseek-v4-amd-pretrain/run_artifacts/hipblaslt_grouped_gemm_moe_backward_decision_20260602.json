@@ -1,0 +1,69 @@
+{
+  "artifact": "hipblaslt_grouped_gemm_moe_backward_decision_20260602",
+  "bf16_result": {
+    "error": "RuntimeError: hipBLASLt returned no GroupedGemm solution",
+    "read": "This ROCm 7.2.2 hipBLASLt GroupedGemm extension path does not expose a usable BF16 solution for the tested row-major A @ B.T owner-rank shape, even at a small control shape.",
+    "small_shape_command": "python tools/dsv4_runtime_probe/probe_hipblaslt_grouped_gemm_owner_shape.py --dtype bfloat16 --tokens-per-rank 512 --hidden 1024 --intermediate 512 --stages forward_gate --warmup 1 --iters 3 --summary-path run_artifacts/hipblaslt_grouped_gemm_owner_shape_bf16_small_smoke_20260602.json",
+    "small_shape_status": "failed_no_groupedgemm_solution",
+    "target_shape_command": "python tools/dsv4_runtime_probe/probe_hipblaslt_grouped_gemm_owner_shape.py --stages forward_gate --warmup 1 --iters 3 --summary-path run_artifacts/hipblaslt_grouped_gemm_owner_shape_forward_gate_smoke_20260602.json",
+    "target_shape_status": "failed_no_groupedgemm_solution"
+  },
+  "created_at": "2026-06-02",
+  "decision": {
+    "next_moe_backend_lever": "Do not wire hipBLASLt GroupedGemm into TorchTitan. Continue with CK Tile/TileLang/custom grouped-training-GEMM direction, preserving the current padded torch/Triton-SwiGLU owner-rank VJP as the baseline until a backend beats 6.43 ms or the 4.77 ms saved-output upper bound.",
+    "scope_correction": "The MoE backend can target the MoE slice of the 36.17 ms bucket, not attention sparse-MLA/LI Cijk or dense attention projection Cijk.",
+    "use_hipblaslt_groupedgemm_for_moe_backward_now": false,
+    "why": "No BF16 grouped solution in the active ROCm image for the tested shape, and the FP16 grouped solution is much slower than torch.bmm."
+  },
+  "environment": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "exact_full_backward_cijk_split_artifact": "run_artifacts/single_layer_backward_gemm_bucket_split_20260602.json",
+  "fp16_control": {
+    "a_shape": [
+      32,
+      816,
+      4096
+    ],
+    "artifact": "run_artifacts/hipblaslt_grouped_gemm_owner_shape_forward_gate_fp16_smoke_20260602.json",
+    "b_shape": [
+      32,
+      2048,
+      4096
+    ],
+    "hipblaslt_grouped_median_ms": 5.069951057434082,
+    "hipblaslt_grouped_tflops_median": 86.40846020586972,
+    "kernel_name": "Cijk_Alik_Bljk_HHS_BH_Bias_HA_S_SAV_UserArgs_MT16x16x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_GRVWB4_GSUAMB_GLS0_ISA950_IU1_K1_LDSTI0_LBSPPA128_LBSPPB128_LBSPPM0_LPA4_LPB4_LPM0_LRVW4_LWPMn1_MIAV0_MIWT1_1_MO40_NTn1_NTA0_NTB0_NTC0_NTD0_NTM0_NEPBS16_NLCA1_NLCB1_ONLL1_PGR2_PLR1_PKA1_SIA3_SS0_SPO0_SRVW4_SSO0_SVW4_SK0_SKFTR0_SKXCCM0_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA1_WSGRB1_WS64_WG16_4_1",
+    "out_shape": [
+      32,
+      816,
+      2048
+    ],
+    "read": "FP16 proves the binding and library call path work, but the selected grouped kernel is about 9.5x slower than torch.bmm for this contraction, so it is not a promising fallback even aside from BF16.",
+    "solution_name": "Cijk_Alik_Bljk_HHS_BH_Bias_GG_HA_S_SAV_UserArgs_MT16x16x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_GRVWB4_GSU1_GSUAMB_GSUC0_GSUWGMRR0_GLS0_ISA950_IU1_K1_LDSTI0_LBSPPA128_LBSPPB128_LBSPPM0_LPA4_LPB4_LPM0_LRVW4_LWPMn1_MIAV0_MIWT1_1_MO40_NTn1_NTA0_NTB0_NTC0_NTD0_NTM0_NEPBS16_NLCA1_NLCB1_ONLL1_PGR2_PLR1_PKA1_SIA3_SS0_SU0_SUM0_SUS64_SPO0_SRVW4_SSO0_SVW4_SK0_SKFTR0_SKXCCM0_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA1_WSGRB1_WS64_WG16_4_1_WGM1_WGMXCC1_WGMXCCGn1",
+    "speedup_vs_torch": 0.10524125747780994,
+    "stage": "forward_gate",
+    "torch_bmm_median_ms": 0.5335680246353149,
+    "torch_bmm_tflops_median": 821.0511949088874,
+    "workspace_bytes": 7680
+  },
+  "full_backward_cijk_context": {
+    "attention_cijk_ms": 9.579737000000002,
+    "bucket_ms": 36.16602900000001,
+    "moe_cijk_ms": 26.586292,
+    "read": "The 36.17 ms full-backward Cijk bucket is mostly MoE routed-expert VJP in the old single-GPU packed-sim trace, but the EP8 owner-rank VJP probe is a different distributed shape and should not be compared to the whole bucket.",
+    "routed_moe_expert_vjp_cijk_ms": 25.453129,
+    "sparse_mla_backward_cijk_ms": 4.889395
+  },
+  "probe_scope": "Benchmark-only raw grouped A @ B.T GEMM floor after operands are packed; excludes routing, SwiGLU, combine, top-k/router gradients, and token reduce.",
+  "probe_script": "tools/dsv4_runtime_probe/probe_hipblaslt_grouped_gemm_owner_shape.py",
+  "question": "Can ROCm hipBLASLt GroupedGemm be used/ported as the next backend for the MoE backward GEMM/BMM-family wall?",
+  "source_scan_artifact": "run_artifacts/rocm_libraries_moe_backward_source_scan_20260602.json",
+  "sources_checked": [
+    "https://github.com/ROCm/rocm-libraries/tree/main/projects/hipblaslt/clients/samples",
+    "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/16_hipblaslt_groupedgemm_ext/sample_hipblaslt_groupedgemm_ext.cpp",
+    "https://raw.githubusercontent.com/ROCm/rocm-libraries/develop/projects/hipblaslt/clients/samples/17_hipblaslt_groupedgemm_fixed_mk_ext/sample_hipblaslt_groupedgemm_fixed_mk_ext.cpp"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 966.1329956054688,
+    "dkv_atol": 0.75,
+    "max_abs_diff": 3.0517578125e-05,
+    "mean_abs_diff": 4.402050706175942e-07,
+    "passed": true,
+    "reference_norm": 966.1329956054688
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This diagnostic handles only the compressed prefix route. It uses forward lse/output to recompute per-group probabilities, aggregates block_rows token-head contributions locally, then atomic-adds one D block per compressed group. It tests whether reducing dKV atomic granularity is a promising direction before building a production sparse MLA/LI/compressor fused backward.",
+  "scope": "sparse_mla_shared_latent_kv_compressed_dkv_group_reduce_probe",
+  "seed": 1234,
+  "shape": {
+    "atomic_elements_upper_bound": 1048576,
+    "atomic_vectors_upper_bound": 16384,
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "materialized_probs_fp32_gib": 0.0009765625,
+    "materialized_shared_selected_kv_fp32_gib": 0.0078125,
+    "seq_len": 128
+  },
+  "status": "passed",
+  "tile": {
+    "block_d": 64,
+    "block_rows": 128,
+    "d_blocks": 8,
+    "dot_block_d": 64,
+    "row_blocks_max": 64
+  },
+  "timing": {
+    "triton_compressed_dkv_group_reduce": {
+      "checksum_norm": 966.1329956054688,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.5692049860954285,
+        "mean_ms": 0.5634054839611053,
+        "median_ms": 0.5634054839611053,
+        "min_ms": 0.5576059818267822,
+        "samples_ms": [
+          0.5692049860954285,
+          0.5576059818267822
+        ],
+        "stdev_ms": 0.008201734573371467
+      },
+      "label": "triton_compressed_dkv_group_reduce",
+      "peak_memory_allocated_bytes": 105415680,
+      "peak_memory_allocated_gib": 0.0981760025024414,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.6049479125067592,
+        "mean_ms": 0.5896724760532379,
+        "median_ms": 0.5896724760532379,
+        "min_ms": 0.5743970395997167,
+        "samples_ms": [
+          0.6049479125067592,
+          0.5743970395997167
+        ],
+        "stdev_ms": 0.021602729403738127
+      }
+    }
+  }
+}

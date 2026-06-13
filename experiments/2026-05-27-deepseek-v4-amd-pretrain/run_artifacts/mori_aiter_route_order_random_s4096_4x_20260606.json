@@ -1,0 +1,752 @@
+{
+  "all_ranks_grouped_by_local_expert": false,
+  "artifact": "mori_aiter_route_order_probe",
+  "ranks": [
+    {
+      "expert_start": 0,
+      "expert_stop": 64,
+      "local_rank": 0,
+      "ok": true,
+      "rank": 0,
+      "recv_count": 13431,
+      "route_order": {
+        "already_grouped_by_local_expert": false,
+        "assignments": 24359,
+        "first_local_experts": [
+          14,
+          1,
+          5,
+          15,
+          4,
+          12,
+          54,
+          18,
+          45,
+          30,
+          28,
+          52,
+          42,
+          16,
+          11,
+          54,
+          26,
+          59,
+          63,
+          56,
+          25,
+          32,
+          35,
+          25,
+          63,
+          48,
+          63,
+          22,
+          54,
+          14,
+          9,
+          49
+        ],
+        "first_token_route_pairs": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            5,
+            1
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            10,
+            2
+          ],
+          [
+            10,
+            5
+          ],
+          [
+            11,
+            0
+          ],
+          [
+            11,
+            1
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            12,
+            4
+          ],
+          [
+            13,
+            3
+          ],
+          [
+            14,
+            0
+          ],
+          [
+            14,
+            1
+          ],
+          [
+            14,
+            3
+          ],
+          [
+            15,
+            2
+          ],
+          [
+            15,
+            5
+          ],
+          [
+            16,
+            0
+          ],
+          [
+            16,
+            1
+          ]
+        ],
+        "max_count": 438,
+        "mean_count_per_expert": 380.609375,
+        "min_count_nonzero": 344,
+        "nonempty_experts": 64,
+        "runs": 24159,
+        "runs_per_nonempty_expert": 377.484375
+      }
+    },
+    {
+      "expert_start": 64,
+      "expert_stop": 128,
+      "local_rank": 1,
+      "ok": true,
+      "rank": 1,
+      "recv_count": 13629,
+      "route_order": {
+        "already_grouped_by_local_expert": false,
+        "assignments": 24739,
+        "first_local_experts": [
+          13,
+          52,
+          22,
+          14,
+          23,
+          31,
+          49,
+          25,
+          61,
+          52,
+          50,
+          32,
+          15,
+          8,
+          36,
+          32,
+          60,
+          54,
+          18,
+          58,
+          38,
+          23,
+          51,
+          39,
+          21,
+          8,
+          26,
+          53,
+          50,
+          19,
+          59,
+          15
+        ],
+        "first_token_route_pairs": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            5
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            5,
+            1
+          ],
+          [
+            5,
+            4
+          ],
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            2
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            8,
+            2
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            10,
+            4
+          ],
+          [
+            10,
+            5
+          ],
+          [
+            11,
+            1
+          ],
+          [
+            11,
+            2
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            12,
+            0
+          ],
+          [
+            13,
+            0
+          ],
+          [
+            14,
+            1
+          ],
+          [
+            15,
+            1
+          ],
+          [
+            15,
+            4
+          ],
+          [
+            15,
+            5
+          ]
+        ],
+        "max_count": 421,
+        "mean_count_per_expert": 386.546875,
+        "min_count_nonzero": 337,
+        "nonempty_experts": 64,
+        "runs": 24531,
+        "runs_per_nonempty_expert": 383.296875
+      }
+    },
+    {
+      "expert_start": 128,
+      "expert_stop": 192,
+      "local_rank": 2,
+      "ok": true,
+      "rank": 2,
+      "recv_count": 13481,
+      "route_order": {
+        "already_grouped_by_local_expert": false,
+        "assignments": 24478,
+        "first_local_experts": [
+          31,
+          12,
+          7,
+          46,
+          1,
+          62,
+          50,
+          35,
+          39,
+          58,
+          63,
+          54,
+          51,
+          15,
+          10,
+          6,
+          9,
+          27,
+          2,
+          11,
+          9,
+          3,
+          53,
+          13,
+          45,
+          2,
+          18,
+          51,
+          36,
+          8,
+          2,
+          39
+        ],
+        "first_token_route_pairs": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            5
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            6,
+            2
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            9,
+            2
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            10,
+            1
+          ],
+          [
+            11,
+            4
+          ],
+          [
+            12,
+            0
+          ],
+          [
+            13,
+            0
+          ],
+          [
+            14,
+            0
+          ],
+          [
+            15,
+            0
+          ],
+          [
+            15,
+            1
+          ],
+          [
+            15,
+            2
+          ]
+        ],
+        "max_count": 422,
+        "mean_count_per_expert": 382.46875,
+        "min_count_nonzero": 336,
+        "nonempty_experts": 64,
+        "runs": 24265,
+        "runs_per_nonempty_expert": 379.140625
+      }
+    },
+    {
+      "expert_start": 192,
+      "expert_stop": 256,
+      "local_rank": 3,
+      "ok": true,
+      "rank": 3,
+      "recv_count": 13567,
+      "route_order": {
+        "already_grouped_by_local_expert": false,
+        "assignments": 24728,
+        "first_local_experts": [
+          58,
+          21,
+          14,
+          50,
+          31,
+          43,
+          33,
+          63,
+          3,
+          12,
+          16,
+          13,
+          55,
+          38,
+          46,
+          58,
+          31,
+          52,
+          10,
+          52,
+          53,
+          49,
+          42,
+          32,
+          22,
+          0,
+          52,
+          34,
+          21,
+          11,
+          37,
+          31
+        ],
+        "first_token_route_pairs": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            1,
+            3
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            5
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            5,
+            1
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            6,
+            2
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            10,
+            1
+          ],
+          [
+            10,
+            5
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            12,
+            0
+          ],
+          [
+            12,
+            1
+          ],
+          [
+            12,
+            2
+          ],
+          [
+            13,
+            0
+          ],
+          [
+            13,
+            1
+          ],
+          [
+            14,
+            1
+          ],
+          [
+            14,
+            2
+          ],
+          [
+            14,
+            3
+          ],
+          [
+            15,
+            0
+          ]
+        ],
+        "max_count": 425,
+        "mean_count_per_expert": 386.375,
+        "min_count_nonzero": 324,
+        "nonempty_experts": 64,
+        "runs": 24518,
+        "runs_per_nonempty_expert": 383.09375
+      }
+    }
+  ],
+  "read": "Checks whether MORI dispatch already returns local owner routes in grouped expert order. If false, owner VJP still needs an explicit local route pack/sort before grouped GEMM. If true, a guarded sort-skip fast path is worth testing.",
+  "runtime": {
+    "block_num": 64,
+    "max_total_recv_tokens": 0,
+    "rdma_block_num": 32,
+    "route_order_only": true,
+    "warp_num_per_block": 8
+  },
+  "shape": {
+    "dtype": "torch.bfloat16",
+    "experts": 256,
+    "hidden": 4096,
+    "local_experts": 64,
+    "tokens_per_rank": 4096,
+    "topk": 6,
+    "topk_pattern": "random",
+    "world_size": 4
+  }
+}

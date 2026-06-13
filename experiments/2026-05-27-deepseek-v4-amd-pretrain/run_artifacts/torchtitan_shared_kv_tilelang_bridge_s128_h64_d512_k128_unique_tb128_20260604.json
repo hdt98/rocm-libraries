@@ -1,0 +1,58 @@
+{
+  "backend_path": "/workspace/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": null,
+    "tilelang_block_k": null,
+    "tilelang_group_panel_size": null,
+    "tilelang_panel_capacity": null,
+    "tilelang_threads": null,
+    "tilelang_token_block": "128"
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "The TileLang mode still materializes probs/grad_logits and performs route planning inside backward."
+  ],
+  "parity": {
+    "dkv_compressed_candidate_max_abs": 6.3125,
+    "dkv_compressed_max_abs": 0.03125,
+    "dkv_compressed_mean_abs": 0.0018933216342702508,
+    "dkv_compressed_ref_max_abs": 6.3125,
+    "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.00390625,
+    "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": 1.2394593795761466e-07,
+    "dkv_local_max_abs": 0.0009765625,
+    "dkv_max_abs": 0.03125,
+    "dkv_mean_abs": 0.0009466723422519863,
+    "dq_max_abs": 0.0,
+    "dsink_max_abs": 0.0,
+    "tilelang_bf16_ref_vs_explicit_ref_max_abs": 0.03125,
+    "tilelang_bf16_ref_vs_explicit_ref_mean_abs": 0.0018932395614683628
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 128,
+    "dim": 512,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 16,
+    "selected": 144,
+    "seq_len": 128
+  },
+  "timing": {
+    "explicit_pytorch": {
+      "median_ms": 0.6060460209846497,
+      "times_ms": [
+        0.6060460209846497
+      ]
+    },
+    "explicit_tilelang_dkv": {
+      "median_ms": 151.0694122314453,
+      "times_ms": [
+        151.0694122314453
+      ]
+    }
+  }
+}

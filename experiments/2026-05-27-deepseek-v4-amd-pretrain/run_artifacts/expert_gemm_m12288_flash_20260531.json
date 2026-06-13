@@ -1,0 +1,310 @@
+{
+  "blas_backend_effective": "Cublaslt",
+  "blas_backend_request": "current",
+  "experts": 1,
+  "layout": "actual",
+  "max_tuning_duration_ms": 1,
+  "max_tuning_iters": 1,
+  "ops": [
+    {
+      "a_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          4096
+        ],
+        "stride": [
+          50331648,
+          4096,
+          1
+        ]
+      },
+      "a_shape": [
+        1,
+        12288,
+        4096
+      ],
+      "b_meta": {
+        "is_contiguous": false,
+        "shape": [
+          1,
+          4096,
+          2048
+        ],
+        "stride": [
+          8388608,
+          1,
+          4096
+        ]
+      },
+      "b_shape": [
+        1,
+        4096,
+        2048
+      ],
+      "dtype": "bfloat16",
+      "flops": 206158430208.0,
+      "layout": "actual",
+      "op": "fwd_w1",
+      "tflops_median": 1301.4888419819654,
+      "timings": {
+        "fwd_w1_ms_max": 0.19400200247764587,
+        "fwd_w1_ms_mean": 0.16639380156993866,
+        "fwd_w1_ms_median": 0.1584019958972931,
+        "fwd_w1_ms_min": 0.15616099536418915
+      }
+    },
+    {
+      "a_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          4096
+        ],
+        "stride": [
+          50331648,
+          4096,
+          1
+        ]
+      },
+      "a_shape": [
+        1,
+        12288,
+        4096
+      ],
+      "b_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          4096,
+          2048
+        ],
+        "stride": [
+          8388608,
+          2048,
+          1
+        ]
+      },
+      "b_shape": [
+        1,
+        4096,
+        2048
+      ],
+      "dtype": "bfloat16",
+      "flops": 206158430208.0,
+      "layout": "actual",
+      "op": "w2_dgrad",
+      "tflops_median": 1265.0705346130135,
+      "timings": {
+        "w2_dgrad_ms_max": 0.1839209944009781,
+        "w2_dgrad_ms_mean": 0.16759360134601592,
+        "w2_dgrad_ms_median": 0.16296200454235077,
+        "w2_dgrad_ms_min": 0.16228200495243073
+      }
+    },
+    {
+      "a_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          2048
+        ],
+        "stride": [
+          25165824,
+          2048,
+          1
+        ]
+      },
+      "a_shape": [
+        1,
+        12288,
+        2048
+      ],
+      "b_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          2048,
+          4096
+        ],
+        "stride": [
+          8388608,
+          4096,
+          1
+        ]
+      },
+      "b_shape": [
+        1,
+        2048,
+        4096
+      ],
+      "dtype": "bfloat16",
+      "flops": 412316860416.0,
+      "layout": "actual",
+      "op": "w1w3_xgrad",
+      "tflops_median": 1252.3177561965404,
+      "timings": {
+        "w1w3_xgrad_ms_max": 0.3515230119228363,
+        "w1w3_xgrad_ms_mean": 0.3317710041999817,
+        "w1w3_xgrad_ms_median": 0.329243004322052,
+        "w1w3_xgrad_ms_min": 0.31980299949645996
+      }
+    },
+    {
+      "a_meta": {
+        "is_contiguous": false,
+        "shape": [
+          1,
+          4096,
+          12288
+        ],
+        "stride": [
+          50331648,
+          1,
+          4096
+        ]
+      },
+      "a_shape": [
+        1,
+        4096,
+        12288
+      ],
+      "b_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          2048
+        ],
+        "stride": [
+          25165824,
+          2048,
+          1
+        ]
+      },
+      "b_shape": [
+        1,
+        12288,
+        2048
+      ],
+      "dtype": "bfloat16",
+      "flops": 206158430208.0,
+      "layout": "actual",
+      "op": "w2_wgrad",
+      "tflops_median": 1146.3308663459354,
+      "timings": {
+        "w2_wgrad_ms_max": 0.20328199863433838,
+        "w2_wgrad_ms_mean": 0.18536199927330016,
+        "w2_wgrad_ms_median": 0.1798419952392578,
+        "w2_wgrad_ms_min": 0.17964200675487518
+      }
+    },
+    {
+      "a_meta": {
+        "is_contiguous": false,
+        "shape": [
+          1,
+          2048,
+          12288
+        ],
+        "stride": [
+          25165824,
+          1,
+          2048
+        ]
+      },
+      "a_shape": [
+        1,
+        2048,
+        12288
+      ],
+      "b_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          4096
+        ],
+        "stride": [
+          50331648,
+          4096,
+          1
+        ]
+      },
+      "b_shape": [
+        1,
+        12288,
+        4096
+      ],
+      "dtype": "bfloat16",
+      "flops": 206158430208.0,
+      "layout": "actual",
+      "op": "w1_wgrad",
+      "tflops_median": 1143.7868416273307,
+      "timings": {
+        "w1_wgrad_ms_max": 0.18752199411392212,
+        "w1_wgrad_ms_mean": 0.18269000053405762,
+        "w1_wgrad_ms_median": 0.18024200201034546,
+        "w1_wgrad_ms_min": 0.17992199957370758
+      }
+    },
+    {
+      "a_meta": {
+        "is_contiguous": false,
+        "shape": [
+          1,
+          2048,
+          12288
+        ],
+        "stride": [
+          25165824,
+          1,
+          2048
+        ]
+      },
+      "a_shape": [
+        1,
+        2048,
+        12288
+      ],
+      "b_meta": {
+        "is_contiguous": true,
+        "shape": [
+          1,
+          12288,
+          4096
+        ],
+        "stride": [
+          50331648,
+          4096,
+          1
+        ]
+      },
+      "b_shape": [
+        1,
+        12288,
+        4096
+      ],
+      "dtype": "bfloat16",
+      "flops": 206158430208.0,
+      "layout": "actual",
+      "op": "w3_wgrad",
+      "tflops_median": 1146.3372301412232,
+      "timings": {
+        "w3_wgrad_ms_max": 0.1844010055065155,
+        "w3_wgrad_ms_mean": 0.1800092041492462,
+        "w3_wgrad_ms_median": 0.17984099686145782,
+        "w3_wgrad_ms_min": 0.1761610060930252
+      }
+    }
+  ],
+  "tokens": 12288,
+  "tokens_per_group": 12288,
+  "topk": 1,
+  "tunable_enabled": false,
+  "tunable_file": null,
+  "tuning_enabled": false
+}

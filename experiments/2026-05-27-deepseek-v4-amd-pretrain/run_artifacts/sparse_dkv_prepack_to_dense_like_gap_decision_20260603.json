@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-03",
+  "question": "If actual-LI route prepacking is cheap, why is sparse compressed dKV not dense-like yet?",
+  "short_answer": "Prepacking solves the metadata problem, not the output-tile ownership and accumulator-body problem. Dense attention is fast because a GEMM-like schedule owns an output tile and reduces contributions inside that tile. The current sparse producer is query-major and fast for contribution math, but each contribution still targets an indirect compressed group. Naive attempts to make compressed groups own the output tile either lose query-major MFMA reuse, introduce per-contribution LDS/table traffic, or write/read compact partial slabs. The next viable kernel must graft grouped or segmented accumulation onto the fast query-major producer before global writes.",
+  "current_baseline": {
+    "shape": "DeepSeek-V4 actual LI hard layer-2 route, S=4096, compressed_ratio=4, compressed_groups=1024, topk_groups_per_token=512, heads=64, d=512",
+    "raw_selected_pairs": 1572352,
+    "estimated_scalar_dkv_atomic_add_elements": 805306368,
+    "retained_sparse_atomic_wall_ms": {
+      "range": [8.0, 8.8],
+      "same_tuple_median_ms": 8.007,
+      "artifact": "actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json"
+    },
+    "mechanism_split_ms": {
+      "dkv_dot_math_only": 0.79,
+      "full_dkv_atomic_accumulation": 8.21,
+      "read": "The expensive part is not the dot contribution itself; it is the many-to-one indirect accumulation/writeback."
+    }
+  },
+  "prepack_result": {
+    "status": "positive_metadata_gate",
+    "pack_median_ms": [0.52, 0.54],
+    "metadata_walk_ms": 0.02,
+    "one_d_scalar_input_walk_ms": [0.58, 0.68],
+    "best_practical_bringup": {
+      "token_block": 32,
+      "group_panel": 256,
+      "modeled_write_reduction_x": 23.81,
+      "k16_fill": 0.958,
+      "route_workspace_mib_int32": 12.0
+    },
+    "higher_reduction_followup": {
+      "token_block": 64,
+      "group_panel": 256,
+      "modeled_write_reduction_x": 47.25
+    },
+    "read": "The route can be sorted or segmented cheaply enough. Route metadata is no longer the suspected wall."
+  },
+  "why_dense_attention_is_different": {
+    "dense_backward": [
+      "dV = P^T dO",
+      "dK = dS^T Q"
+    ],
+    "dense_schedule_property": "A CTA/wave/GEMM tile owns an output tile such as dV[n,d] or dK[n,d] and reduces over the query dimension before a final write.",
+    "sparse_backward_math": "dKV[g,d] = sum_{t,h,j: top_index[t,j]=g} grad_logits[t,h,j] * q[t,h,d] * scale + probs[t,h,j] * dO[t,h,d]",
+    "sparse_schedule_problem": "The fast loop is naturally query-major over (token, head, selected slot), while the output is compressed-group-major over g. Without an in-tile segmented reduction, every selected slot becomes an indirect atomic add into dKV[g,d]."
+  },
+  "closed_branches": [
+    {
+      "branch": "detached_raw_scatteradd",
+      "best_or_representative_s4096_ms": 9.98,
+      "why_rejected": "It exposes a clean Scatter stage but forces an HBM round trip for partials, then still performs global atomic accumulation."
+    },
+    {
+      "branch": "compact_partial_store_inside_fast_triton_producer",
+      "best_or_representative_s4096_ms": 8.364,
+      "why_rejected": "It preserves the fast producer but still does one partial update per valid selected contribution and then reads the compact slab back for index_add. It is useful contract evidence, not a speedup over the 8.007 ms sparse-atomic gate."
+    },
+    {
+      "branch": "pairslot_LDS_reduced_atomic",
+      "best_or_representative_s4096_ms": 18.28,
+      "why_rejected": "It gets 23-47x modeled global-write reduction, but runtime stays flat and slow because the body is dominated by per-contribution LDS/table work and active-slot initialization/emission."
+    },
+    {
+      "branch": "pairslot_compact_partial_emit_plus_index_add",
+      "best_or_representative_s4096_ms": 18.31,
+      "why_rejected": "Switching final global atomics to compact partial rows does not fix the producer/local accumulation body."
+    },
+    {
+      "branch": "row_leader_K16_local_coalescing",
+      "best_or_representative_s4096_ms": 133.18,
+      "why_rejected": "K16-local duplicate coalescing is too weak at S4096 and preserves almost all global atomics while adding leader-scan overhead."
+    },
+    {
+      "branch": "persistent_local_grouped_table",
+      "best_or_representative_s4096_ms": 131.23,
+      "why_rejected": "Persistent/local grouped accumulation loses the fast producer shape and pays too much table/schedule overhead."
+    },
+    {
+      "branch": "segment_owned_scalar_CTA",
+      "best_or_representative_s4096_ms": 44.58,
+      "why_rejected": "It realizes the 23.81x write reduction, but recomputes H64 contribution math scalar inside group segments. Segment metadata is good; segment-owned scalar production is not."
+    },
+    {
+      "branch": "panel_owned_D16_contribution_sink",
+      "best_or_representative_s4096_ms": [111.0, 130.0],
+      "why_rejected": "Owning the producer by token/group panel is fine at S128/S512 but collapses at S4096 even without dKV writes. It loses query-major contribution efficiency."
+    },
+    {
+      "branch": "small_hot_group_table_plus_tail_atomics",
+      "best_or_representative_s4096_reduction_x": {
+        "hot_256": 1.96,
+        "hot_512": 4.81
+      },
+      "why_rejected": "A small top-N table does not capture enough groups for layer-2 actual LI. Useful reduction requires hot-768 to hot-1024, which collapses back into the wide local-table problem."
+    }
+  ],
+  "promoted_next_kernel": {
+    "name": "query_major_segmented_mfma_dkv_producer_v1",
+    "contract": [
+      "Consume actual LI route prepacked by seq tile and compressed-group segment.",
+      "Keep the fast query-major contribution loop and MFMA/Triton-style dot schedule for grad_logits^T q and probs^T dO.",
+      "Within the producer tile, group repeated compressed-group destinations with lane/warp/block segmented reduction in registers or narrowly scoped shared memory.",
+      "Emit one compact partial row per (compressed_group, D16 block, producer tile) instead of one scalar atomic per (token, head, selected_slot, d).",
+      "Use the measured cheap rocPRIM-style reduce_by_key or equivalent final reducer for the remaining compact partial rows."
+    ],
+    "do_not_retry": [
+      "naive group-panel rescans",
+      "scalar group-owned recompute",
+      "wide dense active-slot LDS tables",
+      "per-contribution LDS atomic or per-contribution compact partial stores",
+      "global partial slab round trip as the main optimization"
+    ],
+    "promotion_gate_ms": {
+      "must_beat_sparse_atomic_wall_ms": [8.0, 8.8],
+      "producer_budget_if_reducer_is_1p1ms": [6.3, 7.0],
+      "stretch_producer_budget_for_old_sparse_backward_envelope_ms": [3.0, 4.0]
+    }
+  },
+  "decision": "Prepack is enough to justify the next implementation, but it does not by itself make the sparse path dense-like. The missing piece is an in-producer segmented accumulator that preserves query-major MFMA efficiency while reducing compressed-group writes before global memory."
+}

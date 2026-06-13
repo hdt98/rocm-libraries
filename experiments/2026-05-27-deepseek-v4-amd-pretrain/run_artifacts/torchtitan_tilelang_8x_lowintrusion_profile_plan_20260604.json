@@ -1,0 +1,95 @@
+{
+  "status": "deferred_gpu_busy",
+  "scope": "Planned 8xMI350 target-shape TileLang/MORI low-intrusion bottleneck profile",
+  "date": "2026-06-04",
+  "host": "do-sonle5-mi350-gpu",
+  "why_not_run_yet": {
+    "reason": "An unrelated TorchTitan Qwen3 FT job was actively using all eight MI350 GPUs during the profile window.",
+    "observed_process": "/opt/venv/bin/torchrun --nproc_per_node=8 -m torchtitan.experiments.ft.train --job.config_file /tmp/qwen3_32b_ft_2node.toml --training.steps=100",
+    "rocm_smi_read": "All eight GPUs showed active VRAM allocation and high utilization; this workload must not be interrupted without explicit approval."
+  },
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "checkpoint_enable": false
+  },
+  "target": {
+    "tflops_per_gpu": 277.0,
+    "tokens_per_gpu_s": 14640.28,
+    "node_tokens_s_8x": 117122.26,
+    "step_time_s": 4.48
+  },
+  "run_plan": {
+    "run_id": "torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "environment": {
+      "TARGET_HOST": "do-sonle5-mi350-gpu",
+      "REMOTE_ROOT": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+      "IMAGE": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+      "RUN_ID": "torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604",
+      "GPUS_PER_NODE": "8",
+      "CANARY_EP": "8",
+      "CANARY_GBS": "128",
+      "CANARY_STEPS": "3",
+      "CANARY_CHECKPOINT_ENABLE": "false",
+      "CANARY_ACTIVATION_CHECKPOINT_MODE": "full",
+      "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+      "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+      "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+      "CANARY_SHAREDKV_BACKWARD_MODE": "explicit_tilelang_dkv",
+      "CANARY_SHAREDKV_TILELANG_DKV_BACKEND": "selected_limit_hsk_bf16_scaled_source",
+      "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+      "CANARY_MOE_COMM_BACKEND": "mori",
+      "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "true",
+      "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+      "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+      "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+      "CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE": "registered",
+      "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+      "CANARY_PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+      "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+      "CANARY_DSV4_PROFILE_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/profile_timing",
+      "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/mori_timing",
+      "CANARY_DSV4_ADDITIVE_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/additive_timing.jsonl"
+    }
+  },
+  "expected_outputs": {
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604",
+    "profile_timing_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/profile_timing",
+    "mori_timing_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/mori_timing",
+    "additive_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling/additive_timing.jsonl"
+  },
+  "post_run_parsers": [
+    "ssh do-sonle5-mi350-gpu 'python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling --steady-after-call-id 0 --dsv4-steady-after-call-id 0 --pretty'",
+    "ssh do-sonle5-mi350-gpu 'python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run ep8=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_lowintrusion_profile_8x_s4096_gbs128_steps3_20260604/profiling --steady-after-call-id 0 --pretty'"
+  ],
+  "decision_gate": {
+    "primary_question": "Does the 8x target surface preserve the 4x ranking that MoE routed backward and AC recompute dominate while TileLang sparse attention is a secondary e2e lever?",
+    "promote_if": [
+      "The run completes at least three steps with finite loss and clean process-group teardown.",
+      "Step 2/3 TFLOPs are measured with intrusive torch profiler disabled.",
+      "MORI timing sidecars and additive timing files exist for all eight ranks."
+    ],
+    "interpretation_rules": [
+      "Use step 1 only as compile/warmup evidence.",
+      "Use steps 2 and 3 for throughput trend and memory growth.",
+      "If TileLang compiles only during step 1, classify compile as prewarm/cache work rather than steady-state wall.",
+      "If MoE combine_dx dominates but raw combine calls are small, treat it as arrival skew fed by local VJP tail."
+    ]
+  },
+  "current_best_related_evidence": {
+    "low_intrusion_4x_artifact": "run_artifacts/torchtitan_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_20260604.json",
+    "deep_4x_artifact": "run_artifacts/torchtitan_tilelang_deep_bottleneck_profile_4x_s4096_gbs64_20260604.json",
+    "selective_ac_failure_artifact": "run_artifacts/torchtitan_tilelang_selective_ac_failure_4x_s4096_gbs64_20260604.json",
+    "read": "The next run should verify the same ranking on EP8/FSDP8 before choosing between MoE VJP fusion, dX overlap, AC selective-save isolation, and more TileLang sparse-attention work."
+  },
+  "dependency_pin_changes": "none"
+}

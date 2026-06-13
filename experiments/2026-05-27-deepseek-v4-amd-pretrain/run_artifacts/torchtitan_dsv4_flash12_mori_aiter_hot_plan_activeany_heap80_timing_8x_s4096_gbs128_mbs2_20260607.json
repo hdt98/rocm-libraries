@@ -1,0 +1,108 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_hot_plan_activeany_heap80_timing_8x_s4096_gbs128_mbs2_20260607",
+    "comparison": {
+        "active_any_step1_vs_previous_step1_ratio": 0.0964,
+    "cached_cpu_topk_previous_step1_tokens_per_gpu_s": 1432,
+    "cached_cpu_topk_previous_step2_tokens_per_gpu_s": 3958
+  },
+  "date": "2026-06-07",
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_MORI_AITER_BALANCED_MOE_ACTIVE_ANY_PRUNE": "true",
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "route_mask",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": 2,
+    "CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS": 512,
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_PLAN_BACKEND": "cached_cpu_topk",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_stage1_recompute",
+    "CANARY_MORI_AITER_STAGE1_SHUFFLE_CACHE_SIZE": 12,
+    "CANARY_MORI_AITER_TIMING_PATH": "enabled",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "80G",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128"
+  },
+  "fwd_bwd_microbatch_ms": {
+    "count": 64,
+    "max_ms": 80345.32913693693,
+    "mean_ms": 59282.10497845248,
+    "median_ms": 56265.74469049228,
+    "min_ms": 56186.89256091602
+  },
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "interruption": "docker stopped after step 1 because throughput was far below baseline",
+    "read": "Active-any pruning did not materialize. The protocol smoke passes, and this e2e shape did prune some cached hot records, but the branch still kept enough plan/remote-mask/hot-split overhead that the run completed only step 1 at 138 tok/GPU/s / 6.97 TFLOPs/GPU before manual interruption. This rejects cached-plan plus active-any as a speed path and points back to fresh/bounded hot planning or a different helper execution contract, not more stale-cache skip logic.",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_aiter_hot_plan_activeany_heap80_timing_8x_s4096_gbs128_mbs2_20260607/docker-run.log",
+  "remote_timing_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_hot_plan_activeany_heap80_timing_8x_s4096_gbs128_mbs2_20260607/mori_timing",
+  "shape": {
+    "activation_checkpoint": "none",
+    "expert_parallel": 8,
+    "fsdp": 8,
+    "global_batch_size": 128,
+    "gpus": 8,
+    "micro_batch_size": 2,
+    "seq_len": 4096,
+    "steps_completed": 1,
+    "steps_requested": 2
+  },
+  "status": "rejected_interrupted_after_step1",
+    "step1_metric": {
+        "tflops_per_gpu": 6.97,
+        "tokens_per_gpu_s": 138.0
+    },
+  "timing_records": {
+    "active_any_all_pruned_records": 64,
+    "active_any_flags_counter": {
+      "(0, 0)": 64,
+      "(0, 1)": 24,
+      "(1, 0)": 8,
+      "(1, 1)": 768
+    },
+    "active_any_pruned_records": 96,
+    "active_any_records": 864,
+    "cache_hit_records": 768,
+    "cache_miss_records": 96,
+    "call_counts_by_rank": {
+      "0": 108,
+      "1": 108,
+      "2": 108,
+      "3": 108,
+      "4": 108,
+      "5": 108,
+      "6": 108,
+      "7": 108
+    },
+    "ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "records": 864,
+    "remote_rows": {
+      "count": 864,
+      "local_zero_but_global_kept_records": 36,
+      "local_zero_records": 100,
+      "max": 5718,
+      "mean": 1780.84375,
+      "median": 1751.5,
+      "min": 0
+    },
+    "stage_rankmax_total_ms": {
+      "forward.balanced_moe.execute.active_any": 127.56771746277809,
+      "forward.balanced_moe.execute.hot_split.broadcast_w1": 33.194446966052055,
+      "forward.balanced_moe.execute.hot_split.broadcast_w2": 22.796435952186584,
+      "forward.balanced_moe.execute.hot_split.broadcast_w3": 22.618358001112938,
+      "forward.balanced_moe.execute.hot_split.gather_remote": 35.73248454928398,
+      "forward.balanced_moe.execute.hot_split.grouped_rows": 76.86284571886063,
+      "forward.balanced_moe.execute.hot_split.scatter_tokens": 7.064623020589352,
+      "forward.balanced_moe.execute.hot_split.sort_counts": 855.0082927495241,
+      "forward.balanced_moe.execute.plan": 9991.487435311545,
+      "forward.balanced_moe.execute.remote_mask": 501.6391317397356
+    }
+  }
+}

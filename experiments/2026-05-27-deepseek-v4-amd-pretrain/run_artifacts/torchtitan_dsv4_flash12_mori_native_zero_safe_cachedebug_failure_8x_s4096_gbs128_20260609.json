@@ -1,0 +1,157 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_zero_safe_cachedebug_nockpt_mbs8_steps6_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_zero_safe_cachedebug_nockpt_mbs8_steps6_20260609/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_zero_safe_cachedebug_nockpt_mbs8_steps6_20260609",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12
+  },
+  "configuration": {
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "checkpoint_enable": false,
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_mori_native_compact_max_peer_rows": 65536,
+    "standard_ep_mori_native_compact_blocks": 64,
+    "standard_ep_mori_native_compact_warps": 8,
+    "standard_ep_mori_native_compact_prereset": false,
+    "standard_ep_mori_native_compact_debug_cache": true,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "mori_shmem_heap_size": "48G"
+  },
+  "source_changes_under_test": {
+    "token_dispatcher": "Native compact capacity buckets use max(next_power_of_two(required_rows), fixed_floor); cache key is stable and compatible larger handles are reused while smaller same-prefix handles are evicted.",
+    "mori_dispatch_combine_python": "Vendored MORI Python wrapper passes one-element/one-row same-device scratch tensors for zero-row compact dispatch/combine pointer arguments while preserving the real row counts."
+  },
+  "result": {
+    "status": "failed_after_step4_not_promoted",
+    "completed_logged_steps": 4,
+    "promotion_status": "rejected_unstable_less_than_6_steps",
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.1905,
+        "grad_norm": 16.5,
+        "tokens_per_gpu_s": {
+          "min": 1094,
+          "max": 1096
+        },
+        "tflops_per_gpu": {
+          "min": 55.4,
+          "max": 55.5
+        },
+        "rank_max_memory_gib": 173.9
+      },
+      {
+        "step": 2,
+        "loss": 9.37517,
+        "grad_norm": 83.0,
+        "tokens_per_gpu_s": {
+          "min": 8266,
+          "max": 8266
+        },
+        "tflops_per_gpu": {
+          "min": 418.5,
+          "max": 418.51
+        },
+        "rank_max_memory_gib": 218.84
+      },
+      {
+        "step": 3,
+        "loss": 21.29714,
+        "grad_norm": 150.0,
+        "tokens_per_gpu_s": {
+          "min": 8177,
+          "max": 8178
+        },
+        "tflops_per_gpu": {
+          "min": 414.03,
+          "max": 414.04
+        },
+        "rank_max_memory_gib": 223.13
+      },
+      {
+        "step": 4,
+        "loss": 23.13984,
+        "grad_norm": 202.0,
+        "tokens_per_gpu_s": {
+          "min": 8520,
+          "max": 8520
+        },
+        "tflops_per_gpu": {
+          "min": 431.36,
+          "max": 431.37
+        },
+        "rank_max_memory_gib": 225.22
+      }
+    ],
+    "failure": {
+      "phase": "after_step4_next_backward",
+      "rank": 0,
+      "signal": "SIGABRT",
+      "message": "Memory access fault by GPU node-2 on address (nil).",
+      "stack": [
+        "torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py:4157 _grad_attn_sink_from_output_lse",
+        "torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py:4223 backward"
+      ]
+    },
+    "read": "The previous zero-row C++ launcher failure is fixed, but native compact remains unstable under the full sparse 12-layer canary. The step-4 8.52k tok/GPU/s observation is diagnostic only and must not be promoted."
+  },
+  "cache_evidence": {
+    "bucket_policy": "max(next_power_of_two(required_rows), fixed_floor)",
+    "fixed_floor": 65536,
+    "larger_cached_bucket": 131072,
+    "observed_reuse": "Later 65536 requests reuse cached 131072 handles for dispatch and combine.",
+    "example_reuse_line": "reuse=dispatch requested_key=(0, 0, 8, 4096, 2, 65536) cached_key=(0, 0, 8, 4096, 2, 131072)"
+  },
+  "baseline_comparison": {
+    "retained_baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "retained_baseline_steps": 20,
+    "retained_baseline_steps_2_to_20_tokens_per_gpu_s": 8518.84,
+    "retained_baseline_steps_2_to_20_tflops_per_gpu": 431.31,
+    "retained_baseline_steps_13_to_20_tokens_per_gpu_s": 8630.66,
+    "apples_to_apples_note": "Same 8x MBS8 GBS128 S4096 standard-EP hot-helper top-8 sparse configuration family, but native compact run is a failed 4-logged-step diagnostic and cannot be compared as a stable throughput mean."
+  },
+  "mori_profiler_next_step": {
+    "reference": "https://github.com/ROCm/mori/blob/main/docs/PROFILER.md",
+    "current_jit_banner": "profiler=False",
+    "requires": [
+      "Build or JIT MORI with ENABLE_PROFILER=ON.",
+      "Add scoped MORI_TRACE_* instrumentation around native compact dispatch/combine only.",
+      "Export the op debug buffer with mori.kernel_profiler.export_to_perfetto(mori.cpp.get_debug_time_buf(op._handle), trace_json).",
+      "Use short isolated profiler runs first because the debug buffer wraps and profiling perturbs performance."
+    ],
+    "gate": "Do not launch or promote a 20-step native compact run until a non-profiled 6-step stability gate passes."
+  }
+}

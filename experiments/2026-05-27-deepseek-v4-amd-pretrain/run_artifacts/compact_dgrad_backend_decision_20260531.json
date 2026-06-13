@@ -1,0 +1,112 @@
+{
+  "artifact": "compact_dgrad_backend_decision_20260531",
+  "date": "2026-05-31",
+  "operator": "bwd_w2_dgrad",
+  "shape_contract": {
+    "input": {
+      "dY_compact": [
+        "tokens * topk",
+        7168
+      ],
+      "W2": [
+        384,
+        7168,
+        3072
+      ],
+      "group_sizes": [
+        384
+      ]
+    },
+    "output": {
+      "dHidden_compact": [
+        "tokens * topk",
+        3072
+      ]
+    },
+    "dtype": "bfloat16"
+  },
+  "isolated_gate": {
+    "s2048_target_ms": 3.0,
+    "source": "compact_moe_tile_kernel_manifest_20260531.json"
+  },
+  "baseline": {
+    "retained_path": "padded torch.bmm(out=) over [experts, max_count, *], then compact gather where needed",
+    "s2048_torch_padded_bmm_out_median_ms": 3.8770699501037598,
+    "s4096_torch_padded_bmm_out_median_ms": 4.259036064147949
+  },
+  "candidates": {
+    "aiter_tuned_s2048": {
+      "artifact": "aiter_gmm_config_sweep_refine_s2048_20260531.json",
+      "correctness_ok": true,
+      "best_median_ms": 4.226398944854736,
+      "best_min_ms": 4.194478988647461,
+      "speedup_vs_aiter_default": 1.7158126998880001,
+      "speedup_vs_torch_padded_bmm_out": 0.8968457480373504,
+      "best_config": {
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_N": 256,
+        "GROUP_SIZE": 1,
+        "GRID_DIM": 256,
+        "num_warps": 8,
+        "num_stages": 1
+      },
+      "decision": "demote"
+    },
+    "aiter_tuned_s4096": {
+      "artifact": "aiter_gmm_config_sweep_refine_s4096_20260531.json",
+      "correctness_ok": true,
+      "best_median_ms": 4.9874467849731445,
+      "best_min_ms": 4.972167015075684,
+      "speedup_vs_aiter_default": 1.473357831790898,
+      "speedup_vs_torch_padded_bmm_out": 0.8539511793850413,
+      "best_config": {
+        "BLOCK_SIZE_M": 64,
+        "BLOCK_SIZE_K": 64,
+        "BLOCK_SIZE_N": 256,
+        "GROUP_SIZE": 1,
+        "GRID_DIM": 512,
+        "num_warps": 8,
+        "num_stages": 1
+      },
+      "decision": "demote"
+    },
+    "tilelang_example_style_s2048": {
+      "artifact": "tilelang_grouped_gemm_dgrad_s2048_20260531.json",
+      "correctness_ok": true,
+      "best_median_ms": 5.731928825378418,
+      "best_min_ms": 5.579768180847168,
+      "speedup_vs_torch_padded_bmm_out": 0.676398829821094,
+      "best_config": {
+        "block_M": 32,
+        "block_K": 64,
+        "block_N": 256,
+        "threads": 256,
+        "num_stages": 1
+      },
+      "decision": "demote"
+    }
+  },
+  "backend_surface": {
+    "tilelang_examples": [
+      "/opt/tilelang/examples/grouped_gemm/example_grouped_gemm_fwd.py",
+      "/opt/tilelang/examples/grouped_gemm/example_grouped_gemm_bwd.py",
+      "/opt/tilelang/examples/grouped_gemm/example_grouped_gemm_fwd_ptr.py"
+    ],
+    "ck_grouped_gemm_sources": [
+      "/sgl-workspace/aiter/3rdparty/composable_kernel/example/15_grouped_gemm/grouped_gemm_xdl_bf16.cpp",
+      "/sgl-workspace/aiter/3rdparty/composable_kernel/example/ck_tile/17_grouped_gemm/grouped_gemm.cpp",
+      "/sgl-workspace/aiter/3rdparty/composable_kernel/include/ck/tensor_operation/gpu/device/impl/device_grouped_gemm_xdl.hpp",
+      "/sgl-workspace/aiter/3rdparty/composable_kernel/include/ck/tensor_operation/gpu/device/impl/device_grouped_gemm_multiple_d_xdl_cshuffle_tile_loop.hpp"
+    ]
+  },
+  "decision": {
+    "demote": [
+      "tuned AITER gmm for bwd_w2_dgrad",
+      "example-style TileLang grouped_gemm for bwd_w2_dgrad"
+    ],
+    "promote": null,
+    "next": "Prototype a CK/CK-Tile grouped GEMM or a more specialized compact-native TileLang kernel that avoids the example schedule's per-program batch scan and beats padded torch.bmm(out=) before full-layer integration.",
+    "reason": "Both compact library paths are correct, but neither beats the retained padded BMM baseline, and both miss the isolated 3.0 ms S2048 gate. AITER tuning proved the default M tile was mismatched; the TileLang example proved the tensor contract is implementable, but not performant enough."
+  }
+}

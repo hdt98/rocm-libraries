@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-05",
+  "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+  "status": "completed_6_steps_clean_teardown",
+  "purpose": "Same-shape AMD 4xMI350 throughput-token gate closer to the local Ascend run: GBS128 with MBS1, which implies GA32 on 4 GPUs. This is the recommended GBS128 lane from amd_4x_gbs128_ga8_profile_plan_blocked_20260605.json because literal GBS128+GA8 on 4 GPUs requires MBS4 and has much higher OOM risk.",
+  "node": {
+    "target_host": "do-vunguyen-mi350-gpu",
+    "hostname": "vu",
+    "gpu": "AMD Instinct MI350X VF",
+    "visible_devices": "0,1,2,3"
+  },
+  "storage_policy": {
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+    "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+    "remote_output_size": "8.0K",
+    "remote_log_size": "48K",
+    "scratch_free_after_run": "34T",
+    "root_free_after_run": "476G",
+    "docker_root": "/var/lib/docker",
+    "docker_root_moved": false,
+    "read": "Kept Docker root as-is and routed source, outputs, HF/cache, MORI JIT, and AITER JIT under /scratch/sonle5. Root still had enough headroom for the overlay image."
+  },
+  "image": {
+    "base": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "overlay": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "overlay_id": "sha256:41720eb837a264dbdeb344383706b8bf2744cdc9269b78a2d1b9f233df65c8f8",
+    "overlay_created": "2026-06-05T13:54:40.612402478Z",
+    "overlay_size_bytes": 28387137764,
+    "mori_version": "1.1.2.dev32+g5dd02d681.d20260605",
+    "aiter_import": "present",
+    "build_note": "Overlay build succeeded. AITER import smoke warned that ROCm/HIP JIT runtime reported missing jax during image check, but runtime built and loaded module_aiter_core, module_moe_sorting_opus, and module_moe_ck2stages_b16_b16_preshuffle_on_b16_silu_no_mulWeightStage2 during the run."
+  },
+  "shape": {
+    "hardware": "4xMI350",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 32,
+    "tokens_per_step": 524288,
+    "tokens_per_gpu_per_step": 131072,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "checkpointing": "disabled",
+    "chunked_ce_num_chunks": 2
+  },
+  "kernel_and_comm_knobs": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_aiter_block_num": 64,
+    "mori_aiter_rdma_block_num": 32,
+    "mori_aiter_warp_num_per_block": 8,
+    "mori_shmem_heap_size": "32G",
+    "torch_profiler": "disabled",
+    "dsv4_profile_timing": "disabled",
+    "mori_aiter_timing": "disabled",
+    "structured_logging": "disabled"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.37915,
+      "grad_norm": 12.75,
+      "tflops_per_gpu": [13.07, 13.07, 13.07, 13.07],
+      "tps_per_gpu": [691, 691, 691, 691],
+      "memory_gib": [95.6, 95.91, 95.87, 95.79],
+      "read": "First step includes first-use MORI/AITER JIT compile and is not a throughput point."
+    },
+    {
+      "step": 2,
+      "loss": 8.44746,
+      "grad_norm": 22.5,
+      "tflops_per_gpu": [105.1, 105.1, 105.1, 105.11],
+      "tps_per_gpu": [5555, 5555, 5555, 5555],
+      "memory_gib": [122.81, 124.1, 123.01, 124.2]
+    },
+    {
+      "step": 3,
+      "loss": 21.34219,
+      "grad_norm": 29.5,
+      "tflops_per_gpu": [84.78, 84.78, 84.78, 84.78],
+      "tps_per_gpu": [4481, 4481, 4481, 4481],
+      "memory_gib": [135.16, 144.24, 143.61, 124.9]
+    },
+    {
+      "step": 4,
+      "loss": 14.75664,
+      "grad_norm": 37.25,
+      "tflops_per_gpu": [76.41, 76.41, 76.41, 76.41],
+      "tps_per_gpu": [4038, 4038, 4038, 4038],
+      "memory_gib": [143.26, 144.49, 146.72, 146.58]
+    },
+    {
+      "step": 5,
+      "loss": 12.45435,
+      "grad_norm": 54.5,
+      "tflops_per_gpu": [76.07, 76.07, 76.07, 76.07],
+      "tps_per_gpu": [4020, 4020, 4020, 4020],
+      "memory_gib": [147.27, 144.49, 147.34, 146.58]
+    },
+    {
+      "step": 6,
+      "loss": 9.89334,
+      "grad_norm": 43.75,
+      "tflops_per_gpu": [76.61, 76.61, 76.61, 76.61],
+      "tps_per_gpu": [4049, 4049, 4049, 4049],
+      "memory_gib": [144.49, 147.27, 147.34, 146.58]
+    }
+  ],
+  "late_step_summary": {
+    "steps": [4, 5, 6],
+    "mean_tflops_per_gpu": 76.3633,
+    "mean_tps_per_gpu": 4035.6667,
+    "implied_step_time_s": 32.4787,
+    "peak_memory_gib": 147.34,
+    "target_tflops_per_gpu": 277.0,
+    "ratio_to_target": 0.27568,
+    "speedup_needed_to_target": 3.6274
+  },
+  "comparison": {
+    "prior_4x_gbs64_explicit_sharedkv_noac_late_mean_tflops_per_gpu": 74.1333,
+    "prior_4x_gbs64_explicit_sharedkv_noac_late_mean_tps_per_gpu": 3916.0,
+    "prior_4x_gbs64_query_recompute_noac_late_mean_tflops_per_gpu": 77.4,
+    "prior_4x_gbs64_query_recompute_noac_late_mean_tps_per_gpu": 4090.33,
+    "read": "GBS128/MBS1/GA32 sustains about 76.36 TFLOPs/GPU, close to the prior GBS64 4x no-AC lane. The larger global batch did not create a new materialized uplift; it mainly doubles tokens per optimizer step and therefore doubles step time while keeping per-GPU token/s similar."
+  },
+  "follow_up": {
+    "next_run": "same-shape low-intrusion timing profile on 4xMI350 GBS128/MBS1/GA32",
+    "profile_focus": [
+      "additive forward/loss/backward/fwd-bwd wrapper buckets",
+      "SparseAttnSharedkvGrad and SparseLightningIndexerGradKLLoss timing",
+      "MORI AITER owner-rank routed VJP and dX return skew",
+      "dense GEMM/backward wrapper attribution"
+    ]
+  },
+  "commands_run": [
+    "TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE_TAG=onenexus/nexus-titan:rocm722-pytorch-nightly-mori BASE_IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/build_torchtitan_mori_overlay_image.sh",
+    "TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SHAREDKV_BACKWARD_MODE=explicit_pytorch CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29631 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "RUN_ID=torchtitan_dsv4_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs1_ga32_vu_20260605 TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_ENABLE_PROFILING=false CANARY_ENABLE_STRUCTURED_LOGGING=false CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_SHAREDKV_BACKWARD_MODE=explicit_pytorch CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_AITER_BLOCK_NUM=64 CANARY_MORI_AITER_RDMA_BLOCK_NUM=32 CANARY_MORI_AITER_WARP_NUM_PER_BLOCK=8 CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29632 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  ],
+  "dependency_pin_changes": []
+}

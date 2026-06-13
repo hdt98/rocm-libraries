@@ -1,0 +1,76 @@
+{
+  "artifact": "continuation_node_gate_cpu_check",
+  "date_local": "2026-05-31",
+  "goal_lanes_checked": [
+    "8x_mi350_torchtitan_mixed_muon_resume",
+    "single_mi350_dsv4_layer_microbench"
+  ],
+  "eight_gpu_resume_gate": {
+    "host": "do-sonle5-mi350-gpu",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+    "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh check-idle",
+    "result": "blocked_by_active_kfd_processes",
+    "latest_run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+    "blocking_processes": [
+      {
+        "pid": 3335962,
+        "name": "pt_elastic",
+        "summary": "torchrun for Primus TorchTitan Llama 3.1 8B fault-tolerance pretraining, nproc_per_node=2, training.steps=20000"
+      },
+      {
+        "pid": 3336399,
+        "name": "python",
+        "summary": "rank process for the same Primus TorchTitan Llama 3.1 fault-tolerance run"
+      },
+      {
+        "pid": 3336400,
+        "name": "python",
+        "summary": "rank process for the same Primus TorchTitan Llama 3.1 fault-tolerance run"
+      }
+    ],
+    "decision": "did_not_run_resume_or_co_schedule"
+  },
+  "single_gpu_microbench_gate": {
+    "host": "do-sonle-kernel",
+    "runner": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+    "status_command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh status",
+    "result": "not_clean_for_trustworthy_performance_or_rocprof_run",
+    "observed_processes": [
+      {
+        "pid": 3242872,
+        "name": "python3",
+        "summary": "tools/bench_coda_tilelang_stage1_absmax.py --preset dsv4-flash-routed --full-path --topk 6 --delayed-scale-stage2 ..."
+      }
+    ],
+    "observed_new_containers": [
+      "naughty_ganguly",
+      "modest_williamson"
+    ],
+    "decision": "skipped_gpu_timing_and_profiler_work_to_avoid_contaminated_evidence"
+  },
+  "non_gpu_validation": {
+    "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-cpu",
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "device": "cpu",
+    "dtype": "float64",
+    "seqlen": 4,
+    "ok": true,
+    "check": {
+      "name": "moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_learned_router_match",
+      "router": "learned_topk",
+      "grouped_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "loop_impl": "loop",
+      "output_max_abs": 0.0,
+      "output_rel_l2": 0.0,
+      "max_grad_rel_l2": 4.767825220877897e-16,
+      "moe_gate_grad_rel_l2": 4.443540465874805e-16,
+      "loss_grouped": 1.6459901262364651,
+      "loss_loop": 1.6459901262364651
+    }
+  },
+  "next_safe_actions": [
+    "When do-sonle5-mi350-gpu is idle, run the mixed Muon/AdamW resume: env CANARY_OPTIMIZER_MODE=mixed-muon-adamw RESUME_LOAD_STEP=1 RESUME_STEPS=2 CANARY_GBS=8 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh run-resume",
+    "When do-sonle-kernel is clean, run either the retained S2048/S4096 bench refresh or S2048 rocprof/profile work from run_retained_mi350_suite.sh"
+  ]
+}

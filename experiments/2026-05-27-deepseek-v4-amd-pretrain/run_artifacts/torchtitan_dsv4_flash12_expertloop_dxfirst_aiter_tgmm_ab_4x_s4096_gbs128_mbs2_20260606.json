@@ -1,0 +1,179 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_expert_loop_aiter_tgmm_wgrad_ab",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "objective": "Test whether replacing the late expert_loop dX-first per-expert wgrad torch.mm loop with AITER grouped TGMM materializes end-to-end throughput uplift on the active 12-layer 4xMI350 shape.",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "local_vjp_mode": "expert_loop",
+    "dx_return_mode": "sync_dx_first",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "xgrad_mode": "compact",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8
+  },
+  "code_change": {
+    "default_behavior": "unchanged",
+    "opt_in_env": {
+      "TORCHTITAN_MORI_AITER_EXPERT_LOOP_WGRAD_MODE": "aiter_tgmm",
+      "TORCHTITAN_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "nptgmm"
+    },
+    "implementation": "Build int32 group_sizes from active expert counts and call AITER ptgmm or nptgmm for late dw2, dw1, and dw3 in the dX-first expert_loop finish path. The retained default remains the per-expert loop."
+  },
+  "validation": {
+    "local_py_compile": "passed for mori_aiter_moe.py and check_mori_expert_loop_dx_first.py",
+    "launcher_bash_n": "passed",
+    "local_cpu_parity": "not runnable on macOS local environment because torch is not installed",
+    "container_py_compile": "passed in onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "container_cpu_float32_parity": {
+      "command": "TORCHTITAN_MORI_AITER_EXPERT_LOOP_WGRAD_MODE=aiter_tgmm check_mori_expert_loop_dx_first.py --device cpu --dtype float32",
+      "max_diff": {
+        "dx": 0.0,
+        "dw1": 0.0,
+        "dw3": 0.0,
+        "dw2": 0.0,
+        "dtopk": 0.0
+      },
+      "result": "passed"
+    },
+    "container_gpu_bf16_parity": {
+      "commands": [
+        "TORCHTITAN_MORI_AITER_EXPERT_LOOP_WGRAD_MODE=aiter_tgmm TORCHTITAN_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP=ptgmm check_mori_expert_loop_dx_first.py --device cuda --dtype bfloat16 --tokens 128 --topk 3 --experts 8 --hidden 256 --intermediate 512",
+        "TORCHTITAN_MORI_AITER_EXPERT_LOOP_WGRAD_MODE=aiter_tgmm TORCHTITAN_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP=nptgmm check_mori_expert_loop_dx_first.py --device cuda --dtype bfloat16 --tokens 128 --topk 3 --experts 8 --hidden 256 --intermediate 512"
+      ],
+      "max_diff": {
+        "dx": 0.0,
+        "dw1": 0.0,
+        "dw3": 0.0,
+        "dw2": 0.0,
+        "dtopk": 0.0
+      },
+      "result": "passed"
+    }
+  },
+  "attempts": {
+    "aiter_tgmm_nptgmm_success": {
+      "run_id": "torchtitan_dsv4_flash12_expertloop_dxfirst_aiter_tgmm_nptgmm_4x_s4096_gbs128_mbs2_heap40_steps4_20260606",
+      "status": "completed",
+      "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expertloop_dxfirst_aiter_tgmm_nptgmm_4x_s4096_gbs128_mbs2_heap40_steps4_20260606/docker-run.log",
+      "steps": [
+        {
+          "step": 1,
+          "loss": 12.10756,
+          "grad_norm": 13.25,
+          "tokens_per_gpu_s_mean": 2421.0,
+          "node_tokens_s_mean": 9684.0,
+          "tflops_per_gpu_mean": 122.57,
+          "memory_gib_max": 174.54
+        },
+        {
+          "step": 2,
+          "loss": 9.40054,
+          "grad_norm": 24.125,
+          "tokens_per_gpu_s_mean": 3134.0,
+          "node_tokens_s_mean": 12536.0,
+          "tflops_per_gpu_mean": 158.66,
+          "memory_gib_max": 224.28
+        },
+        {
+          "step": 3,
+          "loss": 19.17696,
+          "grad_norm": 33.0,
+          "tokens_per_gpu_s_mean": 3029.0,
+          "node_tokens_s_mean": 12116.0,
+          "tflops_per_gpu_mean": 153.35,
+          "memory_gib_max": 224.42
+        },
+        {
+          "step": 4,
+          "loss": 6.72252,
+          "grad_norm": 25.0,
+          "tokens_per_gpu_s_mean": 2745.0,
+          "node_tokens_s_mean": 10980.0,
+          "tflops_per_gpu_mean": 138.97,
+          "memory_gib_max": 224.62
+        }
+      ],
+      "late_step_summary": {
+        "window": "steps_2_to_4",
+        "tokens_per_gpu_s": 2969.33,
+        "node_tokens_s": 11877.33,
+        "tflops_per_gpu": 150.99,
+        "peak_logged_memory_gib": 224.62,
+        "target_ratio_tokens_per_gpu": 0.2434
+      }
+    }
+  },
+  "comparison": {
+    "retained_mbs2_expert_loop_sync": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_mbs2_heap_sweep_4x_s4096_gbs128_20260606.json",
+      "window": "steps_2_to_4",
+      "tokens_per_gpu_s": 3696.0,
+      "node_tokens_s": 14784.0,
+      "tflops_per_gpu": 187.12,
+      "peak_logged_memory_gib": 225.73
+    },
+    "dxfirst_sync_no_bucket": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expertloop_dxfirst_ab_4x_s4096_gbs128_mbs2_20260606.json",
+      "window": "steps_2_to_4",
+      "tokens_per_gpu_s": 3679.0,
+      "node_tokens_s": 14716.0,
+      "tflops_per_gpu": 186.29,
+      "peak_logged_memory_gib": 225.22
+    },
+    "bucket_bmm": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_expertloop_dxfirst_bucketwgrad_ab_4x_s4096_gbs128_mbs2_20260606.json",
+      "window": "steps_2_to_4",
+      "tokens_per_gpu_s": 3625.0,
+      "node_tokens_s": 14500.0,
+      "tflops_per_gpu": 183.54,
+      "peak_logged_memory_gib": 224.54
+    },
+    "aiter_tgmm_vs_retained": {
+      "tokens_per_gpu_s_delta": -726.67,
+      "tokens_per_gpu_s_ratio": 0.8034,
+      "tflops_per_gpu_delta": -36.13,
+      "tflops_per_gpu_ratio": 0.8069
+    },
+    "aiter_tgmm_vs_dxfirst_no_bucket": {
+      "tokens_per_gpu_s_delta": -709.67,
+      "tokens_per_gpu_s_ratio": 0.8071,
+      "tflops_per_gpu_delta": -35.3,
+      "tflops_per_gpu_ratio": 0.8105
+    },
+    "aiter_tgmm_vs_bucket_bmm": {
+      "tokens_per_gpu_s_delta": -655.67,
+      "tokens_per_gpu_s_ratio": 0.8191,
+      "tflops_per_gpu_delta": -32.55,
+      "tflops_per_gpu_ratio": 0.8227
+    }
+  },
+  "decision": {
+    "status": "rejected_not_promoted",
+    "reason": "The late-wgrad AITER TGMM finish is parity-safe, but it is materially slower than retained expert_loop sync, dX-first no-bucket, and the bucketed torch.bmm stopgap at the active 12-layer MBS2 shape. The likely issue is that this is still a late Python adapter over per-step compact state and AITER TGMM shape/dispatch overhead, not a fused owner-rank training backward.",
+    "next_action": "Do not tune this late-wgrad-only AITER TGMM wrapper further as a promotion path. Move to a fused compact grouped owner-rank training backward or an AITER/CK training-backward contract that consumes AITER forward saved state directly and avoids the Python expert-loop structure."
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_rowmix_standard_ep_profile_20260610",
+  "created_utc": "2026-06-10T15:58:00Z",
+  "host": "do-sonle5-mi350-gpu",
+  "purpose": "Validate profile-only row_group_summary metadata for the retained standard-EP top-8 helper path, so future native-MORI compact A/Bs can distinguish route-mix skew from real transport/helper-graph changes.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1
+  },
+  "config": {
+    "activation_checkpoint_scope": "attention_only",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "pytorch_alloc_conf": "expandable_segments:True"
+  },
+  "runs": {
+    "standard_profile_step2": {
+      "run_id": "torchtitan_dsv4_flash12_rowmix_standard_ep_profile_mbs8_8x_s4096_gbs128_20260610d",
+      "status": "completed_two_steps_diagnostic_profile_only",
+      "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_rowmix_standard_ep_profile_mbs8_8x_s4096_gbs128_20260610d/docker-run.log",
+      "raw_profile_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_rowmix_standard_ep_profile_mbs8_8x_s4096_gbs128_20260610d/profile_timing",
+      "profile_file_count": 8,
+      "profile_record_count": 8000,
+      "observed_metrics": {
+        "step_1": {
+          "loss": 12.28542,
+          "grad_norm": 19.5,
+          "memory_gib_rankmax": 204.86,
+          "tok_per_gpu_s_range": [1659.0, 1662.0],
+          "tflops_per_gpu_range": [84.02, 84.17]
+        },
+        "step_2": {
+          "loss": 7.98561,
+          "grad_norm": 36.0,
+          "memory_gib_rankmax": 238.22,
+          "tok_per_gpu_s_range": [6510.0, 6510.0],
+          "tflops_per_gpu_range": [329.59, 329.60]
+        }
+      },
+      "step2_profile": {
+        "kind_rankmax_ms": {
+          "module_backward": 11783.045,
+          "chunked_ce_loss": 398.677,
+          "standard_ep_hot_split": 366.186,
+          "standard_ep_combine": 310.439,
+          "standard_ep_dispatch": 261.896,
+          "standard_ep_hot_weight": 110.433
+        },
+        "row_group_record_counts": {
+          "standard_ep_hot_split": 192
+        },
+        "row_group_summary": {
+          "standard_ep_hot_split": {
+            "records": 192,
+            "total_rows_min": 28452,
+            "total_rows_median": 75170.0,
+            "total_rows_max": 140242,
+            "max_group_rows_min": 6705,
+            "max_group_rows_median": 19400.0,
+            "max_group_rows_max": 31155,
+            "nonzero_group_count_min": 4,
+            "nonzero_group_count_median": 7.0,
+            "nonzero_group_count_max": 8,
+            "sample": {
+              "row_group_count": 8,
+              "row_group_counts": [11142, 7566, 5859, 5607, 8925, 8759, 7468, 5831],
+              "row_group_max_rows": 11142,
+              "row_group_min_nonzero_rows": 5607,
+              "row_group_nonzero_count": 8,
+              "row_group_top8_rows": [11142, 8925, 8759, 7566, 7468, 5859, 5831, 5607],
+              "row_group_total_rows": 61157
+            }
+          }
+        },
+        "standard_ep_stage_rankmax_ms": {
+          "standard_ep_dispatch.count_all_to_all": 103.974,
+          "standard_ep_dispatch.permute": 79.077,
+          "standard_ep_dispatch.hot_local_reorder": 20.098,
+          "standard_ep_dispatch.hot_metadata": 20.121,
+          "standard_ep_combine.all_to_all_wait": 186.388,
+          "standard_ep_combine.weighted_scatter_add": 117.135,
+          "standard_ep_combine.unpermute": 42.076,
+          "standard_ep_hot_split.broadcast_hot_weights": 120.671,
+          "standard_ep_hot_split.weighted_scatter_tokens": 108.167,
+          "standard_ep_hot_split.grouped_w1": 40.729,
+          "standard_ep_hot_split.grouped_w2": 52.300,
+          "standard_ep_hot_split.grouped_w3": 52.117,
+          "standard_ep_hot_weight.w1.forward.all_reduce_hot_weight": 17.962,
+          "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": 74.109,
+          "standard_ep_hot_weight.w3.forward.all_reduce_hot_weight": 17.863
+        }
+      }
+    },
+    "backward_timing_validation": {
+      "run_id": "torchtitan_dsv4_flash12_rowmix_standard_ep_bwdtiming_profile_mbs8_8x_s4096_gbs128_20260610",
+      "status": "completed_two_steps_diagnostic_profile_only",
+      "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_rowmix_standard_ep_bwdtiming_profile_mbs8_8x_s4096_gbs128_20260610/docker-run.log",
+      "raw_profile_timing_dir_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_rowmix_standard_ep_bwdtiming_profile_mbs8_8x_s4096_gbs128_20260610/profile_timing",
+      "profile_file_count": 8,
+      "profile_record_count": 9536,
+      "observed_metrics": {
+        "step_1": {
+          "loss": 12.28067,
+          "grad_norm": 19.75,
+          "memory_gib_rankmax": 205.25,
+          "tok_per_gpu_s_range": [1678.0, 1683.0],
+          "tflops_per_gpu_range": [84.97, 85.20]
+        },
+        "step_2": {
+          "loss": 8.80791,
+          "grad_norm": 56.5,
+          "memory_gib_rankmax": 239.86,
+          "tok_per_gpu_s_range": [6493.0, 6493.0],
+          "tflops_per_gpu_range": [328.77, 328.77]
+        }
+      },
+      "all_profile_records": {
+        "kind_record_counts": {
+          "standard_ep_hot_split": 384,
+          "standard_ep_hot_split_backward": 768,
+          "standard_ep_hot_split_compact_return": 768
+        },
+        "row_group_record_counts": {
+          "standard_ep_hot_split": 384,
+          "standard_ep_hot_split_backward": 768
+        },
+        "row_group_summary": {
+          "standard_ep_hot_split_backward": {
+            "records": 768,
+            "total_rows_min": 12963,
+            "total_rows_median": 37314.5,
+            "total_rows_max": 117316,
+            "max_group_rows_min": 4102,
+            "max_group_rows_median": 10146.0,
+            "max_group_rows_max": 32187,
+            "nonzero_group_count_min": 3,
+            "nonzero_group_count_median": 7.0,
+            "nonzero_group_count_max": 8,
+            "sample": {
+              "row_group_count": 8,
+              "row_group_counts": [5015, 4769, 4108, 2838, 3602, 3621, 3120, 5182],
+              "row_group_max_rows": 5182,
+              "row_group_min_nonzero_rows": 2838,
+              "row_group_nonzero_count": 8,
+              "row_group_top8_rows": [5182, 5015, 4769, 4108, 3621, 3602, 3120, 2838],
+              "row_group_total_rows": 32255
+            }
+          }
+        },
+        "standard_ep_backward_stage_rankmax_ms": {
+          "standard_ep_hot_split_backward.helper_mlp_vjp_to_sorted_x": 409.902,
+          "standard_ep_hot_split_backward.scatter_to_remote_y": 105.061,
+          "standard_ep_hot_split_compact_return.compact_dx_return.index_add": 49.140,
+          "standard_ep_hot_split_compact_return.compact_dtopk_return.index_add": 3.295
+        }
+      },
+      "note": "standard_ep_hot_split_backward records currently do not carry step metadata, so this validation reports the two-step diagnostic aggregate instead of a step-2-only split."
+    }
+  },
+  "read": [
+    "No-mHC retained-shape baseline/node health is validated separately; these runs are profile-only and are not throughput promotions.",
+    "The standard profile validates forward row_group_summary on all 192 step-2 standard_ep_hot_split records.",
+    "The backward-timing validation emits 768 standard_ep_hot_split_backward records and all carry row_group_summary; backward records currently lack step metadata, so the artifact reports them over the full two-step diagnostic.",
+    "Future native-MORI A/Bs should compare row_group_total_rows and max_group_rows alongside timing before attributing deltas to native compact mechanics."
+  ]
+}

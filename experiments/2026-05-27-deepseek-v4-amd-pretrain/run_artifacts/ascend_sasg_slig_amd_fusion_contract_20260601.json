@@ -1,0 +1,233 @@
+{
+  "status": "route_slice_attribution_completed_compressed_topk_dominates",
+  "scope": "ascend_sparse_attention_grad_and_sparse_lightning_indexer_grad_kl_loss_to_amd_next_cut",
+  "date": "2026-06-01",
+  "source_references": {
+    "ascend_autofuse_doc": "sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md",
+    "torch_npu_sparse_attention_wrapper": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/deepseek_v4_sfa.py",
+    "torch_npu_dsa_wrapper": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/dsa.py",
+    "sparse_attn_sharedkv_binding": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/ops/aclnn/sparse_attn_sharedkv/binding.cpp",
+    "sparse_lightning_indexer_grad_kl_loss_binding": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/ops/aclnn/sparse_lightning_indexer_grad_kl_loss/binding.cpp"
+  },
+  "ascend_sparse_attn_sharedkv_grad_contract": {
+    "forward_inputs": {
+      "query": "[B, S, Hq, D] contiguous BSND",
+      "ori_kv": "[B, S, 1, D] original shared KV",
+      "cmp_kv": "[B, C, 1, D] compressed shared KV or null",
+      "ori_sparse_indices": "null for band/sliding-window mode in DSv4 wrapper",
+      "cmp_sparse_indices": "[B, S, 1, K] int32 compressed selected groups for cmp_ratio=4",
+      "sinks": "[Hq] fp32 attention sink",
+      "softmax_scale": "scalar",
+      "cmp_ratio": "1 for SWA/CFA-like paths, 4 for sparse compressed attention path in wrapper",
+      "window": "ori_win_left=127, ori_win_right=0 in wrapper"
+    },
+    "forward_outputs_saved_for_backward": {
+      "result": "[B, S, Hq, D]",
+      "softmax_lse": "[B, S, Hq, 1] fp32",
+      "saved_tensors": "query, ori_kv, cmp_kv, result, softmax_lse, ori_sparse_indices, cmp_sparse_indices, sinks"
+    },
+    "backward_input": {
+      "dout": "[B, S, Hq, D]"
+    },
+    "backward_outputs": {
+      "d_query": "[B, S, Hq, D]",
+      "d_ori_kv": "[B, S, 1, D]",
+      "d_cmp_kv": "[B, C, 1, D] when cmp_ratio > 1",
+      "d_sinks": "[Hq]"
+    },
+    "doc_pipeline": [
+      "Gather selected original/compressed KV tiles",
+      "Cube12 for QK and dO dot V style matrix work",
+      "Process softmax, row stats, and intermediate gradients",
+      "Cube345 for dQ and selected dK/dV math",
+      "Scatter gradients back into original and compressed KV banks"
+    ]
+  },
+  "ascend_sparse_lightning_indexer_grad_kl_loss_contract": {
+    "forward_behavior": "returns a dummy fp32 scalar loss; real KL loss and LI gradients are deferred to backward to avoid duplicate activation-checkpoint recompute",
+    "inputs": {
+      "query": "main-attention query tensor",
+      "key": "main-attention key tensor",
+      "query_index": "LI query tensor, grad output required",
+      "key_index": "LI key tensor, grad output required",
+      "weight": "LI per-token or per-head weights tensor, grad output required",
+      "sparse_indices": "top-k sparse indices selected by LightningIndexer",
+      "softmax_max": "optional main-attention row max or null in DSv4 wrapper",
+      "softmax_sum": "optional main-attention row sum or null in DSv4 wrapper",
+      "query_rope": "optional",
+      "key_rope": "optional",
+      "cmp_ratio": "compressed-attention ratio",
+      "scale_value": "main-attention scale"
+    },
+    "outputs_from_backward": {
+      "d_query_index": "same shape as query_index",
+      "d_key_index": "same shape as key_index",
+      "d_weight": "same shape as weight",
+      "loss": "[1] fp32, scaled by token count in wrapper"
+    },
+    "doc_pipeline": [
+      "V0 gathers top-k main-attention K and LI K rows",
+      "C1 computes main-attention QK and LI QK products",
+      "V1 computes KL loss derivative and dW",
+      "C2 computes LI dQ",
+      "V2 scatter-adds LI dK"
+    ],
+    "math_contract": {
+      "li_logits": "I_t = W_t @ ReLU(q_index_t @ K_index_selected_t^T)",
+      "loss": "sum_t KL(target_probs_t || softmax(I_t))",
+      "d_index_logits": "softmax(I_t) - target_probs_t"
+    }
+  },
+  "amd_current_mapping": {
+    "shared_kv_public_abi": {
+      "wrapper": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py exposes sparse_attn_sharedkv(query, ori_kv, cmp_kv, cmp_sparse_indices, sinks, ...)",
+      "s128_parity_artifact": "run_artifacts/sparse_attn_sharedkv_ascend_abi_s128_mi350_20260601.json",
+      "s4096_timing_artifact": "run_artifacts/sparse_attn_sharedkv_ascend_abi_s4096_timing_mi350_20260601.json"
+    },
+    "shared_kv_backward_slice": {
+      "best_raw_query_major_tile": "H64/N64, 14.36 ms median on S4096 with 640 selected keys/query",
+      "best_raw_query_major_artifact": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_combined_query_h64n64_s4096_timing5_current_mi350_20260601.json",
+      "retained_autograd_bridge": "H64/N128, sparse_mla_shared_kv(...).backward() 17.73 ms median at S4096",
+      "retained_autograd_artifact": "run_artifacts/torchtitan_sparse_mla_shared_kv_query_autograd_s4096_bwdtiming_mi350_20260601.json",
+      "boundary_artifact": "run_artifacts/torchtitan_shared_kv_attention_boundary_query_attribution_s4096_mi350_20260601.json",
+      "boundary_read": "TorchTitan-shaped q/wkv_a/RoPE/LI/compression/shared-KV attention/wo fwd+bwd is 23.36 ms; raw shared-KV autograd slice is 17.84 ms and output projection fwd+bwd is 3.32 ms."
+    },
+    "li_fused_floor": {
+      "target_probs": "0.97 ms S4096, no selected main-K materialization",
+      "kl_derivative": "0.057 ms S4096",
+      "full_unfused_pipeline": "4.49 ms S4096 for target_probs + LI logits + derivative + dQ/dK/dW as separate Triton calls",
+      "full_pipeline_artifact": "run_artifacts/torchtitan_sparse_li_full_pipeline_tl_dot_shifted_s4096_bwd_h64k512d128dot64_mi350_20260601.json"
+    }
+  },
+  "gap_read": {
+    "single_layer_target_ms": 24.9,
+    "current_best_full_layer_proxy_ms": 68.2089,
+    "shared_kv_attention_plus_unfused_li_floor_ms": 27.850193977355957,
+    "why_next_probe": "The Ascend SASG/SLIG design says the backward win comes from fusing Gather/Cube/Process/Scatter and fusing main-attention target scores with LI backward. AMD already has fast LI target and derivative slices; the unresolved wall is shared-KV dKV/scatter and integration with LI/compressor gradients."
+  },
+  "next_clean_gpu_probe": {
+    "purpose": "Attribute the query-major shared-KV backward wall by route composition before designing the next production kernel schedule.",
+    "status": "completed_clean_sequential_on_gpu0",
+    "remote_node": "do-sonle-kernel",
+    "remote_workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp_torchtitan_sglang_schedule",
+    "container": "b9d33e6e8227",
+    "required_condition": "Run only when rocm-smi --showpidgpus shows no external GPU benchmark using GPU 0.",
+    "discarded_note": "An accidental concurrent local-only/compressed-only launch happened while another GPU benchmark was active; do not use those timings as authoritative.",
+    "common_env": {
+      "HIP_VISIBLE_DEVICES": "0",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": "64",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_N": "64",
+      "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_D": "128"
+    },
+    "commands": [
+      {
+        "name": "full_local128_compressed512",
+        "args": "--seq-len 4096 --topk 512 --compress-ratio 4 --local-count 128 --heads 64 --dim 512 --block-m 16 --block-h 64 --block-d 512 --warmup-iters 1 --timed-iters 5 --skip-reference-timing"
+      },
+      {
+        "name": "local128_only",
+        "args": "--seq-len 4096 --topk 0 --compress-ratio 4 --local-count 128 --heads 64 --dim 512 --block-m 16 --block-h 64 --block-d 512 --warmup-iters 1 --timed-iters 5 --skip-reference-timing"
+      },
+      {
+        "name": "compressed512_only",
+        "args": "--seq-len 4096 --topk 512 --compress-ratio 4 --local-count 0 --heads 64 --dim 512 --block-m 16 --block-h 64 --block-d 512 --warmup-iters 1 --timed-iters 5 --skip-reference-timing --dkv-atol 0.15"
+      }
+    ],
+    "interpretation": {
+      "local_dominates": "Not the observed result; local-only is 3.83 ms.",
+      "compressed_dominates": "Observed result; compressed-topk-only is 11.02 ms, about 76.5% of the full local+compressed raw query-major time.",
+      "full_exceeds_sum_pattern": "Not the observed result; full is slightly below local-only plus compressed-only, so the next cut should optimize the compressed top-k branch rather than mixed-route contention."
+    }
+  },
+  "clean_route_slice_results": {
+    "common_shape": {
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "block_m": 16,
+      "block_h": 64,
+      "block_d": 512,
+      "env_block_h": 64,
+      "env_block_n": 64,
+      "env_block_d": 128,
+      "warmup_iters": 1,
+      "timed_iters": 5
+    },
+    "full_local128_compressed512": {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_full_s4096_timing5_mi350_20260601.json",
+      "status": "passed",
+      "local_count": 128,
+      "compressed_topk_count": 512,
+      "selected_count": 640,
+      "query_major_median_ms": 14.392242431640625,
+      "query_major_samples_ms": [
+        14.462039947509766,
+        14.40263843536377,
+        14.322637557983398,
+        14.392242431640625,
+        14.300361633300781
+      ],
+      "separate_dq_plus_dkv_median_ms": 18.395883560180664,
+      "dq_max_abs_diff": 0.013144493103027344,
+      "dkv_max_abs_diff": 0.04524564743041992,
+      "peak_memory_allocated_gib": 1.359377384185791
+    },
+    "local128_only": {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_local128_only_s4096_timing5_mi350_20260601.json",
+      "status": "passed",
+      "local_count": 128,
+      "compressed_topk_count": 0,
+      "selected_count": 128,
+      "query_major_median_ms": 3.8283939361572266,
+      "query_major_samples_ms": [
+        3.864314079284668,
+        3.7935938835144043,
+        3.798314094543457,
+        3.847353935241699,
+        3.8283939361572266
+      ],
+      "separate_dq_plus_dkv_median_ms": 4.207036972045898,
+      "dq_max_abs_diff": 0.012603282928466797,
+      "dkv_max_abs_diff": 0.04392051696777344,
+      "peak_memory_allocated_gib": 1.344728946685791
+    },
+    "compressed512_only": {
+      "artifact": "run_artifacts/torchtitan_sparse_mla_shared_kv_backward_query_h64n64_route_compressed512_only_s4096_timing5_mi350_20260601.json",
+      "status": "passed_with_dkv_atol_0p15",
+      "local_count": 0,
+      "compressed_topk_count": 512,
+      "selected_count": 512,
+      "query_major_median_ms": 11.017240524291992,
+      "query_major_samples_ms": [
+        11.060802459716797,
+        10.941439628601074,
+        11.033121109008789,
+        11.017240524291992,
+        10.986438751220703
+      ],
+      "separate_dq_plus_dkv_median_ms": 15.050722122192383,
+      "dq_max_abs_diff": 0.013092041015625,
+      "dkv_max_abs_diff": 0.1111297607421875,
+      "dkv_atol": 0.15,
+      "peak_memory_allocated_gib": 1.355471134185791
+    },
+    "derived_read": {
+      "compressed_only_ratio_of_full": 0.765499,
+      "local_only_ratio_of_full": 0.266004,
+      "local_plus_compressed_ms": 14.845634460449219,
+      "full_minus_local_plus_compressed_ms": -0.453392028808594,
+      "full_raw_slice_ratio_of_24p9_layer_target": 0.578002,
+      "read": "The full raw query-major S4096 backward slice is essentially the local and compressed routes added together, with the compressed top-k route accounting for most of the wall. This points the next production cut at compressed top-k dKV/scatter/dynamic selected-group reuse, not the sliding-window local route."
+    }
+  },
+  "recommended_next_implementation_cut": {
+    "short_name": "route_split_query_major_sasg_probe",
+    "description": "Keep the proven query-major dQ path, but prioritize the compressed-topk dKV branch first. A route-split implementation should keep the original-window and compressed-topk paths separately visible, matching Ascend's separate ori_kv/d_cmp_kv gradient contract, but the clean route-slice result says compressed-topk dKV/scatter and dynamic selected-group reuse are the dominant wall.",
+    "promotion_gate": [
+      "S128 parity against PyTorch reference",
+      "S4096 route-split full path faster than 14.36 ms raw query-major H64/N64",
+      "No selected K/V or probability tensors saved across forward/backward",
+      "Public sparse_attn_sharedkv ABI still returns d_query, d_ori_kv, d_cmp_kv, d_sinks"
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "artifact_type": "native_mori_compact_stability_diagnostic",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_zero_safe_prereset_mbs8_steps6_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "failed_after_step2_next_backward",
+  "promotion_status": "rejected",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12,
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "environment": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "65536",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_BLOCKS": "64",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WARPS": "8",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_PRERESET": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_DEBUG_CACHE": "true",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_SCATTER_MODE": "triton_bwd",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "48G"
+  },
+  "source_changes_under_test": [
+    "token_dispatcher bucketed native compact capacity and compatible larger-handle reuse",
+    "vendored MORI Python wrapper zero-row non-null scratch tensors",
+    "native compact pre-reset before dispatch/combine"
+  ],
+  "metrics": {
+    "step_1": {
+      "loss": 12.40929,
+      "grad_norm": 15.3125,
+      "tokens_per_gpu_s_range": [1092, 1094],
+      "tflops_per_gpu_range": [55.28, 55.38],
+      "rank_max_memory_gib": 173.71
+    },
+    "step_2": {
+      "loss": 7.64084,
+      "grad_norm": 118.5,
+      "tokens_per_gpu_s": 7783,
+      "tflops_per_gpu": 394.08,
+      "rank_max_memory_gib": 217.68
+    }
+  },
+  "failure": {
+    "phase": "after_step2_next_backward",
+    "signal": "SIGABRT",
+    "summary": "Memory access fault by GPU node-2 on address nil",
+    "stack_tail": [
+      "sparse_mla_shared_kv_triton_forward_backend.py:4157 _grad_attn_sink_from_output_lse",
+      "sparse_mla_shared_kv_triton_forward_backend.py:4223 backward"
+    ]
+  },
+  "read": "Pre-reset did not stabilize the native compact path. It failed earlier than the zero-safe no-prereset run and hit the same sparse MLA sink-gradient backward stack, so the remaining instability is unlikely to be only stale MORI barrier or signal state. This is a rejected isolation branch, not a throughput candidate."
+}

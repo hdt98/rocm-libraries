@@ -1,0 +1,75 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_group_aware_epilogue_probe",
+  "created_at": "2026-06-04",
+  "runtime": {
+    "benchmark_node": "do-sonle-kernel",
+    "benchmark_image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "check_config_node": "do-sonle5-mi350-gpu",
+    "check_config_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "gpu": "MI350X/gfx950"
+  },
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "heads": 64,
+    "dim": 512,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "plan_on_device": true
+  },
+  "baseline": {
+    "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_current_baseline_s4096_layer2_gp512_20260604.json",
+    "hsk_bf16_source_kernel_median_ms": 5.105003833770752
+  },
+  "results": {
+    "slot_order_hot_only": {
+      "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_hotorder_s4096_layer2_gp512_20260604.json",
+      "hsk_bf16_source_kernel_median_ms": 5.094926834106445,
+      "read": "Correct route-ordering surface; speedup is noise-level versus the clean baseline."
+    },
+    "slot_order_hot_accum_slot_swizzle_1": {
+      "s128_correctness_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_hotorder_swizzle1_s128_layer2_gp32_20260604.json",
+      "s128_max_abs_diff": 7.62939453125e-06,
+      "s128_mean_abs_diff": 3.437033910813625e-07,
+      "s4096_timing_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_hotorder_swizzle1_s4096_layer2_gp512_20260604.json",
+      "s4096_hsk_bf16_swizzled_kernel_median_ms": 4.941711902618408,
+      "speedup_vs_baseline_x": 1.033045260505532,
+      "read": "This is the retained low-risk candidate: same HSK BF16 selected-limit producer and same route semantics, with hot route ordering plus the existing zero-extra-shared-memory slot/D swizzle."
+    },
+    "hot_slot_fragment_count_4": {
+      "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_hot4_s128_layer2_gp32_20260604.json",
+      "status": "rejected",
+      "first_compiled_variant_max_abs_diff": 32.68301773071289,
+      "first_compiled_variant_checksum": 341.040771484375,
+      "reference_checksum": 1258.57568359375,
+      "followup_single_writer_fragment": "TileLang layout inference rejected the owner-loop over the GEMM fragment, so hot-slot fragment accumulation is not enabled.",
+      "read": "A per-thread fragment is not a correct replacement for the CTA shared accumulator unless the kernel also implements a lowering-compatible block reduction."
+    }
+  },
+  "integration": {
+    "retained_env": {
+      "CANARY_SHAREDKV_TILELANG_SLOT_ORDER": "hot",
+      "CANARY_SHAREDKV_TILELANG_ACCUM_SLOT_SWIZZLE": "1"
+    },
+    "check_config": {
+      "status": "passed",
+      "observed_slot_order_env": "hot",
+      "observed_accum_slot_swizzle_env": "1"
+    },
+    "guard": "hot_slot_count is rejected in the adapter until a correct lowering-compatible local reduction exists."
+  },
+  "decision": {
+    "promote_hot_slot_fragment": false,
+    "promote_hot_order_only": false,
+    "promote_hot_order_plus_swizzle": true,
+    "expected_e2e_impact": "Small isolated dKV-body improvement only. This will not move end-to-end TFLOPs much until the broader sparse-MLA backward bridge avoids materialized probability/grad-logit tensors and the MoE/loss walls are addressed.",
+    "next": "If we keep pushing this branch, use profiler counters on the retained hot-order+swizzle kernel to confirm lower LDS bank pressure, then integrate the knob into a short TorchTitan A/B only after avoiding TileLang recompilation churn."
+  },
+  "dependency_pin_changes": []
+}

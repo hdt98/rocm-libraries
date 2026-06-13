@@ -1,0 +1,131 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_profiler_clean8x_stageisolated_20260610",
+  "status": "completed_stage_isolation_profile_only_not_throughput",
+  "date_utc": "2026-06-10",
+  "host": "do-sonle5-mi350-gpu",
+  "target_host": "root@165.245.166.41",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-profiler-compactslots-20260610",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_weight_order": "owner_compact",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "sharedkv_sink_dot_chunk": 32,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "runs": {
+    "both_stage_discard_combine": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_profiler_clean8x_s4096_gbs128_20260610",
+      "profile_stage": "both",
+      "steps": 3,
+      "profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_profiler_clean8x_s4096_gbs128_20260610/mori_viz",
+      "result": "completed_but_combine_trace_contaminated_by_dispatch_trace_export",
+      "exported_dispatch_trace_files": 8,
+      "exported_combine_trace_files": 8,
+      "events_per_trace_file": 8192,
+      "discarded_combine_rankmax_window_ms": 8736.34636,
+      "read": "Dispatch trace remains useful because it occurs before any profiler JSON export. Combine trace is invalid because dispatch trace export happened before combine and created rank skew inside combine wait."
+    },
+    "combine_only": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_profiler_clean8x_combineonly_s4096_gbs128_20260610b",
+      "profile_stage": "combine",
+      "steps": 2,
+      "profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_profiler_clean8x_combineonly_s4096_gbs128_20260610b/mori_viz",
+      "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_profiler_clean8x_combineonly_s4096_gbs128_20260610b/dsv4_timing.jsonl",
+      "result": "completed",
+      "exported_dispatch_trace_files": 0,
+      "exported_combine_trace_files": 8,
+      "events_per_trace_file": 8192,
+      "logged_step_2_tokens_per_gpu_s": 4766,
+      "logged_step_2_tflops_per_gpu": 241.31,
+      "logged_step_2_peak_memory_gib": 226.05,
+      "logged_throughput_use": "discard_profile_export_contaminated"
+    },
+    "dispatch_only": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_profiler_clean8x_dispatchonly_s4096_gbs128_20260610b",
+      "profile_stage": "dispatch",
+      "steps": 2,
+      "profile_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_profiler_clean8x_dispatchonly_s4096_gbs128_20260610b/mori_viz",
+      "timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_profiler_clean8x_dispatchonly_s4096_gbs128_20260610b/dsv4_timing.jsonl",
+      "result": "completed",
+      "exported_dispatch_trace_files": 8,
+      "exported_combine_trace_files": 0,
+      "events_per_trace_file": 8192,
+      "logged_step_2_tokens_per_gpu_s": 1673,
+      "logged_step_2_tflops_per_gpu": 84.70,
+      "logged_step_2_peak_memory_gib": 224.37,
+      "logged_throughput_use": "discard_profile_export_contaminated"
+    }
+  },
+  "trace_summary": {
+    "dispatch_only_rankmax_ms": {
+      "total_window": 23.69823,
+      "stage_rows": 1.44071,
+      "signal_counts": 0.00473,
+      "wait_counts": 3.76593,
+      "grid_wait_recv": 3.76876,
+      "receive_copy": 18.53712,
+      "grid_wait_reset": 7.14558,
+      "reset_counters": 5.14931,
+      "grid_wait_send": 0.11877
+    },
+    "combine_only_rankmax_ms": {
+      "total_window": 23.45485,
+      "stage_rows": 2.75895,
+      "signal_counts": 0.00418,
+      "wait_counts": 3.35103,
+      "grid_wait_recv": 3.35382,
+      "receive_copy": 17.98118,
+      "grid_wait_reset": 7.93088,
+      "reset_counters": 5.19876,
+      "grid_wait_send": 0.26074
+    },
+    "both_stage_dispatch_rankmax_ms": {
+      "total_window": 546.44336,
+      "wait_counts": 485.73204,
+      "grid_wait_recv": 485.73564,
+      "receive_copy": 39.59891,
+      "reset_counters": 225.94646,
+      "stage_rows": 1.49302,
+      "read": "Kept as historical evidence only. The later dispatch-only trace is the cleaner rank window."
+    },
+    "both_stage_combine_contaminated_rankmax_ms": {
+      "total_window": 8736.34636,
+      "wait_counts": 8715.82476,
+      "grid_wait_recv": 8715.82754,
+      "read": "Invalid as a combine-performance measurement because dispatch JSON export happened before combine."
+    }
+  },
+  "read": {
+    "primary": "Native compact MORI dispatch and combine are not the multi-second wall when profiled in isolation. Each stage is about 23-24 ms rank-max for the first profiled call at the retained 8x MBS8 shape.",
+    "dominant_native_phase": "receive_copy dominates the isolated MORI window at about 18 ms for both dispatch and combine; row staging is small, about 1.4 ms dispatch and 2.8 ms combine.",
+    "discarded_interpretation": "The previous 8.7 s combine wait was profiler export contamination, not native compact combine behavior.",
+    "throughput_decision": "No throughput promotion is claimed from profiler runs. Use the existing non-profiled 20-step native source-position chunked-sink candidate for throughput comparison.",
+    "next_source_target": "Keep native compact as the cold/normal transport path, but focus code work on first-class compact layout through the surrounding standard-EP helper graph: avoid staging/pull copies where possible, keep outputs in final expert-major or compact return layout, and reduce helper VJP/scatter/weighted-scatter work rather than tuning MORI wait knobs."
+  },
+  "validation": {
+    "local": [
+      "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py"
+    ],
+    "remote": [
+      "combine-only 8x profile completed and exported 8 combine trace JSON files",
+      "dispatch-only 8x profile completed and exported 8 dispatch trace JSON files"
+    ]
+  }
+}

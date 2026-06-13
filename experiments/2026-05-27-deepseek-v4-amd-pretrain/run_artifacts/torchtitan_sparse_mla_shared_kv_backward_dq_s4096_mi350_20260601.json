@@ -1,0 +1,94 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "dq_atol": 0.02,
+    "max_abs_diff": 0.015625,
+    "mean_abs_diff": 9.950454841600731e-05,
+    "passed": true
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This isolates the first backward fusion candidate: dQ recompute from q, shared kv, output, lse, grad_output, and sparse indices. It removes selected-KV and probability materialization for dQ only; dKV scatter/accumulation remains a separate production kernel target.",
+  "scope": "sparse_mla_shared_latent_kv_backward_dq_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.625,
+    "materialized_shared_selected_kv_fp32_gib": 5.0,
+    "selected_count": 640,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "timing": {
+    "pytorch_reference_dq": {
+      "checksum_norm": 1073.2657470703125,
+      "event": {
+        "enabled": true,
+        "max_ms": 13.413153648376465,
+        "mean_ms": 12.514372825622559,
+        "median_ms": 12.10118293762207,
+        "min_ms": 12.02878189086914,
+        "samples_ms": [
+          13.413153648376465,
+          12.10118293762207,
+          12.02878189086914
+        ],
+        "stdev_ms": 0.7792083825302263
+      },
+      "label": "pytorch_reference_dq",
+      "peak_memory_allocated_bytes": 11250696704,
+      "peak_memory_allocated_gib": 10.478027820587158,
+      "wall": {
+        "enabled": true,
+        "max_ms": 13.482945039868355,
+        "mean_ms": 12.555686330112318,
+        "median_ms": 12.130631948821247,
+        "min_ms": 12.053482001647353,
+        "samples_ms": [
+          13.482945039868355,
+          12.130631948821247,
+          12.053482001647353
+        ],
+        "stdev_ms": 0.8039555738354303
+      }
+    },
+    "triton_dq": {
+      "checksum_norm": 1073.263916015625,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.345341920852661,
+        "mean_ms": 2.2453813552856445,
+        "median_ms": 2.267822027206421,
+        "min_ms": 2.1229801177978516,
+        "samples_ms": [
+          2.267822027206421,
+          2.1229801177978516,
+          2.345341920852661
+        ],
+        "stdev_ms": 0.11286664999741253
+      },
+      "label": "triton_dq",
+      "peak_memory_allocated_bytes": 1717570048,
+      "peak_memory_allocated_gib": 1.599611759185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.3622289299964905,
+        "mean_ms": 2.2754356808339558,
+        "median_ms": 2.308389055542648,
+        "min_ms": 2.1556890569627285,
+        "samples_ms": [
+          2.308389055542648,
+          2.1556890569627285,
+          2.3622289299964905
+        ],
+        "stdev_ms": 0.10714067139382336
+      }
+    }
+  }
+}

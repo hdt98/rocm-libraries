@@ -1,0 +1,159 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_li_triton_4x_s4096_gbs64_target_slice_20260602",
+  "created_date": "2026-06-02",
+  "status": "gbs64_one_step_passed_two_step_failed_rank0_mori_aiter_moe_backward_gpu_fault",
+  "purpose": "Record the first normalized 4xMI350 GBS64 S4096 TorchTitan DeepSeek-V4 Flash sparse shared-KV + LI target-slice stress with MORI+AITER routed padded MoE enabled.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "attention_backend": {
+    "mode": "shared_kv",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sparse_mla_max_seq_len": 4096,
+    "li_kl_backend": "triton_tl_dot",
+    "read": "This selects the experimental shared latent-KV sparse MLA path for compressed layers and the opt-in Triton tl.dot deferred LI-KL backend. It is still not the final fused sparse MLA/LI/compressor backward."
+  },
+  "moe_backend": {
+    "comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "read": "The failure in the two-step stress is in the current MORI+AITER padded owner-rank VJP path, not in the sparse shared-KV attention entry gate."
+  },
+  "shared_shape": {
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+    "visible_devices": "0,1,2,3",
+    "gpus": 4,
+    "fsdp": 4,
+    "ep": 4,
+    "seq_len": 4096,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 262144,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false
+  },
+  "runs": {
+    "gbs64_one_step_target_slice": {
+      "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps1_20260602T000000",
+      "status": "pass",
+      "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps1_20260602T000000 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=1 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29576 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps1_20260602T000000/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps1_20260602T000000",
+      "rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps1_20260602T000000/structured_logs/training.global_rank_0.20260602-014926-UVJ872.jsonl",
+      "step1": {
+        "loss": 12.16645,
+        "grad_norm": 12.625,
+        "memory_gib_range": [
+          101.96,
+          124.42
+        ],
+        "tokens_per_gpu_s_range": [
+          2222,
+          2223
+        ],
+        "node_tokens_per_s_range": [
+          8888,
+          8892
+        ],
+        "reported_tflops_per_gpu_range": [
+          42.04,
+          42.07
+        ],
+        "reported_mfu_percent": 1.82,
+        "global_valid_tokens": 262144,
+        "structured_step_time_ms_rank0": 29098.412857973017,
+        "structured_fwd_bwd_first_chunk_ms_rank0": 15402.689603040926,
+        "structured_fwd_bwd_followup_chunk_ms_range_rank0": [
+          718.2356689590961,
+          735.3181270882487
+        ],
+        "structured_optim_ms_rank0": 210.81699500791728
+      },
+      "teardown": "process_groups_destroyed_cleanly"
+    },
+    "gbs64_two_step_stress": {
+      "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps2_20260602T000000",
+      "status": "failed_after_step1_during_step2_mori_aiter_moe_backward",
+      "command_shape": "IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps2_20260602T000000 GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_GBS=64 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29577 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps2_20260602T000000/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps2_20260602T000000",
+      "rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_4x_s4096_gbs64_steps2_20260602T000000/structured_logs/training.global_rank_0.20260602-015132-E5U8SN.jsonl",
+      "step1": {
+        "loss": 12.18508,
+        "grad_norm": 12.875,
+        "memory_gib_range": [
+          110.79,
+          116.33
+        ],
+        "tokens_per_gpu_s_range": [
+          2230,
+          2234
+        ],
+        "node_tokens_per_s_range": [
+          8920,
+          8936
+        ],
+        "reported_tflops_per_gpu_range": [
+          42.19,
+          42.27
+        ],
+        "reported_mfu_percent": 1.83,
+        "global_valid_tokens": 262144,
+        "structured_step_time_ms_rank0": 29009.124508011155,
+        "structured_fwd_bwd_first_chunk_ms_rank0": 15602.018239093013,
+        "structured_fwd_bwd_followup_chunk_ms_range_rank0": [
+          694.1845220280811,
+          713.176770019345
+        ],
+        "structured_optim_ms_rank0": 216.27435798291117
+      },
+      "step2_before_failure": {
+        "step_started": true,
+        "local_valid_tokens_rank0": 65536,
+        "completed_fwd_bwd_chunks_rank0": 3,
+        "completed_fwd_bwd_chunk_ms_rank0": [
+          907.7344950055704,
+          910.4291100520641,
+          909.3713739421219
+        ],
+        "global_valid_tokens_logged": false,
+        "step_end_logged": false,
+        "loss_logged": false
+      },
+      "failure": {
+        "rank": 0,
+        "local_rank": 0,
+        "exitcode": -6,
+        "signal": "SIGABRT",
+        "other_ranks": "SIGTERM_by_elastic_after_rank0_failure",
+        "message": "Memory access fault by GPU node-2 on address nil. Reason: Unknown.",
+        "top_python_frames": [
+          "torchtitan/models/common/mori_aiter_moe.py:133:_swiglu_backward",
+          "torchtitan/models/common/mori_aiter_moe.py:282:_compute_local_padded_vjp",
+          "torchtitan/models/common/mori_aiter_moe.py:478:_compute_mori_routed_vjp",
+          "torchtitan/models/common/mori_aiter_moe.py:616:backward"
+        ]
+      }
+    }
+  },
+  "target_comparison": {
+    "normalized_4x_target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "one_step_pass_tokens_per_gpu_s_range": [
+      2222,
+      2223
+    ],
+    "two_step_step1_tokens_per_gpu_s_range": [
+      2230,
+      2234
+    ],
+    "read": "Both GBS64 step-1 measurements are inside the normalized 4x throughput target band, but this does not promote the sparse path because the two-step run fails during the second step before loss movement can be observed."
+  },
+  "read": "The sparse shared-KV attention gate is now exercised at the normalized 4x S4096/GBS64 target slice and can finish a full optimizer step. The next blocker is multi-step stability in MORI+AITER routed padded MoE backward at this sparse-attention target shape, followed by replacing the prototype sparse MLA/LI backward with the final fused path."
+}

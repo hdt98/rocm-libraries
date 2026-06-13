@@ -1,0 +1,72 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_swapopt_mbs4_fullac_fit_mori_4x_s4096_gbs128_step1_20260606",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "status": "passed_one_step",
+  "purpose": "Validate AMD optimizer-state-only CPU swap as an MBS4 fit path after the BF16 GPU-resident optimizer-state run failed at first AdamW state allocation.",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 4,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 8,
+    "pipeline_parallel": 1,
+    "tensor_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "full",
+    "checkpointing": false
+  },
+  "optimizer": {
+    "implementation": "swap_opt_states_cpu",
+    "swap_chunk_mib": 16,
+    "swap_state_dtype": "param",
+    "state_location": "cpu",
+    "update_style": "chunked Python AdamW; diagnostic fit path, not a performance path"
+  },
+  "kernel_and_moe_knobs": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_local_vjp_mode": "aiter_compact",
+    "mori_aiter_local_vjp_aiter_wgrad_op": "ptgmm",
+    "mori_aiter_compact_recompute_mode": "expert_loop",
+    "mori_aiter_xgrad_mode": "full",
+    "mori_shmem_heap_size": "40G"
+  },
+  "result": {
+    "completed_steps": 1,
+    "loss_step_1": 12.38876,
+    "grad_norm_step_1": 19.375,
+    "logged_memory_gib": 181.8,
+    "tps_per_gpu": 190,
+    "tflops_per_gpu": 9.61,
+    "mfu_percent": 0.42,
+    "step_wall_ms_rank0": 689851.35,
+    "rank0_fwd_bwd_ms_microbatch_like": 55869.99,
+    "rank0_optimizer_ms": 65556.81,
+    "rank0_collect_dist_metrics_ms": 128342.66
+  },
+  "read": "The AMD swap optimizer port fixes the MBS4 first-step optimizer-state OOM and keeps logged GPU memory to about 181.8 GiB. It is not a throughput candidate yet: Python chunked state swap makes optimizer.step about 65.6 s on rank 0, and the one-step run logs only 9.61 TFLOPs/GPU.",
+  "raw_logs": {
+    "docker_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_swapopt_mbs4_fullac_fit_mori_4x_s4096_gbs128_step1_20260606/docker-run.log",
+    "structured_logs_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_swapopt_mbs4_fullac_fit_mori_4x_s4096_gbs128_step1_20260606/structured_logs"
+  },
+  "next_steps": [
+    "Keep swap_opt_states_cpu as a memory-fit diagnostic path.",
+    "If performance matters, move the load-update-store loop into a fused/pipelined C++ or HIP path with pinned CPU buffers and overlap.",
+    "Treat torch_npu.empty_with_swapped_memory as a lower-level allocator project on ROCm, not the first portable AMD port."
+  ]
+}

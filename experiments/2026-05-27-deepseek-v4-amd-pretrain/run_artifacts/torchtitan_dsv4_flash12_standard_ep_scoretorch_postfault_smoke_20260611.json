@@ -1,0 +1,56 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_scoretorch_postfault_smoke_20260611",
+  "date": "2026-06-11",
+  "purpose": "Post-fault no-mHC baseline sanity check after the experimental Triton score-gradient split failed with a GPU memory access fault.",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_scoretorch_postfault_smoke_8x_s4096_gbs128_20260611",
+  "shape": {
+    "gpus": 8,
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation": 4,
+    "fsdp": 8,
+    "ep": 8,
+    "steps": 1
+  },
+  "key_env": {
+    "CANARY_USE_HYPER_CONNECTIONS": "false",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute"
+  },
+  "result": {
+    "status": "passed",
+    "completed_steps": 1,
+    "loss": 12.42832,
+    "grad_norm": 19.625,
+    "rank_memory_gib_range": [
+      143.12,
+      144.25
+    ],
+    "tok_per_gpu_s_range": [
+      1874,
+      1879
+    ],
+    "tflops_per_gpu_range": [
+      94.88,
+      95.13
+    ],
+    "post_run_rocm_smi": "All eight GPUs returned to 0% VRAM; no Docker containers or torchtitan processes remained."
+  },
+  "read": "The node is healthy for the no-mHC current-source baseline path after the experimental Triton split fault. The retained six-step no-mHC MBS8 control and six-step MBS4 scoretorch control remain the relevant stability evidence; the experimental triton_split score-gradient reducer is not promoted."
+}

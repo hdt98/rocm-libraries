@@ -1,0 +1,39 @@
+{
+  "run_id": "torchtitan_direct_dsv4_sparse_li_s512_4xmi350_noac_20260601T000000",
+  "date_utc": "2026-05-31",
+  "result": "failed_before_step_metric",
+  "selected_execution_path": "direct_torchtitan_torchrun",
+  "primus_used": false,
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "host": "do-sonle5-mi350-gpu",
+  "visible_devices": "0,1,2,3",
+  "model": "DeepSeek-V4-Flash_4layer_bounded_pytorch_sparse_mla_lightning_indexer",
+  "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S512",
+  "checkpoint_enable": false,
+  "activation_checkpoint_mode": "none",
+  "gradient_accumulation_steps": 16,
+  "command": "env GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=512 CANARY_STEPS=1 CANARY_MBS=1 CANARY_GBS=64 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true CANARY_ACTIVATION_CHECKPOINT_MODE=none RUN_ID=torchtitan_direct_dsv4_sparse_li_s512_4xmi350_noac_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "observed": {
+    "created_meshes": ["batch", "loss", "ep", "fsdp"],
+    "trainer_initialized": true,
+    "training_started_step": 1,
+    "step_metrics_logged": false,
+    "remote_output_size": "652K",
+    "checkpoint_directory_created": false
+  },
+  "failure": {
+    "phase": "loss.backward",
+    "error_class": "gpu_memory_access_fault",
+    "torch_elastic_root_cause_rank": 0,
+    "exitcode": -6,
+    "signal": "SIGABRT",
+    "messages": [
+      "Memory access fault by GPU nodes 2, 3, 4, 5",
+      "Fatal Python error: Aborted",
+      "torch.distributed.elastic.multiprocessing.errors.ChildFailedError"
+    ]
+  },
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_sparse_li_s512_4xmi350_noac_20260601T000000/docker-run.log",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_s512_4xmi350_noac_20260601T000000",
+  "read": "Disabling activation checkpointing does not clear the S512 distributed sparse-LI backward fault, so the next isolation should stay in the direct TorchTitan path and compare S256/S512, 1x/4x, dense fallback versus sparse-LI, and FSDP/EP interaction."
+}

@@ -1,0 +1,84 @@
+{
+  "schema": "dsv4_amd_pretrain_run_artifact.v1",
+  "created_at": "2026-06-04",
+  "scope": "tilelang_source_direct_dblocked_headsplit_gate",
+  "hardware": "1xMI350, HIP_VISIBLE_DEVICES=4",
+  "runtime_image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "code_change": {
+    "summary": "Added TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_HEAD_BLOCK for the no-HSK direct-source D-blocked TileLang dKV reducer and folded the new head tile into the existing 3D TileLang launch axis.",
+    "files": [
+      "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+      "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py",
+      "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py"
+    ]
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 128,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 16,
+    "compressed_count": 128,
+    "group_count": 128,
+    "selected": 144,
+    "tilelang_dkv_backend": "dblocked_source",
+    "group_panel_size": 16,
+    "panel_capacity": 16,
+    "token_block": 16,
+    "block_k": 16,
+    "block_d": 64
+  },
+  "results": [
+    {
+      "artifact": "run_artifacts/tilelang_source_direct_dblocked_head64_s128_h64_d512_20260604.json",
+      "head_block": 64,
+      "threads": 256,
+      "status": "correct_but_slow",
+      "explicit_pytorch_median_ms": 0.8786960244178772,
+      "tilelang_source_direct_dkv_median_ms": 7.2501702308654785,
+      "dq_max_abs": 0.0078125,
+      "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+      "read": "Baseline direct-source D-blocked schedule compiles and matches the BF16 dKV reference, but is already much slower than the S128 PyTorch explicit smoke."
+    },
+    {
+      "artifact": "run_artifacts/tilelang_source_direct_dblocked_head32_thr128_s128_h64_d512_20260604.json",
+      "head_block": 32,
+      "threads": 128,
+      "status": "correct_but_rejected_for_latency",
+      "explicit_pytorch_median_ms": 0.8536549806594849,
+      "tilelang_source_direct_dkv_median_ms": 6.956320762634277,
+      "speedup_vs_head64": 1.0421512245144442,
+      "dq_max_abs": 0.0078125,
+      "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.015625,
+      "read": "Head splitting reduces shared-memory pressure enough to compile at 128 threads, but the improvement is only about 4.2% and remains far too slow at S128."
+    },
+    {
+      "artifact": "remote console only",
+      "head_block": 32,
+      "threads": 256,
+      "status": "compile_rejected",
+      "failure": "TileLang ROCm GEMM layout inference divide-by-zero.",
+      "read": "The 256-thread H32 layout is not legal in this TileLang/ROCm lowering tuple."
+    },
+    {
+      "artifact": "remote console only",
+      "head_block": 16,
+      "threads": 128,
+      "status": "compile_rejected",
+      "failure": "TileLang ROCm GEMM layout inference divide-by-zero.",
+      "read": "Going narrower than H32 is not currently a viable TileLang MFMA layout."
+    }
+  ],
+  "decision": {
+    "promote_to_s4096": false,
+    "promote_to_e2e": false,
+    "reason": "The only compiling split-head variant is still about 8x slower than the S128 explicit PyTorch smoke and only about 4% faster than full-H direct-source D-blocked. Running this schedule at S4096 would chase an already-failed topology.",
+    "next_kernel_direction": [
+      "Do not continue with TileLang group-owned or D-blocked source recompute schedules.",
+      "Keep the materialized-input selected-limit reducer as diagnostic evidence only.",
+      "Move the no-HSK compact reducer to a lower-level HIP/CK/rocWMMA segmented producer, or wait for a stronger TileLang primitive that can keep query-major P/dP reuse while doing sparse grouped accumulation without large HSK slabs."
+    ]
+  },
+  "dependency_pin_changes": []
+}

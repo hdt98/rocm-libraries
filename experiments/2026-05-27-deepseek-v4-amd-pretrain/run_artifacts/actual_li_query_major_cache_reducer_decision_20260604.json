@@ -1,0 +1,132 @@
+{
+  "artifact": "actual_li_query_major_cache_reducer_decision_20260604",
+  "created_at": "2026-06-04",
+  "purpose": "Decide whether a bounded query-major group cache is the right GEMM-plus-epilogue style reducer for the sparse MLA/LI compressed-dKV wall.",
+  "operator_contract": {
+    "shape": {
+      "batch": 1,
+      "seq_len": 4096,
+      "layer_id": 2,
+      "heads": 64,
+      "dim": 512,
+      "d_block": 16,
+      "topk": 512,
+      "compress_ratio": 4,
+      "compressed_groups": 1024,
+      "valid_pairs": 1572352
+    },
+    "math": "For each selected (token, head, selected_slot), compute dKV contribution and reduce by compressed group before global dKV writes.",
+    "motivation": "Apply the GEMM-plus-epilogue lesson by keeping MFMA contribution tiles query-major while moving grouped reduction into the producer epilogue, avoiding raw selected-row partial slabs and scalar atomic storms."
+  },
+  "source_artifacts": {
+    "planner": "tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py",
+    "wide_sweep": "run_artifacts/actual_li_query_major_cache_reducer_plan_s4096_layer2_20260604.json",
+    "threshold_sweep": "run_artifacts/actual_li_query_major_cache_reducer_threshold_s4096_layer2_20260604.json",
+    "prior_pairslot_runtime_decision": "run_artifacts/actual_li_pairslot_accum_sink_gemm_epilogue_decision_20260604.json"
+  },
+  "baseline_context": {
+    "raw_selected_dkv_scalar_writes": 805044224,
+    "raw_selected_dkv_stream_mib": 3071.0,
+    "retained_sparse_atomic_wall_ms": "8.0-8.8",
+    "clean_rocwmma_raw_atomic_ms": 10.0379,
+    "clean_rocwmma_contrib_sink_ms": 9.02869,
+    "dense_pairslot_accum_sink_ms": 18.849829,
+    "read": "The prior runtime gate showed dense pair-slot local accumulation is the wall, not the final global emit. This planner asks whether a smaller sparse cache can keep the GEMM epilogue idea without becoming that dense table."
+  },
+  "threshold_results": {
+    "token_block_32_selected_block_512": [
+      {
+        "cache_slots": 512,
+        "cache_reduction_x": 1.6256220075659278,
+        "rows_over_perfect_full_segment_x": 14.648578654833482,
+        "cache_stream_mib": 2007.2011756896973,
+        "hit_rate": 0.3848508476473461
+      },
+      {
+        "cache_slots": 640,
+        "cache_reduction_x": 2.6949077303570297,
+        "rows_over_perfect_full_segment_x": 8.836314346726438,
+        "cache_stream_mib": 1210.783130645752,
+        "hit_rate": 0.628929781626506
+      },
+      {
+        "cache_slots": 768,
+        "cache_reduction_x": 4.489727621348273,
+        "rows_over_perfect_full_segment_x": 5.303896772630208,
+        "cache_stream_mib": 726.7586822509766,
+        "hit_rate": 0.7772693391810486
+      },
+      {
+        "cache_slots": 896,
+        "cache_reduction_x": 9.087951911683959,
+        "rows_over_perfect_full_segment_x": 2.6202880552484515,
+        "cache_stream_mib": 359.04137420654297,
+        "hit_rate": 0.8899642064881146
+      },
+      {
+        "cache_slots": 1024,
+        "cache_reduction_x": 23.813051840857806,
+        "rows_over_perfect_full_segment_x": 1.0,
+        "cache_stream_mib": 137.02405166625977,
+        "hit_rate": 0.958006222525236
+      }
+    ],
+    "token_block_64_selected_block_512": [
+      {
+        "cache_slots": 512,
+        "cache_reduction_x": 1.6402142232737271,
+        "rows_over_perfect_full_segment_x": 28.810061910200158,
+        "cache_stream_mib": 1989.3436813354492,
+        "hit_rate": 0.39032354078476067
+      },
+      {
+        "cache_slots": 640,
+        "cache_reduction_x": 2.765202129362088,
+        "rows_over_perfect_full_segment_x": 17.08904850634129,
+        "cache_stream_mib": 1180.0033798217773,
+        "hit_rate": 0.6383627839058938
+      },
+      {
+        "cache_slots": 768,
+        "cache_reduction_x": 4.775774143089283,
+        "rows_over_perfect_full_segment_x": 9.894662499248662,
+        "cache_stream_mib": 683.2289276123047,
+        "hit_rate": 0.7906098634402475
+      },
+      {
+        "cache_slots": 896,
+        "cache_reduction_x": 10.725530187791186,
+        "rows_over_perfect_full_segment_x": 4.405812345975837,
+        "cache_stream_mib": 304.22253799438477,
+        "hit_rate": 0.9067645158336047
+      },
+      {
+        "cache_slots": 1024,
+        "cache_reduction_x": 47.254673318506946,
+        "rows_over_perfect_full_segment_x": 1.0,
+        "cache_stream_mib": 69.05054092407227,
+        "hit_rate": 0.9788380718821231
+      }
+    ]
+  },
+  "decision": {
+    "status": "reject_bounded_query_major_cache_as_next_runtime_kernel",
+    "reason": "Useful reduction only appears when cache_slots is near the full 1024 compressed-group active set. Smaller 512-768 slot caches leave 5x-29x too many emitted rows versus perfect segmentation, while 896 slots is already close to dense-table cost and still leaves 2.6x-4.4x extra rows.",
+    "implication_for_gemm_plus_epilogue": "The epilogue must be sparse/segmented at warp or block level. A dense active_group x D epilogue table repeats the measured pair-slot accumulation wall and does not preserve the CODA-style benefit.",
+    "tilelang_direction": "Do not spend the next TileLang/HIP implementation on a bounded hash/cache reducer. Push a true sorted segmented reducer or group-owned final reduction fed by query-major MFMA contribution tiles.",
+    "next_kernel_contract": [
+      "consume the cheap prepacked LI route",
+      "preserve query-major q/dO reuse for contribution MFMA",
+      "perform lane/warp/block segmented accumulation for repeated compressed groups before global memory",
+      "emit compact partial rows keyed by compressed group and D block",
+      "finish with the already-cheap compact segmented reducer or one reduced atomic per segment"
+    ]
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py",
+    "docker run --rm --network host --ipc host --device /dev/kfd --device /dev/dri --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace sonle5/nexus-titan-rocm722-mori-tilelang:20260604 python3 tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --selected-blocks 256,512 --cache-slots 16,32,64,128,256,512,1024 --summary-path run_artifacts/actual_li_query_major_cache_reducer_plan_s4096_layer2_20260604.json --json",
+    "docker run --rm --network host --ipc host --device /dev/kfd --device /dev/dri --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace sonle5/nexus-titan-rocm722-mori-tilelang:20260604 python3 tools/dsv4_runtime_probe/plan_sparse_dkv_query_major_cache_reducer.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --selected-blocks 512 --cache-slots 512,640,768,896,1024 --summary-path run_artifacts/actual_li_query_major_cache_reducer_threshold_s4096_layer2_20260604.json --json"
+  ],
+  "dependency_pin_changes": []
+}

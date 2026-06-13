@@ -1,0 +1,56 @@
+{
+  "scope": "sparse_mla_exact_forward_group_sidecar_triton_decision",
+  "date": "2026-06-05",
+  "status": "exact_sidecar_confirmed_hot_group_proxy_rejected",
+  "shape": {
+    "hardware": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "contract": {
+    "forward_sidecar": "safe_groups/group_ids[B,S,K] is the exact forward-known selected compressed-group id for every selected slot.",
+    "goal": "Keep the fast Triton query-major producer while using exact group ids to reduce dKV contributions before global memory.",
+    "not_the_goal": "A bounded hottest-group sidecar is not the intended design; it was only a proxy and is not retained as the candidate."
+  },
+  "artifacts": {
+    "triton_exact_group_id_atomic": "run_artifacts/actual_li_active_list_dotk_atomic_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "triton_exact_sidecar_active_group_reducer_u128": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u128d16h64k64_timing_20260602.json",
+    "triton_exact_sidecar_active_group_reducer_u256": "run_artifacts/actual_li_active_list_dotk_micro_s4096_layer2_sc32_u256d16h64k128_timing_20260602.json",
+    "triton_exact_sidecar_compact_micro_sink": "run_artifacts/actual_li_active_list_dotk_compact_micro_sink_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "triton_exact_sidecar_compact_micro_partial_store": "run_artifacts/actual_li_active_list_dotk_compact_micro_partial_store_s4096_layer2_sc32_sb512_d16h64k64_timing10_20260605.json",
+    "hip_exact_sidecar_fullwindow_valid_dkv": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode10_fullwindow_resident_valid_dkv_20260605.json"
+  },
+  "timing_ms": {
+    "triton_exact_group_id_atomic_median": 8.144311904907227,
+    "triton_exact_sidecar_active_group_reducer_u128_median": 60.67277908325195,
+    "triton_exact_sidecar_active_group_reducer_u256_median": 57.238929748535156,
+    "triton_exact_sidecar_compact_micro_sink_median": 7.047167062759399,
+    "triton_exact_sidecar_compact_micro_partial_store_full_median": 8.824965953826904,
+    "triton_exact_sidecar_compact_micro_partial_store_emit_only_median": 8.507503986358643,
+    "hip_exact_sidecar_fullwindow_valid_dkv_median": 42.1207275390625
+  },
+  "read": [
+    "Triton already receives the exact forward-known group id sidecar as safe_groups/group_ids; dot_k_atomic uses it directly but performs one global atomic per selected contribution.",
+    "The exact-sidecar active-group reducer, dot_k_micro, is not the right schedule: it reduces by exact compressed group but introduces active-group blocks and route-matrix matching, which replays q/dO and pushes S4096 latency to roughly 57-61 ms.",
+    "The compact-micro exact-sidecar path preserves more of the fast producer and shows a 7.05 ms no-dKV/diagnostic floor, but its valid partial-store path still writes one selected contribution before final reduction and lands at 8.82 ms, slower than direct atomics.",
+    "The HIP full-window exact-sidecar resident valid-dKV path is also rejected at 42.12 ms because the full selected-window page and token_block=1 provide no route write reduction and overload the producer.",
+    "The retained design is exact group-id sidecar plus query-major producer, but the reducer must be a narrow in-epilogue segmented accumulator or lower-level cooperative producer-consumer, not hottest-group filtering, full-window residency, or active-group-owner replay."
+  ],
+  "next_kernel_contract": {
+    "producer": "Triton/HIP query-major H64/N64/D-block style, with q/dO loaded once for the selected-window work it consumes.",
+    "sidecar": "Exact group_ids[B,S,K] from forward, optionally prepacked as local selected-slot-to-group-slot metadata for the tile.",
+    "epilogue": "Use exact group ids to perform a narrow segmented reduction before global writes; issue final global atomics only after local reduction.",
+    "avoid": [
+      "bounded hot-group approximation",
+      "group-major or active-group-block producer ownership",
+      "full selected-window score/prob pages",
+      "HBM partial slabs that still write one row per selected contribution"
+    ]
+  }
+}

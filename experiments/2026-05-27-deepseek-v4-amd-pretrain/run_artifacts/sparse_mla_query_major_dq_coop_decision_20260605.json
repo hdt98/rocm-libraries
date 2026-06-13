@@ -1,0 +1,73 @@
+{
+  "artifact": "sparse_mla_query_major_dq_coop_decision",
+  "status": "same_workgroup_scorepage_dq_rejected_for_full_boundary_promotion",
+  "date": "2026-06-05",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "selected_block": 512,
+    "seq_chunk": 1
+  },
+  "baseline_gates_ms": {
+    "producer_only_query_major_scorepage": 4.796,
+    "triton_full_sparse_attention_backward": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.806
+  },
+  "measured_candidates": [
+    {
+      "name": "query_major_scorepage_scalar_dq",
+      "event_median_ms": 39.157901763916016,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_dq_s4096_layer2_sb512_sc1_20260605_v2.json",
+      "read": "Reached the source-boundary dQ contract but consumed dP x KV with scalar loops. This proves the binding/path but is not viable."
+    },
+    {
+      "name": "query_major_scorepage_mfma_dq_threads256",
+      "event_median_ms": 17.778579711914062,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_dq_mfma_s4096_layer2_sb512_sc1_20260605.json",
+      "read": "Replacing the scalar dQ consumer with CK MFMA cuts latency by about 2.2x, but it is still slower than the existing Triton full sparse-attention backward boundary before adding dKV."
+    },
+    {
+      "name": "query_major_scorepage_mfma_dq_threads512",
+      "event_median_ms": 19.087383270263672,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_dq_mfma_s4096_layer2_sb512_sc1_thr512_20260605.json",
+      "read": "Adding a second D-consumer wave group inside the same CTA loses to the 256-thread MFMA variant. LDS staging/thread pressure costs more than reduced serial D looping saves."
+    },
+    {
+      "name": "query_major_scorepage_mfma_dq_threads1024",
+      "event_median_ms": 23.934690475463867,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_dq_mfma_s4096_layer2_sb512_sc1_thr1024_20260605.json",
+      "read": "Four D-consumer wave groups lose further, confirming that simply widening the CTA is not the right cooperative mechanism."
+    },
+    {
+      "name": "query_major_scorepage_twostage_scaled_dp_page_dq",
+      "event_median_ms": 16.291025161743164,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_dq_twostage_s4096_layer2_sb512_sc1_20260605.json",
+      "read": "A separate producer writes a BF16 scaled-dP page and a D-parallel CK/rocWMMA consumer emits dQ. This is the best dQ-only rung so far and proves D-parallel consumption helps, but it pays an HBM/L2 page boundary and still fails the 11.13 ms full sparse-attention backward gate before adding dKV."
+    }
+  ],
+  "decision": {
+    "retained_candidate": "query_major_scorepage_twostage_scaled_dp_page_dq",
+    "promote_to_full_sparse_attention_boundary": false,
+    "why": "The best dQ-only path is now 16.29 ms with a BF16 scaled-dP page, while the current Triton full sparse-attention backward boundary is 11.13 ms including dKV. D-parallel consumption helps versus the 17.78 ms same-workgroup dQ path, but not enough to justify this two-kernel HBM-page design as a promotion target.",
+    "next_kernel_direction": "Keep D-parallel consumption, but do not materialize the scaled-dP page globally. The next real kernel must either use a persistent producer-consumer design with tiny immediately consumed score/scaled-dP pages or abandon full dQ materialization in this owner in favor of the faster Triton-style dQ path plus group-aware dKV epilogue. The dKV epilogue must remain group-aware before global writes; do not continue widening this CTA as the main path."
+  },
+  "changed_files": [
+    "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip"
+  ],
+  "validation": [
+    "python3 -m py_compile tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "S4096 MI350 timing-only scalar dQ run",
+    "S4096 MI350 timing-only MFMA dQ threads=256 run",
+    "S4096 MI350 timing-only MFMA dQ threads=512 run",
+    "S4096 MI350 timing-only MFMA dQ threads=1024 run",
+    "S4096 MI350 timing-only two-stage scaled-dP-page dQ run"
+  ]
+}

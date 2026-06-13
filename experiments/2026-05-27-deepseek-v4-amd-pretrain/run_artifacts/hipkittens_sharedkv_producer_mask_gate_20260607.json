@@ -1,0 +1,101 @@
+{
+  "artifact": "hipkittens_sharedkv_producer_mask_gate_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "operator": "HipKittens SharedKV backward latent-dKV epilogue fork",
+  "shape": {
+    "batch": 4,
+    "seq": 4096,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim": 128,
+    "route_mode": "all_cmp",
+    "active_cmp_tiles_in_route_blocks": 16,
+    "active_cmp_rows_in_route_blocks": 1024,
+    "query_chunks": 8
+  },
+  "source_change": {
+    "file": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_latent_epilogue_fork.cpp",
+    "compile_flags": {
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 6
+    },
+    "mode_6_contract": "Return early for all-inactive four-warp CTAs, compute a per-warp route_mask_allow_producer from the compact block/tile QueryTileMask, zero P_ij_bf16_col before dV accumulation, zero dP_ij_bf16_col before dK accumulation, and gate final dQ plus latent dKV writes for inactive resident tiles."
+  },
+  "compiler_resource_report": {
+    "total_sgprs": 105,
+    "vgprs": 256,
+    "agprs": 256,
+    "scratch_bytes_per_lane": 0,
+    "occupancy_waves_per_simd": 1,
+    "sgpr_spill": 0,
+    "vgpr_spill": 0
+  },
+  "baseline_and_prior_gate": {
+    "mode_0_sidecar_disabled_d128_event_ms_median": 4.469598054885864,
+    "mode_5_store_and_dq_gate_active_tiles_8_event_ms_median": 4.42180061340332,
+    "mode_5_store_and_dq_gate_active_tiles_1_event_ms_median": 4.366396903991699,
+    "prior_artifact": "run_artifacts/hipkittens_sharedkv_route_cull_epilogue_gate_20260607.json"
+  },
+  "mode_6_results": {
+    "active_tiles_8": {
+      "event_ms": {
+        "median": 4.622470378875732,
+        "mean": 4.619078731536865,
+        "min": 4.5536699295043945,
+        "max": 4.663431167602539
+      },
+      "wall_ms": {
+        "median": 4.639510065317154,
+        "mean": 4.644306330010295,
+        "min": 4.568675998598337,
+        "max": 4.709425033070147
+      },
+      "dCmpKV_nonzero": 262106,
+      "dCmpKV_norm": 33.03618240356445,
+      "dOriKV_nonzero": 0,
+      "dQ_nonzero": 134097853,
+      "dQ_norm": 8.269272804260254
+    },
+    "active_tiles_1": {
+      "event_ms": {
+        "median": 4.516205072402954,
+        "mean": 4.517480516433716,
+        "min": 4.4591450691223145,
+        "max": 4.576263904571533
+      },
+      "wall_ms": {
+        "median": 4.5614325208589435,
+        "mean": 4.543604818172753,
+        "min": 4.473936976864934,
+        "max": 4.591166041791439
+      },
+      "dCmpKV_nonzero": 32765,
+      "dCmpKV_norm": 11.682506561279297,
+      "dOriKV_nonzero": 0,
+      "dQ_nonzero": 134168572,
+      "dQ_norm": 5.865503787994385
+    },
+    "active_tiles_0": {
+      "event_ms": {
+        "median": 0.03756000101566315,
+        "mean": 0.03932010065764189,
+        "min": 0.02800000086426735,
+        "max": 0.06400000303983688
+      },
+      "wall_ms": {
+        "median": 0.056499033235013485,
+        "mean": 0.05890910979360342,
+        "min": 0.043230014853179455,
+        "max": 0.10809896048158407
+      },
+      "dCmpKV_nonzero": 0,
+      "dOriKV_nonzero": 0,
+      "dQ_nonzero": 0,
+      "note": "All-inactive block/tile sidecar path still early-returns correctly."
+    }
+  },
+  "decision": "reject mode_6 producer-value culling as a C4 SharedKV speed path",
+  "read": "Zeroing the P/dP tiles after they have been produced is still too late for the current four-warp HipKittens owner. It avoids inactive latent dKV outputs and validates the compact sidecar plumbing, but any remaining active resident tile keeps the full QK/P/dP/dQ query-sweep producer alive. Mode 6 is slower than the prior mode-5 store/dQ gate for both active_tiles=8 and active_tiles=1.",
+  "next_gate": "Do not keep adding late masks to this four-warp CTA. The next HipKittens candidate should make compressed-route ownership part of the producer decomposition itself, for example by splitting resident KV tiles into one-warp/tile CTAs or by building a source-boundary owner whose score/prob tile is keyed by active compressed groups before QK/P/dP/dQ accumulation."
+}

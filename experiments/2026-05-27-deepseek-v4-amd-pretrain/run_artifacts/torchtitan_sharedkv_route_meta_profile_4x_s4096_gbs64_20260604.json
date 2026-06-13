@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "artifact_kind": "profile_metadata_gate",
+  "title": "TorchTitan shared-KV sparse MLA route-meta profile",
+  "status": "evidence_only_not_promoted_baseline",
+  "objective_alignment": {
+    "track": "single_layer_sparse_mla_whole_boundary",
+    "reason": "Adds route-aware timing metadata at the sparse-MLA backward boundary so the TileLang dKV replacement can be judged against the full shared-KV backward path instead of only isolated kernel timings."
+  },
+  "local_code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "change_summary": [
+      "Added profiling-only helper _sharedkv_route_profile_meta.",
+      "Wired route metadata into flush_dsv4_profile_timing calls in shared-KV sparse MLA backward.",
+      "Metadata is computed only when the timing sidecar is enabled."
+    ],
+    "new_metadata_fields": [
+      "route_key",
+      "kv_local_count",
+      "compressed_group_count",
+      "selected",
+      "local_count",
+      "compressed_selected",
+      "valid_selected_pairs",
+      "valid_selected_per_query",
+      "observed_compress_ratio_from_kv",
+      "valid_local_pairs",
+      "valid_compressed_pairs",
+      "compressed_slice_local_hits",
+      "valid_local_per_query",
+      "valid_compressed_per_query"
+    ]
+  },
+  "validation": [
+    {
+      "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "where": "local",
+      "result": "passed"
+    },
+    {
+      "command": "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "where": "local_to_remote",
+      "result": "synced"
+    },
+    {
+      "command": "python3 -m py_compile /scratch/sonle5/dsv4_pretrain_canary_20260527/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "where": "remote do-sonle5-mi350-gpu",
+      "result": "passed"
+    }
+  ],
+  "negative_control": {
+    "run": "attempted 4x profile with base image on visible GPUs 0,1,2,3",
+    "result": "failed before training",
+    "root_cause": "ModuleNotFoundError: No module named 'mori'",
+    "read": "Wrong image for this candidate; MORI image is required for the current TorchTitan route."
+  },
+  "successful_profile_run": {
+    "run_id": "torchtitan_dsv4_sharedkv_route_meta_profile_4x_s4096_gbs64_steps2_moriimg_20260604",
+    "remote_node": "do-sonle5-mi350-gpu",
+    "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+    "visible_devices": "0,1,2,3",
+    "shape": {
+      "gpus": 4,
+      "sequence_length": 4096,
+      "global_batch_size": 64,
+      "micro_batch_size": 1,
+      "fsdp": 4,
+      "ep": 4,
+      "tp": 1,
+      "pp": 1,
+      "cp": 1
+    },
+    "training_config": {
+      "activation_checkpointing": "full",
+      "attention_backend": "shared_kv_backward_prototype",
+      "compressed_dkv_backend": "TileLang HSK BF16 source",
+      "moe_backend": "MORI AITER routed MoE"
+    },
+    "step_metrics": [
+      {
+        "step": 1,
+        "loss": 12.23638,
+        "tokens_per_gpu_s_range": [1888.0, 1890.0],
+        "tflops_per_gpu_range": [35.72, 35.77],
+        "logged_peak_memory_gib_range": [81.23, 84.60]
+      },
+      {
+        "step": 2,
+        "loss": 8.70994,
+        "grad_norm": 27.125,
+        "tokens_per_gpu_s": 4080.0,
+        "tflops_per_gpu": 77.21,
+        "mfu_percent": 3.34,
+        "logged_peak_memory_gib_range": [117.44, 196.33]
+      }
+    ],
+    "profile_files_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_route_meta_profile_4x_s4096_gbs64_steps2_moriimg_20260604/profiling/profile_timing/*.jsonl",
+    "profile_rows": 384,
+    "caveats": [
+      "Profiling enabled, so this is not a retained performance baseline.",
+      "TileLang still repeatedly compiles in this path.",
+      "TileLang data-race warning remains present for group_acc(cold_slot, d_i)."
+    ]
+  },
+  "route_key_counts": {
+    "missing_route_key": {
+      "count": 128,
+      "read": "Loss/chunked CE rows, not shared-KV route rows."
+    },
+    "layer=2|cr=4|S=4096|K=640|LC=128|G=1024": 128,
+    "layer=3|cr=128|S=4096|K=160|LC=128|G=32": 128
+  },
+  "route_metadata_samples": {
+    "layer2_cr4": {
+      "route_key": "layer=2|cr=4|S=4096|K=640|LC=128|G=1024",
+      "valid_selected_pairs": 2088512,
+      "valid_local_pairs": 516160,
+      "valid_compressed_pairs": 1572352,
+      "valid_compressed_per_query": 383.875,
+      "compressed_group_count": 1024,
+      "local_count": 128,
+      "selected": 640
+    },
+    "layer3_cr128": {
+      "route_key": "layer=3|cr=128|S=4096|K=160|LC=128|G=32",
+      "valid_selected_pairs": 579680,
+      "valid_local_pairs": 516160,
+      "valid_compressed_pairs": 63520,
+      "valid_compressed_per_query": 15.5078125,
+      "compressed_group_count": 32,
+      "local_count": 128,
+      "selected": 160
+    }
+  },
+  "route_timing_medians_ms": {
+    "layer2_cr4": {
+      "total_gpu_ms": 37.504,
+      "sharedkv_bwd.compressed_tilelang": 10.405,
+      "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 6.416,
+      "sharedkv_bwd.grad_logits_terms": 3.381,
+      "sharedkv_bwd.gather_selected_kv_fp32": 3.189,
+      "sharedkv_bwd.compressed.plan_b0": 2.639,
+      "sharedkv_bwd.scores_qk": 2.238,
+      "sharedkv_bwd.grad_q": 2.228,
+      "sharedkv_bwd.local_scatter": 2.039,
+      "sharedkv_bwd.local_dkv_math": 1.672,
+      "sharedkv_bwd.probs": 0.907,
+      "sharedkv_bwd.compressed.pack_hsk_b0": 0.857,
+      "sharedkv_bwd.grad_attn_sink": 0.688
+    },
+    "layer3_cr128": {
+      "total_gpu_ms": 13.270,
+      "sharedkv_bwd.compressed_tilelang": 2.517,
+      "sharedkv_bwd.local_scatter": 2.117,
+      "sharedkv_bwd.local_dkv_math": 1.740,
+      "sharedkv_bwd.compressed.plan_b0": 1.604,
+      "sharedkv_bwd.grad_logits_terms": 1.226,
+      "sharedkv_bwd.gather_selected_kv_fp32": 0.852,
+      "sharedkv_bwd.grad_attn_sink": 0.694,
+      "sharedkv_bwd.grad_q": 0.653,
+      "sharedkv_bwd.scores_qk": 0.544,
+      "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 0.332,
+      "sharedkv_bwd.q_do_cast": 0.276,
+      "sharedkv_bwd.probs": 0.232
+    }
+  },
+  "decision": {
+    "read": "The TileLang dKV body is not the whole sparse-MLA backward wall. At the layer-2 S4096 route, compressed TileLang is 10.4 ms median, but the full shared-KV backward boundary is 37.5 ms median before considering profile overhead and compile outliers. The next useful sparse branch remains whole-boundary fusion consuming q, dO, compressed/shared KV, LI indices, output, lse/sink directly, eliminating gather_selected_kv/probs/grad_logits/local scatter materialization instead of only replacing the late compressed dKV sink.",
+    "next_sparse_mla_action": "Port or fuse the producer boundary so contribution math, route mapping, dQ, local/compressed dKV, LI/compressor gradients, and sink terms share one saved-state contract.",
+    "not_a_promotion_reason": "This run is a two-step profiled gate with repeated TileLang compile behavior and does not improve stable e2e TFLOPs."
+  },
+  "dependency_pin_changes": []
+}

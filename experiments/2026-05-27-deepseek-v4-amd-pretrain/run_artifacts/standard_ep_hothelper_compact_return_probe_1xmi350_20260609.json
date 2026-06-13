@@ -1,0 +1,144 @@
+{
+  "artifact": "standard_ep_hothelper_compact_return_probe_1xmi350_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "kind": "standard_ep_hothelper_compact_return_probe",
+  "result": "completed_correctness_smoke_and_tailrow_timing_curve_diagnostic_only",
+  "code_change": {
+    "file": "tools/dsv4_runtime_probe/probe_owned_expert_vjp_ep_shape.py",
+    "new_flag": "--grouped-mm-compact-return",
+    "contract": "Return dx_compact and dTopK_compact from helper VJP without dense token/top-k scatter. Densify only for optional correctness checks."
+  },
+  "correctness_smoke": {
+    "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/compact_return_20260609/standard_ep_hothelper_compact_return_smoke_512_1xmi350_20260609.json",
+    "tokens_per_rank": 512,
+    "ok": true,
+    "max_abs_by_output": {
+      "grouped_mm_compact_return_dtopk": 0.011243343353271484,
+      "grouped_mm_compact_return_dw1": 0.0078125,
+      "grouped_mm_compact_return_dw2": 0.00390625,
+      "grouped_mm_compact_return_dw3": 0.015625,
+      "grouped_mm_compact_return_dx": 0.0625
+    },
+    "rel_l2_by_output": {
+      "grouped_mm_compact_return_dtopk": 0.00018227598765805877,
+      "grouped_mm_compact_return_dw1": 0.0035279312531549547,
+      "grouped_mm_compact_return_dw2": 0.00009165200786696794,
+      "grouped_mm_compact_return_dw3": 0.003607256547646798,
+      "grouped_mm_compact_return_dx": 0.004188794802421012
+    }
+  },
+  "probe_command_shape": {
+    "script": "tools/dsv4_runtime_probe/probe_owned_expert_vjp_ep_shape.py",
+    "common_args": "--world-size 1 --hidden 4096 --intermediate 2048 --experts 8 --topk 1 --dtype bfloat16 --warmup 1 --iters 3 --backend torch --grouped-mm-autograd --grouped-mm-scatter-autograd --grouped-mm-scatter-backend triton --grouped-mm-manual-return --grouped-mm-compact-return",
+    "smoke_args": "--tokens-per-rank 512 --warmup 1 --iters 1 --grouped-mm-compact-return --check",
+    "runtime": "HIP_VISIBLE_DEVICES=1 PYTHONPATH=/workspace/sources/wip/torchtitan inside Nexus ROCm 7.2 MORI image"
+  },
+  "rows": [
+    {
+      "label": "medianrows",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/compact_return_20260609/standard_ep_hothelper_compact_return_medianrows_1xmi350_20260609.json",
+      "tokens_per_rank": 69635,
+      "route_stats": {
+        "assignments_to_owner_rank": 69635,
+        "mean_per_local_expert": 8704.375,
+        "max_per_local_expert": 8830,
+        "padding_multiplier_local_max": 1.0144323975012566
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 14.712836265563965,
+        "grouped_mm_scatter_full_forward_backward": 17.854000091552734,
+        "grouped_mm_manual_return_full_forward_backward": 18.827007293701172,
+        "grouped_mm_compact_return_full_forward_backward": 17.2398681640625,
+        "torch_padded_full_vjp": 17.53863525390625,
+        "compact_return_compact_grad": 2.5364339351654053,
+        "compact_return_backward_saved_graph": 12.80640983581543,
+        "manual_dtopk_dense_scatter": 1.566061019897461,
+        "manual_dx_dense_scatter": 1.3002170324325562
+      },
+      "estimated_tflops": {
+        "grouped_mm_compact_return_full_forward_backward": 609.8963649477407,
+        "grouped_mm_scatter_full_forward_backward": 588.9174902835775,
+        "grouped_mm_only_full_forward_backward": 714.6503050570693
+      },
+      "derived": {
+        "compact_return_vs_scatter_speedup": 1.0356227740053388,
+        "compact_return_ms_saved_vs_scatter": 0.6141319274902344,
+        "compact_return_vs_padded_speedup": 1.0173300101253993,
+        "compact_return_gap_vs_grouped_mm_only_ms": 2.527031898498535,
+        "dense_scatter_visible_ms": 2.866278052330017
+      }
+    },
+    {
+      "label": "p95rows",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/compact_return_20260609/standard_ep_hothelper_compact_return_p95rows_1xmi350_20260609.json",
+      "tokens_per_rank": 128284,
+      "route_stats": {
+        "assignments_to_owner_rank": 128284,
+        "mean_per_local_expert": 16035.5,
+        "max_per_local_expert": 16286,
+        "padding_multiplier_local_max": 1.0156215895980794
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 22.36199188232422,
+        "grouped_mm_scatter_full_forward_backward": 28.24835205078125,
+        "grouped_mm_manual_return_full_forward_backward": 29.968210220336914,
+        "grouped_mm_compact_return_full_forward_backward": 27.120094299316406,
+        "torch_padded_full_vjp": 31.637678146362305,
+        "compact_return_compact_grad": 4.642144203186035,
+        "compact_return_backward_saved_graph": 20.26215934753418,
+        "manual_dtopk_dense_scatter": 2.8563590049743652,
+        "manual_dx_dense_scatter": 2.325911045074463
+      },
+      "estimated_tflops": {
+        "grouped_mm_compact_return_full_forward_backward": 714.2392346542929,
+        "grouped_mm_scatter_full_forward_backward": 685.7120500790519,
+        "grouped_mm_only_full_forward_backward": 866.2124330438999
+      },
+      "derived": {
+        "compact_return_vs_scatter_speedup": 1.0416022798081968,
+        "compact_return_ms_saved_vs_scatter": 1.1282577514648438,
+        "compact_return_vs_padded_speedup": 1.1665769962739314,
+        "compact_return_gap_vs_grouped_mm_only_ms": 4.7581024169921875,
+        "dense_scatter_visible_ms": 5.182270050048828
+      }
+    },
+    {
+      "label": "maxrows",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/compact_return_20260609/standard_ep_hothelper_compact_return_maxrows_1xmi350_20260609.json",
+      "tokens_per_rank": 147159,
+      "route_stats": {
+        "assignments_to_owner_rank": 147159,
+        "mean_per_local_expert": 18394.875,
+        "max_per_local_expert": 18589,
+        "padding_multiplier_local_max": 1.0105532111525628
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 27.68659210205078,
+        "grouped_mm_scatter_full_forward_backward": 34.95041275024414,
+        "grouped_mm_manual_return_full_forward_backward": 36.33467102050781,
+        "grouped_mm_compact_return_full_forward_backward": 33.17519760131836,
+        "torch_padded_full_vjp": 36.421714782714844,
+        "compact_return_compact_grad": 5.339715957641602,
+        "compact_return_backward_saved_graph": 24.32110023498535,
+        "manual_dtopk_dense_scatter": 3.227484941482544,
+        "manual_dx_dense_scatter": 2.644437074661255
+      },
+      "estimated_tflops": {
+        "grouped_mm_compact_return_full_forward_backward": 669.7854593400517,
+        "grouped_mm_scatter_full_forward_backward": 635.7654521244755,
+        "grouped_mm_only_full_forward_backward": 802.5641033101404
+      },
+      "derived": {
+        "compact_return_vs_scatter_speedup": 1.0535103112348978,
+        "compact_return_ms_saved_vs_scatter": 1.7752151489257812,
+        "compact_return_vs_padded_speedup": 1.0978597692291505,
+        "compact_return_gap_vs_grouped_mm_only_ms": 5.488605499267578,
+        "dense_scatter_visible_ms": 5.871922016143799
+      }
+    }
+  ],
+  "read": "The compact-return contract is correct in the 512-row smoke and gives a real but modest tail improvement: at max current-best tail rows it is 33.175 ms versus 34.950 ms for scatter-inclusive grouped-MM and 36.422 ms padded VJP. This recovers about 1.78 ms from the return/scatter boundary, but remains 5.49 ms slower than grouped-MM-only at the same tail. Therefore the next implementation still needs a fused/batched compact helper VJP plus compact dispatcher return; compact return alone is not enough to close the MoE/EP wall.",
+  "promotion_status": "diagnostic_only_no_e2e_promotion"
+}

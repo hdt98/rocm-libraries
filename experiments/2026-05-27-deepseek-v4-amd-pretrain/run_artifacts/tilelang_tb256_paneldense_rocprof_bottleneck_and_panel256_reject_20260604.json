@@ -1,0 +1,442 @@
+{
+  "status": "ok",
+  "scope": "tilelang_tb256_paneldense_current_best_bottleneck_and_smaller_panel_decision",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "current_retained_candidate": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps512_cap320_k64d64_thr512_timing10_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "compressed_groups": 1024,
+      "heads": 64,
+      "dim": 512,
+      "topk": 640,
+      "valid_topk": 512,
+      "token_block": 256,
+      "selected_window": 320,
+      "group_panel_size": 512,
+      "block_k": 64,
+      "block_d": 64,
+      "row_block": 8,
+      "threads": 512,
+      "math_mode": "mfma_reduced",
+      "route_pattern": "panel_capacity_random",
+      "cluster_width": 640,
+      "cluster_stride": 4,
+      "weight_source": "input",
+      "output_layout": "[groups, D]",
+      "fold_final_dkv": true,
+      "fold_backend": "tilelang_panel_dense"
+    },
+    "full_final_dkv_median_ms": 7.990410327911377,
+    "full_final_dkv_samples_ms": [
+      7.989390850067139,
+      8.161751747131348,
+      8.009950637817383,
+      7.967830181121826,
+      7.9805908203125,
+      7.986471176147461,
+      7.993511199951172,
+      7.980350017547607,
+      7.994911193847656,
+      7.991429805755615
+    ],
+    "fold_only_median_ms": 0.01397999981418252,
+    "producer_estimate_ms": 7.976430328097194,
+    "compact_route_subset": {
+      "partials_mib": 32.0,
+      "write_reduction_x": 128.0,
+      "token_tiles": 16,
+      "selected_tiles": 2,
+      "route_tiles": 32,
+      "active_partial_rows": 16384,
+      "max_active_groups": 512,
+      "padded_selected_write_mib_fp32": 5120.0
+    }
+  },
+  "previous_tb64_profile": {
+    "artifact": "run_artifacts/tilelang_wide_panel_paneldense_rocprof_bottleneck_20260604.json",
+    "full_final_dkv_median_ms": 8.1296706199646,
+    "fold_only_median_ms": 0.048500001430511475,
+    "producer_trace_steady_ms": 8.054311,
+    "partials_mib": 128.0,
+    "pmc_median_counters": {
+      "SQ_INSTS": 928540592.0,
+      "SQ_INSTS_BRANCH": 45633008.0,
+      "SQ_INSTS_LDS": 318886720.0,
+      "SQ_INSTS_MFMA": 41943040.0,
+      "SQ_INSTS_SALU": 96559104.0,
+      "SQ_INSTS_VALU": 272679952.0,
+      "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+      "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+      "SQ_INSTS_VMEM": 51316736.0,
+      "SQ_INSTS_VMEM_RD": 51185664.0,
+      "SQ_INSTS_VMEM_WR": 131072.0,
+      "SQ_LDS_ADDR_CONFLICT": 0.0,
+      "SQ_LDS_BANK_CONFLICT": 352425472.0,
+      "SQ_LDS_IDX_ACTIVE": 1025788288.0,
+      "SQ_WAVES": 8192.0
+    }
+  },
+  "tb256_trace": {
+    "remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_tb256_paneldense_trace_20260604T0648",
+    "local_tmp_raw_dir": "/tmp/tilelang_tb256_paneldense_trace_20260604T0648",
+    "timed_summary": "run_artifacts/tilelang_tb256_paneldense_rocprof_trace_timed_20260604T0648.json",
+    "producer_dispatch_ms": [
+      8.019301,
+      7.941382,
+      8.025662,
+      7.946301
+    ],
+    "producer_dispatch_median_ms": 7.982801,
+    "fold_dispatch_ms": [
+      0.00628,
+      0.00608,
+      0.00612,
+      0.00692,
+      0.00656,
+      0.00684
+    ],
+    "fold_dispatch_median_ms": 0.00642,
+    "dispatches": [
+      {
+        "dispatch_id": 13,
+        "kernel_name": "compact_partial_prim_kernel",
+        "duration_ms": 8.019301,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          16,
+          2
+        ],
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 14,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00628,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 15,
+        "kernel_name": "compact_partial_prim_kernel",
+        "duration_ms": 7.941382,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          16,
+          2
+        ],
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 16,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00608,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 20,
+        "kernel_name": "compact_partial_prim_kernel",
+        "duration_ms": 8.025662,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          16,
+          2
+        ],
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 21,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00612,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 25,
+        "kernel_name": "compact_partial_prim_kernel",
+        "duration_ms": 7.946301,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          16,
+          2
+        ],
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 26,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00692,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 27,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00656,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      },
+      {
+        "dispatch_id": 31,
+        "kernel_name": "panel_dense_final_fold_prim_kernel",
+        "duration_ms": 0.00684,
+        "workgroup_size": 512,
+        "grid_size_xyz": [
+          4096,
+          1024,
+          1
+        ],
+        "vgpr_count": 20,
+        "sgpr_count": 16,
+        "lds_block_size_reported": 0,
+        "scratch_size": 0
+      }
+    ]
+  },
+  "tb256_pmc_artifacts": {
+    "primary_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_tb256_compact_pmc_primary_20260604T0650",
+    "valu_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_tb256_compact_pmc_valu_20260604T0651",
+    "ldsconf_remote_raw_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/tilelang_tb256_compact_pmc_ldsconf_20260604T0652",
+    "primary_timed_summary": "run_artifacts/tilelang_tb256_paneldense_pmc_primary_timed_20260604T0650.json",
+    "valu_timed_summary": "run_artifacts/tilelang_tb256_paneldense_pmc_valu_timed_20260604T0651.json",
+    "ldsconf_timed_summary": "run_artifacts/tilelang_tb256_paneldense_pmc_ldsconf_timed_20260604T0652.json",
+    "kernel_include_regex": "compact_partial_prim_kernel",
+    "iteration_filter": "[2-3]"
+  },
+  "tb256_pmc_per_dispatch": {
+    "primary": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 7.970137,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS": 924522416.0,
+          "SQ_INSTS_MFMA": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+          "SQ_INSTS_VMEM": 51218432.0,
+          "SQ_INSTS_VMEM_RD": 51185664.0,
+          "SQ_INSTS_VMEM_WR": 32768.0,
+          "SQ_WAVES": 2048.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.047061,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS": 924522416.0,
+          "SQ_INSTS_MFMA": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+          "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+          "SQ_INSTS_VMEM": 51218432.0,
+          "SQ_INSTS_VMEM_RD": 51185664.0,
+          "SQ_INSTS_VMEM_WR": 32768.0,
+          "SQ_WAVES": 2048.0
+        }
+      }
+    ],
+    "valu_lanes": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 7.957345,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS_BRANCH": 45479408.0,
+          "SQ_INSTS_LDS": 318690112.0,
+          "SQ_INSTS_SALU": 95705088.0,
+          "SQ_INSTS_VALU": 270222352.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.051384,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_INSTS_BRANCH": 45479408.0,
+          "SQ_INSTS_LDS": 318690112.0,
+          "SQ_INSTS_SALU": 95705088.0,
+          "SQ_INSTS_VALU": 270222352.0
+        }
+      }
+    ],
+    "lds_conflict": [
+      {
+        "dispatch_id": 15,
+        "duration_ms": 7.953668,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_LDS_ADDR_CONFLICT": 0.0,
+          "SQ_LDS_BANK_CONFLICT": 352425472.0,
+          "SQ_LDS_IDX_ACTIVE": 1024608640.0
+        }
+      },
+      {
+        "dispatch_id": 20,
+        "duration_ms": 8.072112,
+        "kernel_name": "compact_partial_prim_kernel",
+        "workgroup_size": 512,
+        "grid_size_workitems": 131072,
+        "vgpr_count": 92,
+        "sgpr_count": 64,
+        "counters": {
+          "SQ_LDS_ADDR_CONFLICT": 0.0,
+          "SQ_LDS_BANK_CONFLICT": 352425472.0,
+          "SQ_LDS_IDX_ACTIVE": 1024608640.0
+        }
+      }
+    ]
+  },
+  "tb256_pmc_median_counters": {
+    "SQ_INSTS": 924522416.0,
+    "SQ_INSTS_BRANCH": 45479408.0,
+    "SQ_INSTS_LDS": 318690112.0,
+    "SQ_INSTS_MFMA": 41943040.0,
+    "SQ_INSTS_SALU": 95705088.0,
+    "SQ_INSTS_VALU": 270222352.0,
+    "SQ_INSTS_VALU_MFMA_BF16": 41943040.0,
+    "SQ_INSTS_VALU_MFMA_MOPS_BF16": 671088640.0,
+    "SQ_INSTS_VMEM": 51218432.0,
+    "SQ_INSTS_VMEM_RD": 51185664.0,
+    "SQ_INSTS_VMEM_WR": 32768.0,
+    "SQ_LDS_ADDR_CONFLICT": 0.0,
+    "SQ_LDS_BANK_CONFLICT": 352425472.0,
+    "SQ_LDS_IDX_ACTIVE": 1024608640.0,
+    "SQ_WAVES": 2048.0
+  },
+  "tb256_pmc_counter_percent_of_sq_insts": {
+    "SQ_INSTS": 100.0,
+    "SQ_INSTS_BRANCH": 4.919232591111128,
+    "SQ_INSTS_LDS": 34.470782588358574,
+    "SQ_INSTS_MFMA": 4.536725045723499,
+    "SQ_INSTS_SALU": 10.351840728110588,
+    "SQ_INSTS_VALU": 29.228318029229918,
+    "SQ_INSTS_VALU_MFMA_BF16": 4.536725045723499,
+    "SQ_INSTS_VALU_MFMA_MOPS_BF16": 72.58760073157599,
+    "SQ_INSTS_VMEM": 5.5399881185790525,
+    "SQ_INSTS_VMEM_RD": 5.5364438021370805,
+    "SQ_INSTS_VMEM_WR": 0.0035443164419714833,
+    "SQ_LDS_ADDR_CONFLICT": 0.0,
+    "SQ_LDS_BANK_CONFLICT": 38.11973251279177,
+    "SQ_LDS_IDX_ACTIVE": 110.82572172052127,
+    "SQ_WAVES": 0.0002215197776232177
+  },
+  "tb256_derived": {
+    "vmem_read_fraction_of_vmem_insts": 0.9993602303170859,
+    "vmem_write_fraction_of_vmem_insts": 0.0006397696829141509,
+    "lds_bank_conflict_per_lds_idx_active": 0.3439610581460644,
+    "producer_trace_speedup_vs_tb64_trace": 1.0089580085987362,
+    "full_path_speedup_vs_tb64_timing10": 1.0174284281204897,
+    "partial_stream_reduction_vs_tb64_x": 4.0,
+    "vmem_write_inst_reduction_vs_tb64_x": 4.0,
+    "waves_reduction_vs_tb64_x": 4.0,
+    "sq_insts_reduction_vs_tb64_x": 1.0043462180369676,
+    "lds_insts_reduction_vs_tb64_x": 1.0006169253221135
+  },
+  "smaller_panel_candidate": {
+    "decision": "reject",
+    "why": "Halving group_panel_size from 512 to 256 halves the per-CTA active table, but doubles selected panels and increases padded selected work. It preserves correctness at S128 but regresses target S4096 latency from 7.99 ms to 9.59 ms.",
+    "s128_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s128_valid512_tb256_gps256_cap192_k64d64_thr512_correct_20260604.json",
+    "s4096_artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_fold_tilelang_panel_dense_s4096_valid512_tb256_gps256_cap192_k64d64_thr512_timing10_20260604.json",
+    "s128_max_abs_diff": 1.862645149230957e-08,
+    "s4096_full_final_dkv_median_ms": 9.588248252868652,
+    "s4096_fold_only_median_ms": 0.0142000000923872,
+    "compact_route_subset": {
+      "partials_mib": 32.0,
+      "write_reduction_x": 128.0,
+      "token_tiles": 16,
+      "selected_tiles": 4,
+      "route_tiles": 64,
+      "active_partial_rows": 16384,
+      "max_active_groups": 256,
+      "padded_selected_write_mib_fp32": 6144.0
+    }
+  },
+  "read": "The current best TileLang compact-final branch is tb256/gps512/cap320, not tb64. It reduces the compact partial stream 4x, from 128 MiB to 32 MiB, and reduces VMEM write instructions 4x and waves 4x, but full latency improves only about 1.6 percent because total producer instruction count barely changes: tb256 still issues about 924.5M SQ instructions, including 318.7M LDS, 270.2M VALU, 95.7M SALU, 45.5M branch, and the same 41.9M BF16 MFMA instructions. The fold is solved: trace fold dispatch is about 0.006 ms and timed fold-only is sub-0.04 ms. The remaining wall is still the producer body: the large dynamic shared-memory accumulation table plus PairSlots/index/control work around the MFMA loop. The smaller 256-group panel experiment validates the intuition but rejects that simple lever; smaller LDS per CTA is outweighed by more panels and more padded selected chunks.",
+  "decision": "retain_tb256_gps512_cap320_current_best; reject_gps256_cap192; next_work_rewrite_producer_not_fold",
+  "next_kernel_targets": [
+    "Do not spend more time on final fold/scatter; upside is below 0.05 ms.",
+    "A simple smaller panel is not enough. Need a producer layout that reduces LDS/index work without increasing panel count or selected chunks.",
+    "Investigate register or wave-local segmented accumulation for hot subset rows, or fuse compressor/LI dKV consumption so the producer avoids the dense 512x64 FP32 table.",
+    "If staying in TileLang, inspect generated source and try reducing PairSlots double-load/control paths before changing the route panel geometry again."
+  ]
+}

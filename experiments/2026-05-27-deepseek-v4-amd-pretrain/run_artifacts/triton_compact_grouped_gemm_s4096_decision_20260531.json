@@ -1,0 +1,132 @@
+{
+  "artifact": "triton_compact_grouped_gemm_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "S4096 one-MI350 BF16 compact variable-row Triton grouped-GEMM probe for the two dominant routed-MoE dgrad-style contractions.",
+  "source_artifacts": {
+    "s4096_w2_dgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_s4096_w2_dgrad_20260531.json",
+    "s4096_w1_xgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_s4096_w1_xgrad_20260531.json",
+    "s2048_prior_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_decision_20260531.json",
+    "grouped_bmm_s4096_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_decision_20260531.json",
+    "compact_dgrad_backend_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_dgrad_backend_decision_20260531.json"
+  },
+  "run": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "gpu_selection": "HIP_VISIBLE_DEVICES=0",
+    "external_gpu_state": "A separate Python job was active on GPU 1; this probe was pinned to GPU 0.",
+    "dtype": "bfloat16",
+    "tokens": 4096,
+    "assignments": 24576,
+    "experts": 384,
+    "topk": 6,
+    "route": {
+      "min_per_expert": 45,
+      "mean_per_expert": 64.0,
+      "max_per_expert": 88,
+      "padded_rows_global_max": 33792,
+      "padding_multiplier_global_max": 1.375,
+      "compact_vs_padded_flop_ratio": 0.7272727272727273
+    },
+    "tile_sweep": {
+      "block_m": [
+        8,
+        16,
+        32
+      ],
+      "block_n": [
+        64,
+        128
+      ],
+      "block_k": [
+        64
+      ],
+      "num_warps": [
+        4,
+        8
+      ],
+      "warmup": 2,
+      "iters": 5
+    }
+  },
+  "correctness": {
+    "w2_dgrad": {
+      "ok": true,
+      "max_abs": 0.0,
+      "pct_close": 100.0,
+      "atol": 0.5,
+      "rtol": 0.025
+    },
+    "w1_xgrad": {
+      "ok": true,
+      "max_abs": 0.0,
+      "pct_close": 100.0,
+      "atol": 0.5,
+      "rtol": 0.025
+    }
+  },
+  "results": {
+    "w2_dgrad": {
+      "contract": "dY_compact [24576, 7168] x W2 [384, 7168, 3072] -> dHidden_compact [24576, 3072]",
+      "best_triton": {
+        "median_ms": 9.478070259094238,
+        "min_ms": 9.4097900390625,
+        "compact_tflops_median": 114.19326181439722,
+        "config": {
+          "block_m": 32,
+          "block_n": 128,
+          "block_k": 64,
+          "num_warps": 4
+        }
+      },
+      "torch_padded_bmm_out": {
+        "median_ms": 3.0193428993225098,
+        "min_ms": 2.9986228942871094,
+        "padded_tflops_median": 492.89074400854855,
+        "compact_equivalent_tflops_median": 358.46599564258076
+      },
+      "triton_over_torch_padded_bmm_out": 3.1391168993366674,
+      "triton_speedup_vs_torch_padded_bmm_out": 0.3185609324245556
+    },
+    "w1_xgrad": {
+      "contract": "dGate_or_dUp_compact [24576, 3072] x W1_or_W3 [384, 3072, 7168] -> dHidden_compact [24576, 7168]",
+      "best_triton": {
+        "median_ms": 7.927333831787109,
+        "min_ms": 7.8829731941223145,
+        "compact_tflops_median": 136.53162356453998,
+        "config": {
+          "block_m": 32,
+          "block_n": 128,
+          "block_k": 64,
+          "num_warps": 4
+        }
+      },
+      "torch_padded_bmm_out": {
+        "median_ms": 3.0605309009552,
+        "min_ms": 3.0429298877716064,
+        "padded_tflops_median": 486.2575207456741,
+        "compact_equivalent_tflops_median": 353.6418332695812
+      },
+      "triton_over_torch_padded_bmm_out": 2.5901825528195886,
+      "triton_speedup_vs_torch_padded_bmm_out": 0.386073169857317
+    }
+  },
+  "decision": {
+    "status": "demote_naive_triton_compact_grouped_gemm_at_s4096",
+    "read": "The compact Triton probe is correct and removes the 1.375x padded-row work, but the naive tile schedule loses 2.6-3.1x to padded torch.bmm(out=). This confirms that row compaction alone is insufficient; the replacement must preserve high MFMA utilization and avoid per-expert tiny-M launch/scheduling inefficiency.",
+    "do_not_promote": [
+      "Current standalone Triton compact variable-row grouped GEMM for W2 dgrad",
+      "Current standalone Triton compact variable-row grouped GEMM for W1/W3 xgrad"
+    ],
+    "focus_next": [
+      "A custom CK/CK-Tile or TileLang grouped kernel specialized for M around 45-88, K/N = 7168/3072 and 3072/7168, with row compaction but library-like MFMA efficiency.",
+      "A fused backward kernel that combines W2 dgrad, SwiGLU derivative, W1/W3 xgrad accumulation, and compact-to-token reduce, so launch and memory traffic savings offset custom scheduling cost.",
+      "Wgrad bundling remains a separate required path; the dgrad-only compact tile is not sufficient for full-layer promotion."
+    ]
+  },
+  "commands": {
+    "stage": "RUN_TAG=triton_compact_s4096_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh stage",
+    "w2_dgrad": "ssh do-sonle-kernel \"docker exec -e HIP_VISIBLE_DEVICES=0 -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc 'PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_triton_compact_grouped_gemm.py --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --dtype bfloat16 --op w2_dgrad --warmup 2 --iters 5 --block-m 8 16 32 --block-n 64 128 --block-k 64 --num-warps 4 8 --check --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/triton_compact_s4096_20260531/triton_compact_s4096_w2_dgrad/summary.json'\"",
+    "w1_xgrad": "ssh do-sonle-kernel \"docker exec -e HIP_VISIBLE_DEVICES=0 -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc 'PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_triton_compact_grouped_gemm.py --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --dtype bfloat16 --op w1_xgrad --warmup 2 --iters 5 --block-m 8 16 32 --block-n 64 128 --block-k 64 --num-warps 4 8 --check --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/triton_compact_s4096_20260531/triton_compact_s4096_w1_xgrad/summary.json'\""
+  },
+  "dependency_pin_changes": []
+}

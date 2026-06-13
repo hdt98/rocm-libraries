@@ -1,0 +1,84 @@
+{
+  "artifact": "hipkittens_sharedkv_cmp_route_scan_gate_20260607",
+  "status": "route_owner_metadata_gate_passed",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_cmp_route_scan.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_cmp_route_scan.py",
+    "reference_snapshot": "sources/references/hipkittens"
+  },
+  "build": {
+    "command": "make hk_sharedkv_cmp_route_scan GPU_TARGET=CDNA4 THUNDERKITTENS_ROOT=/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/hipkittens ATTN_B=4 ATTN_H=64 ATTN_H_KV=1 ATTN_N=4096",
+    "resource_report": {
+      "total_sgprs": 38,
+      "vgprs": 21,
+      "agprs": 0,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 8,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0,
+      "lds_bytes_per_block": 1024
+    }
+  },
+  "run_command": "PYTHONPATH=/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner python3 probe_hipkittens_sharedkv_cmp_route_scan.py --batch 4 --seq-len 4096 --shapes 4:512,128:32 --warmup 5 --iters 20",
+  "shape_contract": {
+    "batch": 4,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "metadata": "forward-known top_indices packed into route bitset [B,S,ceil(groups/32),1]",
+    "measured_boundary": "compressed-group owner route scan only; no QK/P/dP MFMA math and no dCmpKV stores"
+  },
+  "c4": {
+    "compress_ratio": 4,
+    "topk": 512,
+    "groups": 1024,
+    "words_per_token": 32,
+    "metadata_bytes": {
+      "top_indices_int32": 33554432,
+      "route_bitset_int32": 2097152,
+      "counts_int32": 16384
+    },
+    "count_correctness": {
+      "expected_total_pairs": 6289408,
+      "observed_total_pairs": 6289408,
+      "max_abs_diff": 0,
+      "nonzero_diff": 0
+    },
+    "route_scan_event_ms": {
+      "median": 0.0894010029733181,
+      "mean": 0.08952665030956268,
+      "min": 0.08523999899625778,
+      "max": 0.09436099976301193
+    }
+  },
+  "c128": {
+    "compress_ratio": 128,
+    "topk": 32,
+    "groups": 32,
+    "words_per_token": 1,
+    "metadata_bytes": {
+      "top_indices_int32": 2097152,
+      "route_bitset_int32": 65536,
+      "counts_int32": 512
+    },
+    "count_correctness": {
+      "expected_total_pairs": 254080,
+      "observed_total_pairs": 254080,
+      "max_abs_diff": 0,
+      "nonzero_diff": 0
+    },
+    "route_scan_event_ms": {
+      "median": 0.022579999640583992,
+      "mean": 0.02356014996767044,
+      "min": 0.019120000302791595,
+      "max": 0.0376800000667572
+    }
+  },
+  "decision": {
+    "read": "The compressed-group owner metadata scan is not a hidden wall. C4 scans all B4/S4096 route bitsets for 1024 compressed groups in about 0.089 ms with exact count parity. Together with the earlier 0.349 ms C4 bitset pack, route metadata overhead is well below the current C4 SharedKV dKV accumulation wall.",
+    "next_kernel_gate": "Attach the HipKittens QK/P/dP MFMA producer to this compressed-group-owned row schedule and emit owned dCmpKV rows, while keeping dQ on the existing query-major path until compressed dKV owner latency beats the C4 query-major atomic wall.",
+    "not_an_e2e_claim": true
+  }
+}

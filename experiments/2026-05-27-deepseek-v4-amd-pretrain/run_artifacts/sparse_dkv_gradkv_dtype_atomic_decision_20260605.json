@@ -1,0 +1,82 @@
+{
+  "status": "diagnostic_decision",
+  "date": "2026-06-05",
+  "scope": "DeepSeek-V4 sparse MLA / Lightning Indexer compressed dKV backward",
+  "question": "Do similar attention backward kernels typically use FP8, and would narrowing the sparse dKV atomic destination help our S4096 wall?",
+  "read": "FP8 attention backward exists in NVIDIA cuDNN/TransformerEngine, but it is not the common portable Triton/TileLang/AMD path. Our local sparse TileLang diagnostic is BF16 input with FP32 accumulation. Narrowing only the final grad_kv atomic destination to BF16 gives a small improvement, not a solution.",
+  "external_reference_summary": {
+    "triton_fused_attention_tutorial": "The official Triton fused-attention tutorial includes an FP8 provider for forward but skips FP8 backward.",
+    "nvidia_transformer_engine": "TransformerEngine exposes FP8 attention through the cuDNN fused-attention sub-backend; FlashAttention backend remains BF16/FP16.",
+    "cudnn_frontend": "cuDNN Frontend documents FP8 SDPA backward, but that is a NVIDIA/cuDNN path rather than an AMD/Triton/TileLang primitive we can directly reuse."
+  },
+  "local_reference_summary": {
+    "tilelang_sparse_mqa_bwd_diagnostic": "Asserts dtype == T.bfloat16 and accum_dtype == T.float32.",
+    "benchmark_tilelang_sparse_mqa_bwd_reference": "Models atomic_addx4 calls as batch * seq_len * topk * dim / 4.",
+    "mori": "FP8 appears mainly in EP dispatch/combine communication/quantization paths, not as the sparse attention backward dKV accumulation primitive."
+  },
+  "shape": {
+    "node": "do-sonle-kernel",
+    "gpu": "1x MI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "kernel": {
+    "file": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py",
+    "kernel_mode": "dot_k_atomic",
+    "seq_chunk": 32,
+    "group_block": 64,
+    "selected_block": 64,
+    "block_u": 64,
+    "block_d": 16,
+    "block_h": 64,
+    "block_k": 64,
+    "num_warps": 8,
+    "notes": "Diagnostic still consumes materialized probs and grad_logits, so this is not an e2e-promotable sparse-MLA backward boundary."
+  },
+  "runs": {
+    "fp32_grad_kv": {
+      "artifact": "actual_li_dotk_atomic_gradkv_fp32_s4096_layer2_20260605.json",
+      "grad_kv_dtype": "float32",
+      "event_median_ms": 8.493246078491211,
+      "event_samples_ms": [
+        8.493246078491211,
+        8.900484085083008,
+        8.356840133666992
+      ],
+      "modeled_atomic_elements": 805044224,
+      "modeled_payload_bytes": 3220176896,
+      "checksum_norm": 960.2500610351562
+    },
+    "bf16_grad_kv": {
+      "artifact": "actual_li_dotk_atomic_gradkv_bf16_s4096_layer2_20260605.json",
+      "grad_kv_dtype": "bfloat16",
+      "event_median_ms": 7.726442813873291,
+      "event_samples_ms": [
+        7.726442813873291,
+        8.20776653289795,
+        7.489159107208252
+      ],
+      "modeled_atomic_elements": 805044224,
+      "modeled_payload_bytes": 1610088448,
+      "checksum_norm": 954.275146484375
+    }
+  },
+  "comparison": {
+    "payload_reduction_x": 2.0,
+    "median_speedup_x": 1.099249172090585,
+    "median_latency_reduction_ms": 0.7668032646179199,
+    "median_latency_reduction_pct": 9.028315621209734,
+    "coalesced_active_list_reduction_target_x": 23.813051840857806
+  },
+  "decision": {
+    "do_not_pivot_to_fp8_first": true,
+    "bf16_grad_kv_destination_is_a_minor_knob": true,
+    "next_kernel_target": "Keep BF16/FP32 math for correctness, but make the producer epilogue group-aware: query-major MFMA contribution math, tile-local/grouped/segmented reduction by compressed group, then reduced global atomics or compact partial rows plus final fold.",
+    "e2e_tflops_promotion": "none"
+  }
+}

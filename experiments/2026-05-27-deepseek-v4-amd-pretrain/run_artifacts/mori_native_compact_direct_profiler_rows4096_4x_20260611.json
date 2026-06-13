@@ -1,0 +1,582 @@
+{
+  "files": [
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_dispatch_rank0_call0.json",
+      "phases": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.01207,
+          "warp_sum_ms": 5.922840000000028
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.28665999999999997,
+          "warp_sum_ms": 136.56440000000003
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.03116,
+          "warp_sum_ms": 9.863759999999989
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.30882000000000004,
+          "warp_sum_ms": 23.402080000000048
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.009519999999999982,
+          "warp_sum_ms": 1.7719999999999978
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0033000000000000043,
+          "warp_sum_ms": 0.2805599999999995
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.02462,
+          "warp_sum_ms": 6.785919999999991
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.002719999999999999,
+          "warp_sum_ms": 0.15404000000000004
+        }
+      },
+      "rank": "0",
+      "stage": "dispatch",
+      "total_window_ms": 0.36728,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_dispatch_rank1_call0.json",
+      "phases": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.10369,
+          "warp_sum_ms": 52.750400000000106
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.26769,
+          "warp_sum_ms": 125.53191999999996
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.030969999999999998,
+          "warp_sum_ms": 9.36568000000001
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.28992,
+          "warp_sum_ms": 24.961079999999992
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.02519999999999999,
+          "warp_sum_ms": 1.8489999999999995
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0028000000000000043,
+          "warp_sum_ms": 0.2784400000000007
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.02586,
+          "warp_sum_ms": 7.157120000000002
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.09919,
+          "warp_sum_ms": 0.25515999999999994
+        }
+      },
+      "rank": "1",
+      "stage": "dispatch",
+      "total_window_ms": 0.45592,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_dispatch_rank2_call0.json",
+      "phases": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.04844,
+          "warp_sum_ms": 24.520880000000073
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.27921,
+          "warp_sum_ms": 130.13479999999996
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0312,
+          "warp_sum_ms": 9.310360000000026
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.30173,
+          "warp_sum_ms": 26.302919999999965
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.014110000000000013,
+          "warp_sum_ms": 1.8143999999999996
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.003,
+          "warp_sum_ms": 0.27152000000000054
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0259,
+          "warp_sum_ms": 7.253159999999996
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.04397,
+          "warp_sum_ms": 0.19988000000000006
+        }
+      },
+      "rank": "2",
+      "stage": "dispatch",
+      "total_window_ms": 0.40129000000000004,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_dispatch_rank3_call0.json",
+      "phases": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.26432,
+          "warp_sum_ms": 134.78744000000032
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.28269000000000005,
+          "warp_sum_ms": 130.47879999999995
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.033120000000000004,
+          "warp_sum_ms": 10.079400000000007
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.30499,
+          "warp_sum_ms": 27.616639999999943
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.010450000000000046,
+          "warp_sum_ms": 1.7939599999999958
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.004960000000000001,
+          "warp_sum_ms": 0.29187999999999953
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.02549,
+          "warp_sum_ms": 7.599480000000005
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.25771999999999995,
+          "warp_sum_ms": 0.41208
+        }
+      },
+      "rank": "3",
+      "stage": "dispatch",
+      "total_window_ms": 0.61873,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_combine_rank0_call0.json",
+      "phases": {
+        "standard_compact_combine_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.018449999999999987,
+          "warp_sum_ms": 8.992120000000039
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09171000000000001,
+          "warp_sum_ms": 25.841960000000004
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.20415,
+          "warp_sum_ms": 96.77999999999994
+        },
+        "standard_compact_combine_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.08627000000000001,
+          "warp_sum_ms": 21.726880000000026
+        },
+        "standard_compact_combine_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.00995999999999998,
+          "warp_sum_ms": 1.8066000000000035
+        },
+        "standard_compact_combine_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0034499999999999887,
+          "warp_sum_ms": 0.31592000000000053
+        },
+        "standard_compact_combine_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.22740000000000002,
+          "warp_sum_ms": 21.043600000000033
+        },
+        "standard_compact_combine_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.0028699999999999763,
+          "warp_sum_ms": 0.15924000000000113
+        }
+      },
+      "rank": "0",
+      "stage": "combine",
+      "total_window_ms": 0.35156,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_combine_rank1_call0.json",
+      "phases": {
+        "standard_compact_combine_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.64125,
+          "warp_sum_ms": 327.48451999999975
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09536000000000001,
+          "warp_sum_ms": 26.42596
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.21788999999999997,
+          "warp_sum_ms": 102.64535999999997
+        },
+        "standard_compact_combine_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09076,
+          "warp_sum_ms": 23.25936
+        },
+        "standard_compact_combine_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.011659999999999969,
+          "warp_sum_ms": 1.866039999999999
+        },
+        "standard_compact_combine_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0034800000000000182,
+          "warp_sum_ms": 0.2920000000000006
+        },
+        "standard_compact_combine_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.24123,
+          "warp_sum_ms": 22.289279999999984
+        },
+        "standard_compact_combine_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.63594,
+          "warp_sum_ms": 0.7897600000000002
+        }
+      },
+      "rank": "1",
+      "stage": "combine",
+      "total_window_ms": 0.9946699999999999,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_combine_rank2_call0.json",
+      "phases": {
+        "standard_compact_combine_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.65687,
+          "warp_sum_ms": 335.39915999999977
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09650999999999998,
+          "warp_sum_ms": 27.075160000000007
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.20664000000000002,
+          "warp_sum_ms": 95.9929600000001
+        },
+        "standard_compact_combine_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09077999999999997,
+          "warp_sum_ms": 23.192040000000002
+        },
+        "standard_compact_combine_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0103599999999999,
+          "warp_sum_ms": 1.8281599999999973
+        },
+        "standard_compact_combine_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0035699999999999933,
+          "warp_sum_ms": 0.28527999999999715
+        },
+        "standard_compact_combine_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.22966999999999999,
+          "warp_sum_ms": 23.04984000000004
+        },
+        "standard_compact_combine_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.6517200000000001,
+          "warp_sum_ms": 0.8039200000000001
+        }
+      },
+      "rank": "2",
+      "stage": "combine",
+      "total_window_ms": 0.9985499999999999,
+      "unpaired_events": 0
+    },
+    {
+      "event_count": 8192,
+      "file": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/native_compact_parity_4x_rows4096_profiled_20260611/native_compact_combine_rank3_call0.json",
+      "phases": {
+        "standard_compact_combine_grid_wait_recv": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.6186500000000001,
+          "warp_sum_ms": 315.84687999999966
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.10492000000000007,
+          "warp_sum_ms": 27.187120000000007
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.20579,
+          "warp_sum_ms": 94.82528
+        },
+        "standard_compact_combine_receive_copy": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.09883000000000004,
+          "warp_sum_ms": 27.35276
+        },
+        "standard_compact_combine_reset_counters": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.010670000000000074,
+          "warp_sum_ms": 1.822319999999997
+        },
+        "standard_compact_combine_signal_counts": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.0049899999999999806,
+          "warp_sum_ms": 0.31307999999999797
+        },
+        "standard_compact_combine_stage_rows": {
+          "intervals": 512,
+          "merged_intervals": 1,
+          "union_ms": 0.22955,
+          "warp_sum_ms": 24.21476000000001
+        },
+        "standard_compact_combine_wait_counts": {
+          "intervals": 512,
+          "merged_intervals": 2,
+          "union_ms": 0.61187,
+          "warp_sum_ms": 0.7693600000000008
+        }
+      },
+      "rank": "3",
+      "stage": "combine",
+      "total_window_ms": 0.9687100000000001,
+      "unpaired_events": 0
+    }
+  ],
+  "stages": {
+    "combine": {
+      "files": 4,
+      "phases": {
+        "standard_compact_combine_grid_wait_recv": {
+          "files": 4,
+          "median_ms": 0.62995,
+          "p95_ms": 0.654527,
+          "rankmax_ms": 0.65687
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "files": 4,
+          "median_ms": 0.09593499999999999,
+          "p95_ms": 0.10365850000000006,
+          "rankmax_ms": 0.10492000000000007
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "files": 4,
+          "median_ms": 0.206215,
+          "p95_ms": 0.2162025,
+          "rankmax_ms": 0.21788999999999997
+        },
+        "standard_compact_combine_receive_copy": {
+          "files": 4,
+          "median_ms": 0.09076999999999999,
+          "p95_ms": 0.09762250000000003,
+          "rankmax_ms": 0.09883000000000004
+        },
+        "standard_compact_combine_reset_counters": {
+          "files": 4,
+          "median_ms": 0.010514999999999986,
+          "p95_ms": 0.011511499999999985,
+          "rankmax_ms": 0.011659999999999969
+        },
+        "standard_compact_combine_signal_counts": {
+          "files": 4,
+          "median_ms": 0.0035250000000000056,
+          "p95_ms": 0.004776999999999982,
+          "rankmax_ms": 0.0049899999999999806
+        },
+        "standard_compact_combine_stage_rows": {
+          "files": 4,
+          "median_ms": 0.22960999999999998,
+          "p95_ms": 0.239496,
+          "rankmax_ms": 0.24123
+        },
+        "standard_compact_combine_wait_counts": {
+          "files": 4,
+          "median_ms": 0.6239049999999999,
+          "p95_ms": 0.6493530000000001,
+          "rankmax_ms": 0.6517200000000001
+        }
+      },
+      "total_window_median_ms": 0.98169,
+      "total_window_p95_ms": 0.997968,
+      "total_window_rankmax_ms": 0.9985499999999999
+    },
+    "dispatch": {
+      "files": 4,
+      "phases": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "files": 4,
+          "median_ms": 0.076065,
+          "p95_ms": 0.24022549999999993,
+          "rankmax_ms": 0.26432
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "files": 4,
+          "median_ms": 0.28095000000000003,
+          "p95_ms": 0.2860645,
+          "rankmax_ms": 0.28665999999999997
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "files": 4,
+          "median_ms": 0.03118,
+          "p95_ms": 0.032832,
+          "rankmax_ms": 0.033120000000000004
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "files": 4,
+          "median_ms": 0.30335999999999996,
+          "p95_ms": 0.30824550000000006,
+          "rankmax_ms": 0.30882000000000004
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "files": 4,
+          "median_ms": 0.01228000000000003,
+          "p95_ms": 0.023536499999999988,
+          "rankmax_ms": 0.02519999999999999
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "files": 4,
+          "median_ms": 0.003150000000000002,
+          "p95_ms": 0.004711000000000001,
+          "rankmax_ms": 0.004960000000000001
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "files": 4,
+          "median_ms": 0.025675,
+          "p95_ms": 0.025894,
+          "rankmax_ms": 0.0259
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "files": 4,
+          "median_ms": 0.07158,
+          "p95_ms": 0.2339404999999999,
+          "rankmax_ms": 0.25771999999999995
+        }
+      },
+      "total_window_median_ms": 0.428605,
+      "total_window_p95_ms": 0.5943084999999999,
+      "total_window_rankmax_ms": 0.61873
+    }
+  }
+}

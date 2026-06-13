@@ -1,0 +1,102 @@
+{
+  "status": "rejected_for_latency_keep_as_contract_probe",
+  "scope": "tilelang_sparse_dkv_panelized_k64_mfma_reduced",
+  "date": "2026-06-04",
+  "read": "Panelizing the sparse dKV route into K64 selected windows keeps TileLang's active table at 64 groups and makes the full-table mfma_reduced kernel lower and run correctly. This is real kernel progress, but it is not a promoted speed path: the ideal slot-aligned panelized target remains around 11.8-12.3 ms at S4096, already slower than the retained 8.0-8.8 ms sparse-atomic wall, and the DSv4-like padded random panel route doubles the selected-window work and reaches 23.7 ms.",
+  "artifacts": {
+    "panelized_s128_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s128_tb32_sw64_k64d32_20260604.json",
+    "panelized_s4096_tb16_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s4096_tb16_sw64_k64d32_timing7_20260604.json",
+    "panelized_s4096_tb32_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s4096_tb32_sw64_k64d32_timing10_20260604.json",
+    "panelized_s4096_tb64_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s4096_tb64_sw64_k64d32_timing7_20260604.json",
+    "panelized_s4096_tb16_thr256_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s4096_tb16_sw64_k64d32_thr256_timing7_20260604.json",
+    "panelized_s4096_tb32_thr256_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panelized_s4096_tb32_sw64_k64d32_thr256_timing7_20260604.json",
+    "panel_padded_random_s128_correctness": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_padded_random_s128_valid512_tb32_sw64_k64d32_20260604.json",
+    "panel_padded_random_s4096_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_reduced_panel_padded_random_s4096_valid512_tb32_sw64_k64d32_timing10_20260604.json"
+  },
+  "kernel_update": {
+    "file": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "added_route_pattern": "panel_padded_random",
+    "added_arg": "--valid-topk",
+    "contract": "Choose valid_topk unique compressed groups per token, pack them into selected_window-sized group panels, pad missing panel slots with -1, keep pair_slots=-1 for padded entries, and let mfma_reduced skip invalid rows during compact accumulation."
+  },
+  "results": [
+    {
+      "case": "ideal_panelized_s128",
+      "shape": "S128,H64,D512,topk512,token_block32,selected_window64,block_k64,block_d32,slot_aligned",
+      "correct": true,
+      "max_abs_diff": 1.30385160446167e-8,
+      "median_ms": 0.4056049883365631,
+      "valid_selected_rows": 65536,
+      "active_partial_rows": 2048,
+      "write_reduction_x": 32.0,
+      "partial_mib": 4.0
+    },
+    {
+      "case": "ideal_panelized_s4096_best",
+      "shape": "S4096,H64,D512,topk512,token_block16,selected_window64,block_k64,block_d32,slot_aligned,threads256",
+      "correct": "timing_only",
+      "median_ms": 11.779159545898438,
+      "min_ms": 11.752320289611816,
+      "valid_selected_rows": 2097152,
+      "active_partial_rows": 131072,
+      "write_reduction_x": 16.0,
+      "partial_mib": 256.0,
+      "read": "Best observed ideal panelized point, but it has noisy outliers and still trails the retained sparse-atomic wall."
+    },
+    {
+      "case": "ideal_panelized_s4096_tb32",
+      "shape": "S4096,H64,D512,topk512,token_block32,selected_window64,block_k64,block_d32,slot_aligned,threads128",
+      "correct": "timing_only",
+      "median_ms": 12.03750228881836,
+      "valid_selected_rows": 2097152,
+      "active_partial_rows": 65536,
+      "write_reduction_x": 32.0,
+      "partial_mib": 128.0
+    },
+    {
+      "case": "ideal_panelized_s4096_tb64",
+      "shape": "S4096,H64,D512,topk512,token_block64,selected_window64,block_k64,block_d32,slot_aligned,threads128",
+      "correct": "timing_only",
+      "median_ms": 12.266525268554688,
+      "valid_selected_rows": 2097152,
+      "active_partial_rows": 32768,
+      "write_reduction_x": 64.0,
+      "partial_mib": 64.0
+    },
+    {
+      "case": "panel_padded_random_s128",
+      "shape": "S128,H64,D512,topk1024,valid_topk512,token_block32,selected_window64,block_k64,block_d32,panel_padded_random",
+      "correct": true,
+      "max_abs_diff": 7.450580596923828e-9,
+      "median_ms": 0.764286994934082,
+      "valid_selected_rows": 65536,
+      "padded_selected_rows": 131072,
+      "active_partial_rows": 4096,
+      "write_reduction_x": 16.0,
+      "partial_mib": 8.0
+    },
+    {
+      "case": "panel_padded_random_s4096",
+      "shape": "S4096,H64,D512,topk1024,valid_topk512,token_block32,selected_window64,block_k64,block_d32,panel_padded_random",
+      "correct": "timing_only",
+      "median_ms": 23.72333335876465,
+      "valid_selected_rows": 2097152,
+      "padded_selected_rows": 4194304,
+      "active_partial_rows": 131072,
+      "write_reduction_x": 16.0,
+      "partial_mib": 256.0,
+      "read": "This includes the cost of padding random top512 routes into 16 K64 group panels. It is too slow as a sparse attention backward speed path."
+    }
+  ],
+  "decision": {
+    "promote_to_torchtitan": false,
+    "keep_as_kernel_contract_probe": true,
+    "next_sparse_dkv_kernel_direction": "Do not force random LI routes into padded K64 panels for TileLang. The next viable branch needs a true sparse segmented reducer inside the fast query-major producer, or a HIP/rocWMMA/CK implementation that can keep token-owned K64 MFMA reuse while performing bounded group reduction without padding every token to all group panels.",
+    "closed_branches": [
+      "single giant active-group table for clustered routes",
+      "row-block reducer that recomputes MFMA per active-row block",
+      "ideal panelized K64 as a latency promotion",
+      "padded random group-panel route as a latency promotion"
+    ]
+  }
+}

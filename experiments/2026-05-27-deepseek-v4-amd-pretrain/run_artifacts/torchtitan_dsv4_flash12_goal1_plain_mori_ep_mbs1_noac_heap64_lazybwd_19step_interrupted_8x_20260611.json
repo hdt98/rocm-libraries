@@ -1,0 +1,76 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs1_noac_heap64_lazybwd_20step_8x_20260611",
+  "date": "2026-06-11",
+  "node": "do-sonle5-mi350-gpu",
+  "status": "interrupted_after_step19",
+  "purpose": "Goal 1 same-shape plain MORI EP MBS1 control for the MORI balanced-MoE candidate. This run was interrupted by the local polling cancellation before step 20 completed, so it is retained as partial evidence only.",
+  "shape": {
+    "gpus": 8,
+    "gpu_type": "MI350",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation": 16,
+    "dp_shard": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "none",
+    "mtp_modules": 0,
+    "hyper_connections": false
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_ROUTE_PACK_MODE": "dense_mask",
+    "CANARY_MORI_AITER_LAZY_BACKWARD_OPS": "1",
+    "CANARY_MORI_AITER_OP_CACHE_MODE": "backward",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "64G",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "off",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "0"
+  },
+  "metrics": {
+    "steps_completed": 19,
+    "steps_2_19_mean_tok_per_gpu_s": 504.8888888888889,
+    "steps_2_19_mean_tflops_per_gpu": 23.127222222222223,
+    "steps_13_19_mean_tok_per_gpu_s": 498.57142857142856,
+    "steps_13_19_mean_tflops_per_gpu": 22.835714285714285,
+    "peak_memory_gib": 119.49,
+    "loss_step_1": 12.27444,
+    "loss_step_19": 3.35636
+  },
+  "comparison_to_balanced_mbs1_20step": {
+    "balanced_artifact": "run_artifacts/torchtitan_dsv4_flash12_goal1_mori_ep_balanced_compactdispatch_capfix_mbs1_noac_heap64_lazybwd_20step_8x_20260611.json",
+    "balanced_steps_2_20_tok_per_gpu_s": 525.7894736842105,
+    "balanced_steps_13_20_tok_per_gpu_s": 523.625,
+    "balanced_peak_memory_gib": 134.05,
+    "read": "At MBS1, balanced compact-dispatch is modestly faster in the late window but uses about 14.56 GiB more peak logged memory. MBS1 is therefore not the right surface for proving the MindSpeed-style hot-helper memory-shape advantage. The next gate should sweep MBS2 then MBS4, plain MORI EP versus MORI EP plus balanced compact-dispatch."
+  },
+  "remote_artifacts": {
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs1_noac_heap64_lazybwd_20step_8x_20260611/docker-run.log",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_goal1_plain_mori_ep_mbs1_noac_heap64_lazybwd_20step_8x_20260611"
+  },
+  "step_metrics": [
+    {"step": 1, "loss": 12.27444, "grad_norm": 12.625, "tok_per_gpu_s": 441.0, "tflops_per_gpu": 20.18, "max_rank_memory_gib": 88.62},
+    {"step": 2, "loss": 10.24195, "grad_norm": 28.125, "tok_per_gpu_s": 520.0, "tflops_per_gpu": 23.83, "max_rank_memory_gib": 117.38},
+    {"step": 3, "loss": 13.92918, "grad_norm": 40.0, "tok_per_gpu_s": 511.0, "tflops_per_gpu": 23.41, "max_rank_memory_gib": 117.3},
+    {"step": 4, "loss": 13.50323, "grad_norm": 59.75, "tok_per_gpu_s": 513.0, "tflops_per_gpu": 23.51, "max_rank_memory_gib": 119.49},
+    {"step": 5, "loss": 11.94049, "grad_norm": 37.25, "tok_per_gpu_s": 499.0, "tflops_per_gpu": 22.86, "max_rank_memory_gib": 117.3},
+    {"step": 6, "loss": 9.40906, "grad_norm": 32.5, "tok_per_gpu_s": 507.0, "tflops_per_gpu": 23.23, "max_rank_memory_gib": 117.61},
+    {"step": 7, "loss": 7.73963, "grad_norm": 33.0, "tok_per_gpu_s": 508.0, "tflops_per_gpu": 23.24, "max_rank_memory_gib": 118.12},
+    {"step": 8, "loss": 6.82899, "grad_norm": 32.5, "tok_per_gpu_s": 505.0, "tflops_per_gpu": 23.14, "max_rank_memory_gib": 118.87},
+    {"step": 9, "loss": 6.54115, "grad_norm": 29.5, "tok_per_gpu_s": 501.0, "tflops_per_gpu": 22.97, "max_rank_memory_gib": 118.36},
+    {"step": 10, "loss": 5.68851, "grad_norm": 21.375, "tok_per_gpu_s": 502.0, "tflops_per_gpu": 22.98, "max_rank_memory_gib": 118.86},
+    {"step": 11, "loss": 5.15357, "grad_norm": 17.0, "tok_per_gpu_s": 520.0, "tflops_per_gpu": 23.81, "max_rank_memory_gib": 118.13},
+    {"step": 12, "loss": 4.60315, "grad_norm": 18.875, "tok_per_gpu_s": 512.0, "tflops_per_gpu": 23.46, "max_rank_memory_gib": 118.13},
+    {"step": 13, "loss": 4.0094, "grad_norm": 11.6875, "tok_per_gpu_s": 511.0, "tflops_per_gpu": 23.4, "max_rank_memory_gib": 118.86},
+    {"step": 14, "loss": 3.76546, "grad_norm": 12.8125, "tok_per_gpu_s": 498.0, "tflops_per_gpu": 22.8, "max_rank_memory_gib": 117.86},
+    {"step": 15, "loss": 3.70026, "grad_norm": 16.25, "tok_per_gpu_s": 494.0, "tflops_per_gpu": 22.62, "max_rank_memory_gib": 117.61},
+    {"step": 16, "loss": 3.52052, "grad_norm": 11.1875, "tok_per_gpu_s": 487.0, "tflops_per_gpu": 22.32, "max_rank_memory_gib": 117.88},
+    {"step": 17, "loss": 3.43186, "grad_norm": 7.0938, "tok_per_gpu_s": 493.0, "tflops_per_gpu": 22.6, "max_rank_memory_gib": 117.88},
+    {"step": 18, "loss": 3.39871, "grad_norm": 6.75, "tok_per_gpu_s": 496.0, "tflops_per_gpu": 22.73, "max_rank_memory_gib": 117.36},
+    {"step": 19, "loss": 3.35636, "grad_norm": 6.5625, "tok_per_gpu_s": 511.0, "tflops_per_gpu": 23.38, "max_rank_memory_gib": 117.36}
+  ]
+}

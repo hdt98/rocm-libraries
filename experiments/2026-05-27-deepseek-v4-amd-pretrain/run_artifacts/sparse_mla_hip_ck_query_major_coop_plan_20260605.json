@@ -1,0 +1,92 @@
+{
+  "artifact": "sparse_mla_hip_ck_query_major_coop_plan",
+  "date": "2026-06-05",
+  "status": "implementation_plan_after_rocwmma_selected_tile_rejection",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "batch": 1,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "decision": {
+    "kept_branch": "source_boundary_query_major_hip_ck_cooperative_producer",
+    "rejected_current_branch": "source_boundary_selected_tile_rocwmma_score_page",
+    "why": "The selected-tile rocWMMA producer is already 21.456 ms score-only at S4096, before contribution sink, dKV, or dQ. It solves the no-HBM-score-page contract but loses the fast query-major q/dO reuse that made the Triton materialized producer viable."
+  },
+  "latency_controls_ms": {
+    "current_triton_full_sparse_attention_backward_gate": 11.13,
+    "current_triton_sparse_atomic_dkv_wall": 8.80629825592041,
+    "materialized_query_major_compact_micro_sink": 8.383907318115234,
+    "source_recompute_pdp_sink": 8.423,
+    "source_pdp_two_kernel_pipeline": 16.238,
+    "rocwmma_selected_tile_score_only": 21.455720901489258,
+    "rocwmma_selected_tile_contribution_sink": 41.59596538543701,
+    "rocwmma_selected_tile_dkv_only": 53.2686710357666,
+    "rocwmma_selected_tile_dq_dkv": 63.68679904937744
+  },
+  "kernel_contract": {
+    "boundary": "q, grad_output, output, lse, compressed/shared kv, LI route -> dQ and compressed dKV",
+    "must_not_read": [
+      "materialized selected K/V",
+      "materialized probability slab",
+      "materialized scaled-dP or grad-logit slab",
+      "selected-row dKV partial slab"
+    ],
+    "core_formulas": {
+      "score": "score[t,h,k] = dot(q[t,h,:], kv[g(t,k),:]) * scale",
+      "prob": "p[t,h,k] = exp(score[t,h,k] - lse[t,h])",
+      "scaled_dp": "scaled_dP[t,h,k] = p[t,h,k] * (dot(dO[t,h,:], v[g(t,k),:]) - dot(dO[t,h,:], O[t,h,:])) * scale",
+      "dq": "dQ[t,h,d] += sum_k scaled_dP[t,h,k] * kv[g(t,k),d]",
+      "dkv": "dKV[g,d] += sum_{t,h,k:g(t,k)=g} scaled_dP[t,h,k] * q[t,h,d] + p[t,h,k] * dO[t,h,d]"
+    }
+  },
+  "implementation_surface": {
+    "preferred_order": [
+      "Composable Kernel block-attention style tile loop if route-gathered sparse K/V and custom dQ/dKV epilogue can be expressed",
+      "raw HIP persistent producer-consumer kernel using MFMA/rocWMMA fragments",
+      "TileLang only if it can express a persistent grouped accumulator without active-row HBM materialization"
+    ],
+    "why_not_mori_shared_memory": "MORI/SHMEM can support inter-rank EP buffers, but it cannot make one kernel CTA's LDS score page visible to sibling CTAs. The score tile must be consumed in the same workgroup or by a persistent cooperative launch."
+  },
+  "proposed_owner_grid": {
+    "first_gate": "producer_only_source_boundary_query_major_checksum",
+    "owner": "(batch, token_tile, head_block, selected_window)",
+    "token_tile": "start at 1 or 2 tokens per cooperative group to preserve Q/dO residency; do not jump to group-major ownership",
+    "head_block": "H16 or H32",
+    "selected_window": "K64 or K128 selected slots",
+    "d_consumers": "multiple D16/D32 MFMA consumers consume the immediately produced score/prob/scaled-dP page before HBM",
+    "dq_strategy": "CTA-local dQ accumulator or bounded compact dQ partials; avoid selected-tile scalar atomics as production path",
+    "dkv_strategy": "after producer beats the gate, add route-aware segmented/grouped dKV epilogue before global atomics or compact partial writes"
+  },
+  "promotion_gates": [
+    {
+      "gate": "producer_only_source_boundary_query_major_checksum",
+      "target_ms": 8.0,
+      "reason": "Must beat or match the materialized query-major producer band while eliminating materialized P/grad-logit inputs."
+    },
+    {
+      "gate": "producer_plus_dkv_source_boundary",
+      "target_ms": 11.13,
+      "reason": "Must beat the current full sparse-attention backward kernel boundary before TorchTitan e2e materialization."
+    },
+    {
+      "gate": "producer_plus_dq_plus_dkv_source_boundary",
+      "target_ms": 11.13,
+      "reason": "The final candidate must return the same sparse-attention backward outputs, not only a faster dKV diagnostic slice."
+    }
+  ],
+  "next_commands": {
+    "local_validation": [
+      "jq empty run_artifacts/sparse_mla_hip_ck_query_major_coop_plan_20260605.json",
+      "python3 -m py_compile tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py"
+    ],
+    "remote_first_gate": "Add a query-major source-boundary HIP/CK producer-only checksum mode, then run S4096 layer-2 timing on do-sonle-kernel before adding dKV epilogue."
+  },
+  "dependency_pins_changed": false
+}

@@ -1,0 +1,78 @@
+{
+  "artifact": "actual_li_tile_segment_full_d_scalar_decision",
+  "status": "rejected_as_s4096_production_kernel_shape_but_kept_as_correct_segment_contract_smoke",
+  "date": "2026-06-03",
+  "scope": "Actual-LI layer-2 compressed dKV ScatterAdd reducer for sparse MLA backward, materialized-probs diagnostic contract.",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py",
+    "new_branch": "hip_tile_segment_full_d_scalar_accumulator",
+    "kernel_contract": "prepack valid (token, selected-slot) rows by tile-local compressed group; one CTA owns one segment and emits one reduced full-D dKV row by global atomic add"
+  },
+  "evidence": {
+    "s128_correctness_smoke": {
+      "artifact": "run_artifacts/actual_li_tile_segment_full_d_scalar_s128_layer2_t32k256_20260603.json",
+      "seq_len": 128,
+      "topk": 32,
+      "segments": 80,
+      "pairs": 2016,
+      "write_reduction_x": 25.2,
+      "event_median_ms": 1.394292950630188,
+      "max_abs_diff": 4.291534423828125e-05,
+      "passed": true
+    },
+    "s512_gate": {
+      "artifact": "run_artifacts/actual_li_tile_segment_full_d_scalar_s512_layer2_t32k256_20260603.json",
+      "seq_len": 512,
+      "topk": 128,
+      "segments": 1088,
+      "pairs": 32640,
+      "write_reduction_x": 30.0,
+      "event_median_ms": 1.4247360229492188,
+      "threshold_ms": 3.081876039505005,
+      "gate_status": "passed",
+      "max_abs_diff": 6.67572021484375e-05
+    },
+    "s4096_primary_gate": {
+      "artifact": "run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_timing_20260603.json",
+      "seq_len": 4096,
+      "topk": 512,
+      "segments": 66029,
+      "pairs": 1572352,
+      "write_reduction_x": 23.813051840857806,
+      "event_median_ms": 44.575992584228516,
+      "threshold_ms": 8.80629825592041,
+      "gate_status": "failed",
+      "slowdown_vs_sparse_atomic_gate_x": 5.066351258594312,
+      "correctness": "skipped_timing_only_after_s128_s512_passed"
+    },
+    "s4096_thread512_check": {
+      "artifact": "run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_thr512_timing_20260603.json",
+      "event_median_ms": 60.3873291015625,
+      "gate_status": "failed",
+      "read": "Increasing CTA threads from 256 to 512 regressed, so the S4096 failure is not caused by one extra D loop per thread."
+    }
+  },
+  "read": "The prepacked segment contract validates the intended ScatterAdd grouping: reduced global writes are correct and cheap enough at S512. At S4096, however, one segment-owned scalar CTA recomputes the H64 contribution math too slowly. This means grouping alone is not enough; the next viable branch must preserve query-major/MFMA contribution math and add tile-local grouped/segmented accumulation before global dKV writes.",
+  "decision": {
+    "keep": [
+      "route pack plus segment metadata contract",
+      "one reduced dKV row per tile-local compressed-group segment as the Scatter target",
+      "S128/S512 parity artifacts as correctness smoke for segment ordering"
+    ],
+    "reject": [
+      "one CTA per segment full-D scalar contribution recompute as the S4096 production shape",
+      "thread-count-only tuning of the scalar segment CTA"
+    ],
+    "next_kernel": "query_major_mfma_tile_with_tile_local_grouped_or_segmented_dkv_accumulation",
+    "next_gate": "Beat S4096 sparse atomic dKV wall 8.80629825592041 ms while preserving the 23.813x modeled write reduction."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 128 --layer-id 2 --contract-rung 32x256_d16_smoke --include-tile-segment --skip-scalar-candidate --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_full_d_scalar_s128_layer2_t32k256_20260603.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 512 --layer-id 2 --contract-rung 32x256_d16_smoke --include-tile-segment --skip-scalar-candidate --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_full_d_scalar_s512_layer2_t32k256_20260603.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 4096 --layer-id 2 --contract-rung 32x512_d16_primary --include-tile-segment --skip-scalar-candidate --skip-correctness --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_timing_20260603.json --json'",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -e TORCH_EXTENSIONS_DIR=/workspace/run_artifacts/torch_extensions -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --seq-len 4096 --layer-id 2 --contract-rung 32x512_d16_primary --include-tile-segment --tile-segment-threads 512 --skip-scalar-candidate --skip-correctness --skip-pytorch-reference-timing --warmup-iters 1 --timed-iters 3 --summary-path /workspace/run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_thr512_timing_20260603.json --json'",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_full_d_scalar_s128_layer2_t32k256_20260603.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_full_d_scalar_s512_layer2_t32k256_20260603.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_timing_20260603.json do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_full_d_scalar_s4096_layer2_t32k512_thr512_timing_20260603.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  ]
+}

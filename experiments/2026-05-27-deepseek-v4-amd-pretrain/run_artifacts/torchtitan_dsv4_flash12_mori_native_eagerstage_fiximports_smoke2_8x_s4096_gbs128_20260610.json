@@ -1,0 +1,61 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_smoke2_8x_s4096_gbs128_20260610",
+  "created_at": "2026-06-10",
+  "status": "completed_2_step_smoke",
+  "host": "do-sonle5-mi350-gpu",
+  "host_addr": "165.245.166.41",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_smoke2_8x_s4096_gbs128_20260610/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_smoke2_8x_s4096_gbs128_20260610",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_eagerstage_fiximports_chunk32_smoke2_8x_s4096_gbs128_20260610",
+  "shape": {
+    "model": "DeepSeek-V4 Flash 12-layer ceiling probe",
+    "hardware": "8xMI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "optimizer": "AdamW",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "env_highlights": {
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8"
+  },
+  "source_delta": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "summary": "Native compact dispatch skips fixed-cap scalar capacity all-reduce, uses stage-separated MORI handles, and eagerly creates dispatch plus combine handles under dispatch initialization. This run uses the post-import-fix source."
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "tokens_per_gpu_s": 1820,
+      "tflops_per_gpu": 92.16,
+      "loss": 12.39248,
+      "grad_norm": 16.5,
+      "rank_max_memory_gib": 164.96
+    },
+    {
+      "step": 2,
+      "tokens_per_gpu_s": 8112,
+      "tflops_per_gpu": 410.70,
+      "loss": 8.23003,
+      "grad_norm": 83.0,
+      "rank_max_memory_gib": 210.34
+    }
+  ],
+  "read": "The import-fixed eager-stage native MORI compact source can pass the intended full-node two-step smoke with chunked sparse SharedKV sink-gradient enabled. This is a smoke gate only; no stability or promotion conclusion is taken from two steps."
+}

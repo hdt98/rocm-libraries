@@ -1,0 +1,30 @@
+{
+  "artifact": "aiter_fused_moe_saved_intermediate_contract",
+  "date": "2026-06-02",
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "aiter_module": "/sgl-workspace/aiter/aiter/fused_moe.py"
+  },
+  "fused_moe_signature": "(hidden_states, w1, w2, topk_weight, topk_ids, expert_mask=None, activation=ActivationType.Silu, quant_type=QuantType.No, doweight_stage1=False, w1_scale=None, w2_scale=None, a1_scale=None, a2_scale=None, block_size_M=None, num_local_tokens=None, moe_sorting_dispatch_policy=0, dtype=None, hidden_pad=0, intermediate_pad=0, bias1=None, bias2=None, splitk=0, swiglu_limit=0.0, gate_mode='separated')",
+  "observations": {
+    "public_fused_moe_return": "single final moe output tensor only",
+    "public_return_intermediates_flag": false,
+    "two_stage_path": "fused_moe_2stages creates an inter-stage a2 tensor and then calls stage2",
+    "a2_semantics": "post-activation hidden, equivalent to silu(gate) * up for separated Silu/SwiGLU-style DSv4 path",
+    "a2_missing_for_training_backward": [
+      "gate pre-activation",
+      "up branch",
+      "unweighted compact expert output for dTopkWeight"
+    ]
+  },
+  "owner_rank_probe_artifact": "run_artifacts/owned_expert_vjp_ep8_stage1_saved_activation_20260602.json",
+  "owner_rank_probe_summary_ms": {
+    "triton_swiglu_recompute": 6.577022075653076,
+    "stage1_hidden_only": 6.591463088989258,
+    "stage1_hidden_plus_unweighted_output": 5.85913610458374,
+    "ideal_gate_up_hidden": 5.387613773345947,
+    "ideal_gate_up_hidden_plus_unweighted_output": 4.77380895614624
+  },
+  "read": "The current public AITER fused_moe surface cannot directly realize the ideal saved-activation MoE backward win. Saving only the two-stage a2/post-SwiGLU hidden is effectively neutral because backward still recomputes gate/up and still needs down(hidden) for dTopkWeight. A useful AITER-side training path needs either a stage1 API that can also preserve gate/up or a fused backward kernel that recomputes gate/up internally while using saved a2/unweighted output where worthwhile."
+}

@@ -1,0 +1,71 @@
+{
+  "artifact": "actual_li_group_panel_route_pack_decision",
+  "date": "2026-06-03",
+  "source_artifact": "run_artifacts/actual_li_group_panel_route_pack_s4096_layer2_20260603.json",
+  "source_script": "tools/dsv4_runtime_probe/benchmark_sparse_dkv_group_panel_route_pack.py",
+  "status": "route_prepack_viable_accumulator_runtime_unproven",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "valid_pairs": 1572352
+  },
+  "baseline_gate": {
+    "sparse_atomic_dkv_gate_ms": 8.006924390792847,
+    "raw_dkv_scalar_atomic_add_elements": 805044224
+  },
+  "route_pack_result": {
+    "read": "Torch sort-based route prepacking is comfortably below the sparse-atomic dKV wall on the real layer-2 S4096 LI route, so prepacking is viable as a first group-owned accumulator input contract.",
+    "important_caveat": "This is route metadata only. It does not time dKV contribution math or local/group-owned accumulation."
+  },
+  "measured_rows": [
+    {
+      "token_block": 64,
+      "group_panel": 512,
+      "pack_event_median_ms": 0.5226860046386719,
+      "write_reduction_x": 47.254673318506946,
+      "k16_fill_x": 0.971489580449998,
+      "output_group_rows": 33274,
+      "token_panel_segments": 6138,
+      "production_int32_route_workspace_mib": 12.019512176513672,
+      "naive_panel_rescan_amplification_x": 2
+    },
+    {
+      "token_block": 64,
+      "group_panel": 256,
+      "pack_event_median_ms": 0.5259860157966614,
+      "write_reduction_x": 47.254673318506946,
+      "k16_fill_x": 0.9579007905176867,
+      "output_group_rows": 33274,
+      "token_panel_segments": 10225,
+      "production_int32_route_workspace_mib": 12.035102844238281,
+      "naive_panel_rescan_amplification_x": 4
+    },
+    {
+      "token_block": 32,
+      "group_panel": 256,
+      "pack_event_median_ms": 0.5273860096931458,
+      "write_reduction_x": 23.813051840857806,
+      "k16_fill_x": 0.9579007905176867,
+      "output_group_rows": 66029,
+      "token_panel_segments": 10225,
+      "production_int32_route_workspace_mib": 12.035102844238281,
+      "naive_panel_rescan_amplification_x": 4
+    }
+  ],
+  "decision": {
+    "promote_input_contract": "Use pair_pos_sorted + group_ids_sorted + token_panel_starts sorted by (seq_tile, group_panel, token) as the first runtime input contract for the group-owned dKV accumulator.",
+    "first_accumulator_rung": "token_block=32, group_panel=256 remains the safer S128/S512 bring-up because it matches the prior 32-token target window; token_block=64, group_panel=256/512 is the higher-write-reduction follow-up once the accumulator body is stable.",
+    "reject": "Do not prototype a naive group-panel kernel that rescans top-k inside the accumulator; prepack is cheap enough to use or fuse."
+  },
+  "next_kernel_gate": [
+    "Build a HIP/CK/rocWMMA accumulator that consumes the prepacked route list and computes K16 contribution tiles without per-contribution scalar local-table overhead.",
+    "S128 parity against the shared-KV dKV reference.",
+    "S512 timing against the active-list sparse-atomic gate.",
+    "S4096 timing must beat the 8.0-8.8 ms sparse-atomic dKV slice including or explicitly accounting for route-pack cost."
+  ]
+}

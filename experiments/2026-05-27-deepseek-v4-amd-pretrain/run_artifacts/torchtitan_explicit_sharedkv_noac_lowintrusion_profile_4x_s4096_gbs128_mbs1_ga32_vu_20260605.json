@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-05",
+  "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+  "status": "completed_6_steps_clean_teardown",
+  "purpose": "Same-shape low-intrusion timing profile for the 4xMI350 GBS128/MBS1/GA32 explicit shared-KV no-AC run, using additive step timing, DSv4 profile timing, dense linear backward timing, and MORI AITER timing sidecars without torch profiler traces.",
+  "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+  "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605",
+  "raw_output_size": "34M",
+  "raw_log_size": "40K",
+  "profiling_files": 12,
+  "shape": {
+    "hardware": "4xMI350",
+    "visible_devices": "0,1,2,3",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 32,
+    "tokens_per_step": 524288,
+    "tokens_per_gpu_per_step": 131072,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "checkpointing": "disabled",
+    "chunked_ce_num_chunks": 2
+  },
+  "profile_knobs": {
+    "torch_profiler": "disabled",
+    "structured_logging": "disabled",
+    "profile_dense_linear_backward": true,
+    "dsv4_profile_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/dsv4_timing",
+    "dsv4_additive_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/additive_timing",
+    "mori_aiter_timing_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/mori_timing",
+    "profile_sharedkv_backward": true
+  },
+  "kernel_and_comm_knobs": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync",
+    "mori_aiter_block_num": 64,
+    "mori_aiter_rdma_block_num": 32,
+    "mori_aiter_warp_num_per_block": 8,
+    "mori_shmem_heap_size": "32G"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.31867,
+      "grad_norm": 12.6875,
+      "tps_per_gpu": [3369, 3366, 3367, 3367],
+      "tflops_per_gpu": [63.75, 63.70, 63.71, 63.70],
+      "memory_gib": [95.60, 96.11, 95.97, 97.49]
+    },
+    {
+      "step": 2,
+      "loss": 8.80008,
+      "grad_norm": 21.125,
+      "tps_per_gpu": [5287, 5287, 5287, 5287],
+      "tflops_per_gpu": [100.05, 100.05, 100.05, 100.05],
+      "memory_gib": [122.75, 122.62, 121.81, 123.47]
+    },
+    {
+      "step": 3,
+      "loss": 17.78028,
+      "grad_norm": 38.75,
+      "tps_per_gpu": [4097, 4097, 4097, 4097],
+      "tflops_per_gpu": [77.53, 77.53, 77.53, 77.53],
+      "memory_gib": [130.17, 144.49, 140.45, 138.77]
+    },
+    {
+      "step": 4,
+      "loss": 13.35140,
+      "grad_norm": 41.0,
+      "tps_per_gpu": [3734, 3734, 3734, 3734],
+      "tflops_per_gpu": [70.66, 70.66, 70.66, 70.66],
+      "memory_gib": [146.09, 144.36, 147.07, 146.86]
+    },
+    {
+      "step": 5,
+      "loss": 11.28717,
+      "grad_norm": 46.25,
+      "tps_per_gpu": [3789, 3789, 3789, 3789],
+      "tflops_per_gpu": [71.69, 71.69, 71.69, 71.69],
+      "memory_gib": [146.82, 144.38, 147.07, 146.86]
+    },
+    {
+      "step": 6,
+      "loss": 8.05757,
+      "grad_norm": 34.25,
+      "tps_per_gpu": [3815, 3815, 3815, 3815],
+      "tflops_per_gpu": [72.18, 72.18, 72.18, 72.18],
+      "memory_gib": [146.97, 144.38, 147.07, 146.86]
+    }
+  ],
+  "late_step_summary": {
+    "steps": [4, 5, 6],
+    "mean_tflops_per_gpu": 71.51,
+    "mean_tps_per_gpu": 3779.3333,
+    "implied_step_time_s": 34.684,
+    "peak_memory_gib": 147.07,
+    "no_profile_reference_artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_noprofile_4x_s4096_gbs128_mbs1_ga32_vu_20260605.json",
+    "no_profile_late_mean_tflops_per_gpu": 76.3633,
+    "profile_overhead_tflops_per_gpu": 4.8533,
+    "profile_overhead_percent": 6.36
+  },
+  "additive_late_step_decomposition": {
+    "samples": "12 rank-step samples from steps 4-6 after filtering zero-phase records",
+    "median_step_total_ms": 34592.0879,
+    "median_forward_backward_call_ms": 34342.8735,
+    "median_model_forward_ms": 3967.3102,
+    "median_loss_ms": 1150.0771,
+    "median_backward_ms": 25514.4173,
+    "median_forward_backward_wrapper_residual_ms": 3720.6812,
+    "median_optimizer_step_ms": 30.1789,
+    "median_grad_clip_ms": 19.8913,
+    "median_accumulated_loss_reduce_ms": 118.3844,
+    "fraction_of_step": {
+      "model_forward": 0.1147,
+      "loss": 0.0332,
+      "backward": 0.7376,
+      "forward_backward_wrapper_residual": 0.1076
+    },
+    "read": "The same-shape AMD profile is still dominated by backward and the forward/backward wrapper residual. Forward and loss are visible, but they are not the lead wall."
+  },
+  "sharedkv_sparse_attention_timing": {
+    "records": 1536,
+    "calls_per_rank_step_estimate": 64,
+    "per_call_stage_medians_ms": {
+      "scatter": 13.7749,
+      "dkv_math": 7.9496,
+      "grad_q": 2.1109,
+      "gather_selected_kv_fp32": 1.9943,
+      "grad_logits_terms": 2.2354,
+      "scores_qk": 1.2225,
+      "probs": 0.5734,
+      "grad_attn_sink": 0.6979,
+      "q_do_cast": 0.2785,
+      "index_prepare": 0.0259,
+      "grad_kv_zero": 0.0081
+    },
+    "estimated_rank_step_ms_from_stage_medians": {
+      "scatter": 881.6,
+      "dkv_math": 508.8,
+      "gather_selected_kv_fp32": 127.6,
+      "grad_q": 135.1,
+      "grad_logits_terms": 143.1,
+      "scores_qk": 78.2,
+      "probs": 36.7,
+      "grad_attn_sink": 44.7,
+      "rough_total": 1975.8
+    },
+    "read": "SparseAttnSharedkvGrad is still attention's kernel target: the compressed dKV scatter plus dKV math is the largest part of the sparse attention call. But at the 4x GBS128 e2e shape it is roughly a couple seconds per rank-step, not the dominant 25.5s backward wall."
+  },
+  "lightning_indexer_kl_timing": {
+    "direct_public_wrapper_marker": "not_present_in_this_profile",
+    "captured_indexer_linear_backward_per_call_medians_ms": {
+      "wq_dweight": 0.1458,
+      "wk_dweight": 0.0456,
+      "weights_proj_dweight": 0.0786
+    },
+    "read": "SparseLightningIndexerGradKLLoss does not appear as a direct public-wrapper timing marker in this sidecar. The captured indexer linear-gradient pieces are tiny compared with SparseAttnSharedkvGrad and MORI VJP. If exact public-boundary comparison is needed, add a dedicated LI/KL wrapper marker."
+  },
+  "mori_moe_timing": {
+    "records": 3072,
+    "kept_after_call_id_65": 2812,
+    "approx_calls_per_rank_step": 128,
+    "recv_count_median": 14808.5,
+    "per_call_stage_medians_ms": {
+      "backward.local_vjp.padded": 77.0904,
+      "backward.combine_dx.call": 7.2907,
+      "backward.dispatch_x.call": 0.8029,
+      "backward.dispatch_grad_output.call": 0.6927,
+      "backward.dispatch_topk_dummy.call": 0.2931,
+      "backward.combine_dtopk.call": 0.1084
+    },
+    "per_call_group_medians_ms": {
+      "local_vjp_recompute_forward": 25.8605,
+      "local_vjp_wgrad": 19.6087,
+      "local_vjp_xgrad_reduce": 17.0681,
+      "local_vjp_w2_dgrad_swiglu": 10.8119,
+      "local_vjp_pack_scatter": 3.5862,
+      "local_vjp_dtopk_weight": 0.6055,
+      "dispatch_grad_inputs": 1.5104,
+      "combine_dx": 7.3484
+    },
+    "rough_rank_step_estimates_from_medians_ms": {
+      "local_vjp_padded": 9867.6,
+      "combine_dx": 940.6,
+      "local_vjp_recompute_forward": 3309.0,
+      "local_vjp_wgrad": 2509.9,
+      "local_vjp_xgrad_reduce": 2184.7,
+      "local_vjp_w2_dgrad_swiglu": 1383.9
+    },
+    "skew_signal": {
+      "combine_dx_mean_ms": 26.1501,
+      "combine_dx_median_ms": 7.2907,
+      "combine_dx_max_ms": 188.2262,
+      "read": "combine_dx has a long tail: median is small but mean and max are much larger, consistent with dX return wait/skew rather than pure combine math."
+    },
+    "read": "MORI/AITER routed owner VJP is the largest profiled multi-GPU optimization target. The dominant owner VJP subgroups are recompute forward, wgrad, xgrad/reduce, and W2 dgrad+SwiGLU."
+  },
+  "root_cause_ranking": [
+    {
+      "rank": 1,
+      "target": "MoE/MORI routed backward owner VJP plus dX return skew",
+      "evidence": "Additive backward is about 25.5s of a 34.6s profiled step; MORI local_vjp.padded median is 77.1ms per call with about 128 calls/rank-step; combine_dx has a 7.3ms median but 26.2ms mean and 188ms max."
+    },
+    {
+      "rank": 2,
+      "target": "Forward/backward wrapper residual",
+      "evidence": "The residual between forward_backward_call and model_forward+loss+backward is about 3.72s median per late step, roughly 10.8% of the profiled step."
+    },
+    {
+      "rank": 3,
+      "target": "SparseAttnSharedkvGrad compressed dKV/scatter",
+      "evidence": "Per-call scatter median is 13.77ms and dkv_math median is 7.95ms; rough stage-median total is about 1.98s per rank-step. It remains the attention-side kernel target but is not the largest e2e bucket at this distributed shape."
+    },
+    {
+      "rank": 4,
+      "target": "Loss/lm-head path",
+      "evidence": "Additive loss is about 1.15s per profiled late step with CE2."
+    }
+  ],
+  "commands_run": [
+    "RUN_ID=torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605 TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_ENABLE_PROFILING=false CANARY_ENABLE_STRUCTURED_LOGGING=false CANARY_PROFILE_DENSE_LINEAR_BACKWARD=true CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/dsv4_timing CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/additive_timing CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_lowintrusion_profile_4x_s4096_gbs128_mbs1_ga32_vu_20260605/profiling/mori_timing CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=true CANARY_CHUNKED_CE_NUM_CHUNKS=2 CANARY_SHAREDKV_BACKWARD_MODE=explicit_pytorch CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto MASTER_PORT=29633 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "remote focused JSONL parser over profiling/additive_timing, profiling/dsv4_timing, and profiling/mori_timing"
+  ],
+  "dependency_pin_changes": []
+}

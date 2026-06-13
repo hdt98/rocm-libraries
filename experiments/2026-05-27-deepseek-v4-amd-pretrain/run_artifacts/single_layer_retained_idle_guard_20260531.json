@@ -1,0 +1,80 @@
+{
+  "artifact": "single_layer_retained_idle_guard",
+  "date_local": "2026-05-31",
+  "runner": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+  "change": {
+    "summary": "Added a default KFD idle guard for retained single-MI350 GPU actions.",
+    "default_policy": "REQUIRE_IDLE_GPUS=true",
+    "override": "Set REQUIRE_IDLE_GPUS=false only when intentionally co-scheduling.",
+    "wait_mode": "Set WAIT_IDLE_SECONDS>0 to poll, using WAIT_IDLE_INTERVAL_SECONDS between checks.",
+    "guarded_actions": [
+      "check-cuda",
+      "check-aiter-bwd",
+      "check-aiter-fwd-bwd",
+      "check-aiter-np-bwd",
+      "check-bucket16-moe",
+      "check-base64-overflow-moe",
+      "bench-2048",
+      "bench-4096",
+      "bench",
+      "probe-ops-2048",
+      "probe-ops-4096",
+      "probe-ops",
+      "probe-ops-sweep-2048",
+      "probe-ops-sweep-4096",
+      "bench-moe-sweep-2048",
+      "bench-moe-sweep-4096",
+      "check-attn-sweep",
+      "bench-attn-sweep-2048",
+      "bench-attn-sweep-4096",
+      "attn-sweep-2048",
+      "check-boundary",
+      "bench-control-ablation-2048",
+      "control-ablation-2048",
+      "bench-router-ablation-2048",
+      "bench-route-padding-2048",
+      "bench-route-padding-4096",
+      "sweep-2048",
+      "profile-blocks-2048",
+      "profile-blocks-4096",
+      "rocprof-2048",
+      "rocprof-4096",
+      "rocprof-blocks-2048",
+      "rocprof-blocks-4096",
+      "all"
+    ],
+    "unguarded_non_gpu_actions": [
+      "status",
+      "stage",
+      "check-cpu"
+    ]
+  },
+  "validation": {
+    "bash_syntax": {
+      "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+      "status": "passed"
+    },
+    "idle_guard_currently_refuses": {
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-idle",
+      "status": "passed_expected_failure",
+      "observed_busy_process": "3253779 python3 on do-sonle-kernel",
+      "reason": "Active non-gpuagent KFD process was present, so GPU timing/profiling would be contaminated."
+    },
+    "cpu_check_still_runs": {
+      "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh check-cpu",
+      "status": "passed",
+      "check": "moe_expert_batches_dynamic_compact_reduce_bmm_out_dgrad_learned_router_match",
+      "device": "cpu",
+      "dtype": "float64",
+      "seqlen": 4,
+      "output_max_abs": 0.0,
+      "output_rel_l2": 0.0,
+      "max_grad_rel_l2": 4.767825220877897e-16,
+      "moe_gate_grad_rel_l2": 4.443540465874805e-16
+    }
+  },
+  "interpretation": [
+    "The retained single-layer suite now protects benchmark, profile, and CUDA correctness actions from accidental co-scheduling with unrelated KFD workloads.",
+    "This keeps future S2048/S4096 timing and rocprof artifacts cleaner without blocking CPU-only correctness checks."
+  ]
+}

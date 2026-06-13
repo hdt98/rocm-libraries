@@ -1,0 +1,58 @@
+{
+  "artifact": "tilelang_descriptor_gemm_dgrad_s4096_decision_20260531",
+  "created_at": "2026-05-31",
+  "probe_artifact": "run_artifacts/tilelang_descriptor_gemm_dgrad_s4096_20260531.json",
+  "operator": "moe_w2_dgrad_compact_grouped_gemm",
+  "shape": {
+    "tokens": 4096,
+    "assignments": 24576,
+    "experts": 384,
+    "topk": 6,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF"
+  },
+  "baseline": {
+    "name": "torch_padded_bmm_out",
+    "median_ms": 4.304213047027588,
+    "compact_equivalent_tflops_median": 251.45868635369683,
+    "padded_tflops_median": 345.75569373633317
+  },
+  "candidate": {
+    "name": "tilelang_descriptor_gemm_dgrad",
+    "best_config": {
+      "block_M": 64,
+      "block_N": 128,
+      "block_K": 64,
+      "threads": 256,
+      "num_stages": 1
+    },
+    "median_ms": 7.776040077209473,
+    "min_ms": 7.554956912994385,
+    "speedup_vs_torch_padded_bmm_out": 0.553522487575991,
+    "compact_equivalent_tflops_median": 139.18803759308915,
+    "tile_tflops_median": 205.8823056064444,
+    "tile_rows": 36352,
+    "tile_count": 568,
+    "tile_row_utilization": 0.676056338028169
+  },
+  "correctness": {
+    "ok": true,
+    "max_abs": 0.0,
+    "rel_l2": 0.0,
+    "pct_close": 100.0,
+    "atol": 0.5,
+    "rtol": 0.025
+  },
+  "route_stats": {
+    "max_per_expert": 88,
+    "min_per_expert": 45,
+    "mean_per_expert": 64.0,
+    "padding_multiplier_global_max": 1.375,
+    "padding_multiplier_tile": 1.4791666666666667
+  },
+  "decision": "demote",
+  "read": "Descriptor TileLang removes the all-expert scan from the earlier example-style grouped kernel and is numerically correct at the target S4096 route shape, but its best median latency is 7.776 ms versus 4.304 ms for retained padded torch.bmm(out=). This is only 0.554x of the baseline, so it is not a full-layer candidate.",
+  "next_action": "Retire generic TileLang descriptor grouped GEMM for W2 dgrad. Continue with compact-native CK/CK-Tile or another MFMA-preserving grouped-GEMM design that avoids tiny per-expert scheduling loss; direct Triton and simple TileLang variants are now demoted at S4096."
+}

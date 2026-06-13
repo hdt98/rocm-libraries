@@ -1,0 +1,117 @@
+{
+  "scope": "torchtitan_dsv4_sparse_attention_tilelang_whole_backward_boundary_decision",
+  "date": "2026-06-04",
+  "hardware": "1xMI350 timing/probe slice, HIP_VISIBLE_DEVICES=4",
+  "shape": {
+    "batch": 1,
+    "sequence_length": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_selected": 128,
+    "compressed_selected": 512,
+    "selected_total": 640,
+    "compressed_groups": 1024,
+    "kv_rows": 5120
+  },
+  "retained_fix": {
+    "change": "Disable TileLang aggressive shared-memory merge for bwd_export_hsk_directdq.",
+    "reason": "The merge pass corrupted the persistent Q shared tile after the first selected block. The diagnostic showed dO.KV was correct while Q.KV was wrong for compressed slots.",
+    "s128_before": {
+      "artifact": "torchtitan_tilelang_source_hsk_mixed_index_diagnostic_s128_20260604.json",
+      "source_hsk_probs_max_abs": 0.185546875,
+      "source_hsk_grad_logits_scaled_max_abs": 0.1474609375,
+      "dq_max_abs": 0.494140625,
+      "dkv_compressed_max_abs": 1.3828125
+    },
+    "s128_after": {
+      "artifact": "torchtitan_tilelang_source_hsk_mixed_index_nomerge_s128_20260604.json",
+      "source_hsk_probs_max_abs": 0.000244140625,
+      "source_hsk_grad_logits_scaled_max_abs": 0.0009765625,
+      "dq_max_abs": 0.0078125,
+      "dkv_compressed_max_abs": 0.03125
+    },
+    "s4096_after": {
+      "artifact": "torchtitan_tilelang_source_hsk_mixed_index_nomerge_s4096_20260604.json",
+      "source_hsk_probs_max_abs": 0.000244140625,
+      "source_hsk_grad_logits_scaled_max_abs": 0.000244140625,
+      "dq_max_abs": 0.00390625,
+      "dkv_compressed_max_abs": 0.03125
+    }
+  },
+  "candidate_results": [
+    {
+      "candidate": "tilelang_source_hsk_dkv_no_merge",
+      "artifact": "torchtitan_tilelang_source_hsk_mixed_index_nomerge_s4096_20260604.json",
+      "median_ms": 58.79916000366211,
+      "status": "correct_but_rejected_for_latency",
+      "read": "Correct source-HSK bridge, but it still materializes BF16 probability and scaled-dP HSK slabs and reads them back in the selected-limit reducer."
+    },
+    {
+      "candidate": "tilelang_atomic_dkv",
+      "artifact": "torchtitan_tilelang_atomic_dkv_mixed_index_s4096_timing_20260604.json",
+      "median_ms": 42.53963851928711,
+      "status": "correct_small_shape_but_rejected_for_target_latency",
+      "read": "This is the closest existing whole-boundary source kernel: it consumes q, dO, kv, indices, lse, and delta directly and avoids HSK slabs, but it still performs per-selected-row global dKV atomics."
+    },
+    {
+      "candidate": "tilelang_source_direct_dkv",
+      "artifact": "torchtitan_tilelang_source_direct_dkv_mixed_index_s4096_timing_20260604.json",
+      "median_ms": 732.5068969726562,
+      "status": "rejected",
+      "read": "Route/group-owned direct-source reducer avoids HSK slabs and reduces before global atomics, but it recomputes full-D QK/PV inside route-owned CTAs and destroys query-major reuse."
+    },
+    {
+      "candidate": "temporary_bshk_export_layout",
+      "artifact": "torchtitan_tilelang_source_bshk_bridge_s4096_timing_20260604.json",
+      "median_ms": 59.53487014770508,
+      "status": "rejected_and_reverted",
+      "read": "Changing the export slab to producer-owned BSHK layout did not reduce export time and made the reducer bridge worse because it still had to transpose/copy back to HSK."
+    },
+    {
+      "candidate": "tilelang_source_direct_dblocked_dkv_block64",
+      "artifact": "torchtitan_tilelang_source_direct_dblocked_s4096_timing_20260604.json",
+      "median_ms": 77.21022033691406,
+      "status": "correct_but_rejected_for_latency",
+      "read": "D-blocked direct-source reducer avoids HSK slabs and keeps a small tile-local group accumulator, but repeating QK/PV for every D block loses to direct atomics."
+    },
+    {
+      "candidate": "tilelang_source_direct_dblocked_dkv_block128",
+      "artifact": "torchtitan_tilelang_source_direct_dblocked_s4096_bd128_timing_20260604.json",
+      "median_ms": null,
+      "status": "rejected_launch_failure",
+      "read": "Increasing D block size to reduce repeated QK/PV recompute failed at HIP module launch with invalid argument, likely resource/shared-memory pressure."
+    }
+  ],
+  "stage_split": {
+    "source_hsk_no_merge_profile_dir": "tilelang_source_hsk_profile_s4096_warm_20260604",
+    "representative_warm_call_gpu_ms": {
+      "index_prepare": 0.121800996363163,
+      "delta": 0.7146040201187134,
+      "allocate": 0.008919999934732914,
+      "export_kernel": 34.81673812866211,
+      "local_group_plan": 6.43375301361084,
+      "local_dkv_tilelang": 4.073421001434326,
+      "compressed_group_plan": 2.591852903366089,
+      "compressed_dkv_tilelang": 8.681924819946289
+    },
+    "read": "The reducer body is plausible, especially compressed dKV at about 8.7 ms, but the HSK export boundary is about 34.8 ms and cannot be promoted."
+  },
+  "decision": {
+    "port_whole_backward_to_tilelang": true,
+    "but_not_as": [
+      "HSK slab export plus selected-limit reducer",
+      "direct per-selected-row atomic dKV",
+      "group-owned full-D source recompute",
+      "D-blocked source recompute with repeated full-D QK/PV"
+    ],
+    "next_kernel_contract": [
+      "Keep query-major row recompute for QK, probabilities, scaled dP, and dQ.",
+      "Do not write probability or scaled-dP HSK slabs to HBM.",
+      "Within the query-major producer, accumulate dKV contributions into tile-local grouped/segmented partials keyed by compressed group.",
+      "Emit reduced compact partial rows or reduced atomics, then use a small final reduce/scatter.",
+      "Preserve no-selected-KV saved-tensor contract: inputs are q, dO, kv, indices, output/lse, and sink/delta."
+    ],
+    "expected_first_gate": "Beat 42.5 ms direct atomic at S4096 without HSK slabs, then beat the older 8.0-8.8 ms compressed dKV atomic wall for the dKV slice before e2e TFLOPs A/B.",
+    "e2e_status": "No e2e TFLOPs promotion yet; current TileLang candidates are diagnostic or rejected for target latency."
+  }
+}

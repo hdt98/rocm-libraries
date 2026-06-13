@@ -1,0 +1,89 @@
+{
+  "aiter_metadata": {
+    "is_g1u1": true,
+    "is_shuffled": true,
+    "metadata_block_m": 128,
+    "metadata_fuse_quant": "",
+    "metadata_has_bias": false,
+    "metadata_ksplit": 0,
+    "metadata_run_1stage": false,
+    "metadata_stage1": "partial(ck_moe_stage1)",
+    "metadata_stage2": "partial(ck_moe_stage2_fwd)",
+    "metadata_stage2_has_bias": false,
+    "num_valid_ids": [
+      28800,
+      4096
+    ],
+    "sorted_expert_ids_shape": [
+      256
+    ],
+    "sorted_ids_shape": [
+      32762
+    ]
+  },
+  "decision": {
+    "read": "AITER two-stage forward can expose a compact post-activation stage1 tensor on this BF16 path, but that tensor alone is a partial saved-intermediate solution. A production training contract still needs raw gate/up or a fused backward that recomputes gate/up inside the owner kernel while reusing route sorting and compact stage1 where profitable.",
+    "stage1_capture_is_sufficient_full_backward_state": false,
+    "stage1_capture_matches_public_forward": true
+  },
+  "parity_vs_public_fused_moe": {
+    "actual_finite": true,
+    "cosine_distance": 5.960464477539063e-08,
+    "dtype": "torch.bfloat16",
+    "expected_finite": true,
+    "max_abs_diff": 3.814697265625e-06,
+    "max_rel_diff": 1.9073486328125,
+    "mean_abs_diff": 1.1565913782263237e-09,
+    "shape": [
+      4096,
+      4096
+    ]
+  },
+  "probe": "aiter_fused_moe_stage1_capture",
+  "schema_version": 1,
+  "shape": {
+    "dtype": "torch.bfloat16",
+    "experts": 64,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "tokens": 4096,
+    "topk": 6,
+    "topk_pattern": "random"
+  },
+  "stage1_contract": {
+    "backward_reuse_value": [
+      "Can feed W2 wgrad and W2 dgrad without recomputing hidden.",
+      "Can help compute per-route expert output for dTopk if stage2 per-route output is added.",
+      "Cannot compute SwiGLU backward by itself because raw gate/up are not recoverable from hidden."
+    ],
+    "bytes": 100663296,
+    "dtype": "torch.bfloat16",
+    "mib": 96.0,
+    "missing_for_full_training_vjp": [
+      "raw gate projection",
+      "raw up projection",
+      "per-route W2 output before top-k weighted token reduction"
+    ],
+    "read": "For BF16 G1U1 Silu, AITER stage1 is post-activation hidden with shape [tokens, topk, intermediate]. It is not raw gate/up.",
+    "shape": [
+      4096,
+      6,
+      2048
+    ]
+  },
+  "timing": {
+    "manual_minus_public_median_ms": -0.1634819507598877,
+    "manual_stage1_capture_two_stage": {
+      "max_ms": 2.307425022125244,
+      "median_ms": 2.2924649715423584,
+      "min_ms": 2.2017040252685547,
+      "p95_ms": 2.3193930625915526
+    },
+    "public_fused_moe": {
+      "max_ms": 2.668548107147217,
+      "median_ms": 2.455946922302246,
+      "min_ms": 2.4321460723876953,
+      "p95_ms": 2.838629055023193
+    }
+  }
+}

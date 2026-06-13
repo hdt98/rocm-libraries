@@ -1,0 +1,55 @@
+{
+  "schema": "dsv4_swap_optimizer_foreach_preflight.v1",
+  "date": "2026-06-06",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "device": "AMD Instinct MI350X VF",
+  "tool": "tools/dsv4_optimizer_preflight/benchmark_swap_optimizer.py",
+  "purpose": "Check whether batching several CPU-swapped AdamW parameter shards through torch foreach ops improves the portable AMD swap optimizer path before attempting another full canary run.",
+  "shape": {
+    "gpus": 1,
+    "total_parameter_numel": 64000000,
+    "num_parameter_tensors": 32,
+    "per_parameter_numel": 2000000,
+    "parameter_dtype": "bfloat16",
+    "state_dtype": "param",
+    "pin_memory": "auto",
+    "chunk_mib": 16,
+    "steps": 4
+  },
+  "results": [
+    {
+      "update_mode": "torch_param",
+      "foreach_max_params": null,
+      "cold_step_ms": 622.7407820988446,
+      "warm_median_ms": 13.681815937161446,
+      "peak_memory_gib": 0.29115915298461914
+    },
+    {
+      "update_mode": "foreach_param",
+      "foreach_max_params": 4,
+      "cold_step_ms": 531.8374121561646,
+      "warm_median_ms": 14.153169933706522,
+      "peak_memory_gib": 0.4168081283569336
+    },
+    {
+      "update_mode": "foreach_param",
+      "foreach_max_params": 8,
+      "cold_step_ms": 498.3726239297539,
+      "warm_median_ms": 13.837577076628804,
+      "peak_memory_gib": 0.5843400955200195
+    }
+  ],
+  "read": "The foreach-param rung is correct but not a throughput promotion in this ROCm/PyTorch tuple. It improves the cold first step modestly, but warm median latency is flat-to-slower versus torch_param and transient GPU memory rises with foreach batch size. Keep torch_param as the best Python-level portable swap update path. The next performance-relevant rung should move load/update/store into a fused or pipelined HIP/C++ owner rather than expanding PyTorch foreach batching.",
+  "validation": [
+    "Local py_compile passed for torchtitan/components/optimizer.py, tools/dsv4_optimizer_preflight/benchmark_swap_optimizer.py, and tests/unit_tests/test_optimizer_param_groups.py.",
+    "Launcher bash -n passed after adding CANARY_OPTIMIZER_SWAP_FOREACH_MAX_PARAMS pass-through.",
+    "ROCm container unittest passed on do-sonle5-mi350-gpu: TestOptimizersContainerWithParamGroups.test_swap_opt_states_cpu_foreach_param_matches_torch_param."
+  ],
+  "code_paths": [
+    "sources/wip/torchtitan/torchtitan/components/optimizer.py",
+    "sources/wip/torchtitan/tests/unit_tests/test_optimizer_param_groups.py",
+    "tools/dsv4_optimizer_preflight/benchmark_swap_optimizer.py",
+    "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  ]
+}

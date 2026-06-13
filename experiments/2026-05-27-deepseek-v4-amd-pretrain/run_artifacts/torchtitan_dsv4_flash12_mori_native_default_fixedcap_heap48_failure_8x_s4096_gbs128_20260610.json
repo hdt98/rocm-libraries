@@ -1,0 +1,49 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_default_fixedcap_heap48_steps20_8x_s4096_gbs128_20260610",
+  "artifact": "torchtitan_dsv4_flash12_mori_native_default_fixedcap_heap48_failure_8x_s4096_gbs128_20260610",
+  "host": "do-sonle5-mi350-gpu",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_default_fixedcap_heap48_steps20_8x_s4096_gbs128_20260610/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_default_fixedcap_heap48_steps20_8x_s4096_gbs128_20260610",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12
+  },
+  "env": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": 131072,
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "48G",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_SHAREDKV_SINK_DOT_CHUNK": 32,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "result": {
+    "status": "failed",
+    "completed_steps": 1,
+    "failure_phase": "next backward after step1",
+    "failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES with 0 MB reported free",
+    "read": "Fixed 131072 peer-row capacity avoids auto-cap heap churn but is too HBM-heavy for this exact do-sonle5 8x run when used as a blanket default. The attempted launcher default was reverted."
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.34552,
+      "grad_norm": 13.5,
+      "tok_per_gpu_s": 1062,
+      "tflops_per_gpu": 53.79,
+      "rank_max_memory_gib": 196.77
+    }
+  ],
+  "decision": "Do not make fixed-cap heap48 the unconditional native default. Keep it as an explicit diagnostic/stability tuple until the native compact path decouples reserved capacity from active-row work and reduces staging/output residency."
+}

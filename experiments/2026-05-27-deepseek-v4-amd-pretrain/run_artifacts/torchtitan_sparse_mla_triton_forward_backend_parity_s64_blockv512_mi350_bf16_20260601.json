@@ -1,0 +1,63 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 16,
+  "candidate_estimated_selected_state_elements": 335544320,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": 0.03650955110788345,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 80,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": 2.384185791015625e-07,
+  "max_output_abs_diff": 0.00390625,
+  "max_param_grad_abs_diff": 1.9073486328125e-06,
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 0.0,
+    "indexer.wk.weight": 0.0,
+    "indexer.wq.weight": 0.0,
+    "kv_norm.weight": 1.9073486328125e-06,
+    "q_norm.weight": 5.960464477539063e-08,
+    "wkv_a.weight": 1.9073486328125e-06,
+    "wkv_b.weight": 4.76837158203125e-07,
+    "wo.weight": 4.76837158203125e-07,
+    "wq_a.weight": 1.1920928955078125e-07,
+    "wq_b.weight": 1.1920928955078125e-07
+  },
+  "reference_compressed_groups": 16,
+  "reference_estimated_selected_state_elements": 335544320,
+  "reference_kernel_module": null,
+  "reference_loss": 0.036509621888399124,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 80,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 64,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": true,
+      "iters": 5,
+      "last_loss": 0.03650955110788345,
+      "mean_ms": 15.26365161407739,
+      "peak_memory_allocated_bytes": 4898739712,
+      "peak_memory_allocated_gib": 4.562306880950928,
+      "warmup_iters": 2
+    },
+    "reference": {
+      "enabled": true,
+      "iters": 5,
+      "last_loss": 0.036509621888399124,
+      "mean_ms": 15.771193383261561,
+      "peak_memory_allocated_bytes": 4894545408,
+      "peak_memory_allocated_gib": 4.558400630950928,
+      "warmup_iters": 2
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "artifact": "compressed_dkv_tile_segment_dblock_hip_min",
+  "status": "timed",
+  "scope": "isolated compressed-dKV accumulator slice fed by materialized probs/grad_logits",
+  "build_seconds": 24.30941800912842,
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "selected": 512,
+    "kv_len": 5120,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "contract": {
+    "rung": "32x512_d16_primary",
+    "seq_chunk": 32,
+    "selected_block": 512,
+    "block_d": 16,
+    "tile_segment_dblock_threads": 256,
+    "expected_write_reduction_x": 23.813051840857806,
+    "read": "Primary hard layer-2 coalesced-write contract for S4096 CR4 topk512 from compressed_dkv_mfma_segmented_reducer_next_contract."
+  },
+  "route_pack": {
+    "valid_pairs": 1572352,
+    "segment_count": 66029,
+    "raw_atomic_elements_model": 805044224,
+    "reduced_atomic_elements_model": 33806848,
+    "modeled_write_reduction_x": 23.813051840857806
+  },
+  "timing": {
+    "hip_tile_segment_dblock_headsplit_accumulator": {
+      "label": "hip_tile_segment_dblock_headsplit_accumulator",
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          116.13688408397138,
+          116.52193404734135,
+          116.02550582028925
+        ],
+        "mean_ms": 116.22810798386733,
+        "median_ms": 116.13688408397138,
+        "min_ms": 116.02550582028925,
+        "max_ms": 116.52193404734135,
+        "stdev_ms": 0.26048338927403836
+      },
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          116.04402160644531,
+          116.43567657470703,
+          115.9654312133789
+        ],
+        "mean_ms": 116.14837646484375,
+        "median_ms": 116.04402160644531,
+        "min_ms": 115.9654312133789,
+        "max_ms": 116.43567657470703,
+        "stdev_ms": 0.2518930870749993
+      },
+      "peak_memory_allocated_bytes": 3819439616,
+      "peak_memory_allocated_gib": 3.5571303367614746,
+      "checksum_norm": 960.25390625
+    }
+  },
+  "gate": {
+    "candidate_event_median_ms": 116.04402160644531,
+    "s4096_sparse_atomic_wall_ms": 8.80629825592041,
+    "passed_sparse_atomic_wall": false,
+    "read": "Passing this gate would only justify folding the reducer into the fused no-HSK sparse-MLA backward boundary; it would not by itself solve the late dKV materialization problem."
+  },
+  "workspace": {
+    "q_float_gib": 0.5,
+    "grad_output_float_gib": 0.5,
+    "probs_gib": 0.5,
+    "grad_logits_gib": 0.5,
+    "pair_pos_sorted_mib": 11.99609375,
+    "segment_starts_mib": 0.5037689208984375
+  },
+  "compile_isolation": {
+    "hip_source_includes_torch_extension": false,
+    "hip_source_headers": [
+      "hip/hip_runtime.h",
+      "cstdint"
+    ],
+    "cpp_source_includes": [
+      "torch/extension.h"
+    ]
+  }
+}

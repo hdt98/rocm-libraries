@@ -1,0 +1,56 @@
+{
+  "backend_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "candidate_mode": "tilelang_source_direct_dkv",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": "64",
+    "tilelang_block_k": "16",
+    "tilelang_d_blocks_per_kernel": "8",
+    "tilelang_dkv_backend": "dblocked_grouped_source",
+    "tilelang_group_panel_size": null,
+    "tilelang_head_block": null,
+    "tilelang_panel_capacity": "16",
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "TileLang compressed-dKV backend is selected by TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND; direct-source modes include full_d, dblocked_source, and dblocked_grouped_source.",
+    "explicit_tilelang_dkv still materializes selected-KV/probs/grad_logits before the TileLang compressed-dKV slice; tilelang_source_hsk_dkv moves probability/scaled-dP/dQ recompute into TileLang and feeds selected-limit dKV from BF16 HSK tensors."
+  ],
+  "parity": {
+    "enabled": false
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 128,
+    "dim": 512,
+    "group_count": 128,
+    "heads": 64,
+    "local_count": 128,
+    "selected": 256,
+    "seq_len": 512
+  },
+  "source_hsk_export_check": {
+    "enabled": false
+  },
+  "timing": {
+    "tilelang_source_direct_dkv": {
+      "median_ms": 46.058895111083984,
+      "times_ms": [
+        46.058895111083984,
+        45.75031280517578,
+        46.33780288696289
+      ],
+      "wall_median_ms": 46.087825903669,
+      "wall_times_ms": [
+        46.087825903669,
+        45.77670502476394,
+        46.36306711472571
+      ]
+    }
+  }
+}

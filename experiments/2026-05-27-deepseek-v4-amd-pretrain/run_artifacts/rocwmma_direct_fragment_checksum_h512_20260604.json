@@ -1,0 +1,68 @@
+{
+  "artifact": "compressed_dkv_rocwmma_contrib_tile_smoke",
+  "scope": "single_16x16_bf16_rocwmma_contribution_tile",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "k_tile": 16,
+    "d_tile": 16,
+    "h_dim": 512,
+    "formula": "dKV[K,D] = dL_scaled[K,H] @ Q[H,D] + P[K,H] @ dO[H,D]"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 0.6021224311552942,
+  "extension_dir": "/workspace/.torch_extensions_direct_fragment/contrib_tile_h512",
+  "parity": {
+    "allclose": true,
+    "atol": 0.25,
+    "rtol": 0.05,
+    "max_abs_diff": 4.76837158203125e-07,
+    "mean_abs_diff": 7.947164704091847e-08,
+    "reference_max_abs": 1.505549669265747,
+    "direct_fragment_checksum": {
+      "direct_fragment_sum": -0.6215040683746338,
+      "stored_tile_sum": -0.6215035915374756,
+      "reference_sum": -0.6215033531188965,
+      "abs_diff_vs_store": 4.76837158203125e-07,
+      "abs_diff_vs_reference": 7.152557373046875e-07,
+      "read": "This is an order-insensitive gate for rocWMMA accumulator fragment access. Passing it means c_frag[i] can feed scalar epilogues without store_matrix_sync; it does not prove a geometric row/group mapping for route-aware reductions."
+    }
+  },
+  "timing_ms": {
+    "store_matrix_sync_tile": {
+      "warmup_iters": 10,
+      "timed_iters": 40,
+      "median_ms": 0.009740000125020742,
+      "min_ms": 0.009560000151395798,
+      "max_ms": 0.01351999957114458,
+      "mean_ms": 0.00997810009866953
+    },
+    "direct_fragment_checksum": {
+      "warmup_iters": 10,
+      "timed_iters": 40,
+      "median_ms": 0.0118410000577569,
+      "min_ms": 0.011680000461637974,
+      "max_ms": 0.031199999153614044,
+      "mean_ms": 0.012729200022295117
+    }
+  },
+  "tensor_stats": {
+    "reference": {
+      "norm": 10.013084411621094,
+      "max_abs": 1.505549669265747,
+      "mean_abs": 0.5155616998672485
+    },
+    "candidate": {
+      "norm": 10.013083457946777,
+      "max_abs": 1.5055497884750366,
+      "mean_abs": 0.5155616998672485
+    }
+  },
+  "read": "This is the first positive/negative gate for the next compressed-dKV schedule: compute the contribution tile once with BF16 rocWMMA and FP32 accumulation. It does not yet solve route grouping, segmented many-to-one accumulation, or full sparse-MLA backward integration."
+}

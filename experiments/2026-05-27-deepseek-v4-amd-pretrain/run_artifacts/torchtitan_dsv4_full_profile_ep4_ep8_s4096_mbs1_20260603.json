@@ -1,0 +1,177 @@
+{
+  "artifact": "torchtitan_dsv4_full_profile_ep4_ep8_s4096_mbs1_20260603",
+  "created_date": "2026-06-03",
+  "status": "complete",
+  "scope": "Full-shape TorchTitan DeepSeek-V4 Flash 4-layer profiler split for EP4 and EP8, MBS=1, S=4096, full activation checkpointing, MORI+AITER routed padded VJP, and retained manual registered MORI combine tuple [64, 32, 8]. Raw Torch profiler traces and MORI timing JSONL stay under /scratch.",
+  "read_caveat": "Profiler throughput is diagnostic. Torch profiler user/gpu annotation ranges can be nested or overlap, so bucket totals are not additive wall-clock decomposition. MORI stage medians are per routed MoE backward call after excluding the first call of profiled step 2.",
+  "common_knobs": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "sequence_length": 4096,
+    "mbs": 1,
+    "activation_checkpointing": "full",
+    "checkpoint_enabled": false,
+    "profiler_profile_freq": 2,
+    "profiler_warmup": 1,
+    "profiler_active": 1,
+    "profile_dense_linear_backward": true,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_backward": "routed padded VJP",
+    "local_vjp_swiglu_backend": "triton",
+    "mori_op_cache_mode": "backward",
+    "backward_combine_input_mode": "registered",
+    "mori_launch_tuple": [64, 32, 8],
+    "mori_shmem_heap_size": "32G"
+  },
+  "runs": {
+    "ep4": {
+      "run_id": "torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_pf2_20260603",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.22685,
+        "step1_tokens_per_gpu_s": 2541,
+        "step2_loss": 9.34519,
+        "step2_grad_norm": 51.5,
+        "step2_tokens_per_gpu_s": 3862,
+        "profiler_step_wall_median_ms": 16968.164946
+      },
+      "paths": {
+        "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_pf2_20260603",
+        "mori_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_pf2_20260603/mori_timing",
+        "torch_traces": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep4_s4096_gbs64_mbs1_pf2_20260603/torch_traces/iteration_2"
+      },
+      "mori_step2_steady_per_call_gpu_ms": {
+        "filter": "call_id > 65",
+        "records": 252,
+        "recv_count_median": 14175.5,
+        "recv_count_min": 9346,
+        "recv_count_max": 16342,
+        "dispatch_x_call_median": 1.017812,
+        "dispatch_grad_output_call_median": 0.693749,
+        "local_vjp_padded_median": 45.444592,
+        "local_vjp_padded_p90": 80.603325,
+        "combine_dx_call_median": 14.744124,
+        "combine_dx_call_p90": 41.467999,
+        "combine_dtopk_call_median": 0.04288,
+        "vjp_substage_medians": {
+          "w13_xgrad_gemm_reduce": 9.877964,
+          "w13_forward_gemm": 8.814331,
+          "w13_wgrad_gemm": 7.824258,
+          "w2_forward_gemm": 4.464016,
+          "w2_dgrad_gemm": 4.460756,
+          "w2_wgrad_gemm": 4.02053,
+          "gather_scale_scatter": 1.943365,
+          "swiglu_backward": 1.175934,
+          "swiglu_forward": 0.84427,
+          "dtopk_weight": 0.554387,
+          "scatter_outputs": 0.526746
+        }
+      },
+      "torch_trace_rank_median_gpu_annotation_ms": {
+        "loss_lm_head_forward": 14626.687507,
+        "fsdp_gpu_annotation": 11526.260884,
+        "mori_backward_local_padded_vjp": 3458.407356,
+        "moe_other_forward_annotation": 2216.17495,
+        "shared_expert_backward_linear": 1956.154104,
+        "attention_forward_or_recompute": 1215.073332,
+        "mori_backward_dispatch_combine_glue": 1142.869817,
+        "mori_forward_dispatch_fusedmoe_combine": 1105.8667,
+        "attention_projection_backward_linear": 220.092106,
+        "router_gate_backward_linear": 10.524242
+      },
+      "torch_trace_rank_median_kernel_family_ms": {
+        "rocblas_hipblaslt_gemm_cijk_kernel": 3926.501501,
+        "attention_fwd_bwd_kernel": 2088.976954,
+        "copy_cat_fill_gather_kernel": 1977.861564,
+        "rccl_nccl_kernel": 1423.754995,
+        "mori_combine_kernel": 1209.477333,
+        "elementwise_kernel": 829.148809,
+        "aiter_fused_moe_forward_kernel": 293.429865,
+        "mori_dispatch_kernel": 237.51104,
+        "triton_swiglu_kernel": 156.336731
+      },
+      "profiled_linear_cpu_span_median_ms": 12134.10897
+    },
+    "ep8": {
+      "run_id": "torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_pf2_20260603",
+      "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+      "result": {
+        "passed": true,
+        "step1_loss": 12.28368,
+        "step1_tokens_per_gpu_s": 1993,
+        "step2_loss": 7.70633,
+        "step2_grad_norm": 41.75,
+        "step2_tokens_per_gpu_s": 2889,
+        "profiler_step_wall_median_ms": 22682.779553
+      },
+      "paths": {
+        "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_pf2_20260603",
+        "mori_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_pf2_20260603/mori_timing",
+        "torch_traces": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_full_profile_ep8_s4096_gbs128_mbs1_pf2_20260603/torch_traces/iteration_2"
+      },
+      "mori_step2_steady_per_call_gpu_ms": {
+        "filter": "call_id > 65",
+        "records": 504,
+        "recv_count_median": 18719.5,
+        "recv_count_min": 4552,
+        "recv_count_max": 31602,
+        "dispatch_x_call_median": 2.799217,
+        "dispatch_grad_output_call_median": 0.691509,
+        "local_vjp_padded_median": 29.628347,
+        "local_vjp_padded_p90": 72.053337,
+        "combine_dx_call_median": 25.115308,
+        "combine_dx_call_p90": 64.529961,
+        "combine_dtopk_call_median": 0.05092,
+        "vjp_substage_medians": {
+          "w13_xgrad_gemm_reduce": 6.178741,
+          "w13_forward_gemm": 5.555393,
+          "w13_wgrad_gemm": 4.854503,
+          "w2_forward_gemm": 3.029919,
+          "w2_dgrad_gemm": 2.870658,
+          "w2_wgrad_gemm": 2.561994,
+          "gather_scale_scatter": 1.52106,
+          "swiglu_backward": 0.73983,
+          "swiglu_forward": 0.550607,
+          "dtopk_weight": 0.545887,
+          "scatter_outputs": 0.534967
+        }
+      },
+      "torch_trace_rank_median_gpu_annotation_ms": {
+        "loss_lm_head_forward": 20056.802504,
+        "fsdp_gpu_annotation": 10718.087674,
+        "moe_other_forward_annotation": 2752.293144,
+        "mori_backward_local_padded_vjp": 2365.626682,
+        "mori_backward_dispatch_combine_glue": 2335.781092,
+        "shared_expert_backward_linear": 2006.664983,
+        "attention_forward_or_recompute": 1186.59851,
+        "mori_forward_dispatch_fusedmoe_combine": 982.206778,
+        "attention_projection_backward_linear": 213.997031,
+        "router_gate_backward_linear": 12.006362
+      },
+      "torch_trace_rank_median_kernel_family_ms": {
+        "rocblas_hipblaslt_gemm_cijk_kernel": 2834.804729,
+        "mori_combine_kernel": 2375.618893,
+        "attention_fwd_bwd_kernel": 2096.155958,
+        "copy_cat_fill_gather_kernel": 1441.164577,
+        "rccl_nccl_kernel": 1027.447435,
+        "elementwise_kernel": 448.2478,
+        "mori_dispatch_kernel": 437.836285,
+        "aiter_fused_moe_forward_kernel": 254.310463,
+        "triton_swiglu_kernel": 107.136623
+      },
+      "profiled_linear_cpu_span_median_ms": 18015.029536
+    }
+  },
+  "read": [
+    "EP8 keeps owner-rank VJP math smaller than EP4, but the backward combine tail gets worse: combine_dx median is 25.12 ms/call on EP8 versus 14.74 ms/call on EP4, with EP8 p90 at 64.53 ms.",
+    "EP4 local owner VJP math is heavier because each owner rank owns more experts: local_vjp.padded median is 45.44 ms/call on EP4 versus 29.63 ms/call on EP8.",
+    "The kernel-family view shows three large non-loss buckets to pursue: ROCm GEMM kernels, MORI combine, and attention fwd/bwd kernels. At EP8 the rank-median kernel totals are 2.83 s GEMM, 2.38 s MORI combine, and 2.10 s attention fwd/bwd inside the profiled step.",
+    "The dense linear backward labels split the MmBackward0 bucket: shared expert backward is about 2.0 s rank-median on both EP4 and EP8, attention projection backward is only about 0.21-0.22 s, and router gate backward is negligible. The raw profiled-linear CPU span is much larger because it includes nested/waiting behavior and should not be read as GPU GEMM time.",
+    "Loss/lm-head chunk forward is a separate large loss-side dense-work bucket in the profiler: 14.63 s rank-median on EP4 and 20.06 s on EP8. Keep it separate from attention/MoE optimization decisions until we inspect whether the canary loss path is doing extra full-vocab chunk work that final training should shard or fuse.",
+    "Next MoE work should not be another blind MORI launch tuple sweep. EP8 needs split/overlapped backward combine or MORI-native overlap; EP4/EP8 both still need a fused owner-rank MoE backward that reduces the padded VJP GEMM/recompute stack."
+  ]
+}

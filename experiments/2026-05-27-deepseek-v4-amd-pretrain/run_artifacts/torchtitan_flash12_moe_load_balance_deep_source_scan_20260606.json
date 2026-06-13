@@ -1,0 +1,46 @@
+{
+  "artifact": "torchtitan_flash12_moe_load_balance_deep_source_scan_20260606",
+  "date": "2026-06-06",
+  "question": "Does Ascend/MindSpeed communication source contain a hidden post-router load-balancing scheduler, or does balance come from routing plus count-aware movement and grouped math?",
+  "source_refs": {
+    "torchtitan_npu_router": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/models/deepseek_v4/model/moe.py",
+    "torchtitan_npu_permute": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/permute.py",
+    "torchtitan_npu_gmm": "sources/references/torchtitan-npu-v0.2.2-dev/torchtitan_npu/converters/kernels/gmm.py",
+    "amd_mori_dispatch": "sources/references/mori/src/ops/dispatch_combine/dispatch_combine.cpp",
+    "amd_mori_local_expert_count": "sources/references/mori/src/ops/dispatch_combine/ep_local_expert_count.hpp",
+    "upstream_github_mindspeed_head": "829b232a547014a5a72d2a8060384493e1583926",
+    "upstream_gitee_mindspeed_head": "bb583c908bc35feddee2ac94a5704cb313471859",
+    "upstream_gitee_moe_token_permute_cpp_commit": "494ee9c9d9a89d3babcca3d79b9a5b13f5e101d6",
+    "upstream_gitee_moe_token_permute_doc_commit": "8b005beb72e6587d9a0bf77d0d435436a7755cb8",
+    "upstream_gitee_moe_token_unpermute_doc_ref": "1.0.0_core_r0.7.0"
+  },
+  "findings": [
+    {
+      "mechanism": "router_balance",
+      "read": "Expert load balance is created before dispatch. TorchTitan-NPU uses expert_bias for production-style expert choice and moe_force_load_balance for debug/exact round-robin ceiling."
+    },
+    {
+      "mechanism": "count_aware_dispatch",
+      "read": "TorchTitan-NPU permute exchanges num_tokens_per_expert, derives all-to-all splits, moves tokens/scores, then locally permutes received rows into expert-contiguous order with padding for grouped matmul."
+    },
+    {
+      "mechanism": "fused_token_permute",
+      "read": "MindSpeed npu_moe_token_permute wraps aclnnMoeTokenPermute. The wrapper sorts/gathers by existing expert indices, saves sorted_indices, and backward calls aclnnMoeTokenPermuteGrad to scatter gradients back. It does not alter token-to-expert assignment."
+    },
+    {
+      "mechanism": "compact_grouped_vjp",
+      "read": "TorchTitan-NPU GMMFunction uses npu_grouped_matmul in forward and in both backward VJPs. This is the compact owner-rank math analogue AMD still lacks."
+    },
+    {
+      "mechanism": "mori_capacity_transport",
+      "read": "MORI dispatch/combine exposes capacity, buffer sizing, max receive token clamping, SDMA/AsyncLL, and local expert count atomics. It is transport scheduling, not a post-router load balancer."
+    }
+  ],
+  "amd_gap_mapping": {
+    "load_balance": "AMD has the same expert-bias and force-balance knobs, but short 0.02/0.01 coefficient runs did not collapse natural route skew. Forced balance remains a ceiling, not a production baseline.",
+    "layout": "MORI dispatch moves tokens, but route-order probes show local rows are still fragmented even under exact balanced routing. AMD needs an explicit local expert-contiguous producer driven by saved forward route metadata.",
+    "math": "Current MORI/AITER owner backward is adapter-heavy: gather compact rows, recompute gate/up, split W2 dgrad/wgrad, SwiGLU backward, W13 wgrads/xgrad, and dTopK. The Ascend-like target is one compact grouped owner VJP contract.",
+    "overlap": "dX return overlap should come after the owner VJP tail is shortened; otherwise combine_dx mostly hides peer-arrival skew from imbalanced owner VJP."
+  },
+  "next_rung": "Build the AMD analogue of npu_moe_token_permute -> npu_grouped_matmul backward: saved-route expert-contiguous local compaction plus compact grouped owner VJP for dW13, dW2, dX, and dTopKWeight."
+}

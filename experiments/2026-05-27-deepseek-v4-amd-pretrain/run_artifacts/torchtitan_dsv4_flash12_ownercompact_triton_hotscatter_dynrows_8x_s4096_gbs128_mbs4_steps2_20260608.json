@@ -1,0 +1,83 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_dynrows_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does making Triton weighted-scatter n_rows/dim runtime-dynamic reduce e2e JIT/bridge overhead enough to promote?",
+  "run_id": "torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_dynrows_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_dynrows_8x_s4096_gbs128_mbs4_steps2_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_dynrows_8x_s4096_gbs128_mbs4_steps2_20260608",
+  "source_change": "torchtitan/ops/scatter_add.py changed Triton weighted-scatter forward/backward n_rows and dim from tl.constexpr to runtime params",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "none",
+    "checkpointing": "disabled"
+  },
+  "env": {
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma"
+  },
+  "steps_completed": 2,
+  "step_metrics": {
+    "1": {
+      "loss": 12.28926,
+      "grad_norm": 13.0625,
+      "memory_gib_min": 185.57,
+      "memory_gib_max": 188.78,
+      "tokens_per_gpu_s_mean": 1950.625,
+      "tflops_per_gpu_mean": 98.7575,
+      "mfu_pct_mean": 4.275,
+      "rank_log_count": 8
+    },
+    "2": {
+      "loss": 9.93588,
+      "grad_norm": 26.5,
+      "memory_gib_min": 220.28,
+      "memory_gib_max": 224.74,
+      "tokens_per_gpu_s_mean": 6433.0,
+      "tflops_per_gpu_mean": 325.7,
+      "mfu_pct_mean": 14.1,
+      "rank_log_count": 8
+    }
+  },
+  "summary": {
+    "step2_tokens_per_gpu_s": 6433.0,
+    "step2_tflops_per_gpu": 325.7,
+    "peak_logged_memory_gib": 224.74,
+    "delta_vs_static_constexpr_scatter_tokens_per_gpu_pct": 19.69,
+    "delta_vs_retained_mbs4_ownercompact_tokens_per_gpu_pct": -20.1,
+    "delta_vs_retained_mbs4_ownercompact_tflops_pct": -20.11
+  },
+  "comparisons": {
+    "static_constexpr_scatter_e2e": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_ownercompact_triton_hotscatter_8x_s4096_gbs128_mbs4_steps2_20260608.json",
+      "step2_tokens_per_gpu_s": 5374.89,
+      "step2_inferred_tflops_per_gpu": 272.14
+    },
+    "retained_mbs4_ownercompact": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8051.75,
+      "steps_2_to_6_tflops_per_gpu_mean": 407.6725
+    }
+  },
+  "decision": {
+    "promote": false,
+    "read": "Dynamic n_rows/dim reduces the severity of the Triton weighted-scatter e2e regression, improving step-2 tok/GPU/s from 5,374.89 to 6,433, but it remains about 20.47% below the retained MBS4 owner-compact baseline. Keep the source patch only as diagnostic evidence unless a later first-class compact-row helper VJP uses it; do not promote scatter-only backend swaps."
+  },
+  "validation": {
+    "remote_e2e": "completed 2 steps on 8xMI350",
+    "local_py_compile": "passed for scatter_add.py before run",
+    "parse_source": "docker-run.log trainer metric lines"
+  }
+}

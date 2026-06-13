@@ -1,0 +1,56 @@
+{
+  "artifact": "hipkittens_sharedkv_onewarp_tile_compile_gate_20260607",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "operator": "HipKittens SharedKV backward latent-dKV epilogue fork",
+  "goal": "Test whether the resident compressed-KV tile owner can be split from the current four-warp CTA into one warp per CTA so route masking can skip the producer body for inactive compressed tiles.",
+  "source_change": {
+    "files": [
+      "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_latent_epilogue_fork.cpp",
+      "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/Makefile",
+      "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py"
+    ],
+    "change": "Add compile-time ATTN_NUM_WARPS and matching probe --num-warps so route_blocks/query_tile_mask shapes can match the static kernel grid."
+  },
+  "attempt": {
+    "compile_flags": {
+      "ATTN_B": 4,
+      "ATTN_H": 64,
+      "ATTN_H_KV": 1,
+      "ATTN_N": 4096,
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 6,
+      "ATTN_NUM_WARPS": 1,
+      "GPU_TARGET": "CDNA4"
+    },
+    "result": "compile_failed",
+    "primary_errors": [
+      "subtile_inplace<256, 32>(K_j_smem, ...) requires shared tile rows divisible by 256, but NUM_WARPS=1 makes K_j_smem rows 64",
+      "dP_ij_bf16_col_T is an art<bf16, 256, 16, ...> tile, but attn_i_smem becomes st<bf16, 64, 16, ...>; static assertion requires matching rows"
+    ],
+    "representative_static_assertions": [
+      "ST::rows % subtile_rows == 0 evaluates to 64 % 256",
+      "RT::rows == ST::rows evaluates to 256 == 64"
+    ]
+  },
+  "control_rebuild": {
+    "compile_flags": {
+      "ATTN_NUM_WARPS": 4,
+      "ATTN_QUERY_CHUNKS": 8,
+      "ATTN_ROUTE_MASK_MODE": 6
+    },
+    "result": "compiled",
+    "compiler_resource_report": {
+      "total_sgprs": 105,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    }
+  },
+  "decision": "reject macro-only one-warp/tile retile",
+  "read": "The existing HipKittens owner is structurally a 256-row resident KV tile schedule. Making inactive compressed tiles independently skippable is still a good direction, but it requires retile of K_j_smem, dP transpose storage/load, and associated dQ/dK/dV register tile shapes. It is not a Makefile-only change.",
+  "next_gate": "Design a real 64-row resident tile owner or a route-keyed score/prob producer instead of trying to mechanically change NUM_WARPS."
+}

@@ -1,0 +1,40 @@
+{
+  "artifact": "compressed_dkv_ck_route_grid_direct_fragment_decision",
+  "status": "ck_direct_fragment_promoted_dense_active_window_grouping_rejected",
+  "updated_at": "2026-06-05",
+  "scope": "S4096 compressed shared-KV dKV producer diagnostic for sparse-MLA backward",
+  "shape": {
+    "seq_len": 4096,
+    "topk": 512,
+    "selected_rows": 2097152,
+    "h_dim": 64,
+    "d_dim": 512,
+    "group_count": 1024,
+    "route_pattern": "clustered_unique",
+    "cluster_width": 688,
+    "dtype": "bf16 inputs, fp32 accumulation/output"
+  },
+  "artifacts": {
+    "ck_raw_t8": "run_artifacts/compressed_dkv_ck_route_grid_raw_atomic_s4096_k512_g1024_d512_t8k512_cw688_20260605.json",
+    "ck_raw_t16": "run_artifacts/compressed_dkv_ck_route_grid_raw_atomic_s4096_k512_g1024_d512_t16k512_cw688_20260605.json",
+    "ck_raw_t32": "run_artifacts/compressed_dkv_ck_route_grid_raw_atomic_s4096_k512_g1024_d512_t32k512_cw688_20260605.json",
+    "ck_grouped_t16": "run_artifacts/compressed_dkv_ck_route_grid_clustered_grouped_s4096_k512_g1024_d512_t16k512_cw688_20260605.json",
+    "ck_grouped_t32": "run_artifacts/compressed_dkv_ck_route_grid_clustered_grouped_s4096_k512_g1024_d512_t32k512_cw688_20260605.json"
+  },
+  "results": {
+    "ck_raw_atomic_t8_ms": 5.624936103820801,
+    "ck_raw_atomic_t16_ms": 6.349574089050293,
+    "ck_raw_atomic_t32_ms": 7.133037090301514,
+    "ck_contrib_sink_t16_ms": 4.532797813415527,
+    "ck_grouped_active_window_t16_ms": 11.141596794128418,
+    "ck_grouped_active_window_t32_ms": 12.084689140319824,
+    "prior_rocwmma_route_grid_raw_best_ms": 8.432,
+    "prior_triton_sparse_attention_boundary_full_ms": 11.13
+  },
+  "read": {
+    "promoted": "CK-Tile direct-fragment MFMA producer is a better low-level owner than the old rocWMMA store_matrix_sync/shared-tile route-grid body. It cuts the diagnostic raw-atomic dKV producer floor from about 8.43 ms to 5.62 ms at token_block=8 and remains 6.35 ms at token_block=16.",
+    "rejected": "The dense active-window grouped epilogue is not viable even though it models 11.9x to 23.8x fewer global writes. Initializing, updating, and flushing the 688xD16 shared table makes it 11.14-12.08 ms, slower than raw CK atomics and roughly at the old full sparse-attention boundary.",
+    "not_e2e_candidate": "These probes still consume diagnostic materialized probabilities and scaled dP. They are not integrated TorchTitan sparse-attention kernels and therefore do not get an e2e TFLOPs promotion.",
+    "next_kernel_contract": "Build the cooperative HIP/CK sparse-attention backward owner around the CK direct-fragment producer, but replace the dense shared table with a sparse segmented epilogue over active route lanes/slots: q,dO,kv,indices,lse/sink -> recompute score/prob/scaled-dP -> CK MFMA contribution fragment -> lane/warp/block segmented accumulation for repeated compressed groups -> reduced dKV writes, all before any HBM score/prob/partial slab."
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "artifact": "tilelang_descriptor_gemm_dgrad_decision_20260531",
+  "date": "2026-05-31",
+  "decision": {
+    "status": "demote_for_bwd_w2_dgrad",
+    "reason": "The descriptor-driven TileLang kernel is correct and removes the example grouped-kernel expert scan, but it remains slower than the retained global-max padded torch.bmm(out=) baseline at the S2048 development shape.",
+    "promote_only_if_future_kernel": {
+      "correct": true,
+      "beats_torch_padded_bmm_out_ms": 3.6242690086364746,
+      "initial_latency_gate_ms": 3.0
+    }
+  },
+  "shape": {
+    "tokens": 2048,
+    "assignments": 12288,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "experts": 384,
+    "topk": 6,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF"
+  },
+  "baseline": {
+    "name": "retained_global_max_padded_torch_bmm_out",
+    "median_ms": 3.6242690086364746,
+    "min_ms": 3.3996670246124268,
+    "padded_tflops_median": 219.3097099917079,
+    "compact_equivalent_tflops_median": 149.31724935605646
+  },
+  "candidate": {
+    "name": "tilelang_descriptor_gemm_dgrad",
+    "summary_path": "run_artifacts/tilelang_descriptor_gemm_dgrad_s2048_20260531.json",
+    "sweep_count": 18,
+    "failure_count": 0,
+    "best": {
+      "median_ms": 5.452006816864014,
+      "min_ms": 5.3622050285339355,
+      "speedup_vs_torch_padded_bmm_out": 0.6647587081927291,
+      "tile_tflops_median": 145.52955007645767,
+      "compact_equivalent_tflops_median": 99.2599417928237,
+      "tile_rows": 18016,
+      "tile_count": 563,
+      "tile_row_utilization": 0.6820603907637656,
+      "config": {
+        "block_M": 32,
+        "block_N": 256,
+        "block_K": 64,
+        "threads": 256,
+        "num_stages": 1
+      }
+    },
+    "correctness": {
+      "ok": true,
+      "max_abs": 0.0,
+      "rel_l2": 0.0,
+      "pct_close": 100.0,
+      "atol": 0.5,
+      "rtol": 0.025
+    }
+  },
+  "read": "This closes the direct TileLang descriptor variant for W2 dgrad at S2048. The remaining viable path for this slot is a CK/CK-Tile grouped GEMM or a substantially different custom kernel that can beat torch.bmm(out=) before full-layer integration."
+}

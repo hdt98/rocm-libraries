@@ -1,0 +1,112 @@
+{
+  "artifact": "compressed_dkv_rocwmma_persistent_tile_size_sweep_decision_20260603",
+  "created_date": "2026-06-03",
+  "scope": "Follow-up S4096 layer-2 tile-size sweep for the rocWMMA persistent-tile compressed dKV ScatterAdd probe.",
+  "status": "persistent_tile_retune_rejected",
+  "source_tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_persistent_tile.py",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "why_this_artifact_exists": "The first persistent-tile result passed S128/S512 but failed S4096 at 32x256 and 32x512. This sweep checks whether smaller producer tiles recover enough parallelism to make the same LDS grouped-accumulator body worth pursuing.",
+  "gate_context": {
+    "s4096_sparse_atomic_wall_ms": 8.80629825592041,
+    "materialized_flat_gemm_mixed_floor_ms": 7.052491188049316,
+    "materialized_flat_gemm_bf16_floor_ms": 4.727312088012695,
+    "read": "A promotable S4096 compressed-dKV accumulator must beat the retained sparse-atomic wall before integration, and should trend toward the materialized MFMA floors without their multi-GiB selected-state footprint."
+  },
+  "source_artifacts": {
+    "s8x128": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sc8_sb128_timing_20260603.json",
+    "s16x128": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sc16_sb128_timing_20260603.json",
+    "s16x256": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sc16_sb256_timing_20260603.json",
+    "s32x256": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sb256_timing_20260603.json",
+    "s32x512": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_s4096_layer2_sb512_timing_20260603.json",
+    "base_decision": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_decision_20260603.json"
+  },
+  "sweep_results": [
+    {
+      "seq_chunk": 8,
+      "selected_block": 128,
+      "median_ms": 130.72193908691406,
+      "route_atomic_reduction_x": 2.0240697092145354,
+      "coalesced_atomic_add_elements": 397735424,
+      "nonempty_tiles": 1664,
+      "unique_groups_per_tile_mean": 379.31005859375,
+      "valid_pairs_per_tile_mean": 767.75,
+      "passes_s4096_gate": false
+    },
+    {
+      "seq_chunk": 16,
+      "selected_block": 128,
+      "median_ms": 131.2294158935547,
+      "route_atomic_reduction_x": 3.3692655488294854,
+      "coalesced_atomic_add_elements": 238937600,
+      "nonempty_tiles": 832,
+      "unique_groups_per_tile_mean": 455.7373046875,
+      "valid_pairs_per_tile_mean": 1535.5,
+      "passes_s4096_gate": false
+    },
+    {
+      "seq_chunk": 16,
+      "selected_block": 256,
+      "median_ms": 130.51499938964844,
+      "route_atomic_reduction_x": 6.221961932650073,
+      "coalesced_atomic_add_elements": 129387520,
+      "nonempty_tiles": 448,
+      "unique_groups_per_tile_mean": 493.57421875,
+      "valid_pairs_per_tile_mean": 3071.0,
+      "passes_s4096_gate": false
+    },
+    {
+      "seq_chunk": 32,
+      "selected_block": 256,
+      "median_ms": 132.95367431640625,
+      "route_atomic_reduction_x": 12.338365924856399,
+      "coalesced_atomic_add_elements": 65247232,
+      "nonempty_tiles": 224,
+      "unique_groups_per_tile_mean": 497.796875,
+      "valid_pairs_per_tile_mean": 6142.0,
+      "passes_s4096_gate": false
+    },
+    {
+      "seq_chunk": 32,
+      "selected_block": 512,
+      "median_ms": 136.08460998535156,
+      "route_atomic_reduction_x": 23.813051840857806,
+      "coalesced_atomic_add_elements": 33806848,
+      "nonempty_tiles": 128,
+      "unique_groups_per_tile_mean": 515.8515625,
+      "valid_pairs_per_tile_mean": 12284.0,
+      "passes_s4096_gate": false
+    }
+  ],
+  "read": {
+    "primary_observation": "S4096 runtime is nearly flat around 130-136 ms while modeled write reduction changes from 2.0x to 23.8x. That means this body is not dominated by final global writes; it is dominated by the persistent CTA producer/local-table schedule itself.",
+    "what_this_closes": "Do not spend more time retuning seq_chunk or selected_block for this one-CTA persistent local table design. It already fails by about 14.8x versus the 8.8 ms sparse-atomic wall at its best point.",
+    "why_s512_was_misleading": "S512 has only 32,640 valid pairs and 128 compressed groups, so the local table and serialized producer loop stay small. S4096 has 1,572,352 valid pairs and 1024 compressed groups; the same CTA design loses enough parallelism that write coalescing cannot compensate."
+  },
+  "next_branch": {
+    "name": "parallel_producer_compact_grouped_partials",
+    "required_change": "Split K16xD16 producer work across many CTAs/waves, then reduce compact grouped partial rows separately. The reduction must be over a bounded touched-group format, not the earlier dense [seq_tile, group, D] or full selected-partial slabs.",
+    "candidate_contract": [
+      "Producer CTA: small token microtile x selected microtile x D16, MFMA-shaped contribution math, writes compact rows keyed by compressed group.",
+      "Reducer CTA: merge compact rows for the same (seq_tile or global group, D16) using segmented or hash reduction.",
+      "Production path: fuse probability/LI/compressor recompute so materialized probs/grad_logits are removed after the accumulator schedule is proven."
+    ],
+    "reject_if": [
+      "S512 producer+reducer fails to beat the 1.51 ms persistent-tile positive rung.",
+      "S4096 compact partial traffic pushes timing above the 8.8 ms sparse-atomic wall.",
+      "The compact format degenerates into dense multi-GiB partial slabs or scalar group-major recompute."
+    ]
+  },
+  "commands": {
+    "s8x128": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 4096 --seq-chunk 8 --selected-block 128 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "s16x128": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 4096 --seq-chunk 16 --selected-block 128 --skip-correctness --skip-reference-timing --allow-large-materialization",
+    "s16x256": "docker run ... probe_compressed_dkv_rocwmma_persistent_tile.py --seq-len 4096 --seq-chunk 16 --selected-block 256 --skip-correctness --skip-reference-timing --allow-large-materialization"
+  },
+  "dependency_pin_changes": []
+}

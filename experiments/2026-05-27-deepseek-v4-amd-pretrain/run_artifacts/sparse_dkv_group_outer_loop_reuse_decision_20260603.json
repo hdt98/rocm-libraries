@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-03",
+  "question": "Given prepacked route entries (token, selected_slot) -> group, why not make group the outermost producer loop?",
+  "short_answer": "Prepack makes group membership lookup cheap, but group-outermost contribution production destroys token-local Q/dO reuse. A compressed-group segment is a good writeback/reducer owner, not a good producer owner for the S4096 layer-2 route.",
+  "source_artifacts": {
+    "token_reuse": "actual_li_tile_segment_token_reuse_decision_20260603.json",
+    "route_pack": "actual_li_group_panel_route_pack_decision_20260603.json",
+    "prepack_to_dense_like": "sparse_dkv_prepack_to_dense_like_gap_decision_20260603.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk_groups_per_token": 512,
+    "heads": 64,
+    "dim": 512,
+    "valid_pairs": 1572352
+  },
+  "route_prepack_evidence": {
+    "torch_sort_pack_median_ms": [0.52, 0.54],
+    "token_block32_group_panel256": {
+      "pack_median_ms": 0.527,
+      "modeled_write_reduction_x": 23.81,
+      "k16_fill_x": 0.958,
+      "int32_route_workspace_mib": 12.0,
+      "naive_panel_rescan_amplification_x": 4
+    },
+    "read": "The prepacked route list is cheap enough to use. A naive group-panel kernel that rescans top-k is explicitly rejected; the route list should be consumed directly or fused into the producer."
+  },
+  "group_outer_loop_reuse_evidence": {
+    "token_block32_selected_block256": {
+      "write_reduction_x": 12.338,
+      "segments": 127436,
+      "segment_count_p50": 11.0,
+      "segment_count_p90": 19.0,
+      "segment_count_p99": 32.0,
+      "overall_pair_over_unique_token_x": 1.0,
+      "duplicate_token_segments": 0,
+      "max_pairs_per_token_per_segment_p99": 1.0
+    },
+    "token_block32_selected_block512": {
+      "write_reduction_x": 23.813,
+      "segments": 66029,
+      "segment_count_p50": 23.0,
+      "segment_count_p90": 32.0,
+      "segment_count_p99": 32.0,
+      "overall_pair_over_unique_token_x": 1.0,
+      "duplicate_token_segments": 0,
+      "max_pairs_per_token_per_segment_p99": 1.0
+    },
+    "interpretation": "The group segments are excellent reducers: they collapse 12-24x writes and have useful segment lengths. But each group segment contains at most one selected row per token. Therefore a group-owned producer cannot reuse the same token's q/dO across the selected-K block; it sees many independent token rows instead of the query-major KxH by HxD tile."
+  },
+  "math_contract": {
+    "query_major_fast_path": "For one token, load Q[token,H,D] and dO[token,H,D], then compute many selected-slot contributions with tl.dot/MFMA before writing dKV.",
+    "group_outer_path": "For one group, walk prepacked pairs [(token, selected_slot), ...] and sum grad_logits[token,H,slot] * Q[token,H,D] + probs[token,H,slot] * dO[token,H,D].",
+    "why_group_outer_repeats_work": "The same token contributes to hundreds of groups at layer 2. If groups own production, Q/dO for that token are reloaded or recomputed across many group segments instead of being reused once in a query-major selected-slot tile."
+  },
+  "measured_negative_neighbors": [
+    {
+      "branch": "segment_owned_scalar_CTA",
+      "s4096_ms": 44.58,
+      "note": "Achieved the 23.81x write reduction but lost contribution-production efficiency."
+    },
+    {
+      "branch": "bucketed_group_major_recompute",
+      "s4096_ms": [458.55, 2785.64],
+      "note": "Sorting by group plus row-wise recompute is decisively slower."
+    },
+    {
+      "branch": "panel_owned_D16_contribution_sink",
+      "s4096_ms": [111.0, 130.0],
+      "note": "Owning contribution production by token/group panel collapses at S4096 even without dKV writes."
+    },
+    {
+      "branch": "pairslot_LDS_reducer",
+      "s4096_ms": 18.28,
+      "note": "Closer to query-major but still pays per-contribution local-table overhead."
+    }
+  ],
+  "decision": {
+    "reject": "Do not make compressed group the outermost contribution-production loop for the hard S4096 layer-2 route.",
+    "retain": "Use prepacked group order for writeback/reduction ownership.",
+    "next_kernel": "query_major_segmented_mfma_dkv_producer_v1",
+    "next_kernel_requirement": [
+      "Keep Q/dO loaded in query-major tiles.",
+      "Compute selected-slot KxD contributions with tl.dot/MFMA-style math.",
+      "Use prepacked group metadata to do lane/warp/block segmented accumulation before global writes.",
+      "Emit compact (group, D16, producer_tile) rows or reduced atomics, followed by the already-cheap compact reducer."
+    ]
+  }
+}

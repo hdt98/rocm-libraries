@@ -1,0 +1,89 @@
+{
+  "artifact": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_normal_gbs64_li_aux_train_step_no_activation_checkpointing",
+  "purpose": "Record the first normal-GA TorchTitan DeepSeek-V4-style train-step smoke that keeps the opt-in MORI dispatch + AITER fused_moe + MORI combine bridge enabled and re-enables the default LightningIndexer auxiliary loss.",
+  "host": "do-sonle5-mi350-gpu",
+  "image": {
+    "tag": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "base_tag": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "base_id": "sha256:48c8b82bb0c23c9c1833480a3a6c7717763220f97ce56e8d427d3f81806075a2",
+    "overlay_id": "sha256:ec29190fc60e040ccf57eceeb432331f3ee55963b9f6b4b39e2f3a88515ef012"
+  },
+  "run": {
+    "run_id": "torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000/docker-run.log",
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000"
+  },
+  "shape": {
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "seq_len": 128,
+    "micro_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "steps": 1,
+    "checkpoint_enable": false,
+    "activation_checkpoint_mode": "none"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_DSA_INDEXER_LOSS_COEFF": "default_0.001",
+    "CANARY_DEDICATED_EP_PG": "true",
+    "CANARY_REQUIRE_IDLE_GPUS": "true",
+    "MASTER_PORT": "29566"
+  },
+  "check_config": {
+    "model_spec": "deepseek_v4 flash_4layer",
+    "moe_token_dispatcher_config": "MoriEPTokenDispatcher.Config",
+    "moe_score_before_experts": false,
+    "router_score_func": "sqrtsoftplus",
+    "attention_compress_ratio_by_layer": [
+      0,
+      0,
+      4,
+      128
+    ],
+    "attention_sparse_backward_mode_by_layer": [
+      "manual",
+      "manual",
+      "manual",
+      "manual"
+    ],
+    "attention_indexer_loss_coeff_by_layer": [
+      0.001,
+      0.001,
+      0.001,
+      0.001
+    ]
+  },
+  "result": {
+    "status": "pass",
+    "loss_step_1": 12.24433,
+    "grad_norm_step_1": 9.5625,
+    "memory_gib_step_1": 136.32,
+    "tps_logged": 5,
+    "tflops_logged": 0.07,
+    "step_end_ms_rank0": 379975.47698696144,
+    "step_end_ms_rank_min": 379885.5614060303,
+    "step_end_ms_rank_max": 379975.47698696144,
+    "training_completed": true,
+    "process_groups_destroyed": true,
+    "checkpoint_dir_present": false
+  },
+  "structured_logs": [
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000/structured_logs/training.global_rank_0.20260601-172757-MSGMX8.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000/structured_logs/training.global_rank_1.20260601-172757-UCTUKJ.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000/structured_logs/training.global_rank_2.20260601-172757-OT8DCH.jsonl",
+    "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_overlay_4x_s128_gbs64_liaux_20260602T000000/structured_logs/training.global_rank_3.20260601-172757-4EE60W.jsonl"
+  ],
+  "timing_read": "Not performance evidence: first-run container timing includes MORI/AITER JIT build, the attention backward is still the manual PyTorch sparse-MLA bridge, and the MORI+AITER MoE backward is still reference recompute.",
+  "limitations": [
+    "This proves the MORI+AITER TorchTitan bridge can survive the normal GBS64 accumulation shape with LI aux enabled.",
+    "It does not prove throughput: tps is dominated by JIT and reference backward.",
+    "Full activation checkpointing is recorded separately."
+  ]
+}

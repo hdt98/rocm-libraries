@@ -1,0 +1,101 @@
+{
+  "artifact": "torchtitan_fsdp_ep_pg_probe_ready_20260531",
+  "created_at": "2026-05-31",
+  "purpose": "Prepare the runtime evidence gate for the Ascend-mapped FSDP/EP process-group separation risk on the active image-backed TorchTitan 4x/8x canary path.",
+  "ascend_mapping_context": {
+    "source_artifact": "run_artifacts/ascend_autofuse_amd_mapping_20260531.json",
+    "ascend_lesson": "Ascend reports FSDP and EP sharing a ProcessGroup serialized communication; separating domains reduced MoE communication wait and improved throughput.",
+    "amd_risk": "Local TorchTitan source indicates separate dense/sparse meshes and graph-trainer process-group isolation passes, but the active canary uses image-bundled Primus/TorchTitan with compile.enable=false, so runtime group identity remains unproven."
+  },
+  "prepared_probe": {
+    "tool": "tools/dsv4_runtime_probe/inspect_torchtitan_fsdp_ep_groups.py",
+      "launcher_action": "launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+    "target_runtime": {
+      "host": "do-sonle5-mi350-gpu",
+      "image": "rocm/primus:v26.2",
+      "torchtitan_source": "image-bundled /workspace/Primus/third_party/torchtitan"
+    },
+    "shape": {
+      "tp": 1,
+      "pp": 1,
+      "cp": 1,
+      "fsdp": "4_or_8",
+      "ep": "4_or_8",
+      "dp_replicate": 1,
+      "dp_shard": -1,
+      "backend": "nccl"
+    },
+    "checks": [
+      "Build TorchTitan ParallelDims inside a 4-rank or 8-rank torch.distributed.run job.",
+      "Describe fsdp, ep, efsdp, batch, and loss DeviceMeshes on every rank.",
+      "Record ProcessGroup object identity, group repr, backend, and rank sets.",
+      "Run tiny FSDP all_reduce and EP all_to_all_single smoke collectives when requested.",
+      "Write the rank-gathered JSON to the remote log directory as torchtitan_pg_probe.json."
+    ]
+  },
+  "current_node_state": {
+    "checked_at_utc": "2026-05-31T16:35:48Z",
+    "status": "busy_not_run",
+    "blocking_processes": [
+      {
+        "pid": 3335962,
+        "command": "/opt/venv/bin/torchrun --nproc_per_node 2 ... llama3.1_8B-BF16-TP2-pretrain.yaml ... --training.steps=20000",
+        "note": "parent pt_elastic/torchrun process"
+      },
+      {
+        "pid": 3336399,
+        "gpu": 0,
+        "vram_bytes": 167383355392,
+        "command": "/opt/venv/bin/python -u primus/cli/main.py train pretrain ... llama3.1_8B-BF16-TP2-pretrain.yaml"
+      },
+      {
+        "pid": 3336400,
+        "gpu": 1,
+        "vram_bytes": 167383355392,
+        "command": "/opt/venv/bin/python -u primus/cli/main.py train pretrain ... llama3.1_8B-BF16-TP2-pretrain.yaml"
+      },
+      {
+        "pid": 3793482,
+        "command": "python3 /work/tools/sglang_mori_aiter_ck_tile_ready_probe.py --world-size 2 --tokens 128 --hidden 1024 --inter 128 --experts 16 --topk 2 --cross-rank-topk ..."
+      },
+      {
+        "pid": 3793579,
+        "vram_bytes": 13723607040,
+        "command": "python3 multiprocessing child for sglang_mori_aiter_ck_tile_ready_probe.py"
+      },
+      {
+        "pid": 3793580,
+        "vram_bytes": 13723607040,
+        "command": "python3 multiprocessing child for sglang_mori_aiter_ck_tile_ready_probe.py"
+      }
+    ],
+    "guard_result": "The pg-probe launcher action refused to start because active KFD processes were present."
+  },
+  "validation": {
+    "local_commands": [
+      {
+        "command": "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/inspect_torchtitan_fsdp_ep_groups.py",
+        "result": "passed"
+      },
+      {
+        "command": "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+        "result": "passed"
+      },
+      {
+        "command": "bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+        "result": "refused_as_expected_due_to_active_gpu_processes"
+      }
+    ],
+    "runtime_probe_result": "not_run_due_to_busy_node"
+  },
+  "next_when_idle": {
+    "command": "GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=<idle_gpu_ids> bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh pg-probe",
+    "expected_remote_json": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/<run_id>/torchtitan_pg_probe.json",
+    "promote_if": [
+      "fsdp_group_is_ep_group is false on every rank",
+      "fsdp and ep rank sets are recorded explicitly",
+      "tiny FSDP all_reduce and EP all_to_all_single collective smoke checks pass"
+    ]
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,590 @@
+{
+  "sources": {
+    "combine_backward_dispatch": "/tmp/mori_native_compact_backward_viz_8x_s4094096_mbs4_20260611/*combine_backward_dispatch*.json",
+    "dispatch_backward_combine": "/tmp/mori_native_compact_dispatch_backward_combine_viz_8x_s4096_mbs4_20260611/*dispatch_backward_combine*.json"
+  },
+  "stages": {
+    "combine_backward_dispatch": {
+      "num_files": 8,
+      "slots": {
+        "standard_compact_dispatch_grid_wait_recv": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 96.08000000000004,
+            "mean_warp_us": 95.420078125,
+            "rank": 0,
+            "span_us": 96.18999999999994,
+            "sum_us": 48855.08
+          },
+          "span_us_max": 96.18999999999994,
+          "span_us_median": 79.10000000000002,
+          "sum_us_max": 48855.08
+        },
+        "standard_compact_dispatch_grid_wait_reset": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3661.32,
+            "mean_warp_us": 2626.216796875,
+            "rank": 5,
+            "span_us": 3661.5099999999998,
+            "sum_us": 1344623.0
+          },
+          "span_us_max": 3661.5099999999998,
+          "span_us_median": 3018.51,
+          "sum_us_max": 1344623.0
+        },
+        "standard_compact_dispatch_grid_wait_send": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 87.63999999999999,
+            "mean_warp_us": 50.681796874999996,
+            "rank": 6,
+            "span_us": 87.94999999999993,
+            "sum_us": 25949.079999999998
+          },
+          "span_us_max": 87.94999999999993,
+          "span_us_median": 82.04000000000002,
+          "sum_us_max": 25949.079999999998
+        },
+        "standard_compact_dispatch_receive_copy": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 5807.16,
+            "mean_warp_us": 3395.255234375,
+            "rank": 2,
+            "span_us": 5807.32,
+            "sum_us": 1738370.68
+          },
+          "span_us_max": 5807.32,
+          "span_us_median": 5214.05,
+          "sum_us_max": 1738370.68
+        },
+        "standard_compact_dispatch_reset_counters": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 722.6800000000003,
+            "mean_warp_us": 4.908437500000009,
+            "rank": 0,
+            "span_us": 722.9200000000001,
+            "sum_us": 2513.1200000000044
+          },
+          "span_us_max": 722.9200000000001,
+          "span_us_median": 592.3850000000002,
+          "sum_us_max": 2530.7599999999293
+        },
+        "standard_compact_dispatch_signal_counts": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4.240000000000009,
+            "mean_warp_us": 0.5974999999999961,
+            "rank": 6,
+            "span_us": 4.240000000000009,
+            "sum_us": 305.919999999998
+          },
+          "span_us_max": 4.240000000000009,
+          "span_us_median": 3.465000000000032,
+          "sum_us_max": 305.919999999998
+        },
+        "standard_compact_dispatch_stage_rows": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 728.84,
+            "mean_warp_us": 687.643671875,
+            "rank": 5,
+            "span_us": 729.09,
+            "sum_us": 352073.56
+          },
+          "span_us_max": 729.09,
+          "span_us_median": 714.575,
+          "sum_us_max": 352073.56
+        },
+        "standard_compact_dispatch_wait_counts": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 90.19999999999993,
+            "mean_warp_us": 0.5052343749999895,
+            "rank": 0,
+            "span_us": 93.44999999999993,
+            "sum_us": 258.6799999999946
+          },
+          "span_us_max": 93.44999999999993,
+          "span_us_median": 76.38,
+          "sum_us_max": 258.6799999999946
+        }
+      },
+      "top_slots_by_max_span": [
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 5807.16,
+            "mean_warp_us": 3395.255234375,
+            "rank": 2,
+            "span_us": 5807.32,
+            "sum_us": 1738370.68
+          },
+          "slot": "standard_compact_dispatch_receive_copy",
+          "span_us_max": 5807.32,
+          "span_us_median": 5214.05,
+          "sum_us_max": 1738370.68
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3661.32,
+            "mean_warp_us": 2626.216796875,
+            "rank": 5,
+            "span_us": 3661.5099999999998,
+            "sum_us": 1344623.0
+          },
+          "slot": "standard_compact_dispatch_grid_wait_reset",
+          "span_us_max": 3661.5099999999998,
+          "span_us_median": 3018.51,
+          "sum_us_max": 1344623.0
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 728.84,
+            "mean_warp_us": 687.643671875,
+            "rank": 5,
+            "span_us": 729.09,
+            "sum_us": 352073.56
+          },
+          "slot": "standard_compact_dispatch_stage_rows",
+          "span_us_max": 729.09,
+          "span_us_median": 714.575,
+          "sum_us_max": 352073.56
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 722.6800000000003,
+            "mean_warp_us": 4.908437500000009,
+            "rank": 0,
+            "span_us": 722.9200000000001,
+            "sum_us": 2513.1200000000044
+          },
+          "slot": "standard_compact_dispatch_reset_counters",
+          "span_us_max": 722.9200000000001,
+          "span_us_median": 592.3850000000002,
+          "sum_us_max": 2530.7599999999293
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 96.08000000000004,
+            "mean_warp_us": 95.420078125,
+            "rank": 0,
+            "span_us": 96.18999999999994,
+            "sum_us": 48855.08
+          },
+          "slot": "standard_compact_dispatch_grid_wait_recv",
+          "span_us_max": 96.18999999999994,
+          "span_us_median": 79.10000000000002,
+          "sum_us_max": 48855.08
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 90.19999999999993,
+            "mean_warp_us": 0.5052343749999895,
+            "rank": 0,
+            "span_us": 93.44999999999993,
+            "sum_us": 258.6799999999946
+          },
+          "slot": "standard_compact_dispatch_wait_counts",
+          "span_us_max": 93.44999999999993,
+          "span_us_median": 76.38,
+          "sum_us_max": 258.6799999999946
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 87.63999999999999,
+            "mean_warp_us": 50.681796874999996,
+            "rank": 6,
+            "span_us": 87.94999999999993,
+            "sum_us": 25949.079999999998
+          },
+          "slot": "standard_compact_dispatch_grid_wait_send",
+          "span_us_max": 87.94999999999993,
+          "span_us_median": 82.04000000000002,
+          "sum_us_max": 25949.079999999998
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4.240000000000009,
+            "mean_warp_us": 0.5974999999999961,
+            "rank": 6,
+            "span_us": 4.240000000000009,
+            "sum_us": 305.919999999998
+          },
+          "slot": "standard_compact_dispatch_signal_counts",
+          "span_us_max": 4.240000000000009,
+          "span_us_median": 3.465000000000032,
+          "sum_us_max": 305.919999999998
+        }
+      ],
+      "wall_us_by_rank": [
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank0_local0_pid82_call16.json",
+          "rank": 0,
+          "wall_us": 6618.79
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank1_local1_pid83_call16.json",
+          "rank": 1,
+          "wall_us": 6612.31
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank2_local2_pid84_call16.json",
+          "rank": 2,
+          "wall_us": 6617.68
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank3_local3_pid85_call16.json",
+          "rank": 3,
+          "wall_us": 6536.14
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank4_local4_pid86_call16.json",
+          "rank": 4,
+          "wall_us": 6612.67
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank5_local5_pid87_call16.json",
+          "rank": 5,
+          "wall_us": 6623.36
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank6_local6_pid88_call16.json",
+          "rank": 6,
+          "wall_us": 6611.2
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_combine_backward_dispatch_rank7_local7_pid89_call16.json",
+          "rank": 7,
+          "wall_us": 6630.76
+        }
+      ],
+      "wall_us_max": 6630.76,
+      "wall_us_median": 6615.175
+    },
+    "dispatch_backward_combine": {
+      "num_files": 8,
+      "slots": {
+        "standard_compact_combine_grid_wait_recv": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4379.96,
+            "mean_warp_us": 4371.17359375,
+            "rank": 4,
+            "span_us": 4380.110000000001,
+            "sum_us": 2238040.88
+          },
+          "span_us_max": 4380.110000000001,
+          "span_us_median": 2295.96,
+          "sum_us_max": 2238040.88
+        },
+        "standard_compact_combine_grid_wait_reset": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3489.5200000000004,
+            "mean_warp_us": 930.01796875,
+            "rank": 2,
+            "span_us": 3489.6800000000003,
+            "sum_us": 476169.2
+          },
+          "span_us_max": 3489.6800000000003,
+          "span_us_median": 3013.445,
+          "sum_us_max": 560771.4400000001
+        },
+        "standard_compact_combine_grid_wait_send": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 2040.4,
+            "mean_warp_us": 1481.41296875,
+            "rank": 3,
+            "span_us": 2040.44,
+            "sum_us": 758483.44
+          },
+          "span_us_max": 2040.44,
+          "span_us_median": 1656.7700000000002,
+          "sum_us_max": 758483.44
+        },
+        "standard_compact_combine_receive_copy": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 9083.4,
+            "mean_warp_us": 8784.14375,
+            "rank": 4,
+            "span_us": 9083.46,
+            "sum_us": 4497481.6
+          },
+          "span_us_max": 9083.46,
+          "span_us_median": 8185.360000000001,
+          "sum_us_max": 4517237.08
+        },
+        "standard_compact_combine_reset_counters": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3474.040000000001,
+            "mean_warp_us": 10.387109374999724,
+            "rank": 0,
+            "span_us": 3474.0699999999997,
+            "sum_us": 5318.199999999859
+          },
+          "span_us_max": 3474.0699999999997,
+          "span_us_median": 896.835000000001,
+          "sum_us_max": 5318.199999999859
+        },
+        "standard_compact_combine_signal_counts": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3.519999999999982,
+            "mean_warp_us": 0.5850000000000328,
+            "rank": 7,
+            "span_us": 3.7200000000002547,
+            "sum_us": 299.5200000000168
+          },
+          "span_us_max": 3.7200000000002547,
+          "span_us_median": 2.9550000000001546,
+          "sum_us_max": 299.5200000000168
+        },
+        "standard_compact_combine_stage_rows": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3358.6,
+            "mean_warp_us": 1880.283359375,
+            "rank": 3,
+            "span_us": 3358.61,
+            "sum_us": 962705.08
+          },
+          "span_us_max": 3358.61,
+          "span_us_median": 2964.34,
+          "sum_us_max": 1047349.4
+        },
+        "standard_compact_combine_wait_counts": {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4375.5599999999995,
+            "mean_warp_us": 8.974765624999996,
+            "rank": 4,
+            "span_us": 4377.76,
+            "sum_us": 4595.079999999998
+          },
+          "span_us_max": 4377.76,
+          "span_us_median": 2293.5550000000003,
+          "sum_us_max": 4595.079999999998
+        }
+      },
+      "top_slots_by_max_span": [
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 9083.4,
+            "mean_warp_us": 8784.14375,
+            "rank": 4,
+            "span_us": 9083.46,
+            "sum_us": 4497481.6
+          },
+          "slot": "standard_compact_combine_receive_copy",
+          "span_us_max": 9083.46,
+          "span_us_median": 8185.360000000001,
+          "sum_us_max": 4517237.08
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4379.96,
+            "mean_warp_us": 4371.17359375,
+            "rank": 4,
+            "span_us": 4380.110000000001,
+            "sum_us": 2238040.88
+          },
+          "slot": "standard_compact_combine_grid_wait_recv",
+          "span_us_max": 4380.110000000001,
+          "span_us_median": 2295.96,
+          "sum_us_max": 2238040.88
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 4375.5599999999995,
+            "mean_warp_us": 8.974765624999996,
+            "rank": 4,
+            "span_us": 4377.76,
+            "sum_us": 4595.079999999998
+          },
+          "slot": "standard_compact_combine_wait_counts",
+          "span_us_max": 4377.76,
+          "span_us_median": 2293.5550000000003,
+          "sum_us_max": 4595.079999999998
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3489.5200000000004,
+            "mean_warp_us": 930.01796875,
+            "rank": 2,
+            "span_us": 3489.6800000000003,
+            "sum_us": 476169.2
+          },
+          "slot": "standard_compact_combine_grid_wait_reset",
+          "span_us_max": 3489.6800000000003,
+          "span_us_median": 3013.445,
+          "sum_us_max": 560771.4400000001
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3474.040000000001,
+            "mean_warp_us": 10.387109374999724,
+            "rank": 0,
+            "span_us": 3474.0699999999997,
+            "sum_us": 5318.199999999859
+          },
+          "slot": "standard_compact_combine_reset_counters",
+          "span_us_max": 3474.0699999999997,
+          "span_us_median": 896.835000000001,
+          "sum_us_max": 5318.199999999859
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3358.6,
+            "mean_warp_us": 1880.283359375,
+            "rank": 3,
+            "span_us": 3358.61,
+            "sum_us": 962705.08
+          },
+          "slot": "standard_compact_combine_stage_rows",
+          "span_us_max": 3358.61,
+          "span_us_median": 2964.34,
+          "sum_us_max": 1047349.4
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 2040.4,
+            "mean_warp_us": 1481.41296875,
+            "rank": 3,
+            "span_us": 2040.44,
+            "sum_us": 758483.44
+          },
+          "slot": "standard_compact_combine_grid_wait_send",
+          "span_us_max": 2040.44,
+          "span_us_median": 1656.7700000000002,
+          "sum_us_max": 758483.44
+        },
+        {
+          "count_median": 512.0,
+          "rank_max_span": {
+            "count": 512,
+            "max_warp_us": 3.519999999999982,
+            "mean_warp_us": 0.5850000000000328,
+            "rank": 7,
+            "span_us": 3.7200000000002547,
+            "sum_us": 299.5200000000168
+          },
+          "slot": "standard_compact_combine_signal_counts",
+          "span_us_max": 3.7200000000002547,
+          "span_us_median": 2.9550000000001546,
+          "sum_us_max": 299.5200000000168
+        }
+      ],
+      "wall_us_by_rank": [
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank0_local0_pid82_call16.json",
+          "rank": 0,
+          "wall_us": 14157.6
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank1_local1_pid83_call16.json",
+          "rank": 1,
+          "wall_us": 14140.08
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank2_local2_pid84_call16.json",
+          "rank": 2,
+          "wall_us": 13015.52
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank3_local3_pid85_call16.json",
+          "rank": 3,
+          "wall_us": 12456.61
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank4_local4_pid86_call16.json",
+          "rank": 4,
+          "wall_us": 16273.8
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank5_local5_pid87_call16.json",
+          "rank": 5,
+          "wall_us": 14819.73
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank6_local6_pid88_call16.json",
+          "rank": 6,
+          "wall_us": 15798.68
+        },
+        {
+          "events": 8192,
+          "file": "standard_ep_mori_native_compact_dispatch_backward_combine_rank7_local7_pid89_call16.json",
+          "rank": 7,
+          "wall_us": 13198.52
+        }
+      ],
+      "wall_us_max": 16273.8,
+      "wall_us_median": 14148.84
+    }
+  }
+}

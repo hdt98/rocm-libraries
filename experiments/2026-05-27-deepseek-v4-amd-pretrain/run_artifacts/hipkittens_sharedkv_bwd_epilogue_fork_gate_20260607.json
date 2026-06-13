@@ -1,0 +1,99 @@
+{
+  "artifact": "hipkittens_sharedkv_bwd_epilogue_fork_gate_20260607",
+  "status": "compile_and_runtime_contract_gate_passed_not_promoted",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "fork": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_epilogue_fork.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_epilogue_fork.py",
+    "reference": "sources/references/hipkittens/kernels/attn/gqa_backwards/attn_bkwd_non_causal.cpp",
+    "reference_sha": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "build": {
+    "target": "hk_sharedkv_bwd_epilogue",
+    "gpu_target": "CDNA4",
+    "offload_arch": "gfx950",
+    "target_shape": {
+      "ATTN_B": 4,
+      "ATTN_H": 64,
+      "ATTN_H_KV": 1,
+      "ATTN_N": 4096,
+      "ATTN_D": 128
+    },
+    "resource_report": {
+      "total_sgprs": 106,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_size_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 24,
+      "vgpr_spill": 0
+    }
+  },
+  "contract": {
+    "what_changed": "Fork keeps HipKittens KV-block-owned dense GQA backward producer and routes whole resident 64-row KV tiles at the dK/dV epilogue into original or compressed output buffers.",
+    "outputs": [
+      "dQ_in",
+      "dOriK",
+      "dOriV",
+      "dCmpK",
+      "dCmpV"
+    ],
+    "not_yet_done": [
+      "combine separate dK and dV into DSv4 shared latent dKV",
+      "row-ragged compressed group routing",
+      "dSinks output",
+      "C4/C128 selected-window sparse source-boundary integration",
+      "e2e TorchTitan TFLOPs materialization"
+    ]
+  },
+  "small_smoke": {
+    "shape": {
+      "batch": 1,
+      "seq": 256,
+      "heads": 64,
+      "kv_heads": 1,
+      "dim": 128,
+      "route_mode": "alternate"
+    },
+    "event_ms_median": 1.088769018650055,
+    "wall_ms_median": 1.104533497709781,
+    "outputs_finite": true,
+    "split_outputs_nonzero": {
+      "dOriK": 16384,
+      "dOriV": 16384,
+      "dCmpK": 16384,
+      "dCmpV": 16384
+    }
+  },
+  "target_shape_gate": {
+    "shape": {
+      "batch": 4,
+      "seq": 4096,
+      "heads": 64,
+      "kv_heads": 1,
+      "dim": 128,
+      "route_mode": "alternate"
+    },
+    "event_ms": {
+      "median": 16.967967987060547,
+      "mean": 16.958319091796874,
+      "min": 16.856847763061523,
+      "max": 17.04496955871582
+    },
+    "wall_ms": {
+      "median": 16.983226989395916,
+      "mean": 16.993727581575513,
+      "min": 16.872258973307908,
+      "max": 17.12917594704777
+    },
+    "outputs_finite": true,
+    "split_outputs_nonzero": {
+      "dOriK": 1048576,
+      "dOriV": 1048576,
+      "dCmpK": 1048576,
+      "dCmpV": 1048576
+    }
+  },
+  "read": "The HipKittens KV-owned schedule survives a split-output epilogue at B4/S4096/H64/HKV1/D128 and remains in the expected dense-GQA timing range. This is not a promoted sparse SharedKV backward candidate yet because the fork routes whole resident 64-row KV tiles and keeps dK/dV separate. The next useful code step is the actual DSv4 epilogue: combine dK+dV into shared latent dKV, emit dOriKV, and replace dense dK/dV stores with route-aware dCmpKV accumulation for C4/C128 selected groups."
+}

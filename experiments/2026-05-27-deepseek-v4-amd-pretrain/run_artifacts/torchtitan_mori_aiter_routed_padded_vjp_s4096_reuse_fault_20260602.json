@@ -1,0 +1,181 @@
+{
+  "artifact": "torchtitan_mori_aiter_routed_padded_vjp_s4096_reuse_fault_20260602",
+  "created_date": "2026-06-02",
+  "status": "standalone_pass_torchtitan_single_use_pass_repeated_use_fault",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "common_torchtitan_knobs": {
+    "gpus": 4,
+    "visible_devices": "0,1,2,3",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "mbs": 1,
+    "seq_len": 4096,
+    "checkpoint_enable": false,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_shmem_heap_size": "32G",
+    "persist_jit_cache": "auto"
+  },
+  "source_stage": {
+    "command": "env IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_EP=4 CANARY_VISIBLE_DEVICES=0,1,2,3 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh stage",
+    "status": "pass",
+    "read": "The latest local WIP TorchTitan source was staged into the scratch payload before the S4096 localization runs."
+  },
+  "standalone_probe": {
+    "run_id": "mori_aiter_autograd_bridge_routed_s4096_ep4_repro_20260602",
+    "status": "pass",
+    "shape": "EP4_T4096_H4096_I2048_E256_TOPK6_random",
+    "command": "python3 -m torch.distributed.run --nproc_per_node=4 --master_addr=127.0.0.1 --master_port=29552 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/probe_mori_aiter_moe_autograd_bridge.py --tokens 4096 --hidden 4096 --intermediate 2048 --experts 256 --topk 6 --topk-pattern random --weight-scale 0.05 --warmup 0 --iters 1 --backward-mode routed --output /scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/mori_aiter_autograd_bridge_routed_s4096_ep4_repro_20260602/result.json",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/mori_aiter_autograd_bridge_routed_s4096_ep4_repro_20260602/docker-run.log",
+    "result_json": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/mori_aiter_autograd_bridge_routed_s4096_ep4_repro_20260602/result.json",
+    "runtime": {
+      "torch": "2.13.0a0+gitccf72d7",
+      "hip": "7.2.53211",
+      "device": "AMD Instinct MI350X VF"
+    },
+    "summary": {
+      "all_ranks_pass": true,
+      "max_forward_abs_diff_across_ranks": 0.00048828125,
+      "max_grad_abs_diff_across_ranks": 0.00048828125,
+      "bridge_fwd_bwd_ms_rank_median": 359.1041564941406
+    },
+    "read": "The default standalone routed payload at S4096/EP4 is not inherently impossible; it passes parity and completes one fwd+bwd probe."
+  },
+  "torchtitan_runs": [
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_acfull_heap32g_20260602",
+      "status": "pass",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "steps": 1,
+      "activation_checkpoint_mode": "full",
+      "master_port": 29553,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_acfull_heap32g_20260602/docker-run.log",
+      "step1": {
+        "loss": 12.23646,
+        "grad_norm": 11.1875,
+        "memory_gib_range": [
+          77.91,
+          90.30
+        ],
+        "tps_per_gpu": 310,
+        "tflops_per_gpu": 5.87,
+        "mfu_percent": 0.25
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs8_acfull_heap32g_20260602",
+      "status": "fail",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS8_S4096",
+      "global_batch_size": 8,
+      "gradient_accumulation_steps": 2,
+      "steps": 1,
+      "activation_checkpoint_mode": "full",
+      "master_port": 29555,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs8_acfull_heap32g_20260602/docker-run.log",
+      "failure": "gpu_memory_access_fault_in_mori_routed_backward_before_first_step_metric",
+      "failure_source": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py:436",
+      "failure_boundary": "recv_count_item_sync_after_op_dispatch",
+      "mori_heap_oom": false
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs16_acfull_heap32g_20260602",
+      "status": "fail",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS16_S4096",
+      "global_batch_size": 16,
+      "gradient_accumulation_steps": 4,
+      "steps": 1,
+      "activation_checkpoint_mode": "full",
+      "master_port": 29554,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs16_acfull_heap32g_20260602/docker-run.log",
+      "failure": "gpu_memory_access_fault_in_mori_routed_backward_before_first_step_metric",
+      "failure_source": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py:436",
+      "failure_boundary": "recv_count_item_sync_after_op_dispatch",
+      "mori_heap_oom": false
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_heap32g_20260602",
+      "status": "fail_after_step1",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096_steps2",
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "steps": 2,
+      "activation_checkpoint_mode": "full",
+      "master_port": 29556,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_acfull_heap32g_20260602/docker-run.log",
+      "step1": {
+        "loss": 12.17010,
+        "grad_norm": 11.1250,
+        "memory_gib_range": [
+          85.02,
+          95.69
+        ],
+        "tps_per_gpu_range": [
+          314,
+          316
+        ],
+        "tflops_per_gpu_range": [
+          5.94,
+          5.98
+        ],
+        "mfu_percent": 0.26
+      },
+      "failure": "gpu_memory_access_fault_in_second_backward_before_step2_metric",
+      "failure_source": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py:436",
+      "failure_boundary": "recv_count_item_sync_after_op_dispatch",
+      "mori_heap_oom": false
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_noac_heap32g_20260602",
+      "status": "fail_after_step1",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096_steps2_noac",
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "steps": 2,
+      "activation_checkpoint_mode": "none",
+      "master_port": 29557,
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs4_steps2_noac_heap32g_20260602/docker-run.log",
+      "step1": {
+        "loss": 12.27968,
+        "grad_norm": 10.9375,
+        "memory_gib_range": [
+          86.56,
+          94.05
+        ],
+        "tps_per_gpu_range": [
+          318,
+          319
+        ],
+        "tflops_per_gpu_range": [
+          6.03,
+          6.04
+        ],
+        "mfu_percent": 0.26
+      },
+      "failure": "gpu_memory_access_fault_in_second_backward_before_step2_metric",
+      "failure_source": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py:436",
+      "failure_boundary": "recv_count_item_sync_after_op_dispatch",
+      "mori_heap_oom": false,
+      "key_fault_reasons": [
+        "Write access to a read-only page",
+        "Unknown"
+      ]
+    }
+  ],
+  "read": "S4096 MORI routed backward is valid in the standalone default payload and valid for one TorchTitan optimizer step at GBS4. The failure begins on repeated production use: GBS8 fails on the second accumulation microstep, GBS16 fails similarly, and GBS4 fails on the second train step with or without activation checkpointing. The leading hypothesis is a MORI op, registered buffer, handle reuse, or production wrapper lifetime hazard, not raw S4096 dispatch capacity, MORI heap size, or activation checkpointing.",
+  "next_actions": [
+    "Add a diagnostic mode that disables or narrows MORI backward op caching in the TorchTitan bridge, then rerun S4096 GBS4 steps2 and S4096 GBS8.",
+    "If cache disable does not clear the fault, add explicit MORI handle reset or fresh backward dispatch/combine op construction per call.",
+    "After repeated S4096 use is stable, retry the normalized 4x GBS64 and intended 8x GBS128 target shapes."
+  ]
+}

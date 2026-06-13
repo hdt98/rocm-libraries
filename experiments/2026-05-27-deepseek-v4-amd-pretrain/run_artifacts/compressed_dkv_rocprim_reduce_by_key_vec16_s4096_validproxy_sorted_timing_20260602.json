@@ -1,0 +1,50 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_floor",
+  "scope": "compressed_shared_kv_dkv_scalar_reduce_by_group_and_d",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "mode": "sorted_balanced",
+  "value_kind": "vec16",
+  "seed": 1234,
+  "num_pairs": 1572864,
+  "d_tile": 16,
+  "num_items": 1572864,
+  "groups": 1024,
+  "key_space": 1024,
+  "full_d512_multiplier": 32.0,
+  "build_seconds": 0.5819613749627024,
+  "extension_dir": "/tmp/dsv4_compressed_dkv_rocprim_reduce_by_key",
+  "workspace": {
+    "temp_bytes": 999492,
+    "resident_tensor_bytes": 214909000,
+    "resident_tensor_gib": 0.20014960318803787
+  },
+  "parity": null,
+  "timings": {
+    "reduce_only_sorted_keys": {
+      "samples_ms": [
+        0.31880301237106323,
+        0.3241240084171295,
+        0.31876400113105774,
+        0.3212440013885498,
+        0.31792300939559937
+      ],
+      "median_ms": 0.31880301237106323,
+      "min_ms": 0.31792300939559937,
+      "max_ms": 0.3241240084171295,
+      "p90_ms": 0.3229720056056976,
+      "timed_iters": 5,
+      "warmup_iters": 2
+    },
+    "torch_sort_only": null,
+    "torch_sort_reorder_values": null,
+    "torch_sort_reorder_values_plus_reduce": null
+  },
+  "extrapolated": {
+    "full_d512_reduce_only_ms": 10.201696395874023,
+    "full_d512_sort_reorder_reduce_ms": null
+  },
+  "read": "This is a primitive-floor diagnostic for reducing compressed dKV contributions. scalar mode keys every compressed-group/D scalar; vec16 mode keys route pairs and reduces a D16 float vector payload. It excludes sparse-MLA contribution math. sorted_balanced is an optimistic lower bound where route keys are already grouped; random_sort_reduce includes PyTorch/ROCm sort and value reorder overhead before rocPRIM reduce_by_key."
+}

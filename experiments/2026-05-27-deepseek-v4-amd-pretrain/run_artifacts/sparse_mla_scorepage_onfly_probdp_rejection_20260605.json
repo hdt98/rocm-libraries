@@ -1,0 +1,76 @@
+{
+  "artifact": "sparse_mla_scorepage_onfly_probdp_rejection",
+  "date": "2026-06-05",
+  "scope": "S4096 layer-2 source-boundary sparse-MLA dKV producer, query-major scorepage HIP/CK path",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352,
+    "selected_block": 512,
+    "seq_chunk": 1,
+    "threads": 256,
+    "k_tile": 16,
+    "h_tile": 16,
+    "d_block": 16,
+    "forward_group_sidecar_ordered_by_group": true
+  },
+  "baseline_gates_ms": {
+    "triton_full_sparse_attention_backward_boundary": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.80629825592041
+  },
+  "measured_modes": {
+    "mode15_stored_probdp_sink": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+      "event_median_ms": 21.471811294555664,
+      "emits_valid_dkv": false,
+      "read": "Stores BF16 prob/scaled-dP page in shared memory, replays it during contribution MFMA setup, and sinks checksum."
+    },
+    "mode16_stored_probdp_valid_dkv": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+      "event_median_ms": 22.955167770385742,
+      "emits_valid_dkv": true,
+      "read": "Same stored-page producer as mode 15, but emits real compressed dKV atomics."
+    },
+    "mode21_onfly_probdp_sink": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode21_onfly_probdp_sink_20260605.json",
+      "event_median_ms": 33.87312316894531,
+      "emits_valid_dkv": false,
+      "read": "Skips the BF16 prob/scaled-dP shared page and recomputes prob/scaled-dP inside each contribution MFMA setup, then sinks checksum."
+    },
+    "mode22_onfly_probdp_valid_dkv": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode22_onfly_probdp_valid_dkv_20260605.json",
+      "event_median_ms": 35.30268478393555,
+      "emits_valid_dkv": true,
+      "read": "Same on-the-fly prob/scaled-dP replay as mode 21, but emits real compressed dKV atomics."
+    },
+    "mode20_const_all_contrib_sink_lower_bound": {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode20_const_all_contrib_sink_20260605.json",
+      "event_median_ms": 7.573606967926025,
+      "emits_valid_dkv": false,
+      "read": "Diagnostic only: replaces contribution-stage prob/scaled-dP and q/grad_output operands with constants after the normal score/prob page work. It is a loop/reduction skeleton lower bound, not a valid math path."
+    }
+  },
+  "derived_deltas_ms": {
+    "valid_dkv_atomcs_stored_probdp_mode16_minus_mode15": 1.4833564758300781,
+    "valid_dkv_atomics_onfly_probdp_mode22_minus_mode21": 1.4295616149902344,
+    "onfly_probdp_replay_tax_sink_mode21_minus_mode15": 12.401311874389648,
+    "onfly_probdp_replay_tax_valid_dkv_mode22_minus_mode16": 12.347517013549805,
+    "stored_probdp_valid_dkv_vs_triton_full_boundary": 2.0624616088867188,
+    "onfly_probdp_valid_dkv_vs_triton_full_boundary": 3.171849485435486
+  },
+  "decision": {
+    "status": "rejected",
+    "read": "Recomputing softmax probability and scaled-dP inside each D contribution loop is the wrong no-HBM simplification for this HIP/CK scorepage producer. It removes the BF16 shared prob/scaled-dP page, but duplicates exp/row-term work across D groups and adds about 12.35 ms at S4096. The final valid compressed dKV atomics are only about 1.4-1.5 ms on this same schedule, so the remaining wall is producer/epilogue replay, not the last atomic write.",
+    "next_kernel_surface": "Keep the forward-carried group-id sidecar and the query-major H64/N64-style source boundary, but do not recompute prob/scaled-dP per D group. The next real candidate must either keep a tiny immediately consumed score/prob page resident while multiple D consumers run, or move to a lower-level persistent/cooperative producer-consumer design where the row terms are computed once and consumed before HBM without serializing D parallelism."
+  },
+  "commands": {
+    "mode22": "ssh do-sonle-kernel 'cd /scratch/sonle5/dsv4_pretrain_canary_20260527 && docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4 tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py --kernel-source-flavor query_major_scorepage_dparallel --hip-build-mode prebuilt_object --external-hip-source-path tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip --extension-dir /workspace/torch_extensions_scorepage_mode22_onfly_probdp_valid_dkv_20260605 --hip-define SCOREPAGE_PRODUCER_MODE=22 --seq-len 4096 --layer-id 2 --seq-chunk 1 --selected-block 512 --block-d 16 --threads 256 --sort-forward-group-sidecar --skip-correctness --warmup-iters 1 --timed-iters 5 --summary-path run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode22_onfly_probdp_valid_dkv_20260605.json --json'"
+  }
+}

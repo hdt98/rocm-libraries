@@ -1,0 +1,105 @@
+{
+  "artifact": "hipkittens_sharedkv_cmp_owned_active_tiles_gate_20260607",
+  "status": "rejected_lower_bound_too_slow_for_c4_sharedkv_d512",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_latent_epilogue_fork.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py",
+    "reference_snapshot": "sources/references/hipkittens"
+  },
+  "code_change_under_test": {
+    "summary": "Add inactive RouteBlocks early return and probe --active-cmp-tiles so the latent fork can time only C4's compressed-group tiles instead of all dense KV tiles.",
+    "active_cmp_tiles_for_c4_s4096": 16,
+    "active_cmp_rows_for_c4_s4096": 1024,
+    "notes": [
+      "This is a no-atomics compressed-group-owned lower-bound probe.",
+      "It does not yet apply the forward top-k route mask inside the HipKittens P/dP tile.",
+      "It measures one D=128 HipKittens chunk; production SharedKV C4 uses D=512."
+    ]
+  },
+  "build": {
+    "command": "make hk_sharedkv_bwd_latent_epilogue GPU_TARGET=CDNA4 THUNDERKITTENS_ROOT=/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/hipkittens ATTN_B=4 ATTN_H=64 ATTN_H_KV=1 ATTN_N=4096",
+    "resource_report": {
+      "total_sgprs": 103,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    }
+  },
+  "shape_contract": {
+    "batch": 4,
+    "seq_len": 4096,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim_per_hipkittens_chunk": 128,
+    "target_dim": 512,
+    "route_blocks_shape": [4, 16, 1, 4],
+    "measured_boundary": "HipKittens latent backward fork only; O/L/delta precomputed outside timing"
+  },
+  "active_c4_group_tiles": {
+    "run_command": "PYTHONPATH=/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner python3 probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py --batch 4 --seq 4096 --heads 64 --kv-heads 1 --dim 128 --route-mode all_cmp --active-cmp-tiles 16 --warmup 3 --iters 10",
+    "route_mode": "all_cmp",
+    "active_cmp_tiles": 16,
+    "active_cmp_rows": 1024,
+    "precompute_o_l_delta_ms": 1386.4497459726408,
+    "event_ms": {
+      "median": 16.923562049865723,
+      "mean": 16.930844116210938,
+      "min": 16.870515823364258,
+      "max": 17.06467628479004
+    },
+    "wall_ms": {
+      "median": 16.952446952927858,
+      "mean": 16.962213208898902,
+      "min": 16.886333003640175,
+      "max": 17.109752050600946
+    },
+    "outputs": {
+      "d_q_nonzero": 134113870,
+      "d_ori_kv_nonzero": 0,
+      "d_cmp_kv_nonzero": 524043,
+      "d_cmp_kv_finite": true
+    }
+  },
+  "matched_all_dense_tiles": {
+    "run_command": "PYTHONPATH=/workspace/experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/hipkittens_sharedkv_owner python3 probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py --batch 4 --seq 4096 --heads 64 --kv-heads 1 --dim 128 --route-mode all_cmp --warmup 2 --iters 5",
+    "route_mode": "all_cmp",
+    "active_cmp_tiles": null,
+    "active_cmp_rows": null,
+    "precompute_o_l_delta_ms": 1390.7873299904168,
+    "event_ms": {
+      "median": 17.140592575073242,
+      "mean": 17.11599197387695,
+      "min": 16.955032348632812,
+      "max": 17.197511672973633
+    },
+    "wall_ms": {
+      "median": 17.196158994920552,
+      "mean": 17.165775620378554,
+      "min": 16.971692093648016,
+      "max": 17.292078002355993
+    },
+    "outputs": {
+      "d_q_nonzero": 134160585,
+      "d_ori_kv_nonzero": 0,
+      "d_cmp_kv_nonzero": 2096224,
+      "d_cmp_kv_finite": true
+    }
+  },
+  "comparison_to_current_c4_gate": {
+    "current_triton_c4_sharedkv_full_d512_ms": 11.01801586151123,
+    "current_triton_c4_no_dkv_ms": 1.932217001914978,
+    "current_triton_c4_global_dkv_accumulation_ms": 8.179350852966309,
+    "hipkittens_active_group_owner_d128_ms": 16.923562049865723,
+    "projected_d512_if_four_chunks_ms": 67.69424819946289
+  },
+  "decision": {
+    "read": "The raw HipKittens KV-owned latent backward schedule is not a promotable C4 SharedKV replacement. Timing only the 16 C4 compressed-group tiles is effectively the same as timing all 64 dense tiles, because the kernel has very few long-running KV-owner CTAs and serially sweeps all query tokens inside each CTA. Adding the sparse route mask to this exact fork would add work and cannot beat the current D512 Triton C4 boundary.",
+    "next_kernel_gate": "If HipKittens remains the template, split the query sweep into multiple query chunks per compressed group tile, emit partial dCmpKV rows, and reduce/fold partials. Only after query-chunk parallelism is fixed should the forward top-k route mask be inserted into the P/dP tile.",
+    "not_an_e2e_claim": true
+  }
+}

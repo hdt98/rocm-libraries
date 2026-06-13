@@ -1,0 +1,66 @@
+{
+  "artifact": "ascend910_vs_mi350_reduced_config_check_20260605",
+  "created_at": "2026-06-05",
+  "question": "Are the local Ascend 910C runs and current AMD MI350 runs using the same reduced DeepSeek-V4 model config?",
+  "answer": "They are comparable at the reduced 4-layer DeepSeek-V4-Flash model-identity level, but they are not identical full training/run configs.",
+  "ascend_sources_checked": {
+    "train_config": "/data2/sonle/dsv4_ascend910_fit_20260601/src/torchtitan-npu/torchtitan_npu/models/deepseek_v4/train_configs/deepseek_v4_285b_4layers_debug.toml",
+    "asset_config": "/data2/sonle/dsv4_ascend910_fit_20260601/assets/DeepSeek-V4-Flash-4layer-bf16-from-w8a8/config.json",
+    "best_log": "/data2/sonle/dsv4_ascend910_fit_20260601/logs/bf16_compile_customopp_novirtual_fullac_forcebalance_5step_20260602T032337.log"
+  },
+  "amd_sources_checked": {
+    "target_contract": "sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml",
+    "local_builder": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py",
+    "best_4x_artifact": "run_artifacts/torchtitan_query_recompute_stability_4x_s4096_gbs64_20260604.json",
+    "alternate_4x_artifact": "run_artifacts/torchtitan_explicit_sharedkv_noac_noprofile_4x_s4096_gbs64_ep4_20260604.json"
+  },
+  "matched_reduced_model_identity": {
+    "model_family": "deepseek_v4",
+    "reduced_flavor": "4-layer DeepSeek-V4 Flash canary/debug",
+    "hidden_size": 4096,
+    "num_attention_heads": 64,
+    "head_dim": 512,
+    "q_lora_rank": 1024,
+    "kv_lora_rank": 512,
+    "qk_rope_head_dim": 64,
+    "index_n_heads": 64,
+    "index_head_dim": 128,
+    "index_topk": 512,
+    "moe_intermediate_size": 2048,
+    "num_routed_experts": 256,
+    "num_experts_per_token": 6,
+    "shared_experts": 1,
+    "vocab_size": 129280,
+    "sequence_length": 4096,
+    "ascend_logged_parameter_count": "33,998,248,152 total parameters"
+  },
+  "minor_model_contract_difference": {
+    "ascend_asset_compress_ratios": [1, 1, 4, 128],
+    "amd_target_compress_ratios": [0, 0, 4, 128],
+    "read": "This is not text-identical. In the AMD local builder, compress_ratio=0 disables the compressed sparse path, while Ascend uses compress_ratio=1 for the no-compression first two layers. Treat this as intended to be semantically comparable for the first two layers, not as byte-identical configuration."
+  },
+  "run_config_differences_that_affect_throughput": {
+    "hardware_parallelism": {
+      "ascend": "16 logical Ascend 910C dies, expert_parallel_degree=16, tensor_parallel_degree=1, pipeline_parallel_degree=1, context_parallel_degree=1, data_parallel_replicate_degree=1, data_parallel_shard_degree=-1",
+      "amd_best_4x": "4xMI350, TP1_PP1_CP1_FSDP4_EP4"
+    },
+    "batch_and_accumulation": {
+      "ascend": "local_batch_size=1, global_batch_size=128, gradient_accumulation_steps=8",
+      "amd_best_4x": "micro_batch_size=1, global_batch_size=64, gradient_accumulation_steps=16"
+    },
+    "activation_checkpointing": {
+      "ascend": "mode=full",
+      "amd_best_4x": "none"
+    },
+    "compile_and_operator_stack": {
+      "ascend": "torch.compile model/loss with CANN custom converters and AutoFuse ops including deepseek_v4_sfa",
+      "amd_best_4x": "TorchTitan WIP with MORI/AITER MoE path and prototype shared-KV sparse MLA backward modes"
+    },
+    "checkpoint_and_data": {
+      "ascend": "loads HF assets from /data/models/DeepSeek-V4-bf16 and uses c4_test",
+      "amd_best_4x": "direct canary run artifacts report synthetic/small-token canary path; checkpointing disabled for the best no-AC throughput runs"
+    }
+  },
+  "comparison_read": "The previous TFLOPs/token comparison is fair only as a best-effort reduced-model systems comparison, not as a strict same-config benchmark. Architecture-level dimensions and the 4-layer DSv4 Flash identity match closely enough to compare directionally. The strongest AMD 4x number is not the same run contract as Ascend because it changes activation checkpointing, EP degree/world size, GA/GBS, compiler stack, sparse-attention implementation, and communication/runtime backend. For a stricter apples-to-apples result, run AMD with full activation checkpointing and matching 4-layer config at the memory-equivalent GBS64 shape, and run Ascend or AMD with the same no-AC policy if memory permits.",
+  "dependency_pin_changes": []
+}

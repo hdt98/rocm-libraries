@@ -1,0 +1,127 @@
+{
+  "status": "root_disk_freed_without_interrupting_active_containers",
+  "date": "2026-06-01",
+  "host": "do-sonle5-mi350-gpu",
+  "migration_verified": {
+    "compatibility_path": "/local/data/sonle5/dsv4_pretrain_canary_20260527",
+    "compatibility_path_state": "symlink",
+    "compatibility_path_target": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "canonical_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "disk_usage": {
+    "before_cleanup": {
+      "/": {
+        "size": "2.0T",
+        "used": "925G",
+        "available": "1.1T",
+        "use_percent": "47%"
+      },
+      "/scratch": {
+        "size": "40T",
+        "used": "1007G",
+        "available": "37T",
+        "use_percent": "3%"
+      }
+    },
+    "after_cleanup": {
+      "/": {
+        "size": "2.0T",
+        "used": "617G",
+        "available": "1.4T",
+        "use_percent": "32%"
+      },
+      "/scratch": {
+        "size": "40T",
+        "used": "1007G",
+        "available": "37T",
+        "use_percent": "3%"
+      }
+    },
+    "root_space_reclaimed_approx": "308G"
+  },
+  "containerd_usage": {
+    "before_cleanup": {
+      "/var/lib/containerd": "586G",
+      "content_store": "151G",
+      "overlayfs_snapshots": "435G"
+    },
+    "after_cleanup": {
+      "/var/lib/containerd": "278G",
+      "content_store": "73G",
+      "overlayfs_snapshots": "205G"
+    }
+  },
+  "cleanup_actions": [
+    {
+      "command": "docker image prune -f",
+      "effect": "removed dangling image layers",
+      "reported_reclaimed": "2.245GB"
+    },
+    {
+      "command": "docker container prune -f",
+      "effect": "removed stopped containers",
+      "reported_reclaimed": "3.063GB"
+    },
+    {
+      "command": "docker image rm <stale-unused-tags>",
+      "effect": "removed old unused ROCm/SGLang/PyTorch/Primus image tags",
+      "removed_tags": [
+        "onenexus/nexus-titan:rocm724-pytorch291",
+        "onenexus/nexus-titan:rocm723-pytorch291",
+        "onenexus/nexus-titan:rocm720-mi35x-sgl-20260526",
+        "onenexus/nexus-titan:rocm72-primus-v26.2",
+        "rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.9.1",
+        "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260526-DSv4",
+        "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4",
+        "rocm/sgl-dev:rocm720-mi35x-800693e-20260517-DSv4",
+        "local/sgl-dev:rocm720-mi35x-339e36e-20260512-DSv4-msprobe",
+        "rocm/sgl-dev:rocm720-mi35x-339e36e-20260512-DSv4",
+        "rocm/pytorch:rocm7.2.3_ubuntu24.04_py3.12_pytorch_release_2.9.1",
+        "rocm/pytorch-nightly:20260429082157-rocm7.2.2",
+        "rocm/pytorch-nightly:latest"
+      ]
+    },
+    {
+      "command": "docker image prune -f",
+      "effect": "removed intermediate layers made dangling by stale-tag removal",
+      "reported_reclaimed": "11.83GB"
+    }
+  ],
+  "images_preserved": [
+    {
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+      "reason": "current TorchTitan DSv4 runtime image"
+    },
+    {
+      "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+      "reason": "active dsv4_ep8_mori_notbo_bind_30157 container"
+    },
+    {
+      "image": "rocm/primus:v26.2",
+      "reason": "active dev_primus_longnguyen37 and dev_primus_tanth containers"
+    }
+  ],
+  "intentionally_not_moved_or_deleted": [
+    {
+      "path": "/local/data/sonle5/hf_cache",
+      "size": "275G",
+      "reason": "mounted by active dsv4_ep8_mori_notbo_bind_30157 container"
+    },
+    {
+      "path": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510",
+      "size": "14G",
+      "reason": "mounted by active dsv4_ep8_mori_notbo_bind_30157 container"
+    }
+  ],
+  "active_containers_observed_after_cleanup": [
+    "dsv4_ep8_mori_notbo_bind_30157",
+    "dev_primus_longnguyen37",
+    "dev_primus_tanth"
+  ],
+  "notes": [
+    "The active DSv4 pretrain payload remains canonical on /scratch.",
+    "The legacy /local/data DSv4 pretrain path remains a symlink and consumes no meaningful root payload.",
+    "Further root reduction is possible by stopping the active dsv4_ep8_mori container and then moving /local/data/sonle5/hf_cache to /scratch with a compatibility symlink.",
+    "No repo dependency pins were changed."
+  ]
+}

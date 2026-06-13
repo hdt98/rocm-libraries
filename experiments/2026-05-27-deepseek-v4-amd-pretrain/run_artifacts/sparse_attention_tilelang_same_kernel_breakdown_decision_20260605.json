@@ -1,0 +1,42 @@
+{
+  "status": "ok",
+  "scope": "same_kernel_tilelang_sparse_attention_backward_breakdown",
+  "artifact": "run_artifacts/tilelang_selected_limit_same_kernel_breakdown_s4096_layer2_gp256_20260605.json",
+  "smoke_artifact": "run_artifacts/tilelang_selected_limit_same_kernel_breakdown_smoke_s128_20260605.json",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "compress_ratio": 4,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "token_block": 32,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512
+  },
+  "tilelang_same_kernel_event_median_ms": {
+    "full_dq_dkv_with_final_dkv_atomics": 16.87541961669922,
+    "same_kernel_compute_dkv_skip_final_dkv_atomics": 16.828739166259766,
+    "same_kernel_dq_only_skip_dkv_compute_and_write": 14.327399253845215,
+    "same_family_materialized_hsk_bf16_dkv_only": 5.931808948516846,
+    "same_family_materialized_selected_limit_kernel_only": 6.834694862365723
+  },
+  "derived_same_kernel_ms": {
+    "global_final_dkv_atomic_write": 0.046680450439453125,
+    "dkv_contribution_math_plus_tile_local_group_reduction": 2.501339912414551,
+    "total_dkv_path_inside_fused_source_boundary": 2.548020362854004,
+    "dq_recompute_path_remaining": 14.327399253845215
+  },
+  "comparison_to_triton_actual_li_artifact": {
+    "artifact": "run_artifacts/sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn64_bd128_sweep_20260605.json",
+    "triton_full_ms": 11.138831,
+    "triton_no_dkv_ms": 2.0338199,
+    "triton_global_dkv_accumulation_like_ms": 8.195401
+  },
+  "read": "The earlier 5.97-6.90 ms TileLang numbers are dKV-only/materialized-input sibling surfaces, not an internal slice of the 16.9 ms fused source-boundary dQ+dKV kernel. The same-kernel split shows the route-owned TileLang final dKV atomic write is not the wall after GP256 local grouped reduction; it is only about 0.047 ms. The fused TileLang wall is instead before final writeback: the route-owned source-boundary producer spends about 14.33 ms on dQ/recompute and another 2.50 ms on dKV contribution math plus in-CTA grouped reduction. This differs from the Triton query-major split, where the global dKV accumulation-like portion was about 8.2 ms. Therefore the current TileLang route-owned fused kernel is not a faster replacement for the Triton sparse-attention backward kernel; the next design needs a query-major owner schedule with a group-aware dKV epilogue, not more final-atomic tuning on this route-owned schedule.",
+  "decision": "Do not claim the TileLang 5.97-6.90 ms dKV-only result materializes inside the fused sparse-attention backward kernel. Retain the same-kernel breakdown as the gate. The next kernel branch should keep Triton-like/query-major reuse for score/prob/dQ recompute and add a group-aware dKV epilogue before global memory, rather than using the current route-owned TileLang source-boundary schedule."
+}

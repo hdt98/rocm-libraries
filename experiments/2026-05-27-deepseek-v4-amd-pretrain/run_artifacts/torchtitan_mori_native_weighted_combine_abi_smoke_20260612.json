@@ -1,0 +1,90 @@
+{
+  "artifact": "torchtitan_mori_native_weighted_combine_abi_smoke_20260612",
+  "date": "2026-06-12",
+  "purpose": "Validate the first MORI native compact weighted-combine ABI without launching the full sparse-attention model surface.",
+  "decision_context": {
+    "hot_helper_ladder": "MBS1/MBS2/MBS4/MBS8 ladder establishes MindSpeed-style hot-helper as a real feature: it improves late tok/GPU/s and lowers memory from MBS1 upward, and changes the fit boundary at MBS8.",
+    "path_decision": "Continue native MORI balanced-MoE as the mainline around the proven hot/cold/helper owner-compact layout. Treat Primus-Turbo TurboEPBackend as a raw-top-k/no-helper side branch."
+  },
+  "changed_contract": {
+    "mori_api": "combine_standard_ep_compact_native(..., top_scores_flat, top_k, flat_position_offset, token_output_rows, return_token_output=True)",
+    "output": "Returns source-rank rows, source-rank flat positions, and a MORI-owned score-weighted token-major output.",
+    "torchitan_use": "The opt-in TorchTitan path can remove the separate weighted_scatter_add_from_flat_positions launch in forward while keeping source-rank rows/positions for the existing autograd-correct backward."
+  },
+  "build_validation": [
+    {
+      "node": "do-sonle5-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "cmake --build build --clean-first -j$(nproc), then copy libmori_*.so into python/mori/",
+      "result": "pass"
+    },
+    {
+      "node": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+      "command": "cmake --build build --clean-first -j$(nproc), then copy libmori_*.so into python/mori/",
+      "result": "pass"
+    }
+  ],
+  "invalid_full_model_smoke": {
+    "run_id": "torchtitan_mori_native_weighted_combine_s128_smoke3_20260612",
+    "node": "do-sonle5-mi350-gpu",
+    "result": "invalid_for_mori_combine_validation",
+    "reason": "The node had active unrelated jobs and high VRAM residency. The smoke reached MORI JIT compilation, then OOMed in sparse MLA forward before MoE combine.",
+    "failure_site": "torchtitan/models/deepseek_v4/model.py selected_k = torch.cat((local_k, csa_k), dim=2)",
+    "failure_alloc": "2.50 GiB",
+    "free_memory_observed": "about 300-556 MiB on GPUs 0-3"
+  },
+  "synthetic_compact_combine_smoke": {
+    "node": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "visible_devices": "0",
+    "world_size": 1,
+    "dtype": "bf16",
+    "hidden_dim": 16,
+    "num_rows": 4,
+    "top_k": 2,
+    "token_output_rows": 2,
+    "input_flat_positions": [0, 1, 2, 3],
+    "top_scores": [0.25, 0.5, 1.25, -0.75],
+    "result": "pass",
+    "row_diff": 0.0,
+    "flat_positions_ok": true,
+    "token_output_diff": 0.0
+  },
+  "synthetic_remote_compact_combine_smoke": {
+    "script": "tools/mori_native_weighted_combine_smoke.py",
+    "node": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "visible_devices": "0,1",
+    "world_size": 2,
+    "dtype": "bf16",
+    "hidden_dim": 16,
+    "num_rows_per_rank": 4,
+    "input_splits_per_rank": [2, 2],
+    "output_splits_per_rank": [2, 2],
+    "top_k": 2,
+    "token_output_rows": 2,
+    "result": "pass",
+    "rank_results": [
+      {
+        "rank": 0,
+        "row_diff": 0.0,
+        "flat_ok": true,
+        "token_output_diff": 0.0,
+        "out_flat": [0, 1, 2, 3]
+      },
+      {
+        "rank": 1,
+        "row_diff": 0.0,
+        "flat_ok": true,
+        "token_output_diff": 0.0,
+        "out_flat": [2, 3, 0, 1]
+      }
+    ],
+    "read": "Covers remote receive and destination-local top-score weighting. The test oracle models the current BF16 atomic accumulation contract."
+  },
+  "next_gates": [
+    "Run the MBS8 hot-helper current-best surface with CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_WEIGHTED_OUTPUT=1 on a clean 8x node.",
+    "Profile whether standard_ep.combine.weighted_scatter_add/token-return disappears and what native compact combine adds."
+  ]
+}

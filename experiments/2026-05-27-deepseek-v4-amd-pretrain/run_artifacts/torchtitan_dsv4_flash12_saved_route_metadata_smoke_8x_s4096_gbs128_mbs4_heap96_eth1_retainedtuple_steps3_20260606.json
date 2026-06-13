@@ -1,0 +1,85 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_saved_route_metadata_smoke_8x_s4096_gbs128_mbs4_heap96_eth1_retainedtuple_steps3_20260606",
+  "date": "2026-06-06",
+  "status": "completed_three_steps_not_promoted",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_saved_route_metadata_smoke_8x_s4096_gbs128_mbs4_heap96_eth1_retainedtuple_steps3_20260606",
+  "remote_log_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_saved_route_metadata_smoke_8x_s4096_gbs128_mbs4_heap96_eth1_retainedtuple_steps3_20260606",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp_shard": 8,
+    "expert_parallel": 8,
+    "pipeline_parallel": 1,
+    "tensor_parallel": 1,
+    "context_parallel": 1
+  },
+  "runtime": {
+    "activation_checkpointing": "none",
+    "pytorch_alloc_conf": "expandable_segments:True",
+    "mori_socket_ifname": "eth1",
+    "mori_shmem_heap_size": "96G",
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_save_forward_dispatch": true,
+    "mori_aiter_assume_identical_dispatch_order": true,
+    "mori_aiter_local_vjp_mode": "aiter_compact",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_local_vjp_aiter_wgrad_op": "ptgmm",
+    "mori_aiter_compact_recompute_mode": "expert_loop",
+    "mori_aiter_local_vjp_transpose_cache_size": 0,
+    "mori_aiter_xgrad_mode": "full",
+    "mori_aiter_dtopk_return_mode": "dense_allreduce",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "li_kl_backend": "triton_tl_dot",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.09721,
+      "grad_norm": 18.625,
+      "tokens_per_gpu_s_range": [
+        1681,
+        1683
+      ],
+      "tflops_per_gpu_range": [
+        85.1,
+        85.23
+      ],
+      "max_logged_memory_gib": 127.78
+    },
+    {
+      "step": 2,
+      "loss": 9.00916,
+      "grad_norm": 81.5,
+      "tokens_per_gpu_s": 4933,
+      "tflops_per_gpu_range": [
+        249.74,
+        249.75
+      ],
+      "max_logged_memory_gib": 166.1
+    },
+    {
+      "step": 3,
+      "loss": 24.88342,
+      "grad_norm": 166.0,
+      "tokens_per_gpu_s": 5306,
+      "tflops_per_gpu": 268.66,
+      "max_logged_memory_gib": 166.1
+    }
+  ],
+  "summary_metrics": {
+    "steps_2_to_3_tokens_per_gpu_s_mean": 5149.5,
+    "steps_2_to_3_tflops_per_gpu_mean_approx": 259.355,
+    "peak_logged_memory_gib": 166.1
+  },
+  "read": "MORI_SOCKET_IFNAME=eth1 clears the MORI bootstrap issue. The retained tuple with saved local route metadata completes a short 8x smoke in the current baseline band, but this is only a three-step no-promotion check. The S128 probe separately validates that owner VJP consumed route metadata from saved_forward."
+}

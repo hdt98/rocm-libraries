@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04",
+  "artifact_kind": "failed_target_shape_gate",
+  "run_id": "torchtitan_dsv4_explicit_sharedkv_noac_noprofile_8x_s4096_gbs128_ep4_steps6_20260604",
+  "status": "failed_before_step_1",
+  "shape": {
+    "hardware": "8xMI350",
+    "model": "DeepSeek-V4-Flash 4-layer canary",
+    "precision": "bf16",
+    "micro_batch_size": 1,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "tokens_per_step": 524288,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 4,
+    "activation_checkpointing": "none",
+    "allocator": "expandable_segments",
+    "sharedkv_backward_mode": "explicit_pytorch",
+    "moe_comm_backend": "mori",
+    "moe_forward_mode": "aiter",
+    "moe_backward_mode": "routed",
+    "moe_local_vjp_mode": "padded",
+    "profiling": "disabled"
+  },
+  "observed_mesh": {
+    "pp": 1,
+    "dp_replicate": 1,
+    "dp_shard": 8,
+    "cp": 1,
+    "tp": 1,
+    "ep": 4,
+    "active_dims": [
+      "batch",
+      "loss",
+      "ep",
+      "efsdp",
+      "fsdp"
+    ]
+  },
+  "failure": {
+    "error_type": "NotImplementedError",
+    "message": "MORI+AITER bridge currently requires the EP mesh to cover the whole process group, matching the 4x/8x MI350 canary shapes.",
+    "location": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py:mori_aiter_grouped_experts_forward",
+    "phase": "first_forward_before_step_metrics"
+  },
+  "root_cause": "The MORI+AITER bridge initialized MORI SHMEM from the global default process group and explicitly rejected EP submeshes. That allowed 4x/EP4 and 8x/EP8, but blocked the requested 8x/FSDP8/EP4 target shape.",
+  "patch_direction": {
+    "source_file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "change": "Register and initialize MORI SHMEM from the current rank's EP process group under a stable local name, thread that EP group into all MORI op constructors, and remove the global-world-size guard.",
+    "reference": "sources/references/mori/docs/MORI-EP-GUIDE.md documents that MORI SHMEM must initialize from a registered PyTorch process group name before creating EpDispatchCombineOp."
+  },
+  "raw_artifacts": {
+    "remote_log_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_8x_s4096_gbs128_ep4_steps6_20260604",
+    "remote_output_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_explicit_sharedkv_noac_noprofile_8x_s4096_gbs128_ep4_steps6_20260604"
+  },
+  "decision": "Do not treat this as performance evidence. Retry the same 8x/FSDP8/EP4 shape after the MORI EP-subgroup bridge patch passes syntax and source-stamp checks.",
+  "dependency_pin_changes": []
+}

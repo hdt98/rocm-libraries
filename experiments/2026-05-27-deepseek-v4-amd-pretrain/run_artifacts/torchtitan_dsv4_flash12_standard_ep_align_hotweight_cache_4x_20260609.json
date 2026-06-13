@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "run_id": "torchtitan_dsv4_flash12_4x_mbs2_align_hotweight_timing_torchtransport_slice1234_steps2_20260609",
+  "created_at": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_two_step_4x_diagnostic_not_promotion",
+  "promotion_status": "diagnostic_only",
+  "raw_remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_4x_mbs2_align_hotweight_timing_torchtransport_slice1234_steps2_20260609",
+  "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_4x_mbs2_align_hotweight_timing_torchtransport_slice1234_steps2_20260609/docker-run.log",
+  "profile_timing_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_4x_mbs2_align_hotweight_timing_torchtransport_slice1234_steps2_20260609/profile_timing/records.jsonl",
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "1,2,3,4",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4
+  },
+  "env_highlights": {
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "torch",
+    "standard_ep_hot_weight_reduce_backend": "torch",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "standard_ep_hot_split_backward_timing": true,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "pytorch_alloc_conf": "expandable_segments:True"
+  },
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/moe.py",
+    "summary": "Cache the selected-hot-weight compact_to_hot index once per hot-split call and add explicit timing for build_index plus W1/W2/W3 selected-to-owner-compact reindex stages."
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.30736,
+      "grad_norm": 19.375,
+      "tokens_per_gpu_s": 3023.5,
+      "tflops_per_gpu": 153.07,
+      "peak_logged_memory_gib": 167.14
+    },
+    "step_2": {
+      "loss": 7.78392,
+      "grad_norm": 45.5,
+      "tokens_per_gpu_s": 5160.0,
+      "tflops_per_gpu": 261.27,
+      "peak_logged_memory_gib": 223.45
+    }
+  },
+  "profile_record_counts": {
+    "standard_ep_dispatch": 1536,
+    "standard_ep_combine": 1536,
+    "standard_ep_hot_weight": 9216,
+    "standard_ep_hot_split": 1536,
+    "standard_ep_hot_split_backward": 3072,
+    "chunked_ce_loss": 128
+  },
+  "selected_hot_weight_alignment_timing_gpu_ms": {
+    "records": 1536,
+    "build_index": {
+      "sum": 83.861,
+      "mean": 0.055,
+      "p50": 0.053,
+      "p95": 0.063,
+      "max": 0.204
+    },
+    "w1_index_select": {
+      "sum": 201.945,
+      "mean": 0.131,
+      "p50": 0.131,
+      "p95": 0.137,
+      "max": 0.183
+    },
+    "w2_index_select": {
+      "sum": 182.617,
+      "mean": 0.119,
+      "p50": 0.119,
+      "p95": 0.121,
+      "max": 0.13
+    },
+    "w3_index_select": {
+      "sum": 180.187,
+      "mean": 0.117,
+      "p50": 0.117,
+      "p95": 0.119,
+      "max": 0.125
+    },
+    "total_sum_all_ranks_two_steps": 648.61,
+    "approx_rank_step_total": 81.08,
+    "approx_rank_step_build_index": 10.48,
+    "read": "The cached build-index stage is small. The remaining W1/W2/W3 reindex is visible but not a leading MoE wall."
+  },
+  "larger_stage_timing_gpu_ms": {
+    "standard_ep_hot_split_broadcast_hot_weights": {
+      "sum": 6787.794,
+      "mean": 4.419,
+      "p50": 4.305,
+      "p95": 4.704,
+      "max": 14.491
+    },
+    "standard_ep_hot_split_backward_helper_mlp_vjp_to_sorted_x": {
+      "sum": 4221.866,
+      "mean": 2.749,
+      "p50": 2.528,
+      "p95": 4.583,
+      "max": 7.639
+    },
+    "standard_ep_combine_all_to_all_wait": {
+      "sum": 3060.917,
+      "mean": 1.993,
+      "p50": 1.865,
+      "p95": 3.103,
+      "max": 11.739
+    },
+    "standard_ep_combine_weighted_scatter_add": {
+      "sum": 2711.069,
+      "mean": 1.765,
+      "p50": 1.264,
+      "p95": 3.096,
+      "max": 134.253
+    },
+    "standard_ep_dispatch_count_all_to_all": {
+      "sum": 7997.046,
+      "mean": 5.206,
+      "p50": 0.497,
+      "p95": 1.767,
+      "max": 1826.198
+    }
+  },
+  "decision": "Keep the compact_to_hot cache and timing instrumentation. Do not treat selected-hot-weight alignment as the next main optimization target: after caching, the alignment adapter is materially smaller than hot-weight movement, helper VJP, dispatch count exchange, combine wait, and weighted scatter. The next MoE/EP implementation target remains fused/batched compact-row helper VJP plus compact dX/dTopK return and overlap."
+}

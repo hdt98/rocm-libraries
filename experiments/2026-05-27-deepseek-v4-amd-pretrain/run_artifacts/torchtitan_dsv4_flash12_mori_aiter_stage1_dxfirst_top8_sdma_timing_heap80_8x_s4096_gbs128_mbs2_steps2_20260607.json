@@ -1,0 +1,141 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "run_id": "torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "result": "completed_two_steps_rejected_not_promoted",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH": "1",
+    "CANARY_MORI_AITER_REUSE_FORWARD_ROUTE_METADATA": "1",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_stage1_recompute",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE": "0",
+    "CANARY_MORI_AITER_STAGE1_SHUFFLE_CACHE_SIZE": "12",
+    "CANARY_MORI_AITER_DX_RETURN_MODE": "sync_dx_first",
+    "CANARY_MORI_AITER_DTOPK_RETURN_MODE": "dense_allreduce",
+    "CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER": "1",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "execute",
+    "CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL": "route_mask",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS": "512",
+    "CANARY_MORI_AITER_HOT_SPLIT_W13": "1",
+    "CANARY_MORI_AITER_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_MORI_AITER_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_MORI_AITER_HOT_WEIGHT_BACKWARD_TIMING_LIMIT": "8",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "80G",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none"
+  },
+  "validation": {
+    "local_py_compile": "passed",
+    "remote_run": "completed_two_steps",
+    "loss_finite": true,
+    "grad_norm_finite": true
+  },
+  "step_metrics": {
+    "1": {
+      "tokens_per_gpu_s_range": [1221.0, 1223.0],
+      "tflops_per_gpu_range": [61.82, 61.94],
+      "loss": 12.25735,
+      "grad_norm": 11.1875,
+      "peak_logged_memory_gib": 133.0
+    },
+    "2": {
+      "tokens_per_gpu_s": 3152.0,
+      "node_tokens_s": 25216.0,
+      "tflops_per_gpu": 159.59,
+      "loss": 8.91085,
+      "grad_norm": 51.5,
+      "peak_logged_memory_gib": 175.51
+    }
+  },
+  "timing_summary": {
+    "records": 4672,
+    "call_count": 584,
+    "steady_cut_call_id": 293,
+    "steady_records": 2336,
+    "rankmax_gpu_ms": {
+      "local_vjp_total": 2564.872,
+      "local_vjp_dx_first_prefix": 2092.768,
+      "wgrad_after_dx_sync_combine": 472.104,
+      "combine_dx_total": 609.718,
+      "combine_dx_call": 593.317,
+      "dtopk_return": 186.701,
+      "forward_hot_execute_total": 682.253,
+      "hot_split_backward_total": 493.741
+    },
+    "top_rankmax_stages_ms": {
+      "backward.local_vjp.aiter_stage1_recompute.dx_first": 2092.768,
+      "backward.combine_dx.call": 593.317,
+      "backward.local_vjp.aiter_stage1_recompute.wgrad_after_dx_sync_combine": 472.104,
+      "local_aiter_compact_vjp.dx_first.finish_wgrads": 449.139,
+      "local_aiter_stage1_recompute_vjp.dx_first.stage1_forward": 442.462,
+      "local_aiter_stage1_saved_vjp.dx_first.prepare_ops": 367.289,
+      "local_aiter_stage1_saved_vjp.dx_first.xgrad": 299.46,
+      "backward.dispatch_grad_output.call": 241.192,
+      "local_aiter_stage1_saved_vjp.dx_first.gate_up_recompute": 222.497,
+      "forward.balanced_moe.execute.hot_split.grouped_rows": 211.817,
+      "local_aiter_stage1_saved_vjp.dx_first.dtopk_weight": 187.875,
+      "local_aiter_stage1_recompute_vjp.dx_first.prepare_shuffled_weights": 180.737,
+      "backward.dtopk_dense_allreduce.all_reduce": 173.302
+    }
+  },
+  "comparison": {
+    "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607.json",
+    "baseline_step2_tokens_per_gpu_s": 4306.0,
+    "baseline_step2_tflops_per_gpu": 218.02,
+    "step2_tokens_per_gpu_delta_pct": -26.8,
+    "step2_tflops_per_gpu_delta_pct": -26.8,
+    "baseline_steady_rankmax_local_vjp_ms": 2128.414,
+    "baseline_steady_rankmax_combine_dx_call_ms": 736.838,
+    "new_steady_rankmax_local_vjp_total_ms": 2564.872,
+    "new_steady_rankmax_combine_dx_call_ms": 593.317,
+    "local_vjp_total_delta_pct": 21.78,
+    "combine_dx_call_delta_pct": -19.47,
+    "local_vjp_plus_combine_call_delta_pct": 10.33
+  },
+  "failed_preflight_without_heap": {
+    "run_id": "torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "result": "failed_before_metric",
+    "failure": "MORI static heap exhausted",
+    "message": "Out of heap memory; requested 540540928 bytes with current heap size 4294967296 bytes",
+    "fix": "rerun with CANARY_MORI_SHMEM_HEAP_SIZE=80G"
+  },
+  "remote_paths": {
+    "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607/docker-run.log",
+    "timing_jsonl": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_stage1_dxfirst_top8_sdma_timing_heap80_8x_s4096_gbs128_mbs2_steps2_20260607/mori_timing.jsonl"
+  },
+  "read": "The new aiter_stage1_recompute sync-dx-first split is functional but rejected. It lowers combine_dx.call from 736.838 ms to 593.317 ms in the steady proxy, but the prefix plus delayed grouped wgrad path grows local VJP from 2128.414 ms to 2564.872 ms. The resulting step-2 throughput is 3152 tok/GPU/s and 159.59 TFLOPs/GPU, 26.8% below the route-mask top-8 SDMA baseline. This says stage1 dx-first is not a free overlap win; the real target remains first-class hot/cold/helper dispatcher layout and a more compact owner VJP, not splitting the current stage1 adapter after the fact."
+}

@@ -1,0 +1,64 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 32,
+  "candidate_estimated_selected_state_elements": 1342177280,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": NaN,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 160,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": NaN,
+  "max_output_abs_diff": NaN,
+  "max_param_grad_abs_diff": 0.0,
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 0.0,
+    "indexer.wk.weight": 0.0,
+    "indexer.wq.weight": 0.0,
+    "kv_norm.weight": NaN,
+    "q_norm.weight": NaN,
+    "wkv_a.weight": NaN,
+    "wkv_b.weight": NaN,
+    "wo.weight": NaN,
+    "wq_a.weight": NaN,
+    "wq_b.weight": NaN
+  },
+  "reference_compressed_groups": 32,
+  "reference_estimated_selected_state_elements": 1342177280,
+  "reference_kernel_module": null,
+  "reference_loss": 0.021132495254278183,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 160,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 128,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": true,
+      "iters": 3,
+      "last_loss": NaN,
+      "mean_ms": 45.72609932317088,
+      "peak_memory_allocated_bytes": 5499692544,
+      "peak_memory_allocated_gib": 5.121987819671631,
+      "warmup_iters": 1
+    },
+    "reference": {
+      "enabled": true,
+      "iters": 3,
+      "last_loss": 0.021132495254278183,
+      "mean_ms": 45.66230531781912,
+      "peak_memory_allocated_bytes": 5491303936,
+      "peak_memory_allocated_gib": 5.114175319671631,
+      "warmup_iters": 1
+    }
+  }
+}

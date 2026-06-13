@@ -1,0 +1,83 @@
+{
+  "artifact": "sparse_mla_scorepage_contribution_attribution",
+  "date": "2026-06-05",
+  "status": "measured_rejected_selected_window_page_family",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "gate_ms": {
+    "retained_full_sparse_attention_backward": 11.1347,
+    "retained_sparse_atomic_dkv_wall_context": 8.8063
+  },
+  "same_shape_attribution_sb512_thr256_ms": {
+    "producer_qk_dov_prob_scaled_dp_mode2": {
+      "event_median_ms": 4.7370,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode2_20260605b.json"
+    },
+    "constant_contribution_reduction_mode20": {
+      "event_median_ms": 7.5736,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode20_const_all_contrib_sink_20260605.json",
+      "delta_vs_producer_ms": 2.8366
+    },
+    "real_prob_dp_replay_constant_qgo_mode19": {
+      "event_median_ms": 11.7160,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode19_const_qgo_contrib_sink_20260605.json",
+      "delta_vs_constant_contribution_ms": 4.1424
+    },
+    "real_qgo_replay_sink_mode15": {
+      "event_median_ms": 21.4720,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode15_forward_sidecar_sink_20260605.json",
+      "delta_vs_constant_qgo_ms": 9.7560
+    },
+    "valid_dkv_mode16": {
+      "event_median_ms": 22.9550,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode16_forward_sidecar_valid_dkv_20260605.json",
+      "final_atomic_delta_vs_sink_ms": 1.4830
+    }
+  },
+  "selected_window_page_reuse_mode23_ms": [
+    {
+      "selected_block": 64,
+      "threads": 512,
+      "event_median_ms": 20.6192,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode23_thr512_20260605.json"
+    },
+    {
+      "selected_block": 128,
+      "threads": 512,
+      "event_median_ms": 17.2801,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb128_sc1_mode23_thr512_20260605.json"
+    },
+    {
+      "selected_block": 256,
+      "threads": 512,
+      "event_median_ms": 26.2762,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb256_sc1_mode23_thr512_20260605.json"
+    }
+  ],
+  "read": {
+    "primary_wall": "The real contribution path is dominated by replaying q/grad_output for every K16 selected tile; same-shape attribution puts that tax near 9.76 ms.",
+    "secondary_wall": "Reading/replaying the BF16 prob/scaled-dP page inside the contribution MFMA path adds about 4.14 ms.",
+    "not_primary_wall": "Final compressed dKV atomics add about 1.48 ms on this branch, so optimizing only the final atomic stream cannot close the full sparse-attention gap.",
+    "selected_window_page_result": "A wider selected-window P/dP page does improve q/grad_output reuse from K64 to K128, but best mode23 remains 17.28 ms before valid dKV atomics. K256 regresses to 26.28 ms, likely from LDS/page pressure. This family is not promotable."
+  },
+  "next_kernel_contract": {
+    "promote_to_e2e_tflops": false,
+    "next_code_target": "Implement a lighter producer-consumer handoff where the K16 score/prob/scaled-dP page is consumed by D-parallel contribution consumers before HBM, without staging a large selected-window page. The selected-window page family is rejected; the next surface needs either a persistent wave-level pipeline or a CK/FMHA-style block pipeline with q/grad_output resident across K tiles.",
+    "must_preserve": [
+      "query-major token/selected-slot producer",
+      "source-boundary inputs q, grad_output, output, lse, compressed KV, safe_groups, valid_u8",
+      "no materialized full [S, topk, H] probability or scaled-dP slab",
+      "S4096 latency gate measured before any e2e TFLOPs promotion"
+    ]
+  },
+  "dependency_pin_changes": []
+}

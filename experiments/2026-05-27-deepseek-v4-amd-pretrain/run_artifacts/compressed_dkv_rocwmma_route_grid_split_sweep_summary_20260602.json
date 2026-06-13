@@ -1,0 +1,85 @@
+{
+  "artifact": "compressed_dkv_rocwmma_route_grid_split_sweep_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Follow-up split-token sweep for the full-grid compressed dKV rocWMMA route pressure probe on 1xMI350.",
+  "why_this_exists": "The previous full-grid rocWMMA route probe showed that a single-CTA dense LDS compressed-group table is slower than raw selected-row atomics at S4096 even when modeled write count drops. This sweep tests whether smaller token tiles expose enough parallelism to make the grouped path viable.",
+  "runtime": {
+    "node": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "common_shape": {
+    "seq_len": 4096,
+    "topk": 512,
+    "h_dim": 64,
+    "d_dim": 512,
+    "group_count": 1024,
+    "selected_block": 512,
+    "route_pattern": "clustered_unique",
+    "cluster_width": 688,
+    "d_tile": 16,
+    "selected_rows": 2097152
+  },
+  "source_artifacts": {
+    "baseline_t32k512_clustered": "run_artifacts/compressed_dkv_rocwmma_route_grid_clustered_unique_s4096_k512_g1024_d512_t32k512_cw688_timing_20260602.json",
+    "split_t16k512_clustered": "run_artifacts/compressed_dkv_rocwmma_route_grid_clustered_unique_s4096_k512_g1024_d512_t16k512_cw688_split_sweep_20260602.json",
+    "split_t8k512_clustered": "run_artifacts/compressed_dkv_rocwmma_route_grid_clustered_unique_s4096_k512_g1024_d512_t8k512_cw688_split_sweep_20260602.json"
+  },
+  "results": [
+    {
+      "token_block": 32,
+      "selected_block": 512,
+      "modeled_write_reduction_x": 23.813953488372093,
+      "raw_atomic_ms": 10.077184677124023,
+      "grouped_atomic_ms": 20.982654571533203,
+      "grouped_direct_unique_ms": 19.2331485748291,
+      "grouped_partial_emit_ms": null,
+      "grouped_partial_reduce_ms": null,
+      "read": "Baseline actual-density clustered route. Grouped writes reduce the modelled global write count but are about 2.08x slower than raw atomics."
+    },
+    {
+      "token_block": 16,
+      "selected_block": 512,
+      "modeled_write_reduction_x": 11.906976744186046,
+      "raw_atomic_ms": 8.838491439819336,
+      "grouped_atomic_ms": 21.220500946044922,
+      "grouped_direct_unique_ms": 19.4835205078125,
+      "grouped_partial_emit_ms": 21.24526023864746,
+      "grouped_partial_reduce_ms": 0.09776200354099274,
+      "read": "Smaller token tiles improve raw atomics, but grouped and partial-emitter paths remain about 21 ms."
+    },
+    {
+      "token_block": 8,
+      "selected_block": 512,
+      "modeled_write_reduction_x": 5.953488372093023,
+      "raw_atomic_ms": 8.43152904510498,
+      "grouped_atomic_ms": 21.273366928100586,
+      "grouped_direct_unique_ms": 19.9263916015625,
+      "grouped_partial_emit_ms": 21.253480911254883,
+      "grouped_partial_reduce_ms": 0.3054389953613281,
+      "read": "Further token splitting improves raw atomics again, while grouped paths stay flat or worsen."
+    }
+  ],
+  "derived_read": {
+    "best_raw_atomic_ms": 8.43152904510498,
+    "best_raw_atomic_token_block": 8,
+    "best_grouped_atomic_ms": 20.982654571533203,
+    "best_grouped_atomic_token_block": 32,
+    "best_grouped_direct_unique_ms": 19.2331485748291,
+    "best_grouped_direct_unique_token_block": 32,
+    "read": "Token splitting helps the raw-atomic baseline by increasing grid parallelism and reducing per-CTA serial work. It does not rescue the grouped route because the dense LDS group table initialization, accumulation, and scan remain the dominant local work. The separate partial reduction is tiny; the emitter is the wall."
+  },
+  "decision": {
+    "status": "token_split_grouped_route_rejected",
+    "do_not_pursue": [
+      "Do not try to make the current dense LDS grouped route production by only decreasing token_block.",
+      "Do not expect no-final-atomic partial emission to fix this kernel; partial reduction is less than 0.31 ms in the split runs while emit remains about 21 ms.",
+      "Do not add compressed-group panel recompute to this branch; earlier panel runs already regressed badly at S4096."
+    ],
+    "next_candidate": "Keep the faster raw-atomic split observation as a baseline, but replace the dense local group table with a sparse/segmented reduction topology that only touches active lanes/rows. The next useful branch is a split-wave or CK-Tile/rocPRIM-style segmented reducer for K16 contribution rows, not a token-block retune of the dense-table kernel.",
+    "promotion_gate": "A replacement grouped reducer must beat the split raw-atomic floor of about 8.43 ms at S4096 topk512 clustered route and still avoid selected-K/V, probability, dense route, or raw global partial slabs."
+  },
+  "dependency_pin_changes": []
+}

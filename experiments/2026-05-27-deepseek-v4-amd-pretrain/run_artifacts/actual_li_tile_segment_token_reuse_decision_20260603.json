@@ -1,0 +1,64 @@
+{
+  "artifact": "actual_li_tile_segment_token_reuse_decision_20260603",
+  "created_at": "2026-06-03",
+  "scope": "actual_li_s4096_layer2_compressed_dkv_scatteradd_rewrite",
+  "status": "group_owned_segment_cta_rejected_as_producer_owner",
+  "source_artifacts": {
+    "token_reuse_analysis": "run_artifacts/actual_li_tile_segment_token_reuse_s4096_layer2_tb32_sb256-512_20260603.json",
+    "tile_segment_pack_decision": "run_artifacts/actual_li_tile_segment_pack_decision_20260603.json",
+    "rocwmma_persistent_tile_decision": "run_artifacts/compressed_dkv_rocwmma_persistent_tile_decision_20260603.json",
+    "rocprim_compact_reducer_floor": "run_artifacts/compressed_dkv_rocprim_vec16_compact_partial_32x512_s4096_decision_20260603.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352
+  },
+  "results": {
+    "token_block32_selected_block256": {
+      "tile_local_write_reduction_x": 12.338365924856399,
+      "segments": 127436,
+      "segment_count_p50": 11.0,
+      "segment_count_p90": 19.0,
+      "segment_count_p99": 32.0,
+      "overall_pair_over_unique_token_x": 1.0,
+      "duplicate_token_segments": 0,
+      "duplicate_token_segment_pair_share": 0.0,
+      "max_pairs_per_token_per_segment_p99": 1.0
+    },
+    "token_block32_selected_block512": {
+      "tile_local_write_reduction_x": 23.813051840857806,
+      "segments": 66029,
+      "segment_count_p50": 23.0,
+      "segment_count_p90": 32.0,
+      "segment_count_p99": 32.0,
+      "overall_pair_over_unique_token_x": 1.0,
+      "duplicate_token_segments": 0,
+      "duplicate_token_segment_pair_share": 0.0,
+      "max_pairs_per_token_per_segment_p99": 1.0
+    }
+  },
+  "decision": {
+    "retain": [
+      "Tile-group segment metadata is still useful for the final compact reducer and gives the desired 12.34x to 23.81x write-reduction envelope.",
+      "The 32x512 segment distribution remains attractive for a reducer: p50 segment length is 23 and p90/p99 are 32."
+    ],
+    "reject": [
+      "A group-owned segment CTA as the contribution producer. Every measured segment has at most one selected row per token, so a segment-owned producer cannot naturally reuse one token's q/dO across a K16 selected block.",
+      "A segment-owned MFMA rewrite that computes one group segment directly; it would lose the query-major KxH by HxD reuse and repeat the scalar/persistent-CTA S4096 failure mode."
+    ],
+    "next_kernel_requirement": "Keep token/query-major MFMA contribution production, then perform cross-token/group segmented reduction with warp/block cooperation or emit compact rows for the already-positive rocPRIM reducer. Do not move the producer owner to compressed-group segments unless the kernel explicitly preserves token-local q/dO reuse.",
+    "read": "The new token-reuse diagnostic explains why the attractive 23.81x route-segment write reduction has not translated into S4096 latency wins: sorting by compressed group creates good ScatterAdd segments but destroys the same-token selected-K reuse that makes the fast dot-K producer efficient."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "ssh do-sonle5-mi350-gpu 'docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_segments.py --seq-len 4096 --layer-id 2 --token-blocks 32 --selected-blocks 256,512 --summary-path /workspace/run_artifacts/actual_li_tile_segment_token_reuse_s4096_layer2_tb32_sb256-512_20260603.json --json'",
+    "rsync -a do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/run_artifacts/actual_li_tile_segment_token_reuse_s4096_layer2_tb32_sb256-512_20260603.json experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/"
+  ],
+  "dependency_pin_changes": []
+}

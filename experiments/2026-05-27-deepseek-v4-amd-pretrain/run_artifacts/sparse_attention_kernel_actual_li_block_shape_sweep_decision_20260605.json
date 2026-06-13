@@ -1,0 +1,141 @@
+{
+  "artifact": "sparse_attention_kernel_actual_li_block_shape_sweep_decision_20260605",
+  "created_at": "2026-06-05",
+  "scope": "actual_sparse_attention_backward_kernel_latency",
+  "shape": {
+    "batch": 1,
+    "sequence_length": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "dtype": "bfloat16",
+    "device": "MI350"
+  },
+  "boundary": {
+    "inputs": "q, dO, shared/compressed KV, actual LightningIndexer indices, output/lse row state",
+    "outputs": "dQ plus compressed dKV",
+    "measured_path": "current TorchTitan Triton query-major shared-KV sparse-MLA backward profile path",
+    "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "not_tilelang": true,
+    "not_expandable_allocator_e2e_run": true,
+    "uses_global_dkv_atomic_accumulation": true,
+    "read": "This is the actual sparse-attention backward kernel boundary latency. It is not the TileLang late dKV reducer and not the TorchTitan no-AC expandable-allocator end-to-end throughput candidate."
+  },
+  "retained_baseline": {
+    "artifact": "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn64_bd128_20260605.json",
+    "block_h": 64,
+    "block_n": 64,
+    "block_d": 128,
+    "warmup_iters": 2,
+    "timed_iters": 5,
+    "correctness_checked": false,
+    "full_sparse_attention_backward_kernel_ms": 11.134678840637207,
+    "no_dkv_ms": 1.9622999429702759,
+    "dkv_reduce_sink_ms": 2.853471040725708,
+    "dkv_dot_math_approx_ms": 0.8911710977554321,
+    "global_dkv_accumulation_approx_ms": 8.281207799911499,
+    "full_minus_no_dkv_ms": 9.172378897666931
+  },
+  "block_shape_sweep": {
+    "command_shape": "python3 tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_query_recompute_profile.py --seq-len 4096 --layer-id 2 --block-h <BH> --block-n <BN> --block-d 128 --token-block 32 --selected-block 512 --coalesced-d-block 16 --warmup-iters 1 --timed-iters 3 --skip-correctness",
+    "artifacts": [
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh32_bn32_bd128_sweep_20260605.json",
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh32_bn64_bd128_sweep_20260605.json",
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh32_bn128_bd128_sweep_20260605.json",
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn32_bd128_sweep_20260605.json",
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn64_bd128_sweep_20260605.json",
+      "sparse_attention_kernel_actual_li_query_recompute_profile_s4096_layer2_bh64_bn128_bd128_sweep_20260605.json"
+    ],
+    "rows": [
+      {
+        "block_h": 32,
+        "block_n": 32,
+        "block_d": 128,
+        "full_ms": 31.896684646606445,
+        "no_dkv_ms": 18.764509201049805,
+        "dkv_reduce_sink_ms": 25.935575485229492,
+        "full_minus_sink_ms": 5.961109161376953,
+        "read": "H32 loses badly before dKV accumulation; reject."
+      },
+      {
+        "block_h": 32,
+        "block_n": 64,
+        "block_d": 128,
+        "full_ms": 27.721359252929688,
+        "no_dkv_ms": 17.688495635986328,
+        "dkv_reduce_sink_ms": 19.438268661499023,
+        "full_minus_sink_ms": 8.283090591430664,
+        "read": "H32 still loses badly; reject."
+      },
+      {
+        "block_h": 32,
+        "block_n": 128,
+        "block_d": 128,
+        "full_ms": 36.21144104003906,
+        "no_dkv_ms": 24.87636947631836,
+        "dkv_reduce_sink_ms": 26.821504592895508,
+        "full_minus_sink_ms": 9.389936447143555,
+        "read": "Worst full latency in sweep; reject."
+      },
+      {
+        "block_h": 64,
+        "block_n": 32,
+        "block_d": 128,
+        "full_ms": 14.862748146057129,
+        "no_dkv_ms": 3.3717119693756104,
+        "dkv_reduce_sink_ms": 9.382850646972656,
+        "full_minus_sink_ms": 5.479897499084473,
+        "read": "Lower accumulation delta but higher sink/no-dKV; not promoted."
+      },
+      {
+        "block_h": 64,
+        "block_n": 64,
+        "block_d": 128,
+        "full_ms": 11.13883113861084,
+        "no_dkv_ms": 2.0338199138641357,
+        "dkv_reduce_sink_ms": 2.943429946899414,
+        "full_minus_sink_ms": 8.195401191711426,
+        "read": "Best sweep full latency; consistent with the retained 5-iteration baseline."
+      },
+      {
+        "block_h": 64,
+        "block_n": 128,
+        "block_d": 128,
+        "full_ms": 11.142666816711426,
+        "no_dkv_ms": 1.3930530548095703,
+        "dkv_reduce_sink_ms": 2.070141077041626,
+        "full_minus_sink_ms": 9.072525978088379,
+        "read": "Ties full latency but increases the accumulation wall; not promoted over H64/N64."
+      }
+    ]
+  },
+  "rejected_related_paths": [
+    {
+      "path": "TileLang route-owned whole-boundary GP256/block_d64",
+      "latency_ms": 16.7047,
+      "reason": "Consumes source tensors and emits dQ+dKV, but loses query-major reuse and fails the actual-kernel latency gate."
+    },
+    {
+      "path": "TileLang route-owned whole-boundary GP512/block_d32",
+      "latency_ms": 28.7191,
+      "reason": "Fits shared memory by halving D tile but regresses full boundary latency."
+    },
+    {
+      "path": "TileLang/compact dKV-only late reducers",
+      "reason": "Useful implementation probes, but they are not the sparse-attention kernel boundary and do not materialize e2e while PyTorch/Triton already paid selected-state/probability/materialization costs."
+    }
+  ],
+  "decision": {
+    "promoted_current_kernel_block_shape": "block_h=64, block_n=64, block_d=128",
+    "promoted_latency_ms": 11.134678840637207,
+    "best_sweep_latency_ms": 11.13883113861084,
+    "block_shape_tuning_found_speedup": false,
+    "primary_wall": "global compressed dKV many-to-one atomic accumulation inside the sparse-attention backward kernel",
+    "next_rewrite_target": "Preserve the query-major sparse-attention producer and move group-aware segmented reduction into that owner before global memory, so the kernel emits fewer reduced dKV writes instead of one atomic/write stream per selected token-slot-D contribution.",
+    "not_next": "Do not promote route-owned TileLang whole-boundary or late dKV-only replacement until it beats the actual 11.13 ms kernel boundary and then materializes in TorchTitan e2e TFLOPs."
+  }
+}

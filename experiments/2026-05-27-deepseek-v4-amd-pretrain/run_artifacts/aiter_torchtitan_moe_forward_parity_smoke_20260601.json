@@ -1,0 +1,92 @@
+{
+  "probe": "aiter_torchtitan_moe_forward_parity",
+  "shape": {
+    "tokens": 64,
+    "hidden": 1024,
+    "intermediate": 128,
+    "experts": 8,
+    "topk": 2,
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.02
+  },
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF",
+    "interleave_gate_mode": "interleave"
+  },
+  "reference": "TorchTitan SwiGLU: down(silu(w1_gate x) * (w3_up x)), weighted by topk_weight and index-added by token",
+  "best_candidate": "interleave_up_gate",
+  "best_max_abs_diff": 8.344650268554688e-05,
+  "best_mean_abs_diff": 1.527788845123723e-05,
+  "candidates": [
+    {
+      "name": "separated_gate_up",
+      "gate_mode": "separated",
+      "read": "w13 = cat([TorchTitan w1 gate, TorchTitan w3 up])",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 8.678436279296875e-05,
+      "mean_abs_diff": 1.5634432202205062e-05,
+      "max_rel_diff": 54.32963562011719,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.1238820031285286,
+        "min": 0.10388100147247314,
+        "max": 0.20136100053787231,
+        "iters": 5
+      }
+    },
+    {
+      "name": "separated_up_gate",
+      "gate_mode": "separated",
+      "read": "w13 = cat([TorchTitan w3 up, TorchTitan w1 gate])",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 8.678436279296875e-05,
+      "mean_abs_diff": 1.5627683751517907e-05,
+      "max_rel_diff": 52.9587287902832,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.11560200154781342,
+        "min": 0.10540100187063217,
+        "max": 0.20160099864006042,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_gate_up",
+      "gate_mode": "interleave",
+      "read": "w13 rows alternate [gate_i, up_i]",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 9.107589721679688e-05,
+      "mean_abs_diff": 1.5585628716507927e-05,
+      "max_rel_diff": 54.41904067993164,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10768099874258041,
+        "min": 0.10000099986791611,
+        "max": 0.13308200240135193,
+        "iters": 5
+      }
+    },
+    {
+      "name": "interleave_up_gate",
+      "gate_mode": "interleave",
+      "read": "w13 rows alternate [up_i, gate_i]",
+      "ok": true,
+      "error": null,
+      "max_abs_diff": 8.344650268554688e-05,
+      "mean_abs_diff": 1.527788845123723e-05,
+      "max_rel_diff": 54.22532653808594,
+      "finite": true,
+      "timing_ms": {
+        "median": 0.10204099863767624,
+        "min": 0.09580100327730179,
+        "max": 0.14976100623607635,
+        "iters": 5
+      }
+    }
+  ]
+}

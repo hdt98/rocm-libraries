@@ -1,0 +1,154 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_sourcepos_moriabi_mbs8_steps6_20260609",
+  "date": "2026-06-09",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_six_steps_not_promoted",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "runtime": {
+    "optimizer": "adamw",
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only",
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_compact_collective_backend": "mori_native",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_scatter_mode": "triton_bwd",
+    "li_kl_backend": "triton_tl_dot",
+    "mori_shmem_heap_size": "48G",
+    "mori_native_compact_max_peer_rows": 65536,
+    "mori_native_compact_prereset": false,
+    "mori_native_compact_debug_cache": true
+  },
+  "source_change_under_test": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "summary": "Thread MORI native compact combine source flat positions into the final combine scatter instead of discarding them. The native path now decodes rank-strided flat positions, derives token indices from the returned source order, gathers source-order top-k scores, and records native_source_positions timing metadata. Non-native standard EP combine is unchanged.",
+    "reason": "The native MORI combine ABI returns source-rank compact rows plus source flat positions. Discarding those positions assumed output row order matched the old torch all-to-all/expert-sorted scatter vectors."
+  },
+  "dependency_tuple_notes": {
+    "initial_do_vunguyen_attempt": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_sourcepos_mbs8_steps6_20260609",
+      "result": "failed_before_training_missing_native_mori_symbols",
+      "missing_symbols": [
+        "launch_standard_ep_compact_dispatch",
+        "launch_standard_ep_compact_combine",
+        "get_standard_ep_compact_dispatch_output",
+        "get_standard_ep_compact_combine_output"
+      ],
+      "read": "do-vunguyen had the TorchTitan scratch tree but not the patched vendored MORI tree, so it imported the image's stock MORI extension."
+    },
+    "fix": "Copied the patched 2026-06-09 MORI source/binary tree from do-sonle5 under /scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori on do-vunguyen.",
+    "container_symbol_check": {
+      "launch_standard_ep_compact_dispatch": true,
+      "launch_standard_ep_compact_combine": true,
+      "get_standard_ep_compact_dispatch_output": true,
+      "get_standard_ep_compact_combine_output": true
+    }
+  },
+  "raw_artifacts": {
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_sourcepos_moriabi_mbs8_steps6_20260609/docker-run.log",
+    "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_sourcepos_moriabi_mbs8_steps6_20260609",
+    "scratch_launcher": "/scratch/sonle5/dsv4_pretrain_canary_20260527/run_native_sourcepos_direct.sh",
+    "copied_mori_tarball": "/scratch/sonle5/dsv4_pretrain_canary_20260527/mori_native_20260609.tgz"
+  },
+  "step_metrics": [
+    {
+      "step": 2,
+      "loss": 10.15449,
+      "grad_norm": 80.0,
+      "tokens_per_gpu_s": 7818,
+      "tflops_per_gpu": 395.84,
+      "rank_max_memory_gib": 220.38
+    },
+    {
+      "step": 3,
+      "loss": 19.3692,
+      "grad_norm": 177.0,
+      "tokens_per_gpu_s": 8639,
+      "tflops_per_gpu": 437.4,
+      "rank_max_memory_gib": 221.55
+    },
+    {
+      "step": 4,
+      "loss": 17.85546,
+      "grad_norm": 29.875,
+      "tokens_per_gpu_s": 8714,
+      "tflops_per_gpu": 441.22,
+      "rank_max_memory_gib": 223.62
+    },
+    {
+      "step": 5,
+      "loss": 11.70914,
+      "grad_norm": 153.0,
+      "tokens_per_gpu_s": 8754,
+      "tflops_per_gpu": 443.21,
+      "rank_max_memory_gib": 225.3
+    },
+    {
+      "step": 6,
+      "loss": 9.75131,
+      "grad_norm": 35.5,
+      "tokens_per_gpu_s": 6876,
+      "tflops_per_gpu": 348.16,
+      "rank_max_memory_gib": 226.89
+    }
+  ],
+  "window_metrics": {
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 8160.2,
+      "tflops_per_gpu_mean": 413.166,
+      "peak_logged_memory_gib": 226.89
+    },
+    "steps_2_to_5": {
+      "tokens_per_gpu_s_mean": 8481.25,
+      "tflops_per_gpu_mean": 429.4175,
+      "peak_logged_memory_gib": 225.3
+    },
+    "steps_3_to_5": {
+      "tokens_per_gpu_s_mean": 8702.3333,
+      "tflops_per_gpu_mean": 440.61,
+      "peak_logged_memory_gib": 225.3
+    },
+    "steps_4_to_5": {
+      "tokens_per_gpu_s_mean": 8734.0,
+      "tflops_per_gpu_mean": 442.215,
+      "peak_logged_memory_gib": 225.3
+    }
+  },
+  "comparison_to_retained_baseline": {
+    "retained_baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "retained_steps_2_to_20_tokens_per_gpu_s_mean": 8518.8421,
+    "retained_steps_2_to_20_tflops_per_gpu_mean": 431.3139,
+    "retained_peak_logged_memory_gib": 251.97,
+    "sourcepos_steps_2_to_6_tokens_delta_pct": -4.2147,
+    "sourcepos_steps_2_to_5_tokens_delta_pct": -0.4401,
+    "read": "The six-step gate is a stability breakthrough for native compact plus sparse SharedKV, not a promoted throughput baseline. Steps 2-5 are near the retained 20-step mean, but step 6 dips; require a matching 20-step non-profiled run before promotion."
+  },
+  "stability_read": {
+    "passed_previous_failure_surface": true,
+    "previous_failure": "The zero-row-safe no-prereset native compact sparse gate failed after step 4 / in the next backward with a sparse MLA sink-gradient GPU memory access fault.",
+    "current_read": "Using source-position-driven native combine scatter, the same sparse S4096 native compact path completed all six requested steps and destroyed process groups cleanly.",
+    "promotion_status": "not_promoted",
+    "next_gate": "Run the same sparse source-position native compact path for 20 non-profiled steps, preferably with native compact debug cache logging disabled after confirming no capacity churn."
+  }
+}

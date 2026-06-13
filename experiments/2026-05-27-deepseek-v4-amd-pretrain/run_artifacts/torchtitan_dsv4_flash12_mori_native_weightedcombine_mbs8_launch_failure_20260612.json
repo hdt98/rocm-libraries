@@ -1,0 +1,38 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_launch_failure_20260612",
+  "created_at": "2026-06-12",
+  "result": "invalid_launch_failure_before_metric",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_8x_s4096_gbs128_steps20_20260612",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_weightedcombine_mbs8_8x_s4096_gbs128_steps20_20260612",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_only"
+  },
+  "moe_path_under_test": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "compact_collective_backend": "mori_native",
+    "native_compact_weighted_output": true,
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact"
+  },
+  "failure": {
+    "phase": "first forward sparse MLA layer before any completed training step",
+    "exception": "RuntimeError",
+    "message": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=shared_kv requires TORCHTITAN_DSV4_SPARSE_MLA_SHARED_KV_KERNEL_MODULE, or TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE, to name an importable backend module exposing sparse_mla_shared_kv(...).",
+    "first_observed_rank": 3,
+    "rank_trace_file": "/tmp/torchelastic_3l8u5ymf/none_jfeezt__/attempt_0/3/error.json"
+  },
+  "read": "This run is invalid for MORI native weighted-combine performance. It initialized distributed training and MORI SDMA, but failed before the first metric step because the sparse-MLA SharedKV backend module env was not exported under the TORCHTITAN_DSV4_* name expected by the model code.",
+  "next_action": "Rerun the same MBS8 materialization gate only after pinning the sparse-MLA backend env to TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend or TORCHTITAN_DSV4_SPARSE_MLA_SHARED_KV_KERNEL_MODULE with the same module.",
+  "dependency_pin_changes": "none"
+}

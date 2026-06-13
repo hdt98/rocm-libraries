@@ -1,0 +1,74 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "avoided_materialized_selected_index_k_bytes": 1048576,
+    "block_d": 64,
+    "block_h": 16,
+    "block_k": 64,
+    "logical_flops": 33030144,
+    "logical_tflops_at_event_median": 0.30258191951117863,
+    "mode": "index_logits",
+    "read": "The index_logits mode gathers key-index rows inside the Triton tl.dot tile, applies ReLU and LI weights, and atomically reduces H-block partials to [B,S,K]. It intentionally avoids writing the [B,S,K,D] selected key-index buffer and the [B,S,H,K] head-logit workspace used by the scalar prototype.",
+    "uses_tl_dot": true,
+    "workspace": {
+      "head_logits_bytes": 0,
+      "index_logits_bytes": 16384,
+      "selected_index_k_materialized_bytes": 0,
+      "valid_edges": 2016
+    }
+  },
+  "max_abs_diff": 0.6068954467773438,
+  "reference": {
+    "matmul_dtype": "input",
+    "norm": 2809.29345703125,
+    "selected_index_k_bytes": 1048576
+  },
+  "scope": "triton_gathered_mfma_li_index_logits_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 32,
+    "head_dim": 128,
+    "index_pattern": "shifted",
+    "n_heads": 64,
+    "seq_len": 128,
+    "topk": 32,
+    "valid_edges": 2016
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 0.36092400550842285,
+      "mean_ms": 0.1842553342382113,
+      "median_ms": 0.10916099697351456,
+      "min_ms": 0.08268100023269653,
+      "samples_ms": [
+        0.36092400550842285,
+        0.10916099697351456,
+        0.08268100023269653
+      ],
+      "stdev_ms": 0.15357135837497493
+    },
+    "peak_memory_allocated_bytes": 82980864,
+    "peak_memory_allocated_gib": 0.07728195190429688,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 0.4053589655086398,
+      "mean_ms": 0.2179793082177639,
+      "median_ms": 0.13510894495993853,
+      "min_ms": 0.11347001418471336,
+      "samples_ms": [
+        0.4053589655086398,
+        0.13510894495993853,
+        0.11347001418471336
+      ],
+      "stdev_ms": 0.16263582878968683
+    },
+    "warmup_iters": 1
+  },
+  "triton_norm": 2809.439208984375
+}

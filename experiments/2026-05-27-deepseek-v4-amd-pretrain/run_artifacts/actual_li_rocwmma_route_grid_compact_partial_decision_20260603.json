@@ -1,0 +1,81 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_compact_partial_decision",
+  "created_at": "2026-06-03",
+  "status": "measured_rejected_for_latency",
+  "question": "Can an Ascend-like compact partial emit plus detached reduction improve the real-LI compressed dKV many-to-one accumulation wall?",
+  "source_artifacts": [
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_partial_s128_layer2_t32k32_20260603.json",
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_partial_s512_layer2_t32k128_20260603.json",
+    "run_artifacts/actual_li_rocwmma_route_grid_compact_partial_s4096_layer2_t32k512_timing_20260603.json"
+  ],
+  "implementation": {
+    "kernel": "compressed_dkv_route_grid_compact_partial_bf16",
+    "probe_file": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocwmma_route_grid.py",
+    "benchmark_file": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py",
+    "mechanism": "Precompute per-route-tile compact slot metadata, emit one compact partial row per active compressed group and D tile, then reduce compact rows into dKV with index_add.",
+    "metadata": [
+      "slot_lookup[route_tile, group] -> compact row slot",
+      "active_groups[compact_row] -> compressed group id",
+      "tile_offsets[route_tile + 1] -> compact row range"
+    ],
+    "diagnostic_limitations": [
+      "Still uses materialized probs and grad_logits_scaled inputs.",
+      "Uses a PyTorch index_add reducer after compact partial emission.",
+      "Tests the compact-row accumulation schedule, not the final fused sparse MLA/LI/compressor backward."
+    ]
+  },
+  "correctness": {
+    "s128": {
+      "status": "passed",
+      "max_abs_diff_vs_reference": 0.0000209808349609375,
+      "raw_vs_compact_partial_reduce_max_abs_diff": 0.000019073486328125
+    },
+    "s512": {
+      "status": "passed",
+      "max_abs_diff_vs_reference": 0.000041961669921875,
+      "raw_vs_compact_partial_reduce_max_abs_diff": 0.000026702880859375
+    },
+    "s4096": {
+      "status": "timing_only_reference_skipped",
+      "raw_vs_compact_partial_reduce_max_abs_diff": 0.000110626220703125
+    }
+  },
+  "timing_ms": {
+    "s128_layer2_t32_k32": {
+      "raw_atomic": 0.22748200595378876,
+      "compact_partial_emit": 0.14676199853420258,
+      "compact_partial_emit_plus_index_add": 0.1522819995880127
+    },
+    "s512_layer2_t32_k128": {
+      "raw_atomic": 2.706667900085449,
+      "grouped_atomic": 0.5901259779930115,
+      "compact_partial_emit": 0.7025269865989685,
+      "compact_partial_emit_plus_index_add": 0.7107669711112976
+    },
+    "s4096_layer2_t32_k512": {
+      "contrib_sink": 8.979451179504395,
+      "raw_atomic": 47.31903839111328,
+      "grouped_atomic": 20.999094009399414,
+      "compact_partial_emit": 22.214305877685547,
+      "compact_partial_emit_plus_index_add": 22.28658676147461
+    }
+  },
+  "s4096_compact_metadata": {
+    "compact_rows": 66029,
+    "dense_rows": 131072,
+    "max_active_groups_per_route_tile": 1024,
+    "dense_slot_overhead_x": 1.985150464946463
+  },
+  "derived": {
+    "s4096_compact_emit_reduce_speedup_vs_raw_atomic": 2.1232070616084946,
+    "s4096_compact_emit_reduce_speedup_vs_grouped_atomic": 0.9422301509937447,
+    "s4096_index_add_reducer_overhead_ms": 0.0722808837890625,
+    "s4096_emit_is_the_wall_not_reducer": true
+  },
+  "decision": {
+    "accepted": false,
+    "read": "The compact format is correct and cuts dense partial rows nearly in half at S4096, but the per-route-tile local accumulation and emit schedule is still slower than the retained grouped atomic path. The detached reducer itself is small; the wall is producing the compact partials, not the final index_add.",
+    "closed_branch": "compact rows with per-route-tile LDS/local atomics plus index_add reducer",
+    "next_branch": "Avoid per-contribution local atomic accumulation. Try warp/block segmented reduction or group-owned MFMA accumulation over route-ordered tiles, then fuse target_probs, LI derivative, compressor recompute, dQ, and dK/dV into the same sparse attention backward pipeline."
+  }
+}

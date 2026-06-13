@@ -1,0 +1,43 @@
+{
+  "status": "passed_rejected_as_promotion",
+  "scope": "sparse_attn_sharedkv_grad_plus_sparse_li_kl_stream_overlap_decision",
+  "date": "2026-06-05",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "window": 128,
+    "kv_len": 5120
+  },
+  "artifacts": {
+    "cold_short": "run_artifacts/sparse_attn_li_stream_overlap_s4096_layer2_20260605.json",
+    "warm_repeat": "run_artifacts/sparse_attn_li_stream_overlap_s4096_layer2_warm7_20260605.json",
+    "source_dependency_audit": "run_artifacts/sparse_attn_li_source_dependency_audit_20260605.json"
+  },
+  "warm_repeat_medians_ms": {
+    "retained_sparse_attn_sharedkv_grad_full": 13.341876029968262,
+    "sparse_lightning_indexer_grad_kl_loss_public_wrapper": 4.341117858886719,
+    "serialized_sparse_attn_then_li": 17.5495548248291,
+    "candidate_three_branch_independent_streams": 16.45298194885254,
+    "candidate_fused_local_independent_streams": 16.521543502807617,
+    "three_branch_li_kl_side_stream": 16.140140533447266,
+    "three_branch_dq_side_stream": 11.679342269897461,
+    "three_branch_compressed_dkv_side_stream": 10.620692253112793
+  },
+  "gate": {
+    "source_contract_lower_bound_three_branch_ms": 12.5525,
+    "source_contract_lower_bound_fused_local_ms": 12.2984,
+    "measured_best_candidate_ms": 16.45298194885254,
+    "measured_serial_ms": 17.5495548248291,
+    "best_vs_serial_speedup_x": 1.0666488834294892,
+    "promotion": false
+  },
+  "read": "Source inspection remains correct: SparseLightningIndexerGradKLLoss does not consume SparseAttnSharedkvGrad dQ/dKV/d_sinks outputs and can be scheduled independently in principle. The direct same-process MI350 measurement shows the naive independent-stream schedule is not a materialized latency promotion: LI/KL is 4.34 ms alone but stretches to about 16.14 ms when overlapped with sparse-attention branches, so stream contention erases most of the theoretical lower bound. Keep the dependency split as a scheduling fact, but do not promote this two-stream/four-branch stopgap; the main sparse path still needs a fused source-boundary sparse-attention backward with group-aware compressed-dKV epilogue, and LI/KL needs either separate resource-aware scheduling or fusion only where it does not contend with the same QK/P/dP replay resources."
+}

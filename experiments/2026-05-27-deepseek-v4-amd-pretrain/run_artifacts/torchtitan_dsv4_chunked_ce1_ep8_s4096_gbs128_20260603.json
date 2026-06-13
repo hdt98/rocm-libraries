@@ -1,0 +1,58 @@
+{
+  "artifact": "torchtitan_dsv4_chunked_ce1_ep8_s4096_gbs128_20260603",
+  "date_utc": "2026-06-03",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_dsv4_chunked_ce1_ep8_s4096_gbs128_20260603",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_chunked_ce1_ep8_s4096_gbs128_20260603",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "steps": 2
+  },
+  "retained_mori_settings": {
+    "comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_tuple": [64, 32, 8],
+    "mori_shmem_heap_size": "32G"
+  },
+  "loss_setting": {
+    "chunked_ce_num_chunks": 1
+  },
+  "result": {
+    "status": "passed",
+    "checkpoint_enable": false,
+    "step1": {
+      "loss": 12.31821,
+      "grad_norm": 11.4375,
+      "tok_per_gpu_s_range": [1889, 1892],
+      "logged_memory_gib_range": [42.58, 54.69]
+    },
+    "step2": {
+      "loss": 9.13966,
+      "grad_norm": 22.375,
+      "tok_per_gpu_s": 3002,
+      "tflops_reported": 56.81,
+      "mfu_reported_percent": 2.46,
+      "peak_logged_memory_gib": 143.68
+    },
+    "process_groups_destroyed": true
+  },
+  "comparison": {
+    "ce8_retained_step2_tok_per_gpu_s": 3026,
+    "ce4_step2_tok_per_gpu_s": 2989,
+    "ce2_step2_tok_per_gpu_s": 3136,
+    "read": "CE1 passes but is slower than CE8 and CE2; CE2 remains the current chunked-loss candidate."
+  }
+}

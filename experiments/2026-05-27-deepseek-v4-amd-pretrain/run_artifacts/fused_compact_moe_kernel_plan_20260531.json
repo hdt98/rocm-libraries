@@ -1,0 +1,489 @@
+{
+  "current_retained_baseline": {
+    "contig_wgrad_lhs_candidate": {
+      "artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_reduce_vs_contig_wgrad_lhs_decision_20260531.json",
+      "compact_reduce_avg_ms": 52.328626019880176,
+      "contig_wgrad_lhs_avg_ms": 52.93733838479966,
+      "decision": {
+        "demote": "contig_wgrad_lhs",
+        "promote": "compact_reduce",
+        "reason": "The contig-wgrad-LHS wrapper is a correct control but is slower in paired full-layer S2048 timing. Keep the default compact-reduce path while designing a fused compact grouped MoE training kernel."
+      },
+      "delta_vs_compact_reduce_avg_ms": 0.6087123649194837,
+      "read": "Adjacent full-layer remeasurement demoted contig-wgrad-LHS; isolated sub-millisecond wins did not survive integration."
+    },
+    "latest_moe_sweep_best": {
+      "artifact": "compact_reduce.json",
+      "avg_ms": 52.76586099838217,
+      "avg_ms_over_target_ratio": 1.2186111085076716,
+      "estimated_tflops": 184.51615883645897,
+      "gap_to_development_target_ms": 9.465860998382176,
+      "min_ms": 52.09138698410243,
+      "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+      "tokens_per_s": 38812.974170227084,
+      "tokens_per_s_over_target_ratio": 0.8205702784403189
+    },
+    "s2048": {
+      "avg_ms": 52.58071997668594,
+      "estimated_tflops": 185.16585534463903,
+      "gap_ms": 9.280719976685944,
+      "required_total_latency_reduction_fraction": 0.1765042392116535,
+      "target_ms": 43.3,
+      "tokens_per_s": 38949.63783128253
+    },
+    "s4096": {
+      "avg_ms": 76.57323967820655,
+      "estimated_tflops": 276.50802181590427,
+      "headroom_ms": 10.026760321793446,
+      "target_ms": 86.6,
+      "tokens_per_s": 53491.27211037617
+    }
+  },
+  "date": "2026-05-31",
+  "first_kernel_contract": {
+    "first_schedule": [
+      {
+        "shape": {
+          "dscore": [
+            "tokens * topk"
+          ],
+          "grad_output_select": [
+            "tokens * topk",
+            7168
+          ]
+        },
+        "step": "grad_y_and_dscore",
+        "work": "Gather grad_output by token_ids_sorted, multiply by score_sorted, and reduce grad_output*y_unscaled for score gradients."
+      },
+      {
+        "shape": {
+          "d_hidden": [
+            "N_e",
+            3072
+          ],
+          "d_y_unscaled": [
+            "N_e",
+            7168
+          ],
+          "w2": [
+            7168,
+            3072
+          ]
+        },
+        "step": "w2_dgrad",
+        "work": "Grouped GMM over group_sizes."
+      },
+      {
+        "shape": {
+          "d_gate_up": [
+            "tokens * topk",
+            3072
+          ],
+          "d_hidden": [
+            "tokens * topk",
+            3072
+          ],
+          "gate_up": [
+            "tokens * topk",
+            3072
+          ]
+        },
+        "step": "swiglu_backward",
+        "work": "Pointwise SwiGLU backward on compact rows."
+      },
+      {
+        "shape": {
+          "d_gate_or_d_up": [
+            "N_e",
+            3072
+          ],
+          "dx": [
+            "tokens",
+            7168
+          ],
+          "dx_partial": [
+            "N_e",
+            7168
+          ],
+          "w1_or_w3": [
+            3072,
+            7168
+          ]
+        },
+        "step": "xgrad_pair_and_dx_reduce",
+        "work": "Two grouped GMMs or fused pair, then reduce compact rows back to token order."
+      },
+      {
+        "shape": {
+          "dw1_dw3": [
+            384,
+            3072,
+            7168
+          ],
+          "dw2": [
+            384,
+            7168,
+            3072
+          ]
+        },
+        "step": "expert_wgrad",
+        "work": "Grouped TGMM for W1, W2, and W3 using compact saved rows; keep dense expert-grad output layout."
+      }
+    ],
+    "inputs": {
+      "gate_compact": [
+        "tokens * topk",
+        3072
+      ],
+      "grad_output": [
+        "tokens",
+        7168
+      ],
+      "group_offsets": [
+        385
+      ],
+      "group_sizes": [
+        384
+      ],
+      "hidden_compact": [
+        "tokens * topk",
+        3072
+      ],
+      "score_sorted": [
+        "tokens * topk"
+      ],
+      "token_ids_sorted": [
+        "tokens * topk"
+      ],
+      "up_compact": [
+        "tokens * topk",
+        3072
+      ],
+      "w1": [
+        384,
+        3072,
+        7168
+      ],
+      "w2": [
+        384,
+        7168,
+        3072
+      ],
+      "w3": [
+        384,
+        3072,
+        7168
+      ],
+      "x_compact": [
+        "tokens * topk",
+        7168
+      ],
+      "y_unscaled_compact": [
+        "tokens * topk",
+        7168
+      ]
+    },
+    "mandatory_avoidance": [
+      "Do not scatter compact gate/up/hidden/y_unscaled back to [experts, max_count, *] for saved tensors.",
+      "Do not re-index-select compact rows from padded saved tensors in backward.",
+      "Do not round every expert to one global max_count batch.",
+      "Do not spend launch overhead on Python-side count buckets; learned_bucket16 was slower than compact-reduce by more than 100 ms at S2048."
+    ],
+    "operator": "compact_dynamic_grouped_moe_train_backward_first",
+    "outputs": {
+      "dtop_scores_sorted": [
+        "tokens * topk"
+      ],
+      "dw1": [
+        384,
+        3072,
+        7168
+      ],
+      "dw2": [
+        384,
+        7168,
+        3072
+      ],
+      "dw3": [
+        384,
+        3072,
+        7168
+      ],
+      "dx": [
+        "tokens",
+        7168
+      ]
+    },
+    "scope": "Routed expert backward and saved compact forward tensors. Router matmul/topk, shared expert, attention, RMSNorm, and residual stay outside this first cut."
+  },
+  "hot_backward_evidence": {
+    "block_timer_s2048": {
+      "backward_ms": 36.953925038687885,
+      "forward_ms": 18.64877692423761,
+      "moe_routed_dgrad_ms": 27.989704976789653,
+      "moe_routed_w1_w3_dgrad_ms": 6.3127229223027825,
+      "moe_routed_w1_wgrad_ms": 6.258902023546398,
+      "moe_routed_w2_dgrad_ms": 3.2360259210690856,
+      "moe_routed_w2_wgrad_ms": 5.9961030492559075,
+      "moe_routed_w3_wgrad_ms": 5.51775295753032,
+      "moe_routed_wgrad_ms": 28.00784504506737,
+      "phase_total_ms": 55.69806194398552
+    },
+    "rocprof_s2048": {
+      "combined_moe_routed_backward_kernel_ms_for_attribution_runs": 54.639134999999996,
+      "moe_routed_dgrad": {
+        "kernel_count": 33,
+        "kernel_ms": 27.40845,
+        "marker_ms": 27.522983,
+        "name": "backward.moe.routed.dgrad"
+      },
+      "moe_routed_wgrad": {
+        "kernel_count": 32,
+        "kernel_ms": 27.230685,
+        "marker_ms": 27.376784,
+        "name": "backward.moe.routed.wgrad"
+      },
+      "note": "The block-attribution ranges are profiling slices, not a simple decomposition of one training iteration. Use them to choose the kernel surface, not to sum end-to-end latency."
+    }
+  },
+  "next_commands": [
+    "Prototype tile_m=8 compact-native grouped MoE backward kernel against the operator contract in this artifact.",
+    "Run a small learned-router CPU/CUDA parity check before any S2048 timing.",
+    "Benchmark S2048 against paired_compact_reduce_full_layer_s2048_20260531.json; require at least 1.0 ms full-layer improvement."
+  ],
+  "promotion_gates": [
+    "Small CPU and CUDA parity against the loop MoE reference, including learned-router dtop_scores/moe.gate gradients.",
+    "S2048 isolated op probe must show routed dgrad+wgrad improvement after dispatch/reduce costs, not just faster GEMM-only timing.",
+    "S2048 full-layer fwd+bwd must beat the paired compact-reduce artifact by at least 1.0 ms before promotion; smaller wins stay as selectable probes.",
+    "S4096 full-layer fwd+bwd must remain below the 86.6 ms primary target.",
+    "The candidate must preserve learned routing and moe.gate gradients; fixed-balanced and cached-learned routing are controls only."
+  ],
+  "read": "The next real kernel should be backward-first and compact-native: save compact forward tensors, consume group_sizes/group_offsets directly, and avoid the current padded save plus re-compaction pattern. Wrapper-level PyTorch variants are not large enough to close the S2048 gap.",
+  "route_padding_control_evidence": {
+    "read": "Cached learned routing removes router/top-k/gate-gradient overhead, but fixed-balanced routing removes substantially more. The remaining S2048 gap is therefore dominated by learned-route imbalance and padded routed expert GEMM work, not boundary fusion or simple wrapper choices.",
+    "s2048": {
+      "cached_learned_compact_reduce": {
+        "avg_ms": 51.67925734228144,
+        "estimated_tflops": 188.39577985100718,
+        "label": "cached_learned_compact_reduce",
+        "min_ms": 51.356339012272656,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": 1.4713541666666667,
+        "router_override_mode": "cached_learned",
+        "tokens_per_s": 39629.05245397996
+      },
+      "cached_minus_learned_avg_ms": -1.1736516995976416,
+      "fixed_balanced_compact_reduce": {
+        "avg_ms": 46.732044662348926,
+        "estimated_tflops": 208.33999580943274,
+        "label": "fixed_balanced_compact_reduce",
+        "min_ms": 46.40716197900474,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": 1.0,
+        "router_override_mode": "fixed_balanced",
+        "tokens_per_s": 43824.31829801859
+      },
+      "fixed_gap_to_target_ms": 3.432044662348929,
+      "fixed_minus_cached_avg_ms": -4.9472126799325125,
+      "fixed_minus_learned_avg_ms": -6.120864379530154,
+      "learned_compact_reduce": {
+        "avg_ms": 52.85290904187908,
+        "estimated_tflops": 184.2122631585966,
+        "label": "learned_compact_reduce",
+        "min_ms": 52.38756805192679,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": null,
+        "router_override_mode": "learned",
+        "tokens_per_s": 38749.04971412691
+      },
+      "learned_gap_to_target_ms": 9.552909041879083,
+      "source": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/route_padding_sweep_20260531.json",
+      "target_ms": 43.3,
+      "tokens": 2048
+    },
+    "s4096": {
+      "cached_learned_compact_reduce": {
+        "avg_ms": 75.72599145350978,
+        "estimated_tflops": 279.6016878888241,
+        "label": "cached_learned_compact_reduce",
+        "min_ms": 75.2068948931992,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": 1.2317708333333333,
+        "router_override_mode": "cached_learned",
+        "tokens_per_s": 54089.75071015933
+      },
+      "cached_minus_learned_avg_ms": -1.4360815985128284,
+      "fixed_balanced_compact_reduce": {
+        "avg_ms": 68.95088899182156,
+        "estimated_tflops": 307.07530152319566,
+        "label": "fixed_balanced_compact_reduce",
+        "min_ms": 68.7406409997493,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": 1.0,
+        "router_override_mode": "fixed_balanced",
+        "tokens_per_s": 59404.600287109235
+      },
+      "fixed_gap_to_target_ms": -17.649111008178437,
+      "fixed_minus_cached_avg_ms": -6.7751024616882205,
+      "fixed_minus_learned_avg_ms": -8.211184060201049,
+      "learned_compact_reduce": {
+        "avg_ms": 77.1620730520226,
+        "estimated_tflops": 274.397954720334,
+        "label": "learned_compact_reduce",
+        "min_ms": 76.78169605787843,
+        "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+        "padding_multiplier_32": null,
+        "router_override_mode": "learned",
+        "tokens_per_s": 53083.07356178054
+      },
+      "learned_gap_to_target_ms": -9.437926947977388,
+      "source": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_route_padding_sweep_4096_20260531",
+      "target_ms": 86.6,
+      "tokens": 4096
+    }
+  },
+  "route_targets": [
+    {
+      "assignments": 12288,
+      "compact_rows": 12288,
+      "current_max_padded_rows": 18048,
+      "current_padding_multiplier": 1.46875,
+      "ideal_compact_train_gemm_flop_ratio_vs_max_padded": 0.6808510638297872,
+      "preferred_tiles": [
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.1067708333333333,
+          "row_savings_fraction_vs_max_padded": 0.24645390070921985,
+          "row_savings_vs_max_padded": 4448,
+          "row_utilization": 0.9035294117647059,
+          "tile_m": 8,
+          "tile_rows": 13600,
+          "train_gemm_flop_ratio_vs_max_padded": 0.7535460992907801
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.23046875,
+          "row_savings_fraction_vs_max_padded": 0.1622340425531915,
+          "row_savings_vs_max_padded": 2928,
+          "row_utilization": 0.8126984126984127,
+          "tile_m": 16,
+          "tile_rows": 15120,
+          "train_gemm_flop_ratio_vs_max_padded": 0.8377659574468085
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.4661458333333333,
+          "row_savings_fraction_vs_max_padded": 0.0017730496453900709,
+          "row_savings_vs_max_padded": 32,
+          "row_utilization": 0.6820603907637656,
+          "tile_m": 32,
+          "tile_rows": 18016,
+          "train_gemm_flop_ratio_vs_max_padded": 0.99822695035461
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 2.0,
+          "row_savings_fraction_vs_max_padded": -0.3617021276595745,
+          "row_savings_vs_max_padded": -6528,
+          "row_utilization": 0.5,
+          "tile_m": 64,
+          "tile_rows": 24576,
+          "train_gemm_flop_ratio_vs_max_padded": 1.3617021276595744
+        }
+      ],
+      "saved_forward_tensor_bytes": {
+        "bytes_saved_by_ideal_compact": 271376640,
+        "current_padded_bridge": 850313472,
+        "ideal_compact": 578936832,
+        "saved_fraction": 0.3191489361702128
+      },
+      "tokens": 2048
+    },
+    {
+      "assignments": 24576,
+      "compact_rows": 24576,
+      "current_max_padded_rows": 33792,
+      "current_padding_multiplier": 1.375,
+      "ideal_compact_train_gemm_flop_ratio_vs_max_padded": 0.7272727272727273,
+      "preferred_tiles": [
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.0559895833333333,
+          "row_savings_fraction_vs_max_padded": 0.23200757575757575,
+          "row_savings_vs_max_padded": 7840,
+          "row_utilization": 0.9469790382244143,
+          "tile_m": 8,
+          "tile_rows": 25952,
+          "train_gemm_flop_ratio_vs_max_padded": 0.7679924242424242
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.1184895833333333,
+          "row_savings_fraction_vs_max_padded": 0.1865530303030303,
+          "row_savings_vs_max_padded": 6304,
+          "row_utilization": 0.8940628637951106,
+          "tile_m": 16,
+          "tile_rows": 27488,
+          "train_gemm_flop_ratio_vs_max_padded": 0.8134469696969697
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.2395833333333333,
+          "row_savings_fraction_vs_max_padded": 0.09848484848484848,
+          "row_savings_vs_max_padded": 3328,
+          "row_utilization": 0.8067226890756303,
+          "tile_m": 32,
+          "tile_rows": 30464,
+          "train_gemm_flop_ratio_vs_max_padded": 0.9015151515151515
+        },
+        {
+          "extra_flop_ratio_vs_ideal_compact": 1.4791666666666667,
+          "row_savings_fraction_vs_max_padded": -0.07575757575757576,
+          "row_savings_vs_max_padded": -2560,
+          "row_utilization": 0.676056338028169,
+          "tile_m": 64,
+          "tile_rows": 36352,
+          "train_gemm_flop_ratio_vs_max_padded": 1.0757575757575757
+        }
+      ],
+      "saved_forward_tensor_bytes": {
+        "bytes_saved_by_ideal_compact": 434202624,
+        "current_padded_bridge": 1592076288,
+        "ideal_compact": 1157873664,
+        "saved_fraction": 0.2727272727272727
+      },
+      "tokens": 4096
+    }
+  ],
+  "run_id": "fused_compact_moe_kernel_plan_20260531",
+  "schedule_choice": {
+    "fallback_tile_m": 16,
+    "preferred_tile_m": 8,
+    "read": "Tile_m=8 preserves most of the ideal compact-row savings while staying more kernel-friendly than tile_m=4. Tile_m=16 is acceptable if the generated kernel needs a larger M tile, but it burns about 2.8k extra S2048 rows.",
+    "s2048_tile8_row_utilization": 0.9035294117647059,
+    "s2048_tile8_rows": 13600,
+    "s2048_tile8_train_gemm_flop_ratio_vs_current_max_padded": 0.7535460992907801,
+    "s4096_tile8_row_utilization": 0.9469790382244143,
+    "s4096_tile8_rows": 25952,
+    "s4096_tile8_train_gemm_flop_ratio_vs_current_max_padded": 0.7679924242424242
+  },
+  "source_artifacts": {
+    "compact_save_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_save_bwd_correctness_20260531.json",
+    "contig_candidate": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/contig_wgrad_lhs_full_layer_s2048_20260531.json",
+    "continuation": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/continuation_retained_compact_reduce_20260531.json",
+    "contract": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_moe_kernel_contract_tile_20260531.json",
+    "moe_sweep": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_moe_variant_sweep_s2048_goal_cont_20260531.json",
+    "paired_contig_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_reduce_vs_contig_wgrad_lhs_decision_20260531.json",
+    "route_padding_s2048": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/route_padding_sweep_20260531.json",
+    "route_padding_s4096_dir": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_route_padding_sweep_4096_20260531"
+  },
+  "wrapper_decisions": {
+    "demoted_candidates": [
+      {
+        "artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_reduce_vs_contig_wgrad_lhs_decision_20260531.json",
+        "candidate": "contig_wgrad_lhs",
+        "reason": "The contig-wgrad-LHS wrapper is a correct control but is slower in paired full-layer S2048 timing. Keep the default compact-reduce path while designing a fused compact grouped MoE training kernel."
+      },
+      {
+        "artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/compact_save_bwd_correctness_20260531.json",
+        "avg_ms": 64.69493699260056,
+        "candidate": "compact_save_bwd",
+        "reason": "regressed; keep as a correctness/control artifact, do not promote for S2048 performance"
+      }
+    ],
+    "promoted_current_default": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "artifact": "sparse_mla_source_boundary_dparallel_page_decision",
+  "date": "2026-06-05",
+  "status": "rejected",
+  "shape": {
+    "device": "MI350X",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "baseline_gates_ms": {
+    "retained_triton_full_sparse_attention_backward": 11.1347,
+    "retained_triton_sparse_atomic_dkv_wall": 8.8063
+  },
+  "candidate_contract": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "mode_23_read": "Full selected-window BF16 P/dP page plus D-parallel contribution consumer, checksum sink, no valid dKV atomics.",
+    "mode_24_read": "Same as mode 23, but with valid compressed dKV atomics.",
+    "decision": "Do not run mode 24 or promote this branch: mode 23 already exceeds the full sparse-attention backward gate before final dKV atomics."
+  },
+  "runs": [
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode23_thr512_20260605.json",
+      "mode": 23,
+      "threads": 512,
+      "selected_block": 64,
+      "event_median_ms": 20.6192,
+      "passes_full_boundary_gate": false
+    },
+    {
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb64_sc1_mode23_thr1024_20260605.json",
+      "mode": 23,
+      "threads": 1024,
+      "selected_block": 64,
+      "event_median_ms": 32.0134,
+      "passes_full_boundary_gate": false
+    }
+  ],
+  "interpretation": {
+    "what_was_tested": "Whether the retained query-major source boundary can avoid q/grad_output replay by staging the whole selected-window P/dP page once and letting multiple D16 consumer wave groups reuse it.",
+    "what_failed": "The producer page plus D-parallel consumer synchronization is slower than the retained Triton source-boundary schedule even without valid compressed dKV atomics.",
+    "why_it_matters": "This rejects a tempting shared-scorepage workaround. The next useful kernel needs to stay closer to the Triton H64/N64/D128 query-major inner schedule and attach a lighter group-aware epilogue, not introduce a full selected-window page inside the CTA."
+  },
+  "streaming_boundary_note": {
+    "sync_required": false,
+    "read": "A final sync between split dQ and dKV branches is not mathematically required. The next consumers can wait on the specific event for the tensor they read. A sync is only introduced by framework/autograd integration if the custom op wrapper exposes both outputs as one completed boundary or if a downstream fused consumer requires both tensors at launch."
+  },
+  "dependency_pin_changes": []
+}

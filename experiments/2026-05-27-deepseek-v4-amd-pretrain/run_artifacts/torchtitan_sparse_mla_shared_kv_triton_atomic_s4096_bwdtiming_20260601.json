@@ -1,0 +1,155 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "backward_timing": {
+    "attn_sink_grad_norm": 2.9022639864706434e-05,
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 29.157562255859375,
+      "mean_ms": 28.255497614542644,
+      "median_ms": 27.840869903564453,
+      "min_ms": 27.7680606842041,
+      "samples_ms": [
+        29.157562255859375,
+        27.840869903564453,
+        27.7680606842041
+      ],
+      "stdev_ms": 0.7820586668795244
+    },
+    "enabled": true,
+    "kv_grad_norm": 0.00012332346523180604,
+    "loss": 0.009269178844988346,
+    "peak_memory_allocated_bytes": 29755967488,
+    "peak_memory_allocated_gib": 27.712404251098633,
+    "q_grad_norm": 2.0667928765760735e-05,
+    "read": "Measures forward plus explicit PyTorch backward for the shared latent-KV sparse MLA ABI. This is diagnostic timing, not a fused production-backward result.",
+    "seq_len": 4096,
+    "shape": {
+      "batch": 1,
+      "compressed_groups": 1024,
+      "csa_count": 512,
+      "dim": 512,
+      "heads": 64,
+      "kv_len": 5120,
+      "local_count": 128,
+      "selected_count": 640,
+      "seq_len": 4096
+    },
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 29.213235015049577,
+      "mean_ms": 28.293539692337315,
+      "median_ms": 27.87043701391667,
+      "min_ms": 27.796947048045695,
+      "samples_ms": [
+        29.213235015049577,
+        27.87043701391667,
+        27.796947048045695
+      ],
+      "stdev_ms": 0.7973266637552258
+    },
+    "warmup_iters": 1
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "metadata": {
+    "backend_kind": "experimental_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "backend_name": "deepseek_v4_sparse_mla_shared_kv_triton_forward_explicit_backward",
+    "has_sparse_mla_shared_kv": true,
+    "has_sparse_mla_shared_kv_with_lse": true,
+    "is_production_backend": false,
+    "is_reference_backend": false,
+    "materializes_selected_state": false,
+    "max_promoted_seq_len": 4096,
+    "max_selected_keys": 1024,
+    "promotion_blockers": [
+      "Shared-KV backward is still a mixed explicit PyTorch/Triton prototype, not one fused production kernel.",
+      "TorchTitan shared-KV DSv4 attention path is still experimental and needs full pretraining-image validation.",
+      "LightningIndexer backward and compressor backward are not fused into this probe."
+    ],
+    "shared_kv_abi": "sparse_mla_shared_kv(q, kv, attn_sink, indices, scale)",
+    "signature": "(q: 'torch.Tensor', kv: 'torch.Tensor', attn_sink: 'torch.Tensor', indices: 'torch.Tensor', scale: 'float') -> 'torch.Tensor'",
+    "signature_matches_required_abi": true,
+    "signature_parameters": [
+      "q",
+      "kv",
+      "attn_sink",
+      "indices",
+      "scale"
+    ],
+    "supports_attn_sink": true,
+    "supports_backward": true,
+    "supports_long_sequence": false,
+    "supports_torchtitan_shared_kv_abi": true
+  },
+  "module": null,
+  "promotable_for_s4096": false,
+  "promotion_blockers": [
+    "module does not mark SUPPORTS_LONG_SEQUENCE=True",
+    "module does not mark IS_PRODUCTION_BACKEND=True",
+    "Shared-KV backward is still a mixed explicit PyTorch/Triton prototype, not one fused production kernel.",
+    "TorchTitan shared-KV DSv4 attention path is still experimental and needs full pretraining-image validation.",
+    "LightningIndexer backward and compressor backward are not fused into this probe."
+  ],
+  "promotion_shape_estimate": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_current_per_head_kv_bf16_gib": 320.0,
+    "materialized_shared_latent_one_bank_bf16_gib": 2.5,
+    "materialized_shared_latent_two_bank_equivalent_bf16_gib": 5.0,
+    "qk_dim_for_current_per_head_path": 512,
+    "saved_output_plus_two_row_stats_bf16_fp32_gib": 0.251953125,
+    "selected_count": 640,
+    "seq_len": 4096,
+    "value_dim_for_current_per_head_path": 512
+  },
+  "promotion_timing": {
+    "enabled": false
+  },
+  "read": "This preflights the DeepSeek-V4 sparse MLA shared latent-KV ABI. It is intentionally separate from the older per-head sparse_mla fused ABI because the production TorchTitan path must avoid expanding K/V per head before compression.",
+  "required_abi": "sparse_mla_shared_kv(q, kv, attn_sink, indices, scale)",
+  "seed": 1234,
+  "smoke": {
+    "backward": {
+      "attn_sink_grad_norm": 0.001669580931775272,
+      "enabled": true,
+      "grad_atol": 0.0001,
+      "grad_parity_passed": true,
+      "kv_grad_norm": 0.0033774198964238167,
+      "loss": 0.08960928022861481,
+      "max_attn_sink_grad_abs_diff": 1.2219243217259645e-07,
+      "max_kv_grad_abs_diff": 8.58306884765625e-06,
+      "max_q_grad_abs_diff": 5.960464477539063e-08,
+      "q_grad_norm": 0.0011551127536222339,
+      "reference_loss": 0.08960996568202972
+    },
+    "lse_atol": 0.05,
+    "lse_shape": [
+      1,
+      64,
+      64
+    ],
+    "max_lse_abs_diff": 9.5367431640625e-07,
+    "max_output_abs_diff": 0.015625,
+    "output_atol": 0.03,
+    "output_shape": [
+      1,
+      64,
+      64,
+      512
+    ],
+    "saved_state": {
+      "enabled": false
+    },
+    "selected_count": 144,
+    "seq_len": 64,
+    "status": "passed"
+  },
+  "status": "passed_abi_not_promotable"
+}

@@ -1,0 +1,86 @@
+{
+  "dk_scratch": {
+    "abs_max": 2.0,
+    "finite": true,
+    "mean_abs": 6.103515625e-05,
+    "nonfinite": 0,
+    "nonzero": 256
+  },
+  "dv_scratch": {
+    "abs_max": 1.0,
+    "finite": true,
+    "mean_abs": 3.0517578125e-05,
+    "nonfinite": 0,
+    "nonzero": 256
+  },
+  "latency_ms": {
+    "max": 11.349801063537598,
+    "mean": 11.286827850341798,
+    "median": 11.284859657287598,
+    "min": 11.219799995422363
+  },
+  "route_bitset": {
+    "abs_max": 2147483648.0,
+    "finite": true,
+    "mean_abs": 6623513.0,
+    "nonfinite": 0,
+    "nonzero": 208376
+  },
+  "route_tile_density": {
+    "full_fraction": 0.229736328125,
+    "full_tiles": 3764,
+    "group_tile": 64,
+    "max_selected_pairs_per_tile": 1024.0,
+    "mean_selected_pairs_per_tile": 383.875,
+    "nonzero_fraction": 0.520263671875,
+    "nonzero_tiles": 8524,
+    "q0_selected_pairs_per_tile": 0.0,
+    "q50_selected_pairs_per_tile": 45.0,
+    "q90_selected_pairs_per_tile": 1024.0,
+    "q99_selected_pairs_per_tile": 1024.0,
+    "query_tile": 16,
+    "total_tiles": 16384,
+    "zero_fraction": 0.479736328125,
+    "zero_tiles": 7860
+  },
+  "run_context": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "kernel_build": "hk_sharedkv_qchunk_d512_rowterms_score GPU_TARGET=CDNA4 ATTN_B=4 ATTN_H=64 ATTN_H_KV=1 ATTN_Q_N=4096 ATTN_KV_N=1024 ATTN_QUERY_CHUNKS=16 ATTN_NUM_WARPS=4 ATTN_ROUTE_BITSET_MODE=2",
+    "raw_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "shape": {
+    "active_tiles": 16,
+    "batch": 4,
+    "dim": 512,
+    "dot_slice_qo": 16,
+    "heads": 64,
+    "input_scale": 0.01,
+    "kv_heads": 1,
+    "kv_seq": 1024,
+    "kv_tiles": 16,
+    "lse_value": 1.0,
+    "num_warps": 4,
+    "query_chunks": 16,
+    "query_seq": 4096,
+    "query_steps_per_chunk": 256,
+    "route_bitset_bytes": 2097152,
+    "route_bitset_pattern": "causal_window",
+    "route_bitset_topk": 512,
+    "route_bitset_words": 32,
+    "scale": 0.044194173824159216,
+    "scratch_rows": 16384,
+    "seq_blocks": 4,
+    "softmax_dot_scale": 0.02,
+    "source_rows": 4096,
+    "tile_rows": 64
+  },
+  "sink": {
+    "abs_max": 256.6933288574219,
+    "finite": true,
+    "mean_abs": 256.4422302246094,
+    "nonfinite": 0,
+    "nonzero": 256
+  },
+  "timed_boundary": "q-chunk D512 score/row-term producer gate only: QK and dO V^T are accumulated over four D128 chunks before row terms while the kernel owns a compressed KV tile and a chunk of q-head/query tiles. P/dP then feed one D128 dK/dV scratch epilogue, not full SharedKV gradients. When route_bitset_topk is set and the module is compiled with ATTN_ROUTE_BITSET_MODE>=1, the kernel also preloads the exact forward-known two-word membership sidecar for the current 16-token x 64-group tile and folds its popcount into Sink."
+}

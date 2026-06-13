@@ -1,0 +1,194 @@
+{
+  "artifact": "dsv4_s4096_topk_domain_decomposition_20260603",
+  "created_date": "2026-06-03",
+  "status": "attention_li_topk_and_moe_router_topk_separated",
+  "scope": "DeepSeek-V4-Flash 4-layer TorchTitan canary, S4096, MBS1",
+  "read": "The top-k=512 number used in sparse-attention backward probes is LightningIndexer compressed-KV top-k, not MoE router top-k. MoE router top-k is 6 experts per token and belongs to a separate dispatch/expert-VJP/combine decomposition.",
+  "source_config": {
+    "target_yaml": "sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml",
+    "target_yaml_fields": {
+      "compress_ratios_4layer": [
+        0,
+        0,
+        4,
+        128
+      ],
+      "window_size": 128,
+      "sparse_attention_topk": 512,
+      "num_experts": 256,
+      "router_topk": 6
+    },
+    "model_config_sources": {
+      "attention_indexer": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:dsa_indexer_topk=512",
+      "actual_attention_topk_rule": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py:actual_topk=min(self.topk,index_k.shape[1])",
+      "moe_router": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/__init__.py:router_top_k=6"
+    }
+  },
+  "formula": {
+    "compressed_groups": "G_c = S / compress_ratio for compressed sparse attention layers",
+    "actual_attention_compressed_topk": "K_attn_c = min(dsa_indexer_topk, G_c)",
+    "total_sparse_attention_selected_keys": "K_attn_total = min(window_size, S) + K_attn_c",
+    "moe_router_topk": "K_moe = 6 experts/token, independent of K_attn_c"
+  },
+  "attention_sparse_mla_lightning_indexer": {
+    "domain": "sparse attention compressed-KV route",
+    "configured_indexer_topk": 512,
+    "local_window": 128,
+    "head_count": 64,
+    "qk_head_dim": 512,
+    "value_head_dim": 512,
+    "layers": [
+      {
+        "layer_id": 2,
+        "compress_ratio": 4,
+        "compressed_groups": 1024,
+        "actual_compressed_topk": 512,
+        "selected_attention_keys": 640,
+        "shape_crosscheck": {
+          "compressed_x": [
+            1,
+            1024,
+            4096
+          ],
+          "kv_compressed": [
+            1,
+            1024,
+            512
+          ],
+          "top_scores": [
+            1,
+            4096,
+            512
+          ],
+          "combined_sparse_indices": [
+            1,
+            4096,
+            640
+          ]
+        },
+        "route_fanin": {
+          "valid_compressed_selections": 1572352,
+          "valid_selected_per_query_max": 512,
+          "valid_selected_per_query_mean": 383.875,
+          "nonzero_compressed_groups": 1024,
+          "compressed_group_fanin_max": 3499,
+          "compressed_group_fanin_mean": 1535.5,
+          "h64_d512_estimated_scalar_atomic_add_elements": 805044224,
+          "h16_d512_estimated_scalar_atomic_add_elements": 3220176896
+        },
+        "latency_evidence_ms": {
+          "full_local128_plus_compressed512_raw_backward": 14.392242431640625,
+          "local128_only_raw_backward": 3.8283939361572266,
+          "compressed512_only_raw_backward": 11.017240524291992,
+          "compressed512_profile_full_atomic": 10.894770622253418,
+          "compressed512_profile_no_dkv": 1.8989759683609009,
+          "compressed512_profile_dkv_reduce_sink": 2.684101104736328,
+          "estimated_dkv_dot_math": 0.7851251363754272,
+          "estimated_full_dkv_atomic_accumulation": 8.21066951751709,
+          "rocprof_kernel_full_atomic": 11.06122375,
+          "rocprof_kernel_no_dkv": 1.1442145,
+          "rocprof_kernel_dkv_reduce_sink": 1.882611,
+          "rocprof_estimated_dkv_dot_math": 0.7383965000000001,
+          "rocprof_estimated_full_dkv_atomic_accumulation": 9.17861275
+        },
+        "read": "This is the hard compressed dKV writeback case. The query-major kernel keeps QK/probability/dQ relatively cheap, but emits about 805M scalar atomic-add elements into the compressed shared-KV gradient bank at H64/D512. The 512 is attention compressed-group top-k, not MoE top-k."
+      },
+      {
+        "layer_id": 3,
+        "compress_ratio": 128,
+        "compressed_groups": 32,
+        "actual_compressed_topk": 32,
+        "selected_attention_keys": 160,
+        "shape_crosscheck": {
+          "compressed_x": [
+            1,
+            32,
+            4096
+          ],
+          "kv_compressed": [
+            1,
+            32,
+            512
+          ],
+          "top_scores": [
+            1,
+            4096,
+            32
+          ],
+          "combined_sparse_indices": [
+            1,
+            4096,
+            160
+          ]
+        },
+        "route_fanin": {
+          "valid_compressed_selections": 63520,
+          "valid_selected_per_query_max": 32,
+          "valid_selected_per_query_mean": 15.5078125,
+          "nonzero_compressed_groups": 32,
+          "compressed_group_fanin_max": 3969,
+          "compressed_group_fanin_mean": 1985.0,
+          "h64_d512_estimated_scalar_atomic_add_elements": 32522240,
+          "h16_d512_estimated_scalar_atomic_add_elements": 130088960
+        },
+        "read": "The configured LI cap is still 512, but S4096/CR128 leaves only 32 compressed groups, so actual compressed top-k is 32. This layer is much smaller than layer 2 and should not be used to explain the topk512 dKV wall."
+      }
+    ],
+    "sasg_stage_mapping": {
+      "gather": "Load selected local and compressed K/V plus q/dO tiles.",
+      "cube12": "Recompute QK/probability terms.",
+      "process": "Softmax row terms and grad-logit correction.",
+      "cube345": "Compute dQ and dKV contribution math.",
+      "scatter": "ScatterAdd dK/dV into local and compressed KV gradient banks. The measured compressed dKV atomic accumulation wall belongs here, even though its values are produced by the preceding cube stage."
+    }
+  },
+  "moe_router": {
+    "domain": "routed MoE expert path",
+    "num_experts": 256,
+    "router_topk": 6,
+    "per_sequence_router_selections_at_mbs1_s4096": 24576,
+    "decomposition_scope": [
+      "router logits and top-k weights",
+      "MORI dispatch tokens to expert owners",
+      "AITER/MoE forward or saved/recomputed expert intermediates",
+      "owner-rank expert VJP: W2 dgrad, SwiGLU backward, W1/W3 wgrad, xgrad/reduce",
+      "MORI combine/dX return and dTopkWeight"
+    ],
+    "read": "MoE top-k=6 is unrelated to attention LI top-k=512. Its bottleneck is routed expert training VJP plus return skew/overlap at EP4/EP8, not compressed KV dKV atomic accumulation."
+  },
+  "profile_labeling_contract": {
+    "do": [
+      "Call layer-2 sparse attention probes 'LI compressed-KV topk512' or 'attention topk512'.",
+      "Call MoE probes 'router topk6' or 'expert topk6'.",
+      "Report layer 2 and layer 3 attention separately because CR4 and CR128 produce different actual top-k and atomic volumes.",
+      "Treat the dKV atomic accumulation number as a sparse-attention ScatterAdd/writeback cost, not a MoE dispatch/combine cost."
+    ],
+    "dont": [
+      "Do not compare attention topk512 directly to MoE topk6.",
+      "Do not use layer-3 topk32 evidence to claim layer-2 topk512 is solved.",
+      "Do not call the compressed dKV atomic wall a dense GEMM or MoE grouped-GEMM issue."
+    ]
+  },
+  "next_profile_cut": {
+    "name": "s4096_dsv4_full_decomposition_with_distinct_attention_and_moe_topk_domains",
+    "purpose": "Break the full 4-layer/EP4/EP8 run into additive or near-additive forward/backward buckets without mixing attention LI top-k and MoE router top-k.",
+    "required_buckets": [
+      "forward dense projections and RMSNorm/residual",
+      "forward sparse attention layer 2 CR4 local128+compressed512",
+      "forward sparse attention layer 3 CR128 local128+compressed32",
+      "forward MoE router-topk6 dispatch/expert/combine",
+      "backward sparse attention layer 2 dQ/local dKV/compressed dKV/LI/compressor",
+      "backward sparse attention layer 3 dQ/local dKV/compressed dKV/LI/compressor",
+      "backward MoE router-topk6 owner VJP, return/combine, and skew wait",
+      "loss/lm-head and optimizer/wrapper residual"
+    ],
+    "kernel_rewrite_target": "Layer-2 sparse-attention compressed dKV ScatterAdd/writeback path: preserve query-major QK/probability/dQ reuse, but replace the current many-to-one global atomic writeback with a fused streaming/tile-local or MFMA-friendly segmented accumulation that does not materialize [B,H,S,K] scores/probs."
+  },
+  "artifact_references": {
+    "layer2_actual_li_route_fanin": "run_artifacts/torchtitan_sharedkv_actual_li_route_fanin_s4096_layer2_20260602.json",
+    "layer3_actual_li_route_fanin": "run_artifacts/torchtitan_sharedkv_actual_li_route_fanin_s4096_layer3_20260602.json",
+    "compressed_route_mechanism": "run_artifacts/sparse_mla_sharedkv_compressed_route_mechanism_inspection_20260602.json",
+    "layer2_tile_coalescing": "run_artifacts/actual_li_tile_coalescing_s4096_layer2_20260602.json",
+    "layer3_tile_coalescing": "run_artifacts/actual_li_tile_coalescing_s4096_layer3_20260602.json"
+  }
+}

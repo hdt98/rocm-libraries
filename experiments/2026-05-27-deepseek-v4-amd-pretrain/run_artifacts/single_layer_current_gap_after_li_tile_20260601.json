@@ -1,0 +1,85 @@
+{
+  "artifact": "single_layer_current_gap_after_li_tile_20260601",
+  "date_local": "2026-06-01",
+  "scope": "one_mi350_deepseek_v4_flash_single_layer_gap_after_sparse_li_tile_retune",
+  "target": {
+    "sequence_length": 4096,
+    "full_layer_fwd_bwd_grads_ms": 24.9,
+    "target_layer_tokens_per_s": 164497.9919678715,
+    "source": "user_goal_2026_06_01"
+  },
+  "source_artifacts": {
+    "current_fixed_router_ceiling_metrics": "experiments/2026-05-27-deepseek-v4-amd-pretrain/metrics.md",
+    "older_gap_artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_s4096_updated_target_gap_20260531.json",
+    "shared_kv_attention_boundary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_shared_kv_attention_boundary_query_attribution_s4096_mi350_20260601.json",
+    "wide_tile_li_pipeline": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_sparse_li_full_pipeline_tl_dot_shifted_s4096_bwd_h64k512d128dot64_mi350_20260601.json",
+    "wide_tile_li_index_backward_full": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_sparse_li_index_bwd_tldot_s4096_h64k512d128dot64_full_mi350_20260601.json"
+  },
+  "current_integrated_layer_evidence": {
+    "fixed_router_packed_sim_ceiling": {
+      "artifact_read": "metrics.md retained-path resample, fixed-router packed-sim ceiling",
+      "sequence_length": 4096,
+      "full_layer_ms": 68.2089,
+      "tokens_per_s": 60050.82,
+      "estimated_tflops": 310.415755,
+      "gap_vs_24p9_target_x": 2.7393132530120483,
+      "throughput_fraction_of_target": 0.36505503369140624,
+      "required_reduction_ms": 43.3089,
+      "caveat": "Fixed-router packed-sim is useful as a math/perf ceiling but does not cover real learned-routing training behavior."
+    },
+    "learned_router_packed_sim_bridge": {
+      "artifact_read": "metrics.md post-change full-dim learned-router timing",
+      "sequence_length": 4096,
+      "full_layer_ms": 77.4362,
+      "tokens_per_s": 52895.12,
+      "estimated_tflops": 273.4264,
+      "moe_gate_grad_norm": 0.00012332,
+      "gap_vs_24p9_target_x": 3.109887550200803,
+      "throughput_fraction_of_target": 0.321554806640625,
+      "required_reduction_ms": 52.5362,
+      "caveat": "This bridge has real router gradients but remains a PyTorch packed-sim path with padded expert batches."
+    },
+    "older_direct_gap_artifact": {
+      "artifact": "run_artifacts/single_layer_s4096_updated_target_gap_20260531.json",
+      "full_layer_ms": 76.57323967820655,
+      "gap_vs_24p9_target_x": 3.0752305091649217,
+      "required_reduction_ms": 51.673239678206545
+    }
+  },
+  "updated_attention_li_diagnostic_floor": {
+    "read": "This is a cross-artifact diagnostic floor, not a directly integrated full-layer measurement. It combines the TorchTitan-shape shared-KV attention boundary fwd+bwd with the separate unfused LI auxiliary-loss pipeline after the wide LI tile retune.",
+    "shared_kv_attention_boundary_fwd_bwd_ms": 23.363208770751953,
+    "wide_tile_li_full_pipeline_ms": 4.486985206604004,
+    "combined_attention_plus_li_ms": 27.850193977355957,
+    "combined_gap_vs_24p9_target_x": 1.1184816858375888,
+    "combined_over_target_ms": 2.9501939773559585,
+    "prior_li_pipeline_ms": 8.3085618019104,
+    "li_pipeline_reduction_ms": 3.8215765953063965,
+    "wide_tile_li_stage_medians_ms": {
+      "target_probs": 0.9543780088424683,
+      "index_logits": 0.297325998544693,
+      "kl_derivative": 0.05256099998950958,
+      "li_grads": 3.1772189140319824
+    },
+    "wide_tile_li_index_backward_split_ms": {
+      "full": 3.198436975479126,
+      "q_and_weight": 0.590073972940445,
+      "d_index_k": 2.7073699235916138
+    }
+  },
+  "decision": {
+    "single_layer_target_status": "not_close",
+    "canary_perf_status": "systems_canaries_valid_but_not_final_sparse_mla_li_moe_perf",
+    "why_not_close": [
+      "The best fixed-router packed-sim full layer is still 2.74x slower than the 24.9 ms single-layer target.",
+      "The learned-router bridge is 3.11x slower than the 24.9 ms target.",
+      "The updated shared-KV attention plus LI diagnostic floor is already 27.85 ms before MoE, residual/RMSNorm, full compressor backward integration, and layer bookkeeping."
+    ],
+    "next_single_gpu_actions": [
+      "Fuse the LI side pipeline into sparse MLA/compressor backward so target_probs, derivative, and LI dQ/dK/dW are not separate side launches/tensors.",
+      "Continue reducing the shared-KV backward boundary; the retained S4096 attention boundary is 23.36 ms fwd+bwd and leaves too little budget for the full layer.",
+      "Replace padded PyTorch MoE expert batches with compact-native grouped training GEMM/backward; learned-router S4096 is 77.44 ms and S2048 attribution still shows routed MoE dgrad/wgrad as the limiter."
+    ]
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,184 @@
+{
+  "run_group": "torchtitan_dsv4_flash12_mori_native_receive_multiwarp_profile_20260611",
+  "date": "2026-06-11",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "devdeps_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+  "result": "diagnostic_profile_only_not_promoted",
+  "source_patch": "changesets/patches/mori_native_compact_combine_receive_multiwarp_20260611.patch",
+  "question": "Does multi-warp receive-copy in native compact combine reduce the MORI compact launch/body wall without changing the higher-level balanced-MoE layout?",
+  "short_answer": "Yes, it reduces the targeted native compact combine launch/body bucket by 65.700 ms rank-max across 48 calls and slightly improves the two-step diagnostic top line, but it does not promote native MORI compact over the standard owner-compact control. The remaining wall is still the native compact dispatch/combine launch/body plus the unchanged standard-EP helper graph.",
+  "profile_scope": {
+    "model": "DeepSeek-V4 Flash 12-layer reduced probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "none",
+    "mtp": false,
+    "hyper_connections": false,
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "compact_collective_backend": "mori_native",
+    "source_scatter_backend": "triton_flat",
+    "hot_weight_forward_backend": "mori_sdma",
+    "hot_weight_reduce_backend": "mori_sdma",
+    "mori_enable_sdma": true,
+    "mori_shmem_heap_size": "32G",
+    "weighted_scatter_score_mode": "torch",
+    "sparse_mla_backward": "shared_kv_query_recompute"
+  },
+  "validation": [
+    {
+      "kind": "remote_source_stage",
+      "result": "passed",
+      "detail": "Local MORI vendor snapshot rsynced to /scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori; remote grep confirmed the third MultiWarpIter site in the final compact-combine receive-copy path."
+    },
+    {
+      "kind": "remote_rebuild",
+      "result": "passed",
+      "detail": "Forced clean CMake/Ninja rebuild in the devdeps image and copied rebuilt MORI shared libraries into python/mori."
+    },
+    {
+      "kind": "pybind_smoke",
+      "result": "passed",
+      "detail": "mori imports from the staged source and exposes launch_standard_ep_compact_combine."
+    },
+    {
+      "kind": "compact_parity_smoke",
+      "result": "passed",
+      "detail": "4-rank BF16 hidden4096 rows_per_peer64 local_experts8 native compact dispatch/combine matched the torch all_to_all reference."
+    },
+    {
+      "kind": "first_training_attempt",
+      "result": "failed_before_metric",
+      "detail": "The initial run used mori_sdma hot-weight transport without MORI_ENABLE_SDMA=1; rerun fixed the command shape."
+    },
+    {
+      "kind": "two_step_profile_retry",
+      "result": "passed",
+      "detail": "The corrected 8xMI350 profile completed two metric steps and produced profile_timing.jsonl plus additive_timing.jsonl."
+    }
+  ],
+  "matched_runs": {
+    "standard_owner_compact_control": {
+      "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "compact_collective_backend": "torch",
+      "source_scatter_backend": "materialize",
+      "step_2": {
+        "tokens_per_gpu_s": 6695,
+        "tflops_per_gpu": 306.6,
+        "peak_logged_memory_gib": 195.63,
+        "loss": 9.69171,
+        "grad_norm": 26.125
+      }
+    },
+    "native_mori_compact_before_patch": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_multiwarp_nomtp_profile_retry1_mbs4_noac_steps2_8x_s4096_gbs128_20260611",
+      "compact_collective_backend": "mori_native",
+      "source_scatter_backend": "triton_flat",
+      "step_2": {
+        "tokens_per_gpu_s": 6248,
+        "tflops_per_gpu": 286.16,
+        "peak_logged_memory_gib": 195.97,
+        "loss": 10.74579,
+        "grad_norm": 33.5
+      }
+    },
+    "native_mori_compact_after_receive_multiwarp": {
+      "run_id": "torchtitan_dsv4_flash12_mori_native_receive_multiwarp_mbs4_noac_profile_retry_8x_s4096_gbs128_20260611",
+      "compact_collective_backend": "mori_native",
+      "source_scatter_backend": "triton_flat",
+      "step_2": {
+        "tokens_per_gpu_s": 6314,
+        "tflops_per_gpu": 289.17,
+        "peak_logged_memory_gib": 195.47,
+        "loss": 9.60881,
+        "grad_norm": 27.625
+      },
+      "additive_step2_rankmax_ms": {
+        "step_train_step": 8878.91,
+        "train_step_microbatch_forward_backward": 8770.241,
+        "forward_backward_model_forward": 2514.056,
+        "forward_backward_loss": 360.611,
+        "forward_backward_backward": 5896.073,
+        "train_step_optimizer_step": 45.158,
+        "train_step_grad_clip": 26.706
+      }
+    }
+  },
+  "topline_deltas": {
+    "after_patch_vs_before_patch": {
+      "tokens_per_gpu_s_delta_pct": 1.06,
+      "tflops_per_gpu_delta_pct": 1.05,
+      "peak_logged_memory_delta_gib": -0.5
+    },
+    "after_patch_vs_standard_owner_compact": {
+      "tokens_per_gpu_s_delta_pct": -5.69,
+      "tflops_per_gpu_delta_pct": -5.68,
+      "peak_logged_memory_delta_gib": -0.16
+    }
+  },
+  "targeted_stage_rankmax_ms": {
+    "before_patch_native": {
+      "standard_ep.combine.mori_native_compact.launch": 517.326,
+      "standard_ep.dispatch.mori_native_compact.launch": 216.101,
+      "standard_ep.dispatch.mori_native_compact.init": 19.573,
+      "standard_ep.combine.weighted_scatter_add": 110.211,
+      "standard_ep.dispatch.count_all_to_all": 169.482,
+      "standard_ep.hot_split.broadcast_hot_weights": 194.732
+    },
+    "after_patch_native": {
+      "standard_ep.combine.mori_native_compact.launch": 451.626,
+      "standard_ep.dispatch.mori_native_compact.launch": 207.036,
+      "standard_ep.combine.mori_native_compact.init": 1.271,
+      "standard_ep.dispatch.mori_native_compact.init": 17.849,
+      "standard_ep.combine.weighted_scatter_add": 96.507,
+      "standard_ep.dispatch.count_all_to_all": 126.83,
+      "standard_ep.hot_split.broadcast_hot_weights": 196.685
+    },
+    "after_minus_before_patch_ms": {
+      "standard_ep.combine.mori_native_compact.launch": -65.7,
+      "standard_ep.dispatch.mori_native_compact.launch": -9.065,
+      "standard_ep.dispatch.mori_native_compact.init": -1.724,
+      "standard_ep.combine.weighted_scatter_add": -13.704,
+      "standard_ep.dispatch.count_all_to_all": -42.652,
+      "standard_ep.hot_split.broadcast_hot_weights": 1.953
+    }
+  },
+  "native_compact_capacity_after_patch": {
+    "dispatch": {
+      "records": 768,
+      "active_peer_rows_max": 98304,
+      "remote_max_peer_rows_max": 11224,
+      "capacity_over_active_median": 1.063551,
+      "capacity_over_active_p95": 1.805002
+    },
+    "combine": {
+      "records": 384,
+      "active_peer_rows_max": 98304,
+      "remote_max_peer_rows_max": 11224,
+      "capacity_over_active_median": 1.063551,
+      "capacity_over_active_p95": 1.805002
+    }
+  },
+  "read": {
+    "what_mori_buys": [
+      "The native compact path still removes the standard dispatch permute and combine unpermute edges.",
+      "The receive-copy patch makes the final skinny remote segment copy cooperate across multiple warps and directly shrinks the combine launch/body bucket."
+    ],
+    "what_still_cancels_the_gain": [
+      "The native compact path still pays 451.626 ms rank-max combine launch/body and 207.036 ms dispatch launch/body across 48 calls.",
+      "The unchanged standard-EP hot-helper graph still pays hot-weight movement, helper grouped MLP/VJP, weighted scatter, count exchange, and helper return work.",
+      "This patch improves a real MORI kernel subpath, but it does not yet make hot/cold/helper rows a first-class native MORI balanced-MoE dispatcher ABI."
+    ],
+    "next_source_target": "Collapse the native compact ABI further: MORI should produce final expert-major receive and compact/source-order return layouts directly consumable by the helper grouped-MLP/VJP path, instead of staging symmetric native buffers and adapting back into TorchTitan outputs."
+  },
+  "artifacts": {
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_receive_multiwarp_mbs4_noac_profile_retry_8x_s4096_gbs128_20260611/docker-run.log",
+    "remote_profile_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_receive_multiwarp_mbs4_noac_profile_retry_8x_s4096_gbs128_20260611/profile_timing.jsonl",
+    "remote_additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_mori_native_receive_multiwarp_mbs4_noac_profile_retry_8x_s4096_gbs128_20260611/additive_timing.jsonl"
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_expert_muon_batched_ns1_followup_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Can reducing Muon Newton-Schulz steps fix the experts-on-Muon throughput gap while keeping the memory benefit?",
+  "code_changes": {
+    "config_registry": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/config_registry.py exposes TORCHTITAN_OPTIMIZER_MUON_NS_STEPS/CANARY_OPTIMIZER_MUON_NS_STEPS",
+    "launcher": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh forwards CANARY_OPTIMIZER_MUON_NS_STEPS and CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE",
+    "probe": "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py accepts --muon-ns-steps and --muon-ns-compute-dtype"
+  },
+  "isolated_optimizer_ns_sweep": {
+    "path": "run_artifacts/muon_batched_ns_sweep_1xmi350_20260608.jsonl",
+    "shape": "1xMI350 synthetic 12-layer local expert-bank slice, BatchedMuonExpertParams, chunk_matrices=4, BF16 NS compute",
+    "records": [
+      {
+        "muon_ns_steps": 1,
+        "step2_gpu_ms": 213.175,
+        "step_peak_allocated_gib": 54.324,
+        "state_after_step_gib": 18.0,
+        "mem_after_step_gib": 54.074
+      },
+      {
+        "muon_ns_steps": 2,
+        "step2_gpu_ms": 321.179,
+        "step_peak_allocated_gib": 54.355,
+        "state_after_step_gib": 18.0,
+        "mem_after_step_gib": 54.074
+      },
+      {
+        "muon_ns_steps": 3,
+        "step2_gpu_ms": 420.93,
+        "step_peak_allocated_gib": 54.355,
+        "state_after_step_gib": 18.0,
+        "mem_after_step_gib": 54.074
+      },
+      {
+        "muon_ns_steps": 5,
+        "step2_gpu_ms": 637.791,
+        "step_peak_allocated_gib": 54.355,
+        "state_after_step_gib": 18.0,
+        "mem_after_step_gib": 54.074
+      }
+    ],
+    "read": "NS step count is the remaining speed lever: NS1 cuts the 12-layer expert optimizer slice from about 638 ms to about 213 ms at the same ~54.3 GiB peak."
+  },
+  "e2e_ns1_run": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_ns1_rerun_8x_s4096_gbs128_mbs4_steps4_20260608",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_expert_muon_batched_ns1_rerun_8x_s4096_gbs128_mbs4_steps4_20260608/docker-run.log",
+    "shape": {
+      "model": "deepseek_v4_flash_12layer_ceiling_probe",
+      "gpus": 8,
+      "sequence_length": 4096,
+      "global_batch_size": 128,
+      "micro_batch_size": 4,
+      "gradient_accumulation_steps": 4,
+      "fsdp": 8,
+      "expert_parallel": 8,
+      "activation_checkpointing": "disabled",
+      "checkpointing": "disabled"
+    },
+    "env": {
+      "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+      "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+      "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+      "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+      "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+      "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma"
+    },
+    "step_metrics": {
+      "1": {
+        "tokens_per_gpu_s": 1644,
+        "node_tokens_s": 13152,
+        "tflops_per_gpu": 83.25,
+        "loss": 12.3216,
+        "grad_norm": 19.125,
+        "memory_gib_min": 153.2,
+        "memory_gib_max": 156.58
+      },
+      "2": {
+        "tokens_per_gpu_s": 7615,
+        "node_tokens_s": 60920,
+        "tflops_per_gpu": 385.57,
+        "loss": 10.76093,
+        "grad_norm": 97.5,
+        "memory_gib_min": 172.76,
+        "memory_gib_max": 177.12
+      },
+      "3": {
+        "tokens_per_gpu_s": 7722,
+        "node_tokens_s": 61776,
+        "tflops_per_gpu": 390.96,
+        "loss": 7.96045,
+        "grad_norm": 189.0,
+        "memory_gib_min": 173.64,
+        "memory_gib_max": 177.12
+      },
+      "4": {
+        "tokens_per_gpu_s": 7738,
+        "node_tokens_s": 61904,
+        "tflops_per_gpu": 391.77,
+        "loss": 33.95701,
+        "grad_norm": 199.0,
+        "memory_gib_min": 174.48,
+        "memory_gib_max": 177.57
+      }
+    },
+    "summary": {
+      "steps_2_to_4_tokens_per_gpu_s_mean": 7691.67,
+      "steps_2_to_4_node_tokens_s_mean": 61533.33,
+      "steps_2_to_4_tflops_per_gpu_mean": 389.433,
+      "peak_logged_memory_gib": 177.57,
+      "delta_vs_retained_adamw_tokens_per_gpu_pct": -4.2,
+      "delta_vs_retained_adamw_tflops_pct": -4.2,
+      "delta_vs_retained_adamw_peak_memory_gib": -16.23,
+      "delta_vs_batched_muon_ns5_tokens_per_gpu_pct": 4.71,
+      "delta_vs_batched_muon_ns5_tflops_pct": 4.71,
+      "delta_vs_batched_muon_ns5_peak_memory_gib": 1.28
+    }
+  },
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+    "read": "NS1 materially improves batched Muon throughput over NS5 and keeps the memory benefit, but it is still about 4.1% slower than retained AdamW and changes Muon update quality. The short run also shows rougher loss/grad behavior by step 4, so this is not a retained optimizer path.",
+    "next_action": "Close Python-level experts-on-Muon as a non-promotion branch. Return optimization focus to standard-EP hot/cold/helper dispatcher layout, MORI transport integration, and sparse MLA backward; use Muon only if a lower-level/fused Muon update is explicitly required."
+  },
+  "validation": {
+    "local_py_compile": "passed for optimizer.py, config_registry.py, probe_muon_optimizer_step.py",
+    "launcher_bash_n": "passed",
+    "remote_ns_sweep": "completed",
+    "remote_e2e": "completed 4 steps",
+    "post_run_node_state": "no active training processes; GPUs returned to 0% memory after allocator drain"
+  }
+}

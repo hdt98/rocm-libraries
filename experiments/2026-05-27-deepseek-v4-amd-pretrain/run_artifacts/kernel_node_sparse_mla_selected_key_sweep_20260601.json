@@ -1,0 +1,107 @@
+{
+  "artifact": "kernel_node_sparse_mla_selected_key_sweep_20260601",
+  "date_local": "2026-06-01",
+  "dependency_pin_changes": [],
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "scope": "Direct synthetic benchmark of the experimental Triton sparse MLA forward backend at B=1, S=4096, H=64, Dq=Dv=512.",
+  "environment": {
+    "HIP_VISIBLE_DEVICES": "0",
+    "ROCR_VISIBLE_DEVICES": "0",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_D": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "64",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SPLIT_SOURCES": "0"
+  },
+  "target": {
+    "attention_forward_anchor_ms": 3.6
+  },
+  "measurements": [
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_local128_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 0,
+      "selected_count": 128,
+      "cuda_event_mean_ms": 18.48696098327637,
+      "target_ratio": 5.135266939798991
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_csa128_s4096_synthetic_20260601.json",
+      "local_count": 0,
+      "csa_count": 128,
+      "selected_count": 128,
+      "cuda_event_mean_ms": 17.975564575195314,
+      "target_ratio": 4.993212381998698
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_csa256_s4096_synthetic_20260601.json",
+      "local_count": 0,
+      "csa_count": 256,
+      "selected_count": 256,
+      "cuda_event_mean_ms": 35.76304550170899,
+      "target_ratio": 9.934179306030274
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_csa384_s4096_synthetic_20260601.json",
+      "local_count": 0,
+      "csa_count": 384,
+      "selected_count": 384,
+      "cuda_event_mean_ms": 53.27535629272461,
+      "target_ratio": 14.798710081312391
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_csa512_s4096_synthetic_20260601.json",
+      "local_count": 0,
+      "csa_count": 512,
+      "selected_count": 512,
+      "cuda_event_mean_ms": 70.48828887939453,
+      "target_ratio": 19.580080244276258
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_local128_csa128_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 128,
+      "selected_count": 256,
+      "cuda_event_mean_ms": 30.529841232299805,
+      "target_ratio": 8.480511453416613
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_local128_csa256_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 256,
+      "selected_count": 384,
+      "cuda_event_mean_ms": 45.817405700683594,
+      "target_ratio": 12.727057139078775
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_local128_csa384_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 384,
+      "selected_count": 512,
+      "cuda_event_mean_ms": 60.268289947509764,
+      "target_ratio": 16.741191652086046
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_default_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 512,
+      "selected_count": 640,
+      "cuda_event_mean_ms": 74.65589294433593,
+      "target_ratio": 20.737748040093315
+    },
+    {
+      "artifact": "run_artifacts/kernel_node_sparse_mla_split_sources_s4096_synthetic_20260601.json",
+      "local_count": 128,
+      "csa_count": 512,
+      "selected_count": 640,
+      "cuda_event_mean_ms": 86.95811920166015,
+      "target_ratio": 24.155033111572266,
+      "note": "Opt-in split-source variant; retained as a negative schedule result."
+    }
+  ],
+  "read": [
+    "CSA-only timing is nearly linear in selected compressed keys: 128, 256, 384, and 512 compressed keys measure 17.98, 35.76, 53.28, and 70.49 ms.",
+    "The retained full layer-2 synthetic shape, 128 local plus 512 compressed keys, measures 74.66 ms, or 20.74x slower than the 3.6 ms attention-forward anchor.",
+    "This isolates the current gap to per-selected-key rowwise score/value work. Pointer-source splitting is not enough; the next kernel must batch multiple query rows and use MFMA-friendly QK and PV tiles while preserving online softmax and selected-state-free backward semantics."
+  ]
+}

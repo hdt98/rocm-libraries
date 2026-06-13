@@ -1,0 +1,62 @@
+{
+  "artifact": "standard_ep_hothelper_groupedmm_scatter_triton_bwd_e2e_gate_20260608",
+  "created_at": "2026-06-08",
+  "branch": "standard_ep_hothelper_groupedmm_scatter_triton_backward",
+  "local_slice": {
+    "shape": "1xMI350_owner_compact_helper_slice_H4096_I2048_G8_topk1_weighted_dx_return",
+    "mean_rows": {
+      "remote_rows": 28000,
+      "old_triton_forward_only_full_forward_backward_ms": 7.816,
+      "new_triton_forward_backward_full_forward_backward_ms": 7.228,
+      "retained_torch_scatter_full_forward_backward_ms": 7.766,
+      "same_run_padded_full_vjp_ms": 6.986
+    },
+    "max_rows": {
+      "remote_rows": 54400,
+      "old_triton_forward_only_full_forward_backward_ms": 14.867,
+      "new_triton_forward_backward_full_forward_backward_ms": 13.655,
+      "retained_torch_scatter_full_forward_backward_ms": 14.543,
+      "same_run_padded_full_vjp_ms": 13.482
+    },
+    "triton_backward_parity_smoke": {
+      "output_max_abs": 0.0009765625,
+      "grad_src_max_abs": 0.0,
+      "grad_scores_max_abs": 0.0,
+      "read": "BF16 duplicate-index output differs from atomic order only; backward tensors match torch exactly in the smoke."
+    },
+    "read": "The Triton weighted-scatter backend is now a real forward+backward local helper-boundary win versus the old Triton forward-only path, but it is still a drop-in microstage candidate until an e2e gate reaches step metrics."
+  },
+  "e2e_attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_triton_scatterbwd_8x_s4096_gbs128_mbs4_steps6_20260608",
+      "host": "do-sonle5-mi350-gpu",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_triton_scatterbwd_8x_s4096_gbs128_mbs4_steps6_20260608/docker-run.log",
+      "shape": "8xMI350_S4096_GBS128_MBS4_FSDP8_EP8_flash12_standard_ep_top8_ownercompact_sdma_hotweight",
+      "intended_delta": "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND=triton with Triton scatter backward in torchtitan/ops/scatter_add.py",
+      "result": "failed_before_step_1",
+      "failure_phase": "first_forward_standard_ep_hot_weight_broadcast_mori_process_group_setup",
+      "failure_stack_summary": "broadcast_object_list -> mori_aiter_moe.py:_ensure_mori_process_group -> _mori_hot_weight_all_reduce_ -> moe.py:_standard_ep_hot_weight_all_reduce_ -> _StandardEPHotWeightBroadcast.forward -> _standard_ep_hot_split_forward",
+      "failure": "SIGABRT / GPU memory access fault while initializing or entering MORI/SDMA hot-weight all-reduce",
+      "step_metrics": {}
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_triton_scatterbwd_8x_s4096_gbs128_mbs4_steps6_vu_20260608",
+      "host": "do-vunguyen-mi350-gpu",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_triton_scatterbwd_8x_s4096_gbs128_mbs4_steps6_vu_20260608/docker-run.log",
+      "shape": "8xMI350_S4096_GBS128_MBS4_FSDP8_EP8_flash12_standard_ep_top8_ownercompact_sdma_hotweight",
+      "intended_delta": "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND=triton with Triton scatter backward in torchtitan/ops/scatter_add.py",
+      "result": "failed_before_step_1",
+      "failure_phase": "first_forward_standard_ep_hot_weight_broadcast_mori_process_group_setup",
+      "failure_stack_summary": "mori_aiter_moe.py:_ensure_mori_process_group -> _mori_hot_weight_all_reduce_ -> moe.py:_standard_ep_hot_weight_all_reduce_ -> _StandardEPHotWeightBroadcast.forward -> _standard_ep_hot_split_forward",
+      "failure": "SIGABRT / GPU memory access fault while initializing or entering MORI/SDMA hot-weight all-reduce",
+      "step_metrics": {}
+    }
+  ],
+  "decision": {
+    "promote": false,
+    "retain_current_baseline": true,
+    "read": "The 8x materialization gate is inconclusive for the Triton scatter-backward backend because both attempts failed before any train step and before the weighted combine/scatter path. Keep the local kernel result as a slice win, but do not claim tok/s or TFLOPs uplift.",
+    "next_action": "Investigate the pre-step MORI/SDMA hot-weight process-group interaction separately; for MoE/EP performance, continue toward a first-class compact-row helper VJP plus weighted dX/dTopK return contract rather than another drop-in scatter-only swap."
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,66 @@
+{
+  "run": {
+    "shape": "8xMI350 TP1 PP1 CP1 FSDP8 EP8 MBS1 S4096 GBS128",
+    "baseline_full_ac_artifact": "run_artifacts/torchtitan_torchprof_decomposition_parser_v2_ep8_s4096_gbs128_20260603.json",
+    "baseline_full_ac_callboundary_artifact": "run_artifacts/torchtitan_callboundary_release_ep8_s4096_gbs128_20260603.json",
+    "no_ac_run_id": "torchtitan_dsv4_torchprof_noac_ep8_s4096_gbs128_20260603",
+    "no_ac_torchprof_artifact": "run_artifacts/torchtitan_torchprof_decomposition_noac_v2_ep8_s4096_gbs128_20260603.json",
+    "no_ac_additive_artifact": "run_artifacts/torchtitan_additive_timing_noac_v2_ep8_s4096_gbs128_20260603.json"
+  },
+  "no_ac_console_step2": {
+    "tokens_per_gpu_s": 4042,
+    "tflops_per_gpu": 76.49,
+    "mfu_percent": 3.31,
+    "loss": 9.06199,
+    "max_memory_gib_range": "70.87-210.48"
+  },
+  "additive_max_rank_step2_ms": {
+    "full_ac_callboundary": {
+      "step_train_step": 21315,
+      "microbatch_forward_backward": 20947,
+      "forward": 2302,
+      "loss": 470,
+      "backward": 13654,
+      "fwd_bwd_wrapper_residual": 4605
+    },
+    "no_ac": {
+      "step_train_step": 16086.585,
+      "microbatch_forward_backward": 14279.97,
+      "forward_backward_call": 14277.492,
+      "forward": 2569.89,
+      "loss": 468.519,
+      "backward": 6749.744,
+      "inner_pre_sync": 2.397,
+      "fwd_bwd_wrapper_residual": 4574.747
+    },
+    "read": "Disabling full activation checkpointing removes about 6.9s from the named backward phase but does not materially reduce the 4.5-4.6s fwd/bwd call-boundary residual."
+  },
+  "torchprof_mean_runtime_ms_per_rank": {
+    "full_ac": {
+      "hipFree": 9424.55,
+      "hipStreamSynchronize": 4489.162,
+      "hipMemcpyWithStream": 2152.405,
+      "hipMalloc": 1304.597,
+      "autograd_eval_MmBackward0": 9003.927,
+      "autograd_eval_MoriAiterForwardBackwardBackward": 4348.827,
+      "hipFree_in_MmBackward0": 4732.309,
+      "hipFree_unattributed": 4692.242
+    },
+    "no_ac": {
+      "hipFree": 4663.723,
+      "hipStreamSynchronize": 2531.946,
+      "hipMemcpyWithStream": 3058.173,
+      "hipMalloc": 696.148,
+      "autograd_eval_MmBackward0": 101.701,
+      "autograd_eval_MoriAiterForwardBackwardBackward": 5416.243,
+      "hipFree_in_MmBackward0": 0.0,
+      "hipFree_unattributed": 4663.723
+    },
+    "read": "The checkpointed MmBackward0 wall almost disappears under no-AC, including its 4.7s hipFree half. The unattributed hipFree half remains about 4.66s and still matches the fwd/bwd wrapper residual."
+  },
+  "decision": {
+    "backward_target": "Split into two branches: checkpointed dense/recompute/MmBackward0 lifetime work, and MORI routed backward skew/VJP. No-AC proves MmBackward0 is an activation-checkpoint-induced branch, not a core MoE kernel.",
+    "wrapper_target": "The 4.5s wrapper is not structured logging, not explicit release_tensors, not after-call bookkeeping, and not phase pre_sync. It is best matched by unattributed synchronizing hipFree at forward_backward_step return/unwind.",
+    "next_action": "Instrument or alter tensor lifetime/free at the FSDP/autograd/checkpoint boundary: saved tensor hooks, FSDP unshard/free timing, checkpoint wrapper output lifetime, or allocator reuse/parking beyond expandable_segments."
+  }
+}

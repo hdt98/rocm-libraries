@@ -1,0 +1,64 @@
+{
+  "artifact": "sparse_mla_hip_cooperative_groups_feasibility",
+  "date": "2026-06-05",
+  "status": "cooperative_launch_supported_but_not_sufficient_for_onchip_scorepage_handoff",
+  "scope": "ROCm HIP cooperative groups feasibility for 1xMI350 sparse-MLA/LI backward score-page producer-consumer design",
+  "hardware": {
+    "target": "MI350",
+    "hip_visible_devices": "0",
+    "offload_arch": "gfx950"
+  },
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "smoke": {
+    "source": "tools/dsv4_runtime_probe/hip_cooperative_groups_smoke.hip",
+    "compile_command": "/opt/rocm/bin/hipcc --offload-arch=gfx950 tools/dsv4_runtime_probe/hip_cooperative_groups_smoke.hip -O2 -o run_artifacts/hip_cooperative_groups_smoke.bin",
+    "ordinary_launch": {
+      "status": "no error",
+      "grid_valid_block0": 0,
+      "grid_rank_block0": 0,
+      "grid_num_threads": 256,
+      "block0_shared_value": 1000,
+      "grid_sync_marker": -1
+    },
+    "cooperative_launch": {
+      "status": "no error",
+      "grid_valid_block0": 1,
+      "grid_rank_block0": 0,
+      "grid_num_threads": 256,
+      "block0_shared_value": 1000,
+      "grid_sync_marker": 1
+    }
+  },
+  "header_evidence": {
+    "cooperative_group_headers_present": [
+      "/opt/rocm/include/hip/hip_cooperative_groups.h",
+      "/opt/rocm/include/hip/amd_detail/amd_hip_cooperative_groups.h",
+      "/opt/rocm/include/hip/amd_detail/hip_cooperative_groups_helper.h"
+    ],
+    "host_launch_api_present": [
+      "hipLaunchCooperativeKernel",
+      "hipLaunchCooperativeKernelMultiDevice",
+      "hipExtLaunchMultiKernelMultiDevice"
+    ],
+    "device_primitives_observed": [
+      "cooperative_groups::this_grid()",
+      "grid_group::is_valid() -> __ockl_grid_is_valid()",
+      "grid_group::sync() -> __ockl_grid_sync()"
+    ]
+  },
+  "related_sparse_mla_gate": {
+    "decision_artifact": "run_artifacts/sparse_mla_query_major_scorepage_valid_dkv_split_decision_20260605.json",
+    "triton_full_sparse_attention_backward_gate_ms": 11.13,
+    "same_workgroup_mode3_valid_dkv_ms": 25.937744140625,
+    "same_workgroup_mode4_contribution_reduce_no_dkv_write_ms": 21.769060134887695,
+    "same_workgroup_mode5_512thread_no_dkv_write_ms": 23.649564743041992,
+    "same_workgroup_mode5_1024thread_no_dkv_write_ms": 31.362939834594727
+  },
+  "read": "ROCm cooperative grid launch is real on the target MI350 image: an ordinary launch reports this_grid().is_valid()==0, while hipLaunchCooperativeKernel reports is_valid()==1 and grid.sync() completes. This helps only for grid-wide synchronization and global-memory visibility. It does not create a shared LDS region across CTAs; the score page can remain on chip only when producer and consumers are inside the same workgroup or inside a lower-level persistent tile owner. A grid-synchronized producer-consumer design would still need a global-memory score page, which reintroduces the HBM round trip we are trying to remove.",
+  "mori_shmem_read": "MORI shmem is symmetric GPU/global memory with P2P/RDMA put/get/signal/barrier support. It remains relevant for EP dispatch/combine overlap and remote dX return, but it is not a replacement for per-workgroup LDS/shared memory in the sparse-attention backward score-tile producer-consumer path.",
+  "decision": "Keep the sparse-attention backward rewrite focused on a CK/rocWMMA/HIP tile-owner kernel: query-major MFMA score/prob/scaled-dP producer, immediate D-parallel dQ and group-aware dKV consumers, and no score/prob slab written to HBM. Do not pursue cooperative-grid global score-page handoff as the next latency candidate, and do not use MORI shmem for this on-chip score tile."
+}

@@ -1,0 +1,666 @@
+{
+  "contract": {
+    "dtypes": {
+      "accumulation": "fp32_or_library_default",
+      "activation": "bfloat16",
+      "indices": "int64_or_int32_if_kernel_supports_it",
+      "weights": "bfloat16"
+    },
+    "global_inputs": {
+      "group_offsets": [
+        385
+      ],
+      "group_sizes": [
+        384
+      ],
+      "sorted_assignment_order": [
+        "tokens * topk"
+      ],
+      "top_indices": [
+        "tokens",
+        6
+      ],
+      "top_scores": [
+        "tokens",
+        6
+      ],
+      "w1": [
+        384,
+        3072,
+        7168
+      ],
+      "w2": [
+        384,
+        7168,
+        3072
+      ],
+      "w3": [
+        384,
+        3072,
+        7168
+      ],
+      "x": [
+        "tokens",
+        7168
+      ]
+    },
+    "global_outputs": {
+      "dtop_scores": [
+        "tokens",
+        6
+      ],
+      "dw1": [
+        384,
+        3072,
+        7168
+      ],
+      "dw2": [
+        384,
+        7168,
+        3072
+      ],
+      "dw3": [
+        384,
+        3072,
+        7168
+      ],
+      "dx": [
+        "tokens",
+        7168
+      ],
+      "y": [
+        "tokens",
+        7168
+      ]
+    },
+    "operator": "compact_dynamic_grouped_moe_train",
+    "per_expert_contract": {
+      "backward_w1_w3_wgrad": {
+        "d_gate_or_d_up_t": [
+          3072,
+          "N_e"
+        ],
+        "dw1_or_dw3": [
+          3072,
+          7168
+        ],
+        "x_compact": [
+          "N_e",
+          7168
+        ]
+      },
+      "backward_w1_w3_xgrad": {
+        "d_gate_or_d_up": [
+          "N_e",
+          3072
+        ],
+        "dx_partial": [
+          "N_e",
+          7168
+        ],
+        "note": "sum W1 and W3 contributions before compact-to-token reduce",
+        "w1_or_w3": [
+          3072,
+          7168
+        ]
+      },
+      "backward_w2_dgrad": {
+        "d_hidden": [
+          "N_e",
+          3072
+        ],
+        "d_y_unscaled": [
+          "N_e",
+          7168
+        ],
+        "w2": [
+          7168,
+          3072
+        ]
+      },
+      "backward_w2_wgrad": {
+        "d_y_unscaled_t": [
+          7168,
+          "N_e"
+        ],
+        "dw2": [
+          7168,
+          3072
+        ],
+        "hidden": [
+          "N_e",
+          3072
+        ]
+      },
+      "forward_w1": {
+        "input": [
+          "N_e",
+          7168
+        ],
+        "output": [
+          "N_e",
+          3072
+        ],
+        "weight_t": [
+          7168,
+          3072
+        ]
+      },
+      "forward_w2": {
+        "input": [
+          "N_e",
+          3072
+        ],
+        "output": [
+          "N_e",
+          7168
+        ],
+        "weight_t": [
+          3072,
+          7168
+        ]
+      },
+      "forward_w3": {
+        "input": [
+          "N_e",
+          7168
+        ],
+        "output": [
+          "N_e",
+          3072
+        ],
+        "weight_t": [
+          7168,
+          3072
+        ]
+      },
+      "symbol": "for expert e with N_e = group_sizes[e]"
+    },
+    "required_fusion_points": [
+      "compact token gather from x into x_compact",
+      "forward W1/W3 grouped GEMMs and SwiGLU",
+      "forward W2 grouped GEMM plus score scale and token index_add",
+      "backward dtop_scores from dY and y_unscaled",
+      "backward W2 dgrad and SwiGLU dgrad",
+      "backward W1/W3 xgrad accumulation plus compact-to-token index_add",
+      "backward W1/W2/W3 grouped wgrad without max-count padding"
+    ],
+    "saved_forward_tensors": {
+      "gate": [
+        "tokens * topk",
+        3072
+      ],
+      "hidden": [
+        "tokens * topk",
+        3072
+      ],
+      "score_sorted": [
+        "tokens * topk"
+      ],
+      "token_ids_sorted": [
+        "tokens * topk"
+      ],
+      "up": [
+        "tokens * topk",
+        3072
+      ],
+      "x_compact": [
+        "tokens * topk",
+        7168
+      ],
+      "y_unscaled": [
+        "tokens * topk",
+        7168
+      ]
+    },
+    "scope": "routed experts only; shared expert, router matmul/topk, attention, RMSNorm, and residual are outside this operator",
+    "tile_schedule_note": "Even compact grouped GEMMs still round each expert's N_e to a kernel tile height. Use route tile_rounding rows to choose CDNA tile_m and bucket strategy; avoid falling back to one global max_count batch."
+  },
+  "probe": "compact_moe_kernel_contract",
+  "read": "The retained PyTorch bridge pads every expert to max_count. A compact grouped-MoE training kernel should instead consume group_sizes and group_offsets directly, operate on sum(group_sizes)=tokens*topk rows, and fuse the compact gather/reduce work around the grouped GEMMs.",
+  "routes": [
+    {
+      "assignments": 12288,
+      "avoidable_padded_rows": 5760,
+      "avoidable_train_gemm_flops": 2283043553280.0,
+      "compact_rows": 12288,
+      "compact_train_gemm_flops": 4870492913664.0,
+      "compact_vs_padded_flop_ratio": 0.6808510638297872,
+      "experts": 384,
+      "max_per_expert": 47,
+      "mean_per_expert": 32.0,
+      "metadata_samples": {
+        "flat_padded_index_first_16": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "group_offsets_first_17": [
+          0,
+          36,
+          62,
+          93,
+          129,
+          161,
+          200,
+          230,
+          252,
+          285,
+          317,
+          346,
+          378,
+          419,
+          452,
+          487,
+          521
+        ],
+        "group_sizes_first_16": [
+          36,
+          26,
+          31,
+          36,
+          32,
+          39,
+          30,
+          22,
+          33,
+          32,
+          29,
+          32,
+          41,
+          33,
+          35,
+          34
+        ],
+        "sorted_assignment_order_first_16": [
+          8721,
+          3860,
+          6764,
+          613,
+          2279,
+          10288,
+          2190,
+          9194,
+          4356,
+          2115,
+          2095,
+          4597,
+          10089,
+          10905,
+          4861,
+          9896
+        ]
+      },
+      "metadata_shapes": {
+        "flat_padded_index": [
+          12288
+        ],
+        "group_offsets": [
+          385
+        ],
+        "group_sizes": [
+          384
+        ],
+        "sorted_assignment_order": [
+          12288
+        ],
+        "top_indices": [
+          2048,
+          6
+        ],
+        "top_scores": [
+          2048,
+          6
+        ]
+      },
+      "min_per_expert": 15,
+      "nonzero_percentiles": {
+        "p50": 32,
+        "p90": 39,
+        "p95": 41,
+        "p99": 45
+      },
+      "padded_rows": 18048,
+      "padded_train_gemm_flops": 7153536466944.0,
+      "padding_multiplier": 1.46875,
+      "per_expert_count_histogram": {
+        "15": 2,
+        "18": 1,
+        "19": 2,
+        "21": 4,
+        "22": 4,
+        "23": 13,
+        "24": 11,
+        "25": 12,
+        "26": 15,
+        "27": 13,
+        "28": 23,
+        "29": 24,
+        "30": 25,
+        "31": 29,
+        "32": 27,
+        "33": 31,
+        "34": 23,
+        "35": 25,
+        "36": 21,
+        "37": 18,
+        "38": 13,
+        "39": 14,
+        "40": 10,
+        "41": 7,
+        "42": 5,
+        "43": 2,
+        "44": 5,
+        "45": 3,
+        "46": 1,
+        "47": 1
+      },
+      "saved_forward_tensor_bytes": {
+        "compact": {
+          "gate": 75497472,
+          "hidden": 75497472,
+          "score": 24576,
+          "token_ids_int64": 98304,
+          "total": 578936832,
+          "up": 75497472,
+          "x": 176160768,
+          "y_unscaled": 176160768
+        },
+        "current_padded_bridge": {
+          "gate": 110886912,
+          "hidden": 110886912,
+          "score": 36096,
+          "token_ids_int64": 144384,
+          "total": 850313472,
+          "up": 110886912,
+          "x": 258736128,
+          "y_unscaled": 258736128
+        }
+      },
+      "tile_rounding": {
+        "16": {
+          "compact_row_utilization": 0.8126984126984127,
+          "extra_rows_vs_compact": 2832,
+          "saved_rows_vs_max_padded": 2928,
+          "tile_m": 16,
+          "tile_rounded_rows": 15120,
+          "tile_rounded_train_gemm_flops": 5992989327360.0
+        },
+        "32": {
+          "compact_row_utilization": 0.6820603907637656,
+          "extra_rows_vs_compact": 5728,
+          "saved_rows_vs_max_padded": 32,
+          "tile_m": 32,
+          "tile_rounded_rows": 18016,
+          "tile_rounded_train_gemm_flops": 7140852891648.0
+        },
+        "64": {
+          "compact_row_utilization": 0.5,
+          "extra_rows_vs_compact": 12288,
+          "saved_rows_vs_max_padded": -6528,
+          "tile_m": 64,
+          "tile_rounded_rows": 24576,
+          "tile_rounded_train_gemm_flops": 9740985827328.0
+        },
+        "8": {
+          "compact_row_utilization": 0.9035294117647059,
+          "extra_rows_vs_compact": 1312,
+          "saved_rows_vs_max_padded": 4448,
+          "tile_m": 8,
+          "tile_rounded_rows": 13600,
+          "tile_rounded_train_gemm_flops": 5390519500800.0
+        }
+      },
+      "tokens": 2048,
+      "topk": 6,
+      "touched_experts": 384
+    },
+    {
+      "assignments": 24576,
+      "avoidable_padded_rows": 9216,
+      "avoidable_train_gemm_flops": 3652869685248.0,
+      "compact_rows": 24576,
+      "compact_train_gemm_flops": 9740985827328.0,
+      "compact_vs_padded_flop_ratio": 0.7272727272727273,
+      "experts": 384,
+      "max_per_expert": 88,
+      "mean_per_expert": 64.0,
+      "metadata_samples": {
+        "flat_padded_index_first_16": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "group_offsets_first_17": [
+          0,
+          66,
+          118,
+          189,
+          259,
+          323,
+          393,
+          448,
+          501,
+          567,
+          634,
+          697,
+          761,
+          830,
+          892,
+          961,
+          1026
+        ],
+        "group_sizes_first_16": [
+          66,
+          52,
+          71,
+          70,
+          64,
+          70,
+          55,
+          53,
+          66,
+          67,
+          63,
+          64,
+          69,
+          62,
+          69,
+          65
+        ],
+        "sorted_assignment_order_first_16": [
+          18948,
+          22931,
+          17888,
+          3621,
+          19485,
+          17474,
+          5238,
+          5305,
+          2853,
+          20680,
+          2095,
+          5965,
+          24370,
+          7313,
+          14969,
+          23803
+        ]
+      },
+      "metadata_shapes": {
+        "flat_padded_index": [
+          24576
+        ],
+        "group_offsets": [
+          385
+        ],
+        "group_sizes": [
+          384
+        ],
+        "sorted_assignment_order": [
+          24576
+        ],
+        "top_indices": [
+          4096,
+          6
+        ],
+        "top_scores": [
+          4096,
+          6
+        ]
+      },
+      "min_per_expert": 45,
+      "nonzero_percentiles": {
+        "p50": 64,
+        "p90": 74,
+        "p95": 78,
+        "p99": 82
+      },
+      "padded_rows": 33792,
+      "padded_train_gemm_flops": 13393855512576.0,
+      "padding_multiplier": 1.375,
+      "per_expert_count_histogram": {
+        "45": 1,
+        "46": 1,
+        "47": 5,
+        "48": 2,
+        "49": 6,
+        "50": 7,
+        "51": 3,
+        "52": 5,
+        "53": 7,
+        "54": 11,
+        "55": 8,
+        "56": 11,
+        "57": 13,
+        "58": 18,
+        "59": 15,
+        "60": 20,
+        "61": 15,
+        "62": 16,
+        "63": 20,
+        "64": 16,
+        "65": 24,
+        "66": 13,
+        "67": 20,
+        "68": 14,
+        "69": 13,
+        "70": 21,
+        "71": 15,
+        "72": 7,
+        "73": 11,
+        "74": 10,
+        "75": 4,
+        "76": 10,
+        "77": 1,
+        "78": 5,
+        "79": 4,
+        "80": 5,
+        "81": 1,
+        "82": 2,
+        "83": 2,
+        "84": 1,
+        "88": 1
+      },
+      "saved_forward_tensor_bytes": {
+        "compact": {
+          "gate": 150994944,
+          "hidden": 150994944,
+          "score": 49152,
+          "token_ids_int64": 196608,
+          "total": 1157873664,
+          "up": 150994944,
+          "x": 352321536,
+          "y_unscaled": 352321536
+        },
+        "current_padded_bridge": {
+          "gate": 207618048,
+          "hidden": 207618048,
+          "score": 67584,
+          "token_ids_int64": 270336,
+          "total": 1592076288,
+          "up": 207618048,
+          "x": 484442112,
+          "y_unscaled": 484442112
+        }
+      },
+      "tile_rounding": {
+        "16": {
+          "compact_row_utilization": 0.8940628637951106,
+          "extra_rows_vs_compact": 2912,
+          "saved_rows_vs_max_padded": 6304,
+          "tile_m": 16,
+          "tile_rounded_rows": 27488,
+          "tile_rounded_train_gemm_flops": 10895191179264.0
+        },
+        "32": {
+          "compact_row_utilization": 0.8067226890756303,
+          "extra_rows_vs_compact": 5888,
+          "saved_rows_vs_max_padded": 3328,
+          "tile_m": 32,
+          "tile_rounded_rows": 30464,
+          "tile_rounded_train_gemm_flops": 12074763681792.0
+        },
+        "64": {
+          "compact_row_utilization": 0.676056338028169,
+          "extra_rows_vs_compact": 11776,
+          "saved_rows_vs_max_padded": -2560,
+          "tile_m": 64,
+          "tile_rounded_rows": 36352,
+          "tile_rounded_train_gemm_flops": 14408541536256.0
+        },
+        "8": {
+          "compact_row_utilization": 0.9469790382244143,
+          "extra_rows_vs_compact": 1376,
+          "saved_rows_vs_max_padded": 7840,
+          "tile_m": 8,
+          "tile_rounded_rows": 25952,
+          "tile_rounded_train_gemm_flops": 10286379565056.0
+        }
+      },
+      "tokens": 4096,
+      "topk": 6,
+      "touched_experts": 384
+    }
+  ],
+  "seed": 20260531,
+  "shape_base": {
+    "dtype": "bfloat16",
+    "experts": 384,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "tile_m": [
+      8,
+      16,
+      32,
+      64
+    ],
+    "topk": 6
+  }
+}

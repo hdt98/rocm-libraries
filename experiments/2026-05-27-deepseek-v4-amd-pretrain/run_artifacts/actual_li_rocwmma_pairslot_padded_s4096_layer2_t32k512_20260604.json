@@ -1,0 +1,556 @@
+{
+  "arch": "gfx950",
+  "artifact": "actual_li_compressed_dkv_rocwmma_route_grid_probe",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "build_seconds": 0.426648769993335,
+  "compact_metadata": {
+    "compact_rows": 66029,
+    "dense_rows": 131072,
+    "dense_slot_overhead_x": 1.9850671674567235,
+    "max_active_groups": 1024,
+    "nonempty_tiles": 128,
+    "route_tiles": 128
+  },
+  "derived": {
+    "compact_direct_valid_partial_emit_reduce_vs_compact_partial_emit_reduce_speedup_x": null,
+    "compact_direct_valid_partial_emit_reduce_vs_grouped_atomic_speedup_x": null,
+    "compact_direct_valid_partial_emit_reduce_vs_raw_speedup_x": null,
+    "compact_direct_valid_partial_emit_vs_grouped_atomic_speedup_x": null,
+    "compact_direct_valid_partial_emit_vs_raw_speedup_x": null,
+    "compact_pairslot_accum_sink_minus_contrib_sink_ms": 9.619489669799805,
+    "compact_pairslot_accum_sink_vs_raw_speedup_x": 0.5399683691203896,
+    "compact_pairslot_atomic_minus_accum_sink_ms": -0.0062808990478515625,
+    "compact_pairslot_atomic_vs_compact_direct_valid_emit_reduce_speedup_x": null,
+    "compact_pairslot_atomic_vs_compact_partial_emit_reduce_speedup_x": null,
+    "compact_pairslot_atomic_vs_grouped_atomic_speedup_x": null,
+    "compact_pairslot_atomic_vs_raw_speedup_x": 0.5401501183746338,
+    "compact_pairslot_padded_accum_sink_minus_contrib_sink_ms": 9.750448226928711,
+    "compact_pairslot_padded_accum_sink_vs_raw_speedup_x": 0.5362065118470785,
+    "compact_pairslot_padded_accum_sink_vs_unpadded_speedup_x": 0.9930331895561971,
+    "compact_pairslot_padded_atomic_minus_padded_accum_sink_ms": -0.7967662811279297,
+    "compact_pairslot_padded_atomic_vs_raw_speedup_x": 0.5599406266278035,
+    "compact_pairslot_padded_atomic_vs_unpadded_speedup_x": 1.0366389038527315,
+    "compact_pairslot_partial_emit_reduce_vs_pairslot_atomic_speedup_x": null,
+    "compact_pairslot_partial_emit_reduce_vs_raw_speedup_x": null,
+    "compact_pairslot_partial_emit_vs_pairslot_atomic_speedup_x": null,
+    "compact_pairslot_partial_emit_vs_raw_speedup_x": null,
+    "compact_partial_emit_reduce_vs_grouped_atomic_speedup_x": null,
+    "compact_partial_emit_reduce_vs_raw_speedup_x": null,
+    "compact_partial_emit_vs_grouped_atomic_speedup_x": null,
+    "compact_partial_emit_vs_raw_speedup_x": null,
+    "grouped_direct_unique_vs_grouped_atomic_speedup_x": null,
+    "grouped_direct_unique_vs_raw_speedup_x": null,
+    "grouped_direct_valid_vs_grouped_atomic_speedup_x": null,
+    "grouped_direct_valid_vs_raw_speedup_x": null,
+    "grouped_vs_raw_speedup_x": null,
+    "raw_minus_contrib_sink_ms": 1.0322942733764648
+  },
+  "device": "AMD Instinct MI350X VF",
+  "diagnostic_tensors": {
+    "compact_pairslot_accum_sink": {
+      "max_abs": 53.10297393798828,
+      "mean_abs": 8.964889526367188,
+      "norm": 5761.54296875
+    },
+    "compact_pairslot_padded_accum_sink": {
+      "max_abs": 53.10297393798828,
+      "mean_abs": 8.964889526367188,
+      "norm": 5761.54296875
+    }
+  },
+  "dtype": {
+    "accumulator": "float32",
+    "inputs": "bfloat16",
+    "materialized_grad_logits_scaled": "bfloat16",
+    "materialized_probs": "bfloat16",
+    "output": "float32"
+  },
+  "extension_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/rocwmma_pairslot_padded_20260604/route_grid",
+  "input_stats": {
+    "grad_logits_scaled": {
+      "max_abs": 0.4375,
+      "mean_abs": 0.0007376754656434059,
+      "norm": 18.751117706298828
+    },
+    "grad_output": {
+      "max_abs": 5.625,
+      "mean_abs": 0.7978725433349609,
+      "norm": 11585.27734375
+    },
+    "groups_max": 1023,
+    "groups_min": -1,
+    "invalid_pairs": 524800,
+    "probs": {
+      "max_abs": 0.66015625,
+      "mean_abs": 0.00193906226195395,
+      "norm": 41.179866790771484
+    },
+    "q": {
+      "max_abs": 3.46875,
+      "mean_abs": 0.46067434549331665,
+      "norm": 6687.9091796875
+    },
+    "valid_pairs": 1572352
+  },
+  "parity": {
+    "compact_direct_valid_partial_reduce": null,
+    "compact_pairslot_atomic": {
+      "candidate": {
+        "max_abs": 43.8742790222168,
+        "mean_abs": 0.7037004232406616,
+        "norm": 960.2496337890625
+      },
+      "skipped_reference": true
+    },
+    "compact_pairslot_padded_atomic": {
+      "candidate": {
+        "max_abs": 43.87428283691406,
+        "mean_abs": 0.7037004232406616,
+        "norm": 960.2496337890625
+      },
+      "skipped_reference": true
+    },
+    "compact_pairslot_partial_reduce": null,
+    "compact_partial_reduce": null,
+    "group_panel_atomic": null,
+    "grouped_atomic": null,
+    "grouped_direct_unique": null,
+    "grouped_direct_valid": null,
+    "grouped_partial_reduce": null,
+    "raw_atomic": {
+      "candidate": {
+        "max_abs": 43.87439727783203,
+        "mean_abs": 0.7037004232406616,
+        "norm": 960.2496948242188
+      },
+      "skipped_reference": true
+    },
+    "raw_vs_compact_direct_valid_partial_reduce_max_abs_diff": null,
+    "raw_vs_compact_pairslot_atomic_max_abs_diff": 0.000118255615234375,
+    "raw_vs_compact_pairslot_padded_atomic_max_abs_diff": 0.00011444091796875,
+    "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": null,
+    "raw_vs_compact_partial_reduce_max_abs_diff": null,
+    "raw_vs_group_panel_max_abs_diff": null,
+    "raw_vs_grouped_direct_unique_max_abs_diff": null,
+    "raw_vs_grouped_direct_valid_max_abs_diff": null,
+    "raw_vs_grouped_max_abs_diff": null,
+    "raw_vs_partial_reduce_max_abs_diff": null
+  },
+  "read": "Actual-LI adapter for the existing HIP/rocWMMA route-grid probe. It uses real TorchTitan LightningIndexer top_indices plus diagnostic materialized probs/grad_logits to test whether local grouped dKV accumulation helps on the actual route. The production target still must fuse probability/LI recompute and avoid these materialized [S,K,H] tensors.",
+  "route_stats": {
+    "baseline_atomic_add_elements": 805044224,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_atomic_add_elements": 33806848,
+    "coalesced_unique_groups": 66029,
+    "d_block": 16,
+    "d_blocks_per_full_dim": 32,
+    "nonempty_tiles": 128,
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block.",
+    "route_atomic_reduction_x": 23.813051840857806,
+    "selected_block": 512,
+    "tiles": 128,
+    "token_block": 32,
+    "unique_groups_per_tile": {
+      "max": 1024,
+      "mean": 515.8515625,
+      "p50": 516.0,
+      "p90": 921.3999633789062,
+      "p99": 1012.8400268554688
+    },
+    "valid_pairs_per_tile": {
+      "max": 16384,
+      "mean": 12284.0,
+      "p50": 16316.0,
+      "p90": 16384.0,
+      "p99": 16384.0
+    }
+  },
+  "scope": "actual_li_materialized_probs_rocwmma_raw_vs_grouped_compressed_dkv_accumulator",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "group_panel": 128,
+    "heads": 64,
+    "invalid_group_value": -1,
+    "layer_id": 2,
+    "selected_block": 512,
+    "seq_len": 4096,
+    "token_block": 32,
+    "topk": 512,
+    "valid_compressed_selections": 1572352
+  },
+  "status": "timed",
+  "timing_ms": {
+    "compact_pairslot_accum_sink": {
+      "checksum_norm": 5761.54296875,
+      "event": {
+        "enabled": true,
+        "max_ms": 19.103099822998047,
+        "mean_ms": 18.74019012451172,
+        "median_ms": 18.666532516479492,
+        "min_ms": 18.548492431640625,
+        "samples_ms": [
+          18.548492431640625,
+          18.666532516479492,
+          19.103099822998047,
+          18.629411697387695,
+          18.753414154052734
+        ],
+        "stdev_ms": 0.21582610639235766
+      },
+      "label": "compact_pairslot_accum_sink",
+      "max_ms": 19.103099822998047,
+      "mean_ms": 18.74019012451172,
+      "median_ms": 18.666532516479492,
+      "min_ms": 18.548492431640625,
+      "peak_memory_allocated_bytes": 3846991872,
+      "peak_memory_allocated_gib": 3.5827903747558594,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 19.122419878840446,
+        "mean_ms": 18.78336532972753,
+        "median_ms": 18.68293690495193,
+        "min_ms": 18.63083499483764,
+        "samples_ms": [
+          18.63083499483764,
+          18.68293690495193,
+          19.122419878840446,
+          18.64838693290949,
+          18.832247937098145
+        ],
+        "stdev_ms": 0.20549819692007718
+      },
+      "warmup_iters": 3
+    },
+    "compact_pairslot_atomic": {
+      "checksum_norm": 960.2496337890625,
+      "event": {
+        "enabled": true,
+        "max_ms": 18.71653175354004,
+        "mean_ms": 18.61070671081543,
+        "median_ms": 18.66025161743164,
+        "min_ms": 18.431167602539062,
+        "samples_ms": [
+          18.534090042114258,
+          18.71653175354004,
+          18.66025161743164,
+          18.431167602539062,
+          18.71149253845215
+        ],
+        "stdev_ms": 0.12441445436044707
+      },
+      "label": "compact_pairslot_atomic",
+      "max_ms": 18.71653175354004,
+      "mean_ms": 18.61070671081543,
+      "median_ms": 18.66025161743164,
+      "min_ms": 18.431167602539062,
+      "peak_memory_allocated_bytes": 3848040448,
+      "peak_memory_allocated_gib": 3.5837669372558594,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 18.791178008541465,
+        "mean_ms": 18.652815045788884,
+        "median_ms": 18.676656996831298,
+        "min_ms": 18.44637608155608,
+        "samples_ms": [
+          18.61665607430041,
+          18.733208067715168,
+          18.676656996831298,
+          18.44637608155608,
+          18.791178008541465
+        ],
+        "stdev_ms": 0.13238230927718164
+      },
+      "warmup_iters": 3
+    },
+    "compact_pairslot_padded_accum_sink": {
+      "checksum_norm": 5761.54296875,
+      "event": {
+        "enabled": true,
+        "max_ms": 18.86333656311035,
+        "mean_ms": 18.79604568481445,
+        "median_ms": 18.7974910736084,
+        "min_ms": 18.721572875976562,
+        "samples_ms": [
+          18.859256744384766,
+          18.86333656311035,
+          18.738571166992188,
+          18.721572875976562,
+          18.7974910736084
+        ],
+        "stdev_ms": 0.06590771760140766
+      },
+      "label": "compact_pairslot_padded_accum_sink",
+      "max_ms": 18.86333656311035,
+      "mean_ms": 18.79604568481445,
+      "median_ms": 18.7974910736084,
+      "min_ms": 18.721572875976562,
+      "peak_memory_allocated_bytes": 3846991872,
+      "peak_memory_allocated_gib": 3.5827903747558594,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 18.940739100798965,
+        "mean_ms": 18.83707228116691,
+        "median_ms": 18.875068984925747,
+        "min_ms": 18.736617173999548,
+        "samples_ms": [
+          18.940739100798965,
+          18.879079027101398,
+          18.7538571190089,
+          18.736617173999548,
+          18.875068984925747
+        ],
+        "stdev_ms": 0.0879930643036095
+      },
+      "warmup_iters": 3
+    },
+    "compact_pairslot_padded_atomic": {
+      "checksum_norm": 960.2496337890625,
+      "event": {
+        "enabled": true,
+        "max_ms": 18.11824607849121,
+        "mean_ms": 18.01811637878418,
+        "median_ms": 18.00072479248047,
+        "min_ms": 17.94120216369629,
+        "samples_ms": [
+          17.997323989868164,
+          18.00072479248047,
+          18.11824607849121,
+          18.033084869384766,
+          17.94120216369629
+        ],
+        "stdev_ms": 0.06500115319719463
+      },
+      "label": "compact_pairslot_padded_atomic",
+      "max_ms": 18.11824607849121,
+      "mean_ms": 18.01811637878418,
+      "median_ms": 18.00072479248047,
+      "min_ms": 17.94120216369629,
+      "peak_memory_allocated_bytes": 3848040448,
+      "peak_memory_allocated_gib": 3.5837669372558594,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 18.133291974663734,
+        "mean_ms": 18.06068434379995,
+        "median_ms": 18.048241967335343,
+        "min_ms": 18.01941287703812,
+        "samples_ms": [
+          18.082001945003867,
+          18.020472954958677,
+          18.133291974663734,
+          18.048241967335343,
+          18.01941287703812
+        ],
+        "stdev_ms": 0.0479619919155903
+      },
+      "warmup_iters": 3
+    },
+    "contrib_sink": {
+      "checksum_norm": 191.41909790039062,
+      "event": {
+        "enabled": true,
+        "max_ms": 9.083642959594727,
+        "mean_ms": 9.053210639953614,
+        "median_ms": 9.047042846679688,
+        "min_ms": 9.030362129211426,
+        "samples_ms": [
+          9.083642959594727,
+          9.030362129211426,
+          9.047042846679688,
+          9.067163467407227,
+          9.037841796875
+        ],
+        "stdev_ms": 0.021892378395631063
+      },
+      "label": "contrib_sink",
+      "max_ms": 9.083642959594727,
+      "mean_ms": 9.053210639953614,
+      "median_ms": 9.047042846679688,
+      "min_ms": 9.030362129211426,
+      "peak_memory_allocated_bytes": 3854346752,
+      "peak_memory_allocated_gib": 3.5896401405334473,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 9.111786028370261,
+        "mean_ms": 9.08491830341518,
+        "median_ms": 9.087666170671582,
+        "min_ms": 9.055836126208305,
+        "samples_ms": [
+          9.10450704395771,
+          9.111786028370261,
+          9.064796147868037,
+          9.087666170671582,
+          9.055836126208305
+        ],
+        "stdev_ms": 0.02430955753257727
+      },
+      "warmup_iters": 3
+    },
+    "raw_atomic": {
+      "checksum_norm": 960.2496948242188,
+      "event": {
+        "enabled": true,
+        "max_ms": 10.12757682800293,
+        "mean_ms": 10.092768478393555,
+        "median_ms": 10.079337120056152,
+        "min_ms": 10.057536125183105,
+        "samples_ms": [
+          10.12757682800293,
+          10.124616622924805,
+          10.057536125183105,
+          10.079337120056152,
+          10.074775695800781
+        ],
+        "stdev_ms": 0.03150946618706923
+      },
+      "label": "raw_atomic",
+      "max_ms": 10.12757682800293,
+      "mean_ms": 10.092768478393555,
+      "median_ms": 10.079337120056152,
+      "min_ms": 10.057536125183105,
+      "peak_memory_allocated_bytes": 3848040448,
+      "peak_memory_allocated_gib": 3.5837669372558594,
+      "timed_iters": 5,
+      "wall": {
+        "enabled": true,
+        "max_ms": 10.188275016844273,
+        "mean_ms": 10.132035985589027,
+        "median_ms": 10.140384081751108,
+        "min_ms": 10.090343886986375,
+        "samples_ms": [
+          10.188275016844273,
+          10.14549401588738,
+          10.140384081751108,
+          10.095682926476002,
+          10.090343886986375
+        ],
+        "stdev_ms": 0.04022876433082305
+      },
+      "warmup_iters": 3
+    }
+  },
+  "torch_hip": "7.2.53211",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "workspace": {
+    "compact_active_groups_gib": 0.0002459771931171417,
+    "compact_pair_slots_gib": 0.0078125,
+    "compact_slot_lookup_gib": 0.00048828125,
+    "grad_logits_scaled_gib": 0.25,
+    "groups_gib": 0.0078125,
+    "probs_gib": 0.25
+  },
+  "write_model": {
+    "d_blocks": 32,
+    "group_panel_recompute_x": 8,
+    "group_panel_scalar_writes": 67108864,
+    "group_panel_write_reduction_x": 11.99609375,
+    "grouped_scalar_writes": 33806848,
+    "k16_duplicate_valid_route_tiles": 0,
+    "k16_unique_valid_route_contract": true,
+    "k16_valid_route_tiles": 99232,
+    "max_tile_groups": 1024,
+    "min_tile_groups": 8,
+    "modeled_write_reduction_x": 23.813051840857806,
+    "panel_tiles": 8,
+    "partial_dense_scalar_writes": 67108864,
+    "partial_dense_write_reduction_x": 11.99609375,
+    "raw_scalar_writes": 805044224,
+    "selected_tiles": 1,
+    "tile_group_rows": 66029,
+    "token_tiles": 128,
+    "valid_pairs": 1572352
+  }
+}

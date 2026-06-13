@@ -1,0 +1,3589 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "best_by_total_reduction": {
+    "baseline_atomic_add_elements": 805044224,
+    "coalesced_atomic_add_elements": 17036288,
+    "empty_tiles": 0,
+    "head_blocks": 1,
+    "hot_group_hybrid_reduction": {
+      "128": {
+        "hot_limit": 128,
+        "hot_pair_share": 0.2747972464181049,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 1.0,
+          "mean": 0.39511061900695704,
+          "min": 0.15203857421875,
+          "p50": 0.2520471464019851,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "hot_pairs": 432078,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 8192.0,
+          "mean": 6751.21875,
+          "min": 496.0,
+          "p50": 7248.5,
+          "p90": 8192.0,
+          "p99": 8192.0
+        },
+        "hot_rows": 7744,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 128.0,
+          "mean": 121.0,
+          "min": 16.0,
+          "p50": 128.0,
+          "p90": 128.0,
+          "p99": 128.0
+        },
+        "hybrid_reduction_x": 1.3696231243760986,
+        "output_elements": 587785216,
+        "output_pairs": 1148018,
+        "saved_elements": 217259008,
+        "saved_pair_fraction": 0.2698721405893846,
+        "saved_pairs": 424334,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 8064.0,
+          "mean": 6630.21875,
+          "min": 480.0,
+          "p50": 7120.5,
+          "p90": 8064.0,
+          "p99": 8064.0
+        }
+      },
+      "16": {
+        "hot_limit": 16,
+        "hot_pair_share": 0.037557111893520026,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 1.0,
+          "mean": 0.0822152255302321,
+          "min": 0.020751953125,
+          "p50": 0.03150589330024814,
+          "p90": 0.14803531453580507,
+          "p99": 0.794421052631578
+        },
+        "hot_pairs": 59053,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 1024.0,
+          "mean": 922.703125,
+          "min": 496.0,
+          "p50": 1024.0,
+          "p90": 1024.0,
+          "p99": 1024.0
+        },
+        "hot_rows": 1024,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 16.0,
+          "mean": 16.0,
+          "min": 16.0,
+          "p50": 16.0,
+          "p90": 16.0,
+          "p99": 16.0
+        },
+        "hybrid_reduction_x": 1.038320094193907,
+        "output_elements": 775333376,
+        "output_pairs": 1514323,
+        "saved_elements": 29710848,
+        "saved_pair_fraction": 0.03690585823021817,
+        "saved_pairs": 58029,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 1008.0,
+          "mean": 906.703125,
+          "min": 480.0,
+          "p50": 1008.0,
+          "p90": 1008.0,
+          "p99": 1008.0
+        }
+      },
+      "256": {
+        "hot_limit": 256,
+        "hot_pair_share": 0.5009374491208075,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 1.0,
+          "mean": 0.6115812517985131,
+          "min": 0.291778564453125,
+          "p50": 0.5033618709289702,
+          "p90": 1.0,
+          "p99": 1.0
+        },
+        "hot_pairs": 787650,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 16384.0,
+          "mean": 12307.03125,
+          "min": 496.0,
+          "p50": 12767.0,
+          "p90": 16384.0,
+          "p99": 16384.0
+        },
+        "hot_rows": 14464,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 256.0,
+          "mean": 226.0,
+          "min": 16.0,
+          "p50": 256.0,
+          "p90": 256.0,
+          "p99": 256.0
+        },
+        "hybrid_reduction_x": 1.9674911094816345,
+        "output_elements": 409172992,
+        "output_pairs": 799166,
+        "saved_elements": 395871232,
+        "saved_pair_fraction": 0.49173849112666884,
+        "saved_pairs": 773186,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 16128.0,
+          "mean": 12081.03125,
+          "min": 480.0,
+          "p50": 12535.0,
+          "p90": 16128.0,
+          "p99": 16128.0
+        }
+      },
+      "32": {
+        "hot_limit": 32,
+        "hot_pair_share": 0.07393764246173885,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 1.0,
+          "mean": 0.14298395198884106,
+          "min": 0.040374755859375,
+          "p50": 0.06301178660049628,
+          "p90": 0.29607062907161014,
+          "p99": 1.0
+        },
+        "hot_pairs": 116256,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 2048.0,
+          "mean": 1816.5,
+          "min": 496.0,
+          "p50": 2032.0,
+          "p90": 2048.0,
+          "p99": 2048.0
+        },
+        "hot_rows": 2032,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 32.0,
+          "mean": 31.75,
+          "min": 16.0,
+          "p50": 32.0,
+          "p90": 32.0,
+          "p99": 32.0
+        },
+        "hybrid_reduction_x": 1.0783360582884356,
+        "output_elements": 746561536,
+        "output_pairs": 1458128,
+        "saved_elements": 58482688,
+        "saved_pair_fraction": 0.07264531097362423,
+        "saved_pairs": 114224,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 2016.0,
+          "mean": 1784.75,
+          "min": 480.0,
+          "p50": 2000.0,
+          "p90": 2016.0,
+          "p99": 2016.0
+        }
+      },
+      "64": {
+        "hot_limit": 64,
+        "hot_pair_share": 0.14403199792412893,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 1.0,
+          "mean": 0.2419450495953164,
+          "min": 0.078704833984375,
+          "p50": 0.12602357320099256,
+          "p90": 0.5921412581432203,
+          "p99": 1.0
+        },
+        "hot_pairs": 226469,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 4096.0,
+          "mean": 3538.578125,
+          "min": 496.0,
+          "p50": 3909.5,
+          "p90": 4096.0,
+          "p99": 4096.0
+        },
+        "hot_rows": 4000,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 64.0,
+          "mean": 62.5,
+          "min": 16.0,
+          "p50": 64.0,
+          "p90": 64.0,
+          "p99": 64.0
+        },
+        "hybrid_reduction_x": 1.1648061350502228,
+        "output_elements": 691140096,
+        "output_pairs": 1349883,
+        "saved_elements": 113904128,
+        "saved_pair_fraction": 0.14148803830185608,
+        "saved_pairs": 222469,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 4032.0,
+          "mean": 3476.078125,
+          "min": 480.0,
+          "p50": 3845.5,
+          "p90": 4032.0,
+          "p99": 4032.0
+        }
+      },
+      "8": {
+        "hot_limit": 8,
+        "hot_pair_share": 0.018968398933572127,
+        "hot_pair_share_per_tile": {
+          "count": 64,
+          "max": 0.7580645161290323,
+          "mean": 0.045221171565105814,
+          "min": 0.01055908203125,
+          "p50": 0.01575294665012407,
+          "p90": 0.07401765726790253,
+          "p99": 0.49269439728353026
+        },
+        "hot_pairs": 29825,
+        "hot_pairs_per_tile": {
+          "count": 64,
+          "max": 512.0,
+          "mean": 466.015625,
+          "min": 346.0,
+          "p50": 512.0,
+          "p90": 512.0,
+          "p99": 512.0
+        },
+        "hot_rows": 512,
+        "hot_rows_per_tile": {
+          "count": 64,
+          "max": 8.0,
+          "mean": 8.0,
+          "min": 8.0,
+          "p50": 8.0,
+          "p90": 8.0,
+          "p99": 8.0
+        },
+        "hybrid_reduction_x": 1.0189969274917874,
+        "output_elements": 790035968,
+        "output_pairs": 1543039,
+        "saved_elements": 15008256,
+        "saved_pair_fraction": 0.0186427721019212,
+        "saved_pairs": 29313,
+        "saved_pairs_per_tile": {
+          "count": 64,
+          "max": 504.0,
+          "mean": 458.015625,
+          "min": 338.0,
+          "p50": 504.0,
+          "p90": 504.0,
+          "p99": 504.0
+        }
+      }
+    },
+    "nonempty_tiles": 64,
+    "overall_tile_reduction_x": 47.254673318506946,
+    "saved_atomic_add_elements": 788007936,
+    "saved_pair_fraction": 0.9788380718821231,
+    "selected_block": 512,
+    "tile_reduction_x": {
+      "count": 64,
+      "max": 62.96875,
+      "mean": 51.84377883634761,
+      "min": 31.0,
+      "p50": 56.31944444444444,
+      "p90": 62.71553846153846,
+      "p99": 62.947792338709675
+    },
+    "tile_saved_pairs": {
+      "count": 64,
+      "max": 32240.0,
+      "mean": 24048.09375,
+      "min": 480.0,
+      "p50": 31736.0,
+      "p90": 32139.199999999997,
+      "p99": 32229.92
+    },
+    "tile_unique_groups": {
+      "count": 64,
+      "max": 1024.0,
+      "mean": 519.90625,
+      "min": 16.0,
+      "p50": 520.0,
+      "p90": 922.5,
+      "p99": 1013.29
+    },
+    "tile_valid_pairs": {
+      "count": 64,
+      "max": 32768.0,
+      "mean": 24568.0,
+      "min": 496.0,
+      "p50": 32504.0,
+      "p90": 32768.0,
+      "p99": 32768.0
+    },
+    "tiles": 64,
+    "token_block": 64,
+    "total_valid_pairs": 1572352,
+    "unique_pairs_after_tile_reduce": 33274
+  },
+  "best_query_major_like": null,
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.38915823461643767,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 1024,
+      "p50_all_rows": 1420.5,
+      "p50_nonzero_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p99_nonzero_rows": 3413.16,
+      "rows": 1024,
+      "top16_share": 0.035047495726147834,
+      "top1_share": 0.002225328679583198,
+      "top64_share": 0.13582136824324326,
+      "top8_share": 0.017700871051774668,
+      "total_selections": 1572352,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 3220176896,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 805044224,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "prefix_compressed_same_topk": {
+      "gini": 0.5555734339384565,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "min": 0,
+      "min_nonzero": 2049,
+      "nonzero_rows": 512,
+      "p50_all_rows": 1024.5,
+      "p50_nonzero_rows": 3071.0,
+      "p90_all_rows": 3683.8,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_all_rows": 4052.08,
+      "p99_nonzero_rows": 4072.56,
+      "rows": 1024,
+      "top16_share": 0.04134443178117877,
+      "top1_share": 0.0026031066834907197,
+      "top64_share": 0.16147020514490393,
+      "top8_share": 0.020753622598502115,
+      "total_selections": 1572352,
+      "zero_rows": 512
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 512,
+    "valid_selected_per_query": {
+      "gini": 0.22245742365577173,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 4093,
+      "p50_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "rows": 4096,
+      "top16_share": 0.005210029306414849,
+      "top1_share": 0.00032562683165092806,
+      "top64_share": 0.020840117225659396,
+      "top8_share": 0.0026050146532074245,
+      "total_selections": 1572352,
+      "zero_rows": 3
+    }
+  },
+  "decision_read": "This is a route-only upper-bound estimate for reducing dKV atomics inside a query-major tile. It counts how many valid (query token, selected compressed group) pairs collapse to unique compressed groups inside each tile. It does not include the extra register/shared-memory pressure needed to hold D-dimensional partial accumulators, so weak reduction factors are strong negative evidence, while strong factors still need a kernel probe. The hot_group_hybrid_reduction fields model a bounded local table: only the N most frequent groups in each tile are reduced locally, while all tail route pairs keep the current direct atomic path.",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "layer_id": 2,
+  "per_token_uniqueness": {
+    "duplicate_groups_per_token": {
+      "count": 4096,
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p99": 0.0
+    },
+    "read": "Per-token duplicate groups are expected to be near zero because LightningIndexer top-k returns unique indices. Any useful coalescing therefore has to come from grouping multiple query tokens in the same kernel tile.",
+    "tokens_with_duplicate_selected_groups": 0,
+    "unique_groups_per_token": {
+      "count": 4096,
+      "max": 512.0,
+      "mean": 383.875,
+      "min": 0.0,
+      "p50": 512.0,
+      "p90": 512.0,
+      "p99": 512.0
+    },
+    "valid_groups_per_token": {
+      "count": 4096,
+      "max": 512.0,
+      "mean": 383.875,
+      "min": 0.0,
+      "p50": 512.0,
+      "p90": 512.0,
+      "p99": 512.0
+    }
+  },
+  "route_fanin": {
+    "all_groups": {
+      "count": 1024,
+      "max": 3499.0,
+      "mean": 1535.5,
+      "min": 1.0,
+      "p50": 1420.5,
+      "p90": 3059.1000000000004,
+      "p99": 3413.16
+    },
+    "nonzero_groups": 1024,
+    "nonzero_groups_only": {
+      "count": 1024,
+      "max": 3499.0,
+      "mean": 1535.5,
+      "min": 1.0,
+      "p50": 1420.5,
+      "p90": 3059.1000000000004,
+      "p99": 3413.16
+    },
+    "total_valid_pairs": 1572352
+  },
+  "scope": "sparse_mla_shared_latent_kv_actual_li_tile_coalescing",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "block_h": 64,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "dim": 512,
+    "heads": 64,
+    "hot_limits": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
+    "selected_blocks": [
+      128,
+      256,
+      512
+    ],
+    "seq_len": 4096,
+    "token_blocks": [
+      16,
+      32,
+      64
+    ],
+    "topk": 512
+  },
+  "status": "analyzed",
+  "tile_coalescing": [
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 238937600,
+      "empty_tiles": 192,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.39885661734776945,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.43098668628299097,
+            "min": 0.2705078125,
+            "p50": 0.357421875,
+            "p90": 0.7103302228009258,
+            "p99": 1.0
+          },
+          "hot_pairs": 627143,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 2020.0,
+            "mean": 753.7776442307693,
+            "min": 28.0,
+            "p50": 692.5,
+            "p90": 1071.9,
+            "p99": 1813.7999999999988
+          },
+          "hot_rows": 103991,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 128.0,
+            "mean": 124.9891826923077,
+            "min": 4.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.4986199008768586,
+          "output_elements": 537190400,
+          "output_pairs": 1049200,
+          "saved_elements": 267853824,
+          "saved_pair_fraction": 0.33271939107782483,
+          "saved_pairs": 523152,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 1892.0,
+            "mean": 628.7884615384615,
+            "min": 2.0,
+            "p50": 565.5,
+            "p90": 945.8,
+            "p99": 1694.079999999998
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.0665264520921524,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.0826554124573243,
+            "min": 0.04150390625,
+            "p50": 0.05810546875,
+            "p90": 0.11760263714113742,
+            "p99": 0.6361927877947282
+          },
+          "hot_pairs": 104603,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 256.0,
+            "mean": 125.72475961538461,
+            "min": 18.0,
+            "p50": 115.0,
+            "p90": 175.89999999999998,
+            "p99": 256.0
+          },
+          "hot_rows": 13288,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 16.0,
+            "mean": 15.971153846153847,
+            "min": 4.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0616561233784165,
+          "output_elements": 758290944,
+          "output_pairs": 1481037,
+          "saved_elements": 46753280,
+          "saved_pair_fraction": 0.058075418226961904,
+          "saved_pairs": 91315,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 240.0,
+            "mean": 109.75360576923077,
+            "min": 2.0,
+            "p50": 99.0,
+            "p90": 159.89999999999998,
+            "p99": 240.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.6486518285981765,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.6729370372152936,
+            "min": 0.4580078125,
+            "p50": 0.61376953125,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 1019909,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 2048.0,
+            "mean": 1225.8521634615386,
+            "min": 28.0,
+            "p50": 1173.0,
+            "p90": 1746.8999999999999,
+            "p99": 2048.0
+          },
+          "hot_rows": 201080,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 256.0,
+            "mean": 241.68269230769232,
+            "min": 4.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.0866675602469997,
+          "output_elements": 385803776,
+          "output_pairs": 753523,
+          "saved_elements": 419240448,
+          "saved_pair_fraction": 0.5207669783865191,
+          "saved_pairs": 818829,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 1916.0,
+            "mean": 984.1694711538462,
+            "min": 2.0,
+            "p50": 922.5,
+            "p90": 1509.9,
+            "p99": 1884.0
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.12404792311136438,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.14782039839369754,
+            "min": 0.08056640625,
+            "p50": 0.108154296875,
+            "p90": 0.22270151922376086,
+            "p99": 1.0
+          },
+          "hot_pairs": 195047,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 512.0,
+            "mean": 234.4314903846154,
+            "min": 28.0,
+            "p50": 212.0,
+            "p90": 331.79999999999995,
+            "p99": 512.0
+          },
+          "hot_rows": 26494,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 32.0,
+            "mean": 31.84375,
+            "min": 4.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.120069183693677,
+          "output_elements": 718745088,
+          "output_pairs": 1403799,
+          "saved_elements": 86299136,
+          "saved_pair_fraction": 0.10719800655323998,
+          "saved_pairs": 168553,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 480.0,
+            "mean": 202.5877403846154,
+            "min": 2.0,
+            "p50": 180.0,
+            "p90": 299.79999999999995,
+            "p99": 480.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.2269129304379681,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.25700529502636094,
+            "min": 0.1455078125,
+            "p50": 0.201171875,
+            "p90": 0.4074194389203174,
+            "p99": 1.0
+          },
+          "hot_pairs": 356787,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 1024.0,
+            "mean": 428.83052884615387,
+            "min": 28.0,
+            "p50": 386.0,
+            "p90": 609.9,
+            "p99": 1024.0
+          },
+          "hot_rows": 52652,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 64.0,
+            "mean": 63.28365384615385,
+            "min": 4.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.2398130603831994,
+          "output_elements": 649327104,
+          "output_pairs": 1268217,
+          "saved_elements": 155717120,
+          "saved_pair_fraction": 0.19342678992999024,
+          "saved_pairs": 304135,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 960.0,
+            "mean": 365.546875,
+            "min": 2.0,
+            "p50": 322.0,
+            "p90": 550.4999999999999,
+            "p99": 960.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.03518804949527841,
+          "hot_pair_share_per_tile": {
+            "count": 832,
+            "max": 1.0,
+            "mean": 0.04535971711126851,
+            "min": 0.02197265625,
+            "p50": 0.031005859375,
+            "p90": 0.061671824269480514,
+            "p99": 0.3427392510402192
+          },
+          "hot_pairs": 55328,
+          "hot_pairs_per_tile": {
+            "count": 832,
+            "max": 128.0,
+            "mean": 66.5,
+            "min": 10.0,
+            "p50": 61.0,
+            "p90": 93.0,
+            "p99": 128.0
+          },
+          "hot_rows": 6652,
+          "hot_rows_per_tile": {
+            "count": 832,
+            "max": 8.0,
+            "mean": 7.9951923076923075,
+            "min": 4.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0319464243054297,
+          "output_elements": 780122112,
+          "output_pairs": 1523676,
+          "saved_elements": 24922112,
+          "saved_pair_fraction": 0.03095744464343862,
+          "saved_pairs": 48676,
+          "saved_pairs_per_tile": {
+            "count": 832,
+            "max": 120.0,
+            "mean": 58.50480769230769,
+            "min": 2.0,
+            "p50": 53.0,
+            "p90": 85.0,
+            "p99": 120.0
+          }
+        }
+      },
+      "nonempty_tiles": 832,
+      "overall_tile_reduction_x": 3.3692655488294854,
+      "saved_atomic_add_elements": 566106624,
+      "saved_pair_fraction": 0.7031994108189514,
+      "selected_block": 128,
+      "tile_reduction_x": {
+        "count": 832,
+        "max": 15.71875,
+        "mean": 4.234760618843127,
+        "min": 1.0769230769230769,
+        "p50": 3.2226613182786115,
+        "p90": 7.133410762679055,
+        "p99": 15.61994565217391
+      },
+      "tile_saved_pairs": {
+        "count": 832,
+        "max": 1916.0,
+        "mean": 1328.938701923077,
+        "min": 2.0,
+        "p50": 1365.0,
+        "p90": 1697.9,
+        "p99": 1884.0
+      },
+      "tile_unique_groups": {
+        "count": 832,
+        "max": 920.0,
+        "mean": 560.9074519230769,
+        "min": 4.0,
+        "p50": 595.0,
+        "p90": 849.0,
+        "p99": 902.6899999999999
+      },
+      "tile_valid_pairs": {
+        "count": 832,
+        "max": 2048.0,
+        "mean": 1889.8461538461538,
+        "min": 28.0,
+        "p50": 2048.0,
+        "p90": 2048.0,
+        "p99": 2048.0
+      },
+      "tiles": 1024,
+      "token_block": 16,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 466675
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 129387520,
+      "empty_tiles": 64,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.34023551978183003,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.40242225246647145,
+            "min": 0.213134765625,
+            "p50": 0.306640625,
+            "p90": 0.7973644052643313,
+            "p99": 1.0
+          },
+          "hot_pairs": 534970,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 2048.0,
+            "mean": 1194.1294642857142,
+            "min": 28.0,
+            "p50": 1121.0,
+            "p90": 1909.1,
+            "p99": 2048.0
+          },
+          "hot_rows": 55202,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 128.0,
+            "mean": 123.21875,
+            "min": 4.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.4391131482796746,
+          "output_elements": 559403008,
+          "output_pairs": 1092584,
+          "saved_elements": 245641216,
+          "saved_pair_fraction": 0.3051276050146532,
+          "saved_pairs": 479768,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 1920.0,
+            "mean": 1070.9107142857142,
+            "min": 2.0,
+            "p50": 993.5,
+            "p90": 1781.1,
+            "p99": 1920.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.051592773119505046,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.0786096119981995,
+            "min": 0.03173828125,
+            "p50": 0.0450439453125,
+            "p90": 0.1205646650623986,
+            "p99": 0.8234936053100166
+          },
+          "hot_pairs": 81122,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 256.0,
+            "mean": 181.07589285714286,
+            "min": 18.0,
+            "p50": 172.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hot_rows": 7144,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 16.0,
+            "mean": 15.946428571428571,
+            "min": 4.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.049372186116417,
+          "output_elements": 767167488,
+          "output_pairs": 1498374,
+          "saved_elements": 37876736,
+          "saved_pair_fraction": 0.04704926123412569,
+          "saved_pairs": 73978,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 240.0,
+            "mean": 165.12946428571428,
+            "min": 2.0,
+            "p50": 156.0,
+            "p90": 240.0,
+            "p99": 240.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5852900622761316,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.6360805730369051,
+            "min": 0.3857421875,
+            "p50": 0.554443359375,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 920282,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 4068.0,
+            "mean": 2054.2008928571427,
+            "min": 28.0,
+            "p50": 1969.5,
+            "p90": 3060.6000000000004,
+            "p99": 3947.899999999999
+          },
+          "hot_rows": 105786,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 256.0,
+            "mean": 236.12946428571428,
+            "min": 4.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.0747371532322765,
+          "output_elements": 388022272,
+          "output_pairs": 757856,
+          "saved_elements": 417021952,
+          "saved_pair_fraction": 0.5180112341256919,
+          "saved_pairs": 814496,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 3812.0,
+            "mean": 1818.0714285714287,
+            "min": 2.0,
+            "p50": 1718.0,
+            "p90": 2841.9,
+            "p99": 3695.6599999999994
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.09870054542494301,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.1392947831358188,
+            "min": 0.059814453125,
+            "p50": 0.0865478515625,
+            "p90": 0.22843463945335363,
+            "p99": 1.0
+          },
+          "hot_pairs": 155192,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 512.0,
+            "mean": 346.4107142857143,
+            "min": 28.0,
+            "p50": 328.5,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 14218,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 32.0,
+            "mean": 31.736607142857142,
+            "min": 4.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0984883098664364,
+          "output_elements": 732865536,
+          "output_pairs": 1431378,
+          "saved_elements": 72178688,
+          "saved_pair_fraction": 0.08965804094757408,
+          "saved_pairs": 140974,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 480.0,
+            "mean": 314.67410714285717,
+            "min": 2.0,
+            "p50": 296.5,
+            "p90": 480.0,
+            "p99": 480.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.1858273465483556,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.24037815476137495,
+            "min": 0.114501953125,
+            "p50": 0.1644287109375,
+            "p90": 0.4407089765580332,
+            "p99": 1.0
+          },
+          "hot_pairs": 292186,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 1024.0,
+            "mean": 652.2008928571429,
+            "min": 28.0,
+            "p50": 613.0,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 28154,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 64.0,
+            "mean": 62.84375,
+            "min": 4.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.2018099547511312,
+          "output_elements": 669859840,
+          "output_pairs": 1308320,
+          "saved_elements": 135184384,
+          "saved_pair_fraction": 0.16792168674698796,
+          "saved_pairs": 264032,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 960.0,
+            "mean": 589.3571428571429,
+            "min": 2.0,
+            "p50": 550.0,
+            "p90": 960.0,
+            "p99": 960.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.026739559589710193,
+          "hot_pair_share_per_tile": {
+            "count": 448,
+            "max": 1.0,
+            "mean": 0.04367448626382305,
+            "min": 0.01611328125,
+            "p50": 0.023681640625,
+            "p90": 0.06202603928734583,
+            "p99": 0.4117468026550083
+          },
+          "hot_pairs": 42044,
+          "hot_pairs_per_tile": {
+            "count": 448,
+            "max": 128.0,
+            "mean": 93.84821428571429,
+            "min": 10.0,
+            "p50": 90.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hot_rows": 3580,
+          "hot_rows_per_tile": {
+            "count": 448,
+            "max": 8.0,
+            "mean": 7.991071428571429,
+            "min": 4.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0250761463679225,
+          "output_elements": 785350656,
+          "output_pairs": 1533888,
+          "saved_elements": 19693568,
+          "saved_pair_fraction": 0.024462715727775967,
+          "saved_pairs": 38464,
+          "saved_pairs_per_tile": {
+            "count": 448,
+            "max": 120.0,
+            "mean": 85.85714285714286,
+            "min": 2.0,
+            "p50": 82.0,
+            "p90": 120.0,
+            "p99": 120.0
+          }
+        }
+      },
+      "nonempty_tiles": 448,
+      "overall_tile_reduction_x": 6.221961932650073,
+      "saved_atomic_add_elements": 675656704,
+      "saved_pair_fraction": 0.8392789909638554,
+      "selected_block": 256,
+      "tile_reduction_x": {
+        "count": 448,
+        "max": 15.859375,
+        "mean": 7.651187171094084,
+        "min": 1.0769230769230769,
+        "p50": 6.210769301512853,
+        "p90": 15.556428571428572,
+        "p99": 15.848805084745763
+      },
+      "tile_saved_pairs": {
+        "count": 448,
+        "max": 3836.0,
+        "mean": 2945.629464285714,
+        "min": 2.0,
+        "p50": 3293.0,
+        "p90": 3669.2000000000003,
+        "p99": 3818.12
+      },
+      "tile_unique_groups": {
+        "count": 448,
+        "max": 1016.0,
+        "mean": 564.0848214285714,
+        "min": 4.0,
+        "p50": 577.5,
+        "p90": 930.0,
+        "p99": 1004.0
+      },
+      "tile_valid_pairs": {
+        "count": 448,
+        "max": 4096.0,
+        "mean": 3509.714285714286,
+        "min": 28.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "tiles": 512,
+      "token_block": 16,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 252710
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 67351040,
+      "empty_tiles": 0,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.28692112198795183,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.4042721648620801,
+            "min": 0.173828125,
+            "p50": 0.2505517410495341,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 451141,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 2048.0,
+            "mean": 1762.26953125,
+            "min": 28.0,
+            "p50": 1911.0,
+            "p90": 2048.0,
+            "p99": 2048.0
+          },
+          "hot_rows": 30784,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 128.0,
+            "mean": 120.25,
+            "min": 4.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.3648948129115144,
+          "output_elements": 589821440,
+          "output_pairs": 1151995,
+          "saved_elements": 215222784,
+          "saved_pair_fraction": 0.26734280873493976,
+          "saved_pairs": 420357,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 1920.0,
+            "mean": 1642.01953125,
+            "min": 24.0,
+            "p50": 1783.0,
+            "p90": 1920.0,
+            "p99": 1920.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.03965460660208401,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.08433211051343402,
+            "min": 0.0247802734375,
+            "p50": 0.03131896763119176,
+            "p90": 0.1542741968273883,
+            "p99": 1.0
+          },
+          "hot_pairs": 62351,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 256.0,
+            "mean": 243.55859375,
+            "min": 28.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hot_rows": 4072,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 16.0,
+            "mean": 15.90625,
+            "min": 4.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0384915390473246,
+          "output_elements": 775205376,
+          "output_pairs": 1514073,
+          "saved_elements": 29838848,
+          "saved_pair_fraction": 0.03706485570661022,
+          "saved_pairs": 58279,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 240.0,
+            "mean": 227.65234375,
+            "min": 24.0,
+            "p50": 240.0,
+            "p90": 240.0,
+            "p99": 240.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5194829147671768,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.6255144728324368,
+            "min": 0.3248291015625,
+            "p50": 0.5011034820990682,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 816810,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 4096.0,
+            "mean": 3190.6640625,
+            "min": 28.0,
+            "p50": 3362.0,
+            "p90": 4096.0,
+            "p99": 4096.0
+          },
+          "hot_rows": 57472,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 256.0,
+            "mean": 224.5,
+            "min": 4.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 1.933978996671644,
+          "output_elements": 416263168,
+          "output_pairs": 813014,
+          "saved_elements": 388781056,
+          "saved_pair_fraction": 0.48293130291436015,
+          "saved_pairs": 759338,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 3840.0,
+            "mean": 2966.1640625,
+            "min": 24.0,
+            "p50": 3111.5,
+            "p90": 3840.0,
+            "p99": 3840.0
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.07780954900683816,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.14618269069560896,
+            "min": 0.0482177734375,
+            "p50": 0.06263793526238352,
+            "p90": 0.3085483936547766,
+            "p99": 1.0
+          },
+          "hot_pairs": 122344,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 512.0,
+            "mean": 477.90625,
+            "min": 28.0,
+            "p50": 512.0,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 8080,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 32.0,
+            "mean": 31.5625,
+            "min": 4.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0783656404826045,
+          "output_elements": 746541056,
+          "output_pairs": 1458088,
+          "saved_elements": 58503168,
+          "saved_pair_fraction": 0.07267075056984695,
+          "saved_pairs": 114264,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 480.0,
+            "mean": 446.34375,
+            "min": 24.0,
+            "p50": 480.0,
+            "p90": 480.0,
+            "p99": 480.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.15116017278573754,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.24743909654115012,
+            "min": 0.0921630859375,
+            "p50": 0.12527587052476705,
+            "p90": 0.6170967873095532,
+            "p99": 1.0
+          },
+          "hot_pairs": 237677,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 1024.0,
+            "mean": 928.42578125,
+            "min": 28.0,
+            "p50": 1024.0,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 15904,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 64.0,
+            "mean": 62.125,
+            "min": 4.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.1642058702230673,
+          "output_elements": 691496448,
+          "output_pairs": 1350579,
+          "saved_elements": 113547776,
+          "saved_pair_fraction": 0.1410453893275806,
+          "saved_pairs": 221773,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 960.0,
+            "mean": 866.30078125,
+            "min": 24.0,
+            "p50": 960.0,
+            "p90": 960.0,
+            "p99": 960.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.02007120542982742,
+          "hot_pair_share_per_tile": {
+            "count": 256,
+            "max": 1.0,
+            "mean": 0.04776574262849339,
+            "min": 0.0128173828125,
+            "p50": 0.01565948381559588,
+            "p90": 0.07713709841369415,
+            "p99": 0.6892307692307664
+          },
+          "hot_pairs": 31559,
+          "hot_pairs_per_tile": {
+            "count": 256,
+            "max": 128.0,
+            "mean": 123.27734375,
+            "min": 28.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hot_rows": 2044,
+          "hot_rows_per_tile": {
+            "count": 256,
+            "max": 8.0,
+            "mean": 7.984375,
+            "min": 4.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.01913034234984,
+          "output_elements": 789932544,
+          "output_pairs": 1542837,
+          "saved_elements": 15111680,
+          "saved_pair_fraction": 0.01877124206284598,
+          "saved_pairs": 29515,
+          "saved_pairs_per_tile": {
+            "count": 256,
+            "max": 120.0,
+            "mean": 115.29296875,
+            "min": 24.0,
+            "p50": 120.0,
+            "p90": 120.0,
+            "p99": 120.0
+          }
+        }
+      },
+      "nonempty_tiles": 256,
+      "overall_tile_reduction_x": 11.952959063438367,
+      "saved_atomic_add_elements": 737693184,
+      "saved_pair_fraction": 0.9163387078720286,
+      "selected_block": 512,
+      "tile_reduction_x": {
+        "count": 256,
+        "max": 15.9296875,
+        "mean": 13.340381458371867,
+        "min": 7.0,
+        "p50": 14.974452554744525,
+        "p90": 15.912193032552828,
+        "p99": 15.928257142857143
+      },
+      "tile_saved_pairs": {
+        "count": 256,
+        "max": 7676.0,
+        "mean": 5628.15234375,
+        "min": 24.0,
+        "p50": 7198.5,
+        "p90": 7582.0,
+        "p99": 7665.8
+      },
+      "tile_unique_groups": {
+        "count": 256,
+        "max": 1024.0,
+        "mean": 513.84765625,
+        "min": 4.0,
+        "p50": 514.0,
+        "p90": 921.5,
+        "p99": 1012.8
+      },
+      "tile_valid_pairs": {
+        "count": 256,
+        "max": 8192.0,
+        "mean": 6142.0,
+        "min": 28.0,
+        "p50": 8174.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 16,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 131545
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 126415360,
+      "empty_tiles": 96,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.35832180071637904,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.3901020411712761,
+            "min": 0.2216796875,
+            "p50": 0.3111572265625,
+            "p90": 0.672225416906268,
+            "p99": 1.0
+          },
+          "hot_pairs": 563408,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 3982.0,
+            "mean": 1354.3461538461538,
+            "min": 120.0,
+            "p50": 1207.5,
+            "p90": 2021.0,
+            "p99": 3588.4000000000037
+          },
+          "hot_rows": 52178,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 128.0,
+            "mean": 125.42788461538461,
+            "min": 8.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.481782490608997,
+          "output_elements": 543294464,
+          "output_pairs": 1061122,
+          "saved_elements": 261749760,
+          "saved_pair_fraction": 0.3251371194236405,
+          "saved_pairs": 511230,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 3854.0,
+            "mean": 1228.9182692307693,
+            "min": 21.0,
+            "p50": 1081.5,
+            "p90": 1893.0,
+            "p99": 3462.6500000000033
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.05709726575219798,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.07146600775748459,
+            "min": 0.034423828125,
+            "p50": 0.048828125,
+            "p90": 0.10499930245535714,
+            "p99": 0.4379195804195819
+          },
+          "hot_pairs": 89777,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 512.0,
+            "mean": 215.81009615384616,
+            "min": 35.0,
+            "p50": 189.5,
+            "p90": 319.0,
+            "p99": 512.0
+          },
+          "hot_rows": 6648,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 16.0,
+            "mean": 15.98076923076923,
+            "min": 8.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0558203841869216,
+          "output_elements": 762482176,
+          "output_pairs": 1489223,
+          "saved_elements": 42562048,
+          "saved_pair_fraction": 0.052869204859980465,
+          "saved_pairs": 83129,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 496.0,
+            "mean": 199.82932692307693,
+            "min": 19.0,
+            "p50": 173.5,
+            "p90": 303.0,
+            "p99": 496.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.6007732365271898,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.6272312767114057,
+            "min": 0.39697265625,
+            "p50": 0.55419921875,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 944627,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 4096.0,
+            "mean": 2270.737980769231,
+            "min": 120.0,
+            "p50": 2120.0,
+            "p90": 3416.5,
+            "p99": 4096.0
+          },
+          "hot_rows": 101088,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 256.0,
+            "mean": 243.0,
+            "min": 8.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.1574148649928033,
+          "output_elements": 373152256,
+          "output_pairs": 728813,
+          "saved_elements": 431891968,
+          "saved_pair_fraction": 0.5364822889531098,
+          "saved_pairs": 843539,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 3960.0,
+            "mean": 2027.7379807692307,
+            "min": 21.0,
+            "p50": 1864.0,
+            "p90": 3160.5,
+            "p99": 3926.9500000000003
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.10775958563985673,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.1287329244560373,
+            "min": 0.065673828125,
+            "p50": 0.0916748046875,
+            "p90": 0.20170534048507463,
+            "p99": 0.8705534465534503
+          },
+          "hot_pairs": 169436,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 1024.0,
+            "mean": 407.2980769230769,
+            "min": 53.0,
+            "p50": 356.0,
+            "p90": 606.5,
+            "p99": 1024.0
+          },
+          "hot_rows": 13264,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 32.0,
+            "mean": 31.884615384615383,
+            "min": 8.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.1102769421966134,
+          "output_elements": 725084160,
+          "output_pairs": 1416180,
+          "saved_elements": 79960064,
+          "saved_pair_fraction": 0.09932381553239987,
+          "saved_pairs": 156172,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 992.0,
+            "mean": 375.41346153846155,
+            "min": 21.0,
+            "p50": 324.0,
+            "p90": 574.5,
+            "p99": 992.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.1997408977124715,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.2276447473247008,
+            "min": 0.121826171875,
+            "p50": 0.17041015625,
+            "p90": 0.36984573044143354,
+            "p99": 1.0
+          },
+          "hot_pairs": 314063,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 2048.0,
+            "mean": 754.9591346153846,
+            "min": 85.0,
+            "p50": 662.5,
+            "p90": 1132.5,
+            "p99": 2048.0
+          },
+          "hot_rows": 26400,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 64.0,
+            "mean": 63.46153846153846,
+            "min": 8.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.2239164498178159,
+          "output_elements": 657760768,
+          "output_pairs": 1284689,
+          "saved_elements": 147283456,
+          "saved_pair_fraction": 0.18295076420547052,
+          "saved_pairs": 287663,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 1984.0,
+            "mean": 691.4975961538462,
+            "min": 21.0,
+            "p50": 599.5,
+            "p90": 1068.5,
+            "p99": 1984.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.029920781097362424,
+          "hot_pair_share_per_tile": {
+            "count": 416,
+            "max": 1.0,
+            "mean": 0.038976798383575,
+            "min": 0.01806640625,
+            "p50": 0.0255126953125,
+            "p90": 0.055578526287481514,
+            "p99": 0.2248164335664336
+          },
+          "hot_pairs": 47046,
+          "hot_pairs_per_tile": {
+            "count": 416,
+            "max": 256.0,
+            "mean": 113.09134615384616,
+            "min": 19.0,
+            "p50": 100.0,
+            "p90": 165.0,
+            "p99": 256.0
+          },
+          "hot_rows": 3328,
+          "hot_rows_per_tile": {
+            "count": 416,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0285993900436599,
+          "output_elements": 782660608,
+          "output_pairs": 1528634,
+          "saved_elements": 22383616,
+          "saved_pair_fraction": 0.02780420669163139,
+          "saved_pairs": 43718,
+          "saved_pairs_per_tile": {
+            "count": 416,
+            "max": 248.0,
+            "mean": 105.09134615384616,
+            "min": 11.0,
+            "p50": 92.0,
+            "p90": 157.0,
+            "p99": 248.0
+          }
+        }
+      },
+      "nonempty_tiles": 416,
+      "overall_tile_reduction_x": 6.368246896579656,
+      "saved_atomic_add_elements": 678628864,
+      "saved_pair_fraction": 0.8429709123656789,
+      "selected_block": 128,
+      "tile_reduction_x": {
+        "count": 416,
+        "max": 30.9375,
+        "mean": 8.164290089017666,
+        "min": 1.2121212121212122,
+        "p50": 6.225053412017415,
+        "p90": 14.246999612853271,
+        "p99": 30.56401515151515
+      },
+      "tile_saved_pairs": {
+        "count": 416,
+        "max": 3960.0,
+        "mean": 3186.170673076923,
+        "min": 21.0,
+        "p50": 3370.5,
+        "p90": 3737.5,
+        "p99": 3926.9500000000003
+      },
+      "tile_unique_groups": {
+        "count": 416,
+        "max": 1015.0,
+        "mean": 593.5216346153846,
+        "min": 8.0,
+        "p50": 610.5,
+        "p90": 932.5,
+        "p99": 1000.0
+      },
+      "tile_valid_pairs": {
+        "count": 416,
+        "max": 4096.0,
+        "mean": 3779.6923076923076,
+        "min": 120.0,
+        "p50": 4096.0,
+        "p90": 4096.0,
+        "p99": 4096.0
+      },
+      "tiles": 512,
+      "token_block": 32,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 246905
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 65247232,
+      "empty_tiles": 32,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.3174867968495604,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.3790604392541773,
+            "min": 0.1900634765625,
+            "p50": 0.2822265625,
+            "p90": 0.7707563585452855,
+            "p99": 1.0
+          },
+          "hot_pairs": 499201,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 4096.0,
+            "mean": 2228.5758928571427,
+            "min": 120.0,
+            "p50": 2036.5,
+            "p90": 3726.4000000000005,
+            "p99": 4096.0
+          },
+          "hot_rows": 27681,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 128.0,
+            "mean": 123.57589285714286,
+            "min": 8.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.428330571785704,
+          "output_elements": 563625984,
+          "output_pairs": 1100832,
+          "saved_elements": 241418240,
+          "saved_pair_fraction": 0.29988196027352654,
+          "saved_pairs": 471520,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 3968.0,
+            "mean": 2105.0,
+            "min": 23.0,
+            "p50": 1908.5,
+            "p90": 3600.8,
+            "p99": 3968.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.04692142726310648,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.07263545804278891,
+            "min": 0.028076171875,
+            "p50": 0.0406494140625,
+            "p90": 0.11263042234592238,
+            "p99": 0.7564100809670453
+          },
+          "hot_pairs": 73777,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 512.0,
+            "mean": 329.36160714285717,
+            "min": 35.0,
+            "p50": 304.0,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 3576,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 16.0,
+            "mean": 15.964285714285714,
+            "min": 8.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0467336506116895,
+          "output_elements": 769101312,
+          "output_pairs": 1502151,
+          "saved_elements": 35942912,
+          "saved_pair_fraction": 0.04464712736079453,
+          "saved_pairs": 70201,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 496.0,
+            "mean": 313.39732142857144,
+            "min": 19.0,
+            "p50": 288.0,
+            "p90": 496.0,
+            "p99": 496.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5551644924291762,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.608264877704436,
+            "min": 0.3497314453125,
+            "p50": 0.5240478515625,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 872914,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 8074.0,
+            "mean": 3896.9375,
+            "min": 120.0,
+            "p50": 3688.0,
+            "p90": 6008.0,
+            "p99": 7846.200000000001
+          },
+          "hot_rows": 53150,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 256.0,
+            "mean": 237.27678571428572,
+            "min": 8.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.0892599935157086,
+          "output_elements": 385325056,
+          "output_pairs": 752588,
+          "saved_elements": 419719168,
+          "saved_pair_fraction": 0.5213616289482254,
+          "saved_pairs": 819764,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 7818.0,
+            "mean": 3659.660714285714,
+            "min": 23.0,
+            "p50": 3432.0,
+            "p90": 5789.800000000001,
+            "p99": 7592.040000000001
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.09031692648974275,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.1288480234054124,
+            "min": 0.0535888671875,
+            "p50": 0.07830810546875,
+            "p90": 0.2145445079455233,
+            "p99": 1.0
+          },
+          "hot_pairs": 142010,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 1024.0,
+            "mean": 633.9732142857143,
+            "min": 55.0,
+            "p50": 581.0,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 7120,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 32.0,
+            "mean": 31.785714285714285,
+            "min": 8.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0938390023527578,
+          "output_elements": 735980544,
+          "output_pairs": 1437462,
+          "saved_elements": 69063680,
+          "saved_pair_fraction": 0.08578867836209704,
+          "saved_pairs": 134890,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 992.0,
+            "mean": 602.1875,
+            "min": 23.0,
+            "p50": 549.0,
+            "p90": 992.0,
+            "p99": 992.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.1715468292087268,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.2243297630303988,
+            "min": 0.10205078125,
+            "p50": 0.14935302734375,
+            "p90": 0.4075728818706349,
+            "p99": 1.0
+          },
+          "hot_pairs": 269732,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 2048.0,
+            "mean": 1204.1607142857142,
+            "min": 87.0,
+            "p50": 1098.0,
+            "p90": 2048.0,
+            "p99": 2048.0
+          },
+          "hot_rows": 14112,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 64.0,
+            "mean": 63.0,
+            "min": 8.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.194132139266001,
+          "output_elements": 674166784,
+          "output_pairs": 1316732,
+          "saved_elements": 130877440,
+          "saved_pair_fraction": 0.1625717396613481,
+          "saved_pairs": 255620,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 1984.0,
+            "mean": 1141.1607142857142,
+            "min": 23.0,
+            "p50": 1034.0,
+            "p90": 1984.0,
+            "p99": 1984.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.024178428239986977,
+          "hot_pair_share_per_tile": {
+            "count": 224,
+            "max": 1.0,
+            "mean": 0.04018436610023197,
+            "min": 0.014404296875,
+            "p50": 0.02099609375,
+            "p90": 0.05767352415026834,
+            "p99": 0.37820504048352266
+          },
+          "hot_pairs": 38017,
+          "hot_pairs_per_tile": {
+            "count": 224,
+            "max": 256.0,
+            "mean": 169.71875,
+            "min": 19.0,
+            "p50": 158.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hot_rows": 1792,
+          "hot_rows_per_tile": {
+            "count": 224,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0235820345583406,
+          "output_elements": 786497024,
+          "output_pairs": 1536127,
+          "saved_elements": 18547200,
+          "saved_pair_fraction": 0.023038734329208728,
+          "saved_pairs": 36225,
+          "saved_pairs_per_tile": {
+            "count": 224,
+            "max": 248.0,
+            "mean": 161.71875,
+            "min": 11.0,
+            "p50": 150.0,
+            "p90": 248.0,
+            "p99": 248.0
+          }
+        }
+      },
+      "nonempty_tiles": 224,
+      "overall_tile_reduction_x": 12.338365924856399,
+      "saved_atomic_add_elements": 739796992,
+      "saved_pair_fraction": 0.9189519903940084,
+      "selected_block": 256,
+      "tile_reduction_x": {
+        "count": 224,
+        "max": 31.46875,
+        "mean": 15.104945155989254,
+        "min": 1.2371134020618557,
+        "p50": 12.371832311757217,
+        "p90": 30.408181818181816,
+        "p99": 31.428839080459774
+      },
+      "tile_saved_pairs": {
+        "count": 224,
+        "max": 7928.0,
+        "mean": 6450.517857142857,
+        "min": 23.0,
+        "p50": 7369.5,
+        "p90": 7757.6,
+        "p99": 7910.16
+      },
+      "tile_unique_groups": {
+        "count": 224,
+        "max": 1024.0,
+        "mean": 568.9107142857143,
+        "min": 8.0,
+        "p50": 579.5,
+        "p90": 935.0,
+        "p99": 1014.77
+      },
+      "tile_valid_pairs": {
+        "count": 224,
+        "max": 8192.0,
+        "mean": 7019.428571428572,
+        "min": 120.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 32,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 127436
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 33806848,
+      "empty_tiles": 0,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.27992968495604037,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.39901594308093685,
+            "min": 0.16058349609375,
+            "p50": 0.2510462826193993,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 440148,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 4096.0,
+            "mean": 3438.65625,
+            "min": 120.0,
+            "p50": 3703.5,
+            "p90": 4096.0,
+            "p99": 4096.0
+          },
+          "hot_rows": 15424,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 128.0,
+            "mean": 120.5,
+            "min": 8.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.370088565284221,
+          "output_elements": 587585536,
+          "output_pairs": 1147628,
+          "saved_elements": 217458688,
+          "saved_pair_fraction": 0.27012017665255617,
+          "saved_pairs": 424724,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 3968.0,
+            "mean": 3318.15625,
+            "min": 112.0,
+            "p50": 3579.5,
+            "p90": 3968.0,
+            "p99": 3968.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.03846148953923803,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.08331800324925677,
+            "min": 0.02203369140625,
+            "p50": 0.031380785327424915,
+            "p90": 0.15206461629712328,
+            "p99": 0.9487341772151906
+          },
+          "hot_pairs": 60475,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 512.0,
+            "mean": 472.4609375,
+            "min": 120.0,
+            "p50": 512.0,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 2040,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 16.0,
+            "mean": 15.9375,
+            "min": 8.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.03859854932602,
+          "output_elements": 775125504,
+          "output_pairs": 1513917,
+          "saved_elements": 29918720,
+          "saved_pair_fraction": 0.03716407013187887,
+          "saved_pairs": 58435,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 496.0,
+            "mean": 456.5234375,
+            "min": 112.0,
+            "p50": 496.0,
+            "p90": 496.0,
+            "p99": 496.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5086602745441224,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.6173944013396508,
+            "min": 0.306396484375,
+            "p50": 0.5020925652387986,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 799793,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 8192.0,
+            "mean": 6248.3828125,
+            "min": 120.0,
+            "p50": 6510.0,
+            "p90": 8192.0,
+            "p99": 8192.0
+          },
+          "hot_rows": 28800,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 256.0,
+            "mean": 225.0,
+            "min": 8.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 1.9621068709529685,
+          "output_elements": 410295808,
+          "output_pairs": 801359,
+          "saved_elements": 394748416,
+          "saved_pair_fraction": 0.4903437652637577,
+          "saved_pairs": 770993,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 7936.0,
+            "mean": 6023.3828125,
+            "min": 112.0,
+            "p50": 6278.0,
+            "p90": 7936.0,
+            "p99": 7936.0
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.07562492368121133,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.14448382625151068,
+            "min": 0.04278564453125,
+            "p50": 0.06276157065484983,
+            "p90": 0.30412923259424657,
+            "p99": 1.0
+          },
+          "hot_pairs": 118909,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 1024.0,
+            "mean": 928.9765625,
+            "min": 120.0,
+            "p50": 1024.0,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 4048,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 32.0,
+            "mean": 31.625,
+            "min": 8.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0788073476954574,
+          "output_elements": 746235392,
+          "output_pairs": 1457491,
+          "saved_elements": 58808832,
+          "saved_pair_fraction": 0.07305043654347118,
+          "saved_pairs": 114861,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 992.0,
+            "mean": 897.3515625,
+            "min": 112.0,
+            "p50": 992.0,
+            "p90": 992.0,
+            "p99": 992.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.14706185383425593,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.244336182816056,
+            "min": 0.08294677734375,
+            "p50": 0.12552314130969966,
+            "p90": 0.6082584651884931,
+            "p99": 1.0
+          },
+          "hot_pairs": 231233,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 2048.0,
+            "mean": 1806.5078125,
+            "min": 120.0,
+            "p50": 1991.5,
+            "p90": 2048.0,
+            "p99": 2048.0
+          },
+          "hot_rows": 7968,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 64.0,
+            "mean": 62.25,
+            "min": 8.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.1654934040577072,
+          "output_elements": 690732544,
+          "output_pairs": 1349087,
+          "saved_elements": 114311680,
+          "saved_pair_fraction": 0.14199428626668836,
+          "saved_pairs": 223265,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 1984.0,
+            "mean": 1744.2578125,
+            "min": 112.0,
+            "p50": 1927.5,
+            "p90": 1984.0,
+            "p99": 1984.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.019461927100293062,
+          "hot_pair_share_per_tile": {
+            "count": 128,
+            "max": 1.0,
+            "mean": 0.047090445711555434,
+            "min": 0.01129150390625,
+            "p50": 0.015690392663712457,
+            "p90": 0.07603230814856164,
+            "p99": 0.6063883652033407
+          },
+          "hot_pairs": 30601,
+          "hot_pairs_per_tile": {
+            "count": 128,
+            "max": 256.0,
+            "mean": 239.0703125,
+            "min": 120.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hot_rows": 1024,
+          "hot_rows_per_tile": {
+            "count": 128,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0191712984719095,
+          "output_elements": 789900800,
+          "output_pairs": 1542775,
+          "saved_elements": 15143424,
+          "saved_pair_fraction": 0.018810673436991207,
+          "saved_pairs": 29577,
+          "saved_pairs_per_tile": {
+            "count": 128,
+            "max": 248.0,
+            "mean": 231.0703125,
+            "min": 112.0,
+            "p50": 248.0,
+            "p90": 248.0,
+            "p99": 248.0
+          }
+        }
+      },
+      "nonempty_tiles": 128,
+      "overall_tile_reduction_x": 23.813051840857806,
+      "saved_atomic_add_elements": 771237376,
+      "saved_pair_fraction": 0.958006222525236,
+      "selected_block": 512,
+      "tile_reduction_x": {
+        "count": 128,
+        "max": 31.734375,
+        "mean": 26.401306813680858,
+        "min": 15.0,
+        "p50": 29.211904761904762,
+        "p90": 31.66858974358974,
+        "p99": 31.72898361495136
+      },
+      "tile_saved_pairs": {
+        "count": 128,
+        "max": 15864.0,
+        "mean": 11768.1484375,
+        "min": 112.0,
+        "p50": 15373.0,
+        "p90": 15762.400000000001,
+        "p99": 15853.84
+      },
+      "tile_unique_groups": {
+        "count": 128,
+        "max": 1024.0,
+        "mean": 515.8515625,
+        "min": 8.0,
+        "p50": 516.0,
+        "p90": 921.3999999999999,
+        "p99": 1012.84
+      },
+      "tile_valid_pairs": {
+        "count": 128,
+        "max": 16384.0,
+        "mean": 12284.0,
+        "min": 120.0,
+        "p50": 16316.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "tiles": 128,
+      "token_block": 32,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 66029
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 64054784,
+      "empty_tiles": 48,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.3300062581406708,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 1.0,
+            "mean": 0.36053068183719766,
+            "min": 0.195556640625,
+            "p50": 0.28070068359375,
+            "p90": 0.6358324360643699,
+            "p99": 1.0
+          },
+          "hot_pairs": 518886,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 7738.0,
+            "mean": 2494.644230769231,
+            "min": 328.0,
+            "p50": 2180.0,
+            "p90": 3817.9000000000005,
+            "p99": 6969.220000000002
+          },
+          "hot_rows": 26176,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 128.0,
+            "mean": 125.84615384615384,
+            "min": 16.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.456364239257087,
+          "output_elements": 552776704,
+          "output_pairs": 1079642,
+          "saved_elements": 252267520,
+          "saved_pair_fraction": 0.3133585863725171,
+          "saved_pairs": 492710,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 7610.0,
+            "mean": 2368.798076923077,
+            "min": 200.0,
+            "p50": 2052.0,
+            "p90": 3689.9000000000005,
+            "p99": 6842.340000000002
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.05059363297785738,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 1.0,
+            "mean": 0.0636635949372592,
+            "min": 0.029052734375,
+            "p50": 0.04205322265625,
+            "p90": 0.0963036875772725,
+            "p99": 0.39442930874016496
+          },
+          "hot_pairs": 79551,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 1024.0,
+            "mean": 382.4567307692308,
+            "min": 70.0,
+            "p50": 327.0,
+            "p90": 583.3,
+            "p99": 1024.0
+          },
+          "hot_rows": 3328,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 16.0,
+            "mean": 16.0,
+            "min": 16.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0509468100678485,
+          "output_elements": 766018048,
+          "output_pairs": 1496129,
+          "saved_elements": 39026176,
+          "saved_pair_fraction": 0.04847705857212634,
+          "saved_pairs": 76223,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 1008.0,
+            "mean": 366.4567307692308,
+            "min": 54.0,
+            "p50": 311.0,
+            "p90": 567.3,
+            "p99": 1008.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5659992164604364,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 1.0,
+            "mean": 0.5936338909676657,
+            "min": 0.35888671875,
+            "p50": 0.516357421875,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 889950,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 8192.0,
+            "mean": 4278.6057692307695,
+            "min": 465.0,
+            "p50": 3915.0,
+            "p90": 6640.0,
+            "p99": 8192.0
+          },
+          "hot_rows": 50830,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 256.0,
+            "mean": 244.375,
+            "min": 16.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.1444126824797607,
+          "output_elements": 375414784,
+          "output_pairs": 733232,
+          "saved_elements": 429629440,
+          "saved_pair_fraction": 0.5336718495604038,
+          "saved_pairs": 839120,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 8049.0,
+            "mean": 4034.230769230769,
+            "min": 209.0,
+            "p50": 3659.0,
+            "p90": 6436.500000000001,
+            "p99": 8015.81
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.09645486506838163,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 1.0,
+            "mean": 0.11580139515809437,
+            "min": 0.0556640625,
+            "p50": 0.08038330078125,
+            "p90": 0.18281625600961537,
+            "p99": 0.7888586174803299
+          },
+          "hot_pairs": 151661,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 2048.0,
+            "mean": 729.1394230769231,
+            "min": 120.0,
+            "p50": 623.5,
+            "p90": 1124.1000000000001,
+            "p99": 2048.0
+          },
+          "hot_rows": 6640,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 32.0,
+            "mean": 31.923076923076923,
+            "min": 16.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.1016029218170138,
+          "output_elements": 730793472,
+          "output_pairs": 1427331,
+          "saved_elements": 74250752,
+          "saved_pair_fraction": 0.09223189209540866,
+          "saved_pairs": 145021,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 2016.0,
+            "mean": 697.2163461538462,
+            "min": 88.0,
+            "p50": 591.5,
+            "p90": 1092.1000000000001,
+            "p99": 2016.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.18106887007489417,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 1.0,
+            "mean": 0.20694263304288996,
+            "min": 0.1048583984375,
+            "p50": 0.1510009765625,
+            "p90": 0.34943983289930564,
+            "p99": 1.0
+          },
+          "hot_pairs": 284704,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 4096.0,
+            "mean": 1368.7692307692307,
+            "min": 200.0,
+            "p50": 1173.0,
+            "p90": 2119.9000000000005,
+            "p99": 4096.0
+          },
+          "hot_rows": 13216,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 64.0,
+            "mean": 63.53846153846154,
+            "min": 16.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.2086982190298141,
+          "output_elements": 666042368,
+          "output_pairs": 1300864,
+          "saved_elements": 139001856,
+          "saved_pair_fraction": 0.1726636274829046,
+          "saved_pairs": 271488,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 4032.0,
+            "mean": 1305.2307692307693,
+            "min": 136.0,
+            "p50": 1109.0,
+            "p90": 2055.9000000000005,
+            "p99": 4032.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.02628355482741778,
+          "hot_pair_share_per_tile": {
+            "count": 208,
+            "max": 0.7580645161290323,
+            "mean": 0.03417232823979131,
+            "min": 0.0150146484375,
+            "p50": 0.02197265625,
+            "p90": 0.05084138569078948,
+            "p99": 0.19721465437008248
+          },
+          "hot_pairs": 41327,
+          "hot_pairs_per_tile": {
+            "count": 208,
+            "max": 512.0,
+            "mean": 198.6875,
+            "min": 38.0,
+            "p50": 171.0,
+            "p90": 302.20000000000005,
+            "p99": 512.0
+          },
+          "hot_rows": 1664,
+          "hot_rows_per_tile": {
+            "count": 208,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0258780483190002,
+          "output_elements": 784736768,
+          "output_pairs": 1532689,
+          "saved_elements": 20307456,
+          "saved_pair_fraction": 0.025225267624552263,
+          "saved_pairs": 39663,
+          "saved_pairs_per_tile": {
+            "count": 208,
+            "max": 504.0,
+            "mean": 190.6875,
+            "min": 30.0,
+            "p50": 163.0,
+            "p90": 294.20000000000005,
+            "p99": 504.0
+          }
+        }
+      },
+      "nonempty_tiles": 208,
+      "overall_tile_reduction_x": 12.568057742572359,
+      "saved_atomic_add_elements": 740989440,
+      "saved_pair_fraction": 0.9204332108840768,
+      "selected_block": 128,
+      "tile_reduction_x": {
+        "count": 208,
+        "max": 59.875,
+        "mean": 15.990376031705853,
+        "min": 1.7282229965156795,
+        "p50": 12.366867950324712,
+        "p90": 28.062745098039223,
+        "p99": 58.42300000000001
+      },
+      "tile_saved_pairs": {
+        "count": 208,
+        "max": 8049.0,
+        "mean": 6957.908653846154,
+        "min": 209.0,
+        "p50": 7456.5,
+        "p90": 7824.3,
+        "p99": 8015.81
+      },
+      "tile_unique_groups": {
+        "count": 208,
+        "max": 1023.0,
+        "mean": 601.4759615384615,
+        "min": 16.0,
+        "p50": 614.5,
+        "p90": 942.0,
+        "p99": 1022.0
+      },
+      "tile_valid_pairs": {
+        "count": 208,
+        "max": 8192.0,
+        "mean": 7559.384615384615,
+        "min": 496.0,
+        "p50": 8192.0,
+        "p90": 8192.0,
+        "p99": 8192.0
+      },
+      "tiles": 256,
+      "token_block": 64,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 125107
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 32901632,
+      "empty_tiles": 16,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.30148910676489743,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 1.0,
+            "mean": 0.36180045363408136,
+            "min": 0.17291259765625,
+            "p50": 0.26617431640625,
+            "p90": 0.7563960785506456,
+            "p99": 1.0
+          },
+          "hot_pairs": 474047,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 8192.0,
+            "mean": 4232.5625,
+            "min": 386.0,
+            "p50": 3770.0,
+            "p90": 7394.900000000002,
+            "p99": 8192.0
+          },
+          "hot_rows": 13888,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 128.0,
+            "mean": 124.0,
+            "min": 16.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.4137402411272144,
+          "output_elements": 569442816,
+          "output_pairs": 1112193,
+          "saved_elements": 235601408,
+          "saved_pair_fraction": 0.292656478956366,
+          "saved_pairs": 460159,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 8064.0,
+            "mean": 4108.5625,
+            "min": 258.0,
+            "p50": 3642.0,
+            "p90": 7266.900000000002,
+            "p99": 8064.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.043505525480299574,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 1.0,
+            "mean": 0.06821359355982143,
+            "min": 0.024658203125,
+            "p50": 0.037353515625,
+            "p90": 0.10464134365318666,
+            "p99": 0.6438556769281696
+          },
+          "hot_pairs": 68406,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 1024.0,
+            "mean": 610.7678571428571,
+            "min": 84.0,
+            "p50": 541.5,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 1792,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 16.0,
+            "mean": 16.0,
+            "min": 16.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.0442401002033554,
+          "output_elements": 770937856,
+          "output_pairs": 1505738,
+          "saved_elements": 34106368,
+          "saved_pair_fraction": 0.042365831569521326,
+          "saved_pairs": 66614,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 1008.0,
+            "mean": 594.7678571428571,
+            "min": 68.0,
+            "p50": 525.5,
+            "p90": 1008.0,
+            "p99": 1008.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5338855421686747,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 1.0,
+            "mean": 0.588337869571414,
+            "min": 0.32464599609375,
+            "p50": 0.501495361328125,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 839456,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 15910.0,
+            "mean": 7495.142857142857,
+            "min": 496.0,
+            "p50": 6963.0,
+            "p90": 11753.400000000001,
+            "p99": 15772.18
+          },
+          "hot_rows": 26718,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 256.0,
+            "mean": 238.55357142857142,
+            "min": 16.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 2.0699355198824665,
+          "output_elements": 388922368,
+          "output_pairs": 759614,
+          "saved_elements": 416121856,
+          "saved_pair_fraction": 0.516893163871703,
+          "saved_pairs": 812738,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 15654.0,
+            "mean": 7256.589285714285,
+            "min": 274.0,
+            "p50": 6707.0,
+            "p90": 11555.000000000002,
+            "p99": 15516.18
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.08429410208401172,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 1.0,
+            "mean": 0.12167985824764015,
+            "min": 0.0474853515625,
+            "p50": 0.072296142578125,
+            "p90": 0.2049970585928309,
+            "p99": 0.978553459119497
+          },
+          "hot_pairs": 132540,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 2048.0,
+            "mean": 1183.392857142857,
+            "min": 147.0,
+            "p50": 1049.0,
+            "p90": 2048.0,
+            "p99": 2048.0
+          },
+          "hot_rows": 3568,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 32.0,
+            "mean": 31.857142857142858,
+            "min": 16.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0893541548310217,
+          "output_elements": 739010560,
+          "output_pairs": 1443380,
+          "saved_elements": 66033664,
+          "saved_pair_fraction": 0.08202489010094431,
+          "saved_pairs": 128972,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 2016.0,
+            "mean": 1151.5357142857142,
+            "min": 115.0,
+            "p50": 1017.0,
+            "p90": 2016.0,
+            "p99": 2016.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.16136717478020188,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 1.0,
+            "mean": 0.21263457835445046,
+            "min": 0.09100341796875,
+            "p50": 0.139495849609375,
+            "p90": 0.37988126519727045,
+            "p99": 1.0
+          },
+          "hot_pairs": 253726,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 4096.0,
+            "mean": 2265.410714285714,
+            "min": 243.0,
+            "p50": 2010.5,
+            "p90": 4094.2000000000003,
+            "p99": 4096.0
+          },
+          "hot_rows": 7072,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 64.0,
+            "mean": 63.142857142857146,
+            "min": 16.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.186055949394206,
+          "output_elements": 678757376,
+          "output_pairs": 1325698,
+          "saved_elements": 126286848,
+          "saved_pair_fraction": 0.15686945416802345,
+          "saved_pairs": 246654,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 4032.0,
+            "mean": 2202.2678571428573,
+            "min": 179.0,
+            "p50": 1946.5,
+            "p90": 4030.2000000000003,
+            "p99": 4032.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.022286358270921524,
+          "hot_pair_share_per_tile": {
+            "count": 112,
+            "max": 0.7580645161290323,
+            "mean": 0.03699427636952563,
+            "min": 0.0126953125,
+            "p50": 0.019134521484375,
+            "p90": 0.052635137235398345,
+            "p99": 0.3219278384640848
+          },
+          "hot_pairs": 35042,
+          "hot_pairs_per_tile": {
+            "count": 112,
+            "max": 512.0,
+            "mean": 312.875,
+            "min": 46.0,
+            "p50": 279.0,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 896,
+          "hot_rows_per_tile": {
+            "count": 112,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0221985871853314,
+          "output_elements": 787561472,
+          "output_pairs": 1538206,
+          "saved_elements": 17482752,
+          "saved_pair_fraction": 0.0217165113155324,
+          "saved_pairs": 34146,
+          "saved_pairs_per_tile": {
+            "count": 112,
+            "max": 504.0,
+            "mean": 304.875,
+            "min": 38.0,
+            "p50": 271.0,
+            "p90": 504.0,
+            "p99": 504.0
+          }
+        }
+      },
+      "nonempty_tiles": 112,
+      "overall_tile_reduction_x": 24.468215558425793,
+      "saved_atomic_add_elements": 772142592,
+      "saved_pair_fraction": 0.9591306526782807,
+      "selected_block": 256,
+      "tile_reduction_x": {
+        "count": 112,
+        "max": 61.9375,
+        "mean": 29.650063986522955,
+        "min": 2.234234234234234,
+        "p50": 24.681622052152232,
+        "p90": 58.39000000000001,
+        "p99": 61.782714285714285
+      },
+      "tile_saved_pairs": {
+        "count": 112,
+        "max": 16112.0,
+        "mean": 13465.098214285714,
+        "min": 274.0,
+        "p50": 15552.5,
+        "p90": 15934.4,
+        "p99": 16094.24
+      },
+      "tile_unique_groups": {
+        "count": 112,
+        "max": 1024.0,
+        "mean": 573.7589285714286,
+        "min": 16.0,
+        "p50": 583.5,
+        "p90": 940.4000000000001,
+        "p99": 1021.24
+      },
+      "tile_valid_pairs": {
+        "count": 112,
+        "max": 16384.0,
+        "mean": 14038.857142857143,
+        "min": 496.0,
+        "p50": 16384.0,
+        "p90": 16384.0,
+        "p99": 16384.0
+      },
+      "tiles": 128,
+      "token_block": 64,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 64261
+    },
+    {
+      "baseline_atomic_add_elements": 805044224,
+      "coalesced_atomic_add_elements": 17036288,
+      "empty_tiles": 0,
+      "head_blocks": 1,
+      "hot_group_hybrid_reduction": {
+        "128": {
+          "hot_limit": 128,
+          "hot_pair_share": 0.2747972464181049,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 1.0,
+            "mean": 0.39511061900695704,
+            "min": 0.15203857421875,
+            "p50": 0.2520471464019851,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 432078,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 8192.0,
+            "mean": 6751.21875,
+            "min": 496.0,
+            "p50": 7248.5,
+            "p90": 8192.0,
+            "p99": 8192.0
+          },
+          "hot_rows": 7744,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 128.0,
+            "mean": 121.0,
+            "min": 16.0,
+            "p50": 128.0,
+            "p90": 128.0,
+            "p99": 128.0
+          },
+          "hybrid_reduction_x": 1.3696231243760986,
+          "output_elements": 587785216,
+          "output_pairs": 1148018,
+          "saved_elements": 217259008,
+          "saved_pair_fraction": 0.2698721405893846,
+          "saved_pairs": 424334,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 8064.0,
+            "mean": 6630.21875,
+            "min": 480.0,
+            "p50": 7120.5,
+            "p90": 8064.0,
+            "p99": 8064.0
+          }
+        },
+        "16": {
+          "hot_limit": 16,
+          "hot_pair_share": 0.037557111893520026,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 1.0,
+            "mean": 0.0822152255302321,
+            "min": 0.020751953125,
+            "p50": 0.03150589330024814,
+            "p90": 0.14803531453580507,
+            "p99": 0.794421052631578
+          },
+          "hot_pairs": 59053,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 1024.0,
+            "mean": 922.703125,
+            "min": 496.0,
+            "p50": 1024.0,
+            "p90": 1024.0,
+            "p99": 1024.0
+          },
+          "hot_rows": 1024,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 16.0,
+            "mean": 16.0,
+            "min": 16.0,
+            "p50": 16.0,
+            "p90": 16.0,
+            "p99": 16.0
+          },
+          "hybrid_reduction_x": 1.038320094193907,
+          "output_elements": 775333376,
+          "output_pairs": 1514323,
+          "saved_elements": 29710848,
+          "saved_pair_fraction": 0.03690585823021817,
+          "saved_pairs": 58029,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 1008.0,
+            "mean": 906.703125,
+            "min": 480.0,
+            "p50": 1008.0,
+            "p90": 1008.0,
+            "p99": 1008.0
+          }
+        },
+        "256": {
+          "hot_limit": 256,
+          "hot_pair_share": 0.5009374491208075,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 1.0,
+            "mean": 0.6115812517985131,
+            "min": 0.291778564453125,
+            "p50": 0.5033618709289702,
+            "p90": 1.0,
+            "p99": 1.0
+          },
+          "hot_pairs": 787650,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 16384.0,
+            "mean": 12307.03125,
+            "min": 496.0,
+            "p50": 12767.0,
+            "p90": 16384.0,
+            "p99": 16384.0
+          },
+          "hot_rows": 14464,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 256.0,
+            "mean": 226.0,
+            "min": 16.0,
+            "p50": 256.0,
+            "p90": 256.0,
+            "p99": 256.0
+          },
+          "hybrid_reduction_x": 1.9674911094816345,
+          "output_elements": 409172992,
+          "output_pairs": 799166,
+          "saved_elements": 395871232,
+          "saved_pair_fraction": 0.49173849112666884,
+          "saved_pairs": 773186,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 16128.0,
+            "mean": 12081.03125,
+            "min": 480.0,
+            "p50": 12535.0,
+            "p90": 16128.0,
+            "p99": 16128.0
+          }
+        },
+        "32": {
+          "hot_limit": 32,
+          "hot_pair_share": 0.07393764246173885,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 1.0,
+            "mean": 0.14298395198884106,
+            "min": 0.040374755859375,
+            "p50": 0.06301178660049628,
+            "p90": 0.29607062907161014,
+            "p99": 1.0
+          },
+          "hot_pairs": 116256,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 2048.0,
+            "mean": 1816.5,
+            "min": 496.0,
+            "p50": 2032.0,
+            "p90": 2048.0,
+            "p99": 2048.0
+          },
+          "hot_rows": 2032,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 32.0,
+            "mean": 31.75,
+            "min": 16.0,
+            "p50": 32.0,
+            "p90": 32.0,
+            "p99": 32.0
+          },
+          "hybrid_reduction_x": 1.0783360582884356,
+          "output_elements": 746561536,
+          "output_pairs": 1458128,
+          "saved_elements": 58482688,
+          "saved_pair_fraction": 0.07264531097362423,
+          "saved_pairs": 114224,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 2016.0,
+            "mean": 1784.75,
+            "min": 480.0,
+            "p50": 2000.0,
+            "p90": 2016.0,
+            "p99": 2016.0
+          }
+        },
+        "64": {
+          "hot_limit": 64,
+          "hot_pair_share": 0.14403199792412893,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 1.0,
+            "mean": 0.2419450495953164,
+            "min": 0.078704833984375,
+            "p50": 0.12602357320099256,
+            "p90": 0.5921412581432203,
+            "p99": 1.0
+          },
+          "hot_pairs": 226469,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 4096.0,
+            "mean": 3538.578125,
+            "min": 496.0,
+            "p50": 3909.5,
+            "p90": 4096.0,
+            "p99": 4096.0
+          },
+          "hot_rows": 4000,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 64.0,
+            "mean": 62.5,
+            "min": 16.0,
+            "p50": 64.0,
+            "p90": 64.0,
+            "p99": 64.0
+          },
+          "hybrid_reduction_x": 1.1648061350502228,
+          "output_elements": 691140096,
+          "output_pairs": 1349883,
+          "saved_elements": 113904128,
+          "saved_pair_fraction": 0.14148803830185608,
+          "saved_pairs": 222469,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 4032.0,
+            "mean": 3476.078125,
+            "min": 480.0,
+            "p50": 3845.5,
+            "p90": 4032.0,
+            "p99": 4032.0
+          }
+        },
+        "8": {
+          "hot_limit": 8,
+          "hot_pair_share": 0.018968398933572127,
+          "hot_pair_share_per_tile": {
+            "count": 64,
+            "max": 0.7580645161290323,
+            "mean": 0.045221171565105814,
+            "min": 0.01055908203125,
+            "p50": 0.01575294665012407,
+            "p90": 0.07401765726790253,
+            "p99": 0.49269439728353026
+          },
+          "hot_pairs": 29825,
+          "hot_pairs_per_tile": {
+            "count": 64,
+            "max": 512.0,
+            "mean": 466.015625,
+            "min": 346.0,
+            "p50": 512.0,
+            "p90": 512.0,
+            "p99": 512.0
+          },
+          "hot_rows": 512,
+          "hot_rows_per_tile": {
+            "count": 64,
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "p50": 8.0,
+            "p90": 8.0,
+            "p99": 8.0
+          },
+          "hybrid_reduction_x": 1.0189969274917874,
+          "output_elements": 790035968,
+          "output_pairs": 1543039,
+          "saved_elements": 15008256,
+          "saved_pair_fraction": 0.0186427721019212,
+          "saved_pairs": 29313,
+          "saved_pairs_per_tile": {
+            "count": 64,
+            "max": 504.0,
+            "mean": 458.015625,
+            "min": 338.0,
+            "p50": 504.0,
+            "p90": 504.0,
+            "p99": 504.0
+          }
+        }
+      },
+      "nonempty_tiles": 64,
+      "overall_tile_reduction_x": 47.254673318506946,
+      "saved_atomic_add_elements": 788007936,
+      "saved_pair_fraction": 0.9788380718821231,
+      "selected_block": 512,
+      "tile_reduction_x": {
+        "count": 64,
+        "max": 62.96875,
+        "mean": 51.84377883634761,
+        "min": 31.0,
+        "p50": 56.31944444444444,
+        "p90": 62.71553846153846,
+        "p99": 62.947792338709675
+      },
+      "tile_saved_pairs": {
+        "count": 64,
+        "max": 32240.0,
+        "mean": 24048.09375,
+        "min": 480.0,
+        "p50": 31736.0,
+        "p90": 32139.199999999997,
+        "p99": 32229.92
+      },
+      "tile_unique_groups": {
+        "count": 64,
+        "max": 1024.0,
+        "mean": 519.90625,
+        "min": 16.0,
+        "p50": 520.0,
+        "p90": 922.5,
+        "p99": 1013.29
+      },
+      "tile_valid_pairs": {
+        "count": 64,
+        "max": 32768.0,
+        "mean": 24568.0,
+        "min": 496.0,
+        "p50": 32504.0,
+        "p90": 32768.0,
+        "p99": 32768.0
+      },
+      "tiles": 64,
+      "token_block": 64,
+      "total_valid_pairs": 1572352,
+      "unique_pairs_after_tile_reduce": 33274
+    }
+  ]
+}

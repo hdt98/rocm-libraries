@@ -1,0 +1,89 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_20step_20260612",
+  "date": "2026-06-12",
+  "status": "completed_not_promoted",
+  "purpose": "20-step gate for Primus-Turbo TurboEPBackend normal/cold raw top-k dispatch+permute under the existing standard-EP top-8 hot-helper layout.",
+  "node": "do-sonle5-mi350-gpu",
+  "gpu": "8xMI350",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_steps20_20260612/docker-run.log",
+  "structured_logs": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_steps20_20260612/structured_logs/",
+  "shape": {
+    "model": "DeepSeek-V4 Flash reduced 12-layer",
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation": 2,
+    "dp_shard": 8,
+    "expert_parallel": 8,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "steps": 20
+  },
+  "key_env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+    "CANARY_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_TENSORS": "1",
+    "CANARY_STANDARD_EP_BACKEND_NORMAL_TOPK_DISPATCH_PERMUTE": "1",
+    "CANARY_MORI_AITER_BALANCED_MOE_PLAN_BACKEND": "primus_turbo",
+    "PRIMUS_TURBO_MOE_DISPATCH_COMBINE_BACKEND": "unset/default TURBO"
+  },
+  "backend_identity": {
+    "normal_cold_ep_backend": "Primus-Turbo in-tree TurboEPBackend",
+    "external_deepep_backend_available": false,
+    "hot_helper_transport": "standard-EP hot-helper wrapper; not Primus-Turbo native compact hot/cold/helper ABI"
+  },
+  "averages": {
+    "steps_2_20": {
+      "tok_per_gpu_s": 6434.894736842105,
+      "node_tok_s": 51479.15789473684,
+      "tflops_per_gpu": 318.57105263157894,
+      "mfu_percent": 13.793684210526315,
+      "max_memory_gib": 268.91,
+      "loss_start": 12.13682,
+      "loss_end": 4.31613
+    },
+    "steps_13_20": {
+      "tok_per_gpu_s": 6460.75,
+      "node_tok_s": 51686.0,
+      "tflops_per_gpu": 319.85,
+      "mfu_percent": 13.84875,
+      "max_memory_gib": 268.91,
+      "loss_start": 5.11417,
+      "loss_end": 4.31613
+    }
+  },
+  "comparisons": {
+    "versus_primus_turbo_nohelper_mbs8_steps_2_20": {
+      "baseline_tok_per_gpu_s": 6910.74,
+      "delta_percent": -6.89
+    },
+    "versus_primus_turbo_nohelper_mbs8_late_window": {
+      "baseline_tok_per_gpu_s": 6837.13,
+      "delta_percent": -5.5
+    },
+    "versus_standard_ep_top8_hothelper_ladder_row": {
+      "baseline_tok_per_gpu_s": 8632.78,
+      "delta_percent": -25.46
+    },
+    "versus_retained_adamw_standard_ep_hothelper_steps_2_20": {
+      "baseline_tok_per_gpu_s": 8518.84,
+      "delta_percent": -24.46
+    },
+    "versus_retained_adamw_standard_ep_hothelper_steps_13_20": {
+      "baseline_tok_per_gpu_s": 8630.66,
+      "delta_percent": -25.14
+    }
+  },
+  "decision": "Reject this mixed wrapper as a promotion. TurboEPBackend remains useful as a raw no-helper DeepSeek EP edge, but bolting it under the existing hot-helper wrapper is slower than raw Turbo no-helper and much slower than standard-EP hot-helper.",
+  "root_cause_hypothesis": [
+    "The run preserves the standard hot-helper policy but does not make hot/cold/helper rows a first-class Primus-Turbo compact ABI.",
+    "Normal/cold rows go through TurboEP dispatch+permute, while helper-hot rows, hot-weight movement, compact owner rows, weighted scatter, and helper VJP remain in the existing standard-EP wrapper graph.",
+    "The next useful step is a same-shape timing profile against standard-EP hot-helper to isolate the added backend state/permute/combine adapter cost, then implement a native Primus-Turbo compact hot/cold/helper ABI instead of another raw token-major top-k adapter."
+  ]
+}

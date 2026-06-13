@@ -1,0 +1,52 @@
+{
+  "status": "ok",
+  "scope": "tilelang_hsk_bf16_active_group_chunk_probe",
+  "created_at": "2026-06-04",
+  "host": "do-sonle-kernel",
+  "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "heads": 64,
+    "dim": 512,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "plan_on_device": true
+  },
+  "baseline": {
+    "artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_current_baseline_s4096_layer2_gp512_20260604.json",
+    "hsk_bf16_source_ms": 5.105003833770752,
+    "same_run_groupchunk_artifact_baseline_ms": 5.042367935180664
+  },
+  "probe_contract": {
+    "active_group_chunk_size": 256,
+    "chunk_count_at_s4096": 2,
+    "read": "Each producer pass owns only one active-group chunk and accumulates into a smaller shared-memory group_acc. The final DKV is zeroed once, then both chunk passes atomic-add their active-group slice. This halves accumulator rows but duplicates the MFMA contribution producer body."
+  },
+  "correctness": {
+    "s128_chunk_size": 16,
+    "s128_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_groupchunk16_s128_layer2_gp32_20260604.json",
+    "s128_padded_vs_source_max_abs_diff": 0.0,
+    "s128_reference_max_abs_diff": 7.62939453125e-06,
+    "s128_baseline_hsk_bf16_ms": 0.07020049914717674,
+    "s128_groupchunk_ms": 0.11046100035309792
+  },
+  "timing": {
+    "s4096_artifact": "run_artifacts/tilelang_selected_limit_hsk_bf16_groupchunk256_s4096_layer2_gp512_20260604.json",
+    "s4096_baseline_hsk_bf16_ms": 5.042367935180664,
+    "s4096_groupchunk256_ms": 9.277929306030273,
+    "s4096_groupchunk_speedup_vs_baseline": 0.5434735931834398,
+    "s4096_groupchunk_regression_x": 1.8441135809841877
+  },
+  "decision": {
+    "promote_group_chunking": false,
+    "retain_current_best_hsk_bf16_source": true,
+    "read": "Active-group chunking reduces shared accumulator footprint but loses badly because it recomputes the query-major MFMA contribution body for each active-group chunk. The useful next kernel direction is intra-CTA or wave-local segmented reduction within a single producer pass, so Q/dO/prob loads and MFMA fragments are reused while LDS read-modify-write pressure is reduced.",
+    "next_kernel_direction": "Prototype wave-private/lane-group accumulation for hot active groups, or move to a lower-level TileLang/HIP schedule that can reduce several selected rows sharing a group before touching group_acc. Re-profile SQ_INSTS_LDS and SQ_LDS_BANK_CONFLICT against the retained 5.1 ms HSK bf16 baseline."
+  }
+}

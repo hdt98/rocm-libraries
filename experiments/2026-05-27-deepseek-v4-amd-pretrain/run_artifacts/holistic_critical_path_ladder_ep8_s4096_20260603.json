@@ -1,0 +1,165 @@
+{
+  "artifact": "holistic_critical_path_ladder_ep8_s4096_20260603",
+  "date_utc": "2026-06-03",
+  "status": "analysis_persisted",
+  "scope": "Full-step critical-path interpretation for the retained TorchTitan DeepSeek-V4 Flash 4-layer 8xMI350 target canary.",
+  "shape": {
+    "gpu": "MI350",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full",
+    "optimizer": "AdamW"
+  },
+  "retained_no_profile_headline": {
+    "source_artifact": "run_artifacts/torchtitan_dsv4_ce2_default_retained_8x_s4096_gbs128_20260603.json",
+    "chunked_ce_num_chunks": 2,
+    "step2_tok_per_gpu_s": 3103,
+    "step2_node_tok_s": 24824,
+    "step2_implied_time_s": 21.12,
+    "loss_movement": "12.20713 -> 8.75234",
+    "target_tok_per_gpu_s": [2200, 2400],
+    "target_status": "passes_normalized_8xmi350_canary_target"
+  },
+  "source_artifacts": [
+    "run_artifacts/torchtitan_dsv4_full_profile_ep4_ep8_s4096_mbs1_20260603.json",
+    "run_artifacts/torchtitan_ep4_ep8_target_profile_breakdown_20260603.json",
+    "run_artifacts/torchtitan_ep4_ep8_gpu_profile_breakdown_correction_20260603.json",
+    "run_artifacts/holistic_optimization_targets_ep8_s4096_20260603.json",
+    "run_artifacts/chunked_ce2_retained_8x_target_shape_20260603.json",
+    "run_artifacts/mori_asyncll_align_mode_srcpos_retry_20260603.json"
+  ],
+  "how_to_read": [
+    "These buckets are not additive wall-clock decomposition. Torch profiler annotation ranges, CUDA event sidecars, and kernel-family summaries have different synchronization boundaries.",
+    "Use the no-profile CE2 run for headline throughput and use profiled runs for relative target ranking.",
+    "A large label is not automatically a high-return optimization target. If the label mostly contains rank waiting, the useful lever is overlap or skew reduction, not only the kernel named on the stack."
+  ],
+  "holistic_ranked_ladder": [
+    {
+      "rank": 1,
+      "bucket": "MoE backward dX return skew and overlap",
+      "representative_evidence": {
+        "ep8_combine_dx_total_s_per_rank_profiled_step": 2.718,
+        "ep8_combine_dx_per_call_median_ms": 25.12,
+        "ep8_combine_dx_per_call_p90_ms": 64.53,
+        "barrier_diag_pre_barrier_median_ms_per_call": 32.61,
+        "barrier_diag_raw_registered_combine_median_ms_per_call": 0.62
+      },
+      "interpretation": "This is a MoE backward critical-path issue, but mostly peer-arrival skew hidden inside combine rather than raw combine bandwidth.",
+      "highest_return_actions": [
+        "Make dX return overlap real by starting return earlier or in chunks.",
+        "Reduce owner-rank VJP imbalance that feeds the combine wait.",
+        "Revisit AsyncLL only with shared route/order metadata or explicit per-dispatched-row route identity."
+      ],
+      "deprioritized_actions": [
+        "Blind MORI [block, rdma, warp] tuple sweeps.",
+        "Independent-handle AsyncLL throughput A/Bs before seeded route/order parity passes."
+      ]
+    },
+    {
+      "rank": 2,
+      "bucket": "Routed MoE owner-rank VJP GEMM family",
+      "representative_evidence": {
+        "ep8_local_vjp_gemm_family_s_per_rank_profiled_step_sidecar": 1.901,
+        "ep8_local_vjp_gemm_family_s_per_rank_profiled_step_gpu_annotation": 2.06,
+        "ep8_local_vjp_per_call_median_ms": 29.63,
+        "ep8_owner_rank_probe_full_local_vjp_ms": 6.69,
+        "ep8_owner_rank_probe_saved_gate_up_hidden_output_ms": 5.11
+      },
+      "interpretation": "This is real MoE math and it also feeds the combine skew. EP8 smooths local VJP versus EP4, but the six padded/recompute GEMM groups are still a structural wall.",
+      "highest_return_actions": [
+        "Replace padded owner-rank VJP with fused/grouped training GEMM for w13 forward, w2 forward/dgrad, w2/w13 wgrad, and xgrad.",
+        "Change the AITER/MORI forward-backward contract to expose gate/up/hidden and compact output, or fuse recompute inside backward.",
+        "Keep Triton SwiGLU as retained vector fusion, but do not spend the next pass on pure SwiGLU alone."
+      ]
+    },
+    {
+      "rank": 3,
+      "bucket": "Loss/lm-head chunked CE",
+      "representative_evidence": {
+        "old_ce8_step2_tok_per_gpu_s": 3026,
+        "ce2_default_step2_tok_per_gpu_s": 3103,
+        "ce2_default_uplift_percent_vs_ce8": 2.5,
+        "ce1_step2_tok_per_gpu_s": 3002,
+        "ce4_step2_tok_per_gpu_s": 2989,
+        "sidecar_chunked_ce_lm_head_backward_region_s_per_step": 2.35
+      },
+      "interpretation": "The loss/lm-head path is a real canary lever and CE2 is retained. Its relative size is amplified in this 4-layer canary, so it should not displace MoE and sparse attention as the final full-model kernel priorities.",
+      "highest_return_actions": [
+        "Keep CE2 as the exact 8x S4096 GBS128 launcher default.",
+        "Only revisit loss after the MoE/attention path changes or if full-model profiling still shows it as a large exclusive bucket."
+      ]
+    },
+    {
+      "rank": 4,
+      "bucket": "Attention and final sparse MLA/LightningIndexer",
+      "representative_evidence": {
+        "ep8_attention_kernel_family_s_per_rank_profiled_step": 2.096,
+        "ep8_attention_forward_s_per_rank_profiled_step": 0.707,
+        "ep8_attention_bwd_dk_dv_s_per_rank_profiled_step": 0.93,
+        "ep8_attention_bwd_dq_s_per_rank_profiled_step": 0.433
+      },
+      "interpretation": "Attention is not the largest current guarded-path bucket, but the final sparse MLA/LI fused backward remains mandatory because the current canary is still a guarded/prototype sparse path.",
+      "highest_return_actions": [
+        "Continue the compressed dKV many-to-one accumulation work as the final sparse-MLA/LI blocker.",
+        "Avoid dense route materialization and group-major row-wise recompute; preserve query-major reuse and reduce dKV writes in-kernel."
+      ]
+    },
+    {
+      "rank": 5,
+      "bucket": "FSDP/RCCL/NCCL and copy/bookkeeping movement",
+      "representative_evidence": {
+        "ep8_rccl_nccl_kernel_family_s_per_rank_profiled_step": 1.027,
+        "ep8_copy_cat_fill_gather_kernel_family_s_per_rank_profiled_step": 1.441,
+        "ep8_fsdp_all_gather_annotation_s_per_rank": 0.834,
+        "ep8_fsdp_reduce_scatter_or_post_backward_reduce_annotation_s_per_rank": 2.005
+      },
+      "interpretation": "Communication and movement are material but not yet the dominant single-node target. FSDP annotation ranges can include overlap and should be interpreted separately from kernel-family NCCL totals.",
+      "highest_return_actions": [
+        "Keep FSDP and NCCL tags in future profiles.",
+        "Re-rank after MoE overlap and final sparse attention changes alter overlap."
+      ]
+    },
+    {
+      "rank": 6,
+      "bucket": "Shared expert dense backward scope check",
+      "representative_evidence": {
+        "broad_trace_shared_expert_backward_s_per_rank_profiled_step": 1.9,
+        "dense_loss_sidecar_shared_expert_linears_s_per_step": 0.05,
+        "attention_projection_backward_s_per_rank_profiled_step": 0.214,
+        "router_gate_backward_s_per_rank_profiled_step": 0.012
+      },
+      "interpretation": "A broad trace can label shared expert backward around 1.9-2.0 s/rank/step, but the deeper dense/loss sidecar puts owner-tagged shared expert linears near 0.05 s/step. Treat the broad number as non-exclusive scope bleed until reproduced by an exclusive GPU-event probe.",
+      "highest_return_actions": [
+        "Keep shared expert labels in future profiles.",
+        "Do not prioritize shared expert dense tuning ahead of MoE overlap/VJP, loss CE, or final sparse attention without stronger exclusive evidence."
+      ]
+    }
+  ],
+  "rejected_or_low_return_branches": [
+    {
+      "branch": "Independent-handle AsyncLL staged dX",
+      "status": "rejected_for_production",
+      "evidence": "S128 smokes pass, but S4096 route_key and src_pos alignment both fail because independent handles do not share a production-safe row order or route identity."
+    },
+    {
+      "branch": "Pure Triton SwiGLU retune",
+      "status": "low_return_now",
+      "evidence": "EP8 pure SwiGLU forward+backward is about 0.104 s/rank/step, far below MoE GEMM and combine."
+    },
+    {
+      "branch": "Dense LI route materialization",
+      "status": "negative_for_layer2",
+      "evidence": "Layer-2 dense-route BMM/flat GEMM are correct but around 23-25 ms with multi-GiB peak memory, so they are not the final sparse-attention backward path."
+    }
+  ],
+  "next_profile_contract": [
+    "For headline throughput, run no-profiler 8x S4096 GBS128 first and compare tok/GPU/s and step time.",
+    "For attribution, keep MORI CUDA-event sidecar, dense-linear owner tags, attention kernel family tags, FSDP/NCCL tags, and loss chunk tags in the same 2-step profile.",
+    "After any MoE overlap change, report both local VJP duration and combine wait/skew; do not report combine alone as raw communication bandwidth.",
+    "After any sparse attention change, report dQ, dK/dV, compressed dKV accumulation, LI/compressor gradients, memory peak, and whether selected-state guard is still active."
+  ],
+  "bottom_line": "The current retained path already passes the normalized 8xMI350 canary target, but the highest-return path toward a production DeepSeek-V4 Flash training stack is MoE backward overlap/skew plus fused owner-rank VJP, followed by the retained CE2 loss setting and final sparse MLA/LI fused backward work."
+}

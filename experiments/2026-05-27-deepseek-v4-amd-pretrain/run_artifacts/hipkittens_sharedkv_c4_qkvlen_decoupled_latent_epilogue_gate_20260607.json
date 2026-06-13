@@ -1,0 +1,130 @@
+{
+  "artifact": "hipkittens_sharedkv_c4_qkvlen_decoupled_latent_epilogue_gate_20260607",
+  "status": "promising_c4_shaped_d128_sharedkv_slice_not_e2e_promoted",
+  "host": "do-vunguyen-mi350-gpu",
+  "scratch_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "scope": "HipKittens SharedKV latent-dKV epilogue fork with decoupled query and compressed-KV sequence lengths",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_bwd_latent_epilogue_fork.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py",
+    "build_file": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/Makefile",
+    "reference_snapshot": "sources/references/hipkittens",
+    "reference_commit": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "code_change_under_test": {
+    "summary": "Split the legacy ATTN_N contract into ATTN_Q_N and ATTN_KV_N so the HipKittens latent-dKV epilogue fork can time C4 as query_seq=4096 with compressed/shared KV groups=1024. The Python probe now accepts --kv-seq and allocates K/V/dOriKV/dCmpKV/route metadata on kv_seq while Q/dO/O/LSE/dQ remain on query_seq.",
+    "why": "The earlier HipKittens query-chunk sweep still used KV_N=4096. For DeepSeek-V4 C4 sparse SharedKV, the compressed group axis is S / 4 = 1024, so timing the KV-owned fork against 4096 KV rows overstates the compressed side and hides the C4-shaped chunking behavior."
+  },
+  "shape": {
+    "batch": 4,
+    "query_seq": 4096,
+    "kv_seq": 1024,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "kv_heads": 1,
+    "dim_per_hipkittens_chunk": 128,
+    "target_latent_dim": 512,
+    "route_mode": "all_cmp",
+    "route_mask_mode": 0,
+    "num_warps": 4,
+    "timed_boundary": "HipKittens kernel only; O/L/delta precomputed outside timing",
+    "outputs": [
+      "dQ_in",
+      "dOriKV",
+      "dCmpKV"
+    ],
+    "missing_from_full_sparseattnsharedkvgrad": [
+      "full D512 accumulation/fusion",
+      "real row-ragged LI top-k route mask",
+      "dSinks output",
+      "TorchTitan integration and e2e TFLOPs materialization"
+    ]
+  },
+  "build": {
+    "command_shape": "make -B hk_sharedkv_bwd_latent_epilogue GPU_TARGET=CDNA4 ATTN_B=4 ATTN_N=4096 ATTN_Q_N=4096 ATTN_KV_N=1024 ATTN_H=64 ATTN_H_KV=1 ATTN_QUERY_CHUNKS=${q} ATTN_ROUTE_MASK_MODE=0 ATTN_NUM_WARPS=4",
+    "compile_macros": {
+      "ATTN_B": 4,
+      "ATTN_Q_N": 4096,
+      "ATTN_KV_N": 1024,
+      "ATTN_H": 64,
+      "ATTN_H_KV": 1,
+      "ATTN_NUM_WARPS": 4,
+      "ATTN_ROUTE_MASK_MODE": 0
+    },
+    "q16_resource_report": {
+      "total_sgprs": 105,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    }
+  },
+  "measurement_command_shape": "python3 /workspace/tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_bwd_latent_epilogue_fork.py --batch 4 --seq 4096 --kv-seq 1024 --heads 64 --kv-heads 1 --dim 128 --query-chunks ${q} --route-mode all_cmp --scale-input 0.01 --warmup 2 --iters 5",
+  "query_chunk_sweep_all_c4_compressed_tiles": [
+    {
+      "query_chunks": 1,
+      "event_median_ms": 16.9707,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 4,
+      "event_median_ms": 4.3252,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 8,
+      "event_median_ms": 2.4269,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 16,
+      "event_median_ms": 1.9,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 32,
+      "event_median_ms": 2.0278,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 64,
+      "event_median_ms": 2.3395,
+      "outputs_finite": true
+    }
+  ],
+  "active_half_cull_diagnostic": [
+    {
+      "query_chunks": 8,
+      "active_cmp_tiles": 8,
+      "active_cmp_rows": 512,
+      "event_median_ms": 2.2471,
+      "outputs_finite": true
+    },
+    {
+      "query_chunks": 16,
+      "active_cmp_tiles": 8,
+      "active_cmp_rows": 512,
+      "event_median_ms": 1.4104,
+      "outputs_finite": true
+    }
+  ],
+  "comparison": {
+    "current_triton_c4_sharedkv_full_d512_ms": 11.018,
+    "current_triton_c4_no_dkv_ms": 1.932,
+    "current_triton_c4_global_dkv_accumulation_ms": 8.179,
+    "previous_hipkittens_kv4096_best_d128_ms": 4.405,
+    "best_c4_shaped_hipkittens_d128_ms": 1.9,
+    "naive_four_d128_serial_projection_ms": 7.6,
+    "projection_caveat": "The four-D128 projection is only a planning lower bound. A promoted full kernel must carry the row terms, dQ, dOriKV, dCmpKV, and dSinks correctly across D512 and real LI routing."
+  },
+  "read": {
+    "positive": "Decoupling query and compressed-KV lengths materially changes the HipKittens gate. The q16 C4-shaped D128 slice is about 1.90 ms for B4/Q4096/KV1024/H64/HKV1 and is far more competitive than the earlier KV4096 slice.",
+    "negative": "This is still not the full SparseAttnSharedkvGrad boundary. It routes whole compressed KV tiles, does not consume exact per-token LI top-k membership, does not emit dSinks, and has not been materialized into TorchTitan throughput.",
+    "decision": "Keep the HipKittens latent epilogue fork alive as a candidate implementation substrate for C4 SharedKV backward, but do not promote it as an e2e speedup yet.",
+    "next_gate": "Implement the full D512 C4 source boundary with dSinks and real row-ragged LI routing, then compare the actual full SharedKV backward latency against the Triton 11.02 ms C4 gate before launching an e2e TFLOPs run."
+  }
+}

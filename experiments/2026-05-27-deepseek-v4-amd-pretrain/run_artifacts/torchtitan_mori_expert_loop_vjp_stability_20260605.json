@@ -1,0 +1,139 @@
+{
+  "artifact": "torchtitan_mori_expert_loop_vjp_stability_20260605",
+  "created_utc": "2026-06-05",
+  "question": "Can MORI EP/MoE backward reuse forward intermediates, and does avoiding padded owner-rank VJP materialize into end-to-end TFLOPs?",
+  "status": "passed_6_step_stability_gate",
+  "node": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_dsv4_mori_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_moriimg_20260605",
+  "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_mori_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_moriimg_20260605/docker-run.log",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "micro_batch_size": 4,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 8,
+    "sequence_length": 4096,
+    "steps": 6,
+    "activation_checkpointing": "none",
+    "checkpointing": false
+  },
+  "env": {
+    "TORCHTITAN_DSV4_MOE_COMM_BACKEND": "mori",
+    "TORCHTITAN_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "TORCHTITAN_MORI_AITER_FORWARD_MODE": "aiter",
+    "TORCHTITAN_MORI_AITER_BACKWARD_MODE": "routed",
+    "TORCHTITAN_MORI_AITER_LOCAL_VJP_MODE": "expert_loop",
+    "TORCHTITAN_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "TORCHTITAN_MORI_AITER_XGRAD_MODE": "compact",
+    "TORCHTITAN_MORI_AITER_DTOPK_CHUNK_ROWS": "1024",
+    "TORCHTITAN_MORI_AITER_SWIGLU_CHUNK_ROWS": "8192",
+    "MORI_SHMEM_HEAP_SIZE": "32G",
+    "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "TORCHTITAN_DSV4_CHUNKED_CE_NUM_CHUNKS": "8"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.2898,
+      "grad_norm": 11.25,
+      "logged_tps": 4739,
+      "tflops_per_gpu": 89.66,
+      "max_logged_memory_gib": 80.09
+    },
+    {
+      "step": 2,
+      "loss": 9.64167,
+      "grad_norm": 22.125,
+      "logged_tps": 12422,
+      "tflops_per_gpu": 235.05,
+      "max_logged_memory_gib": 105.87
+    },
+    {
+      "step": 3,
+      "loss": 14.4657,
+      "grad_norm": 28.875,
+      "logged_tps": 12245,
+      "tflops_per_gpu": 231.7,
+      "max_logged_memory_gib": 108.67
+    },
+    {
+      "step": 4,
+      "loss": 13.37736,
+      "grad_norm": 68.0,
+      "logged_tps": 12087,
+      "tflops_per_gpu": 228.72,
+      "max_logged_memory_gib": 109.88
+    },
+    {
+      "step": 5,
+      "loss": 11.05343,
+      "grad_norm": 59.75,
+      "logged_tps": 11956,
+      "tflops_per_gpu": 226.23,
+      "max_logged_memory_gib": 110.25
+    },
+    {
+      "step": 6,
+      "loss": 9.1643,
+      "grad_norm": 37.25,
+      "logged_tps": 11977,
+      "tflops_per_gpu": 226.62,
+      "max_logged_memory_gib": 111.25
+    }
+  ],
+  "summary": {
+    "mean_tflops_per_gpu_steps_2_to_6": 230.468,
+    "mean_tflops_per_gpu_steps_3_to_6": 229.3175,
+    "mean_tflops_per_gpu_steps_4_to_6": 227.19,
+    "mean_logged_tps_steps_4_to_6": 12006.67,
+    "mean_node_tps_steps_4_to_6": 48026.68,
+    "max_logged_memory_gib": 111.25,
+    "late_step_memory_stable": true,
+    "passes_current_4x_token_target": true,
+    "current_4x_target_node_tps_range": [
+      45000,
+      47000
+    ],
+    "current_4x_target_tps_per_gpu_range": [
+      11300,
+      11800
+    ]
+  },
+  "comparison": {
+    "route_stats_padded_run_id": "torchtitan_dsv4_mori_route_stats_timing_4x_s4096_gbs128_mbs4_ga8_steps4_vu_20260605",
+    "route_stats_padded_step4_tflops_per_gpu": 143.87,
+    "route_stats_padded_step4_max_logged_memory_gib": 229.5,
+    "route_stats_padded_mean_padding_multiplier": 22.03,
+    "route_stats_padded_max_padding_multiplier": 44.204,
+    "streamed_swiglu_padded_six_step_run_id": "torchtitan_dsv4_mori_streamed_swiglu_heap32g_noac_4x_s4096_gbs128_mbs4_ga8_steps6_vu_20260605",
+    "streamed_swiglu_padded_mean_tflops_steps_4_to_6": 147.04,
+    "streamed_swiglu_padded_max_logged_memory_gib": 246.03,
+    "expert_loop_vs_streamed_padded_late_tflops_speedup": 1.5448,
+    "expert_loop_vs_streamed_padded_peak_memory_ratio": 0.4522
+  },
+  "diagnosis": {
+    "mori_moe_wall_type": "route_imbalance_induced_padded_compute_and_transient_materialization",
+    "not_primary_wall": "raw_hbm_bandwidth_or_mori_collective_tuning_only",
+    "why": "The padded owner VJP path inflated local expert GEMM work by 22x mean and 44x max padding under learned-router collapse. The compact expert-loop path avoids the padded tensors and sustains 227.19 TFLOPs/GPU over steps 4-6 at 111.25 GiB, materializing both throughput and memory improvement.",
+    "forward_intermediate_reuse_read": "Reuse is viable, but the saved state must be compact/AITER-owned. The existing padded_saved path saves x_padded, gate, up, hidden, and out_compact, which can reduce backward recompute but reintroduces the padding shape that caused the wall. The useful next path is AITER fused forward exposing compact route metadata and optionally compact gate/up/hidden/out buffers without replacing the fused forward with padded PyTorch work."
+  },
+  "decision": {
+    "promote_as_current_4x_mori_moe_candidate": true,
+    "promote_as_final_kernel_solution": false,
+    "next_action": "Replace Python per-expert expert_loop with a fused compact grouped owner-rank training backward or extend AITER forward/backward to expose compact saved intermediates while preserving the fused forward."
+  },
+  "failed_control": {
+    "run_id": "torchtitan_dsv4_mori_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_20260605",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "status": "failed_before_step_1",
+    "reason": "ModuleNotFoundError: No module named 'mori'",
+    "read": "Use the MORI overlay image for MORI EP runs."
+  }
+}

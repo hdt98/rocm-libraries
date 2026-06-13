@@ -1,0 +1,80 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_profile_steps2_20260612",
+  "date": "2026-06-12",
+  "status": "diagnostic_profile_completed_not_promoted",
+  "purpose": "Low-intrusion timing profile for the rejected DeepSeek MBS8 mixed Primus-Turbo normal/cold dispatch+permute under standard-EP top-8 hot-helper.",
+  "node": "do-sonle5-mi350-gpu",
+  "gpu": "8xMI350",
+  "raw_profile_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_profile_steps2_20260612/",
+  "raw_log_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_primus_turbo_hothelper_mbs8_profile_steps2_20260612/docker-run.log",
+  "shape": {
+    "model": "DeepSeek-V4 Flash reduced 12-layer",
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation": 2,
+    "dp_shard": 8,
+    "expert_parallel": 8,
+    "steps": 2
+  },
+  "active_path": {
+    "hot_helper": "standard-EP top-8 execute, owner_compact row materialization",
+    "normal_cold_backend": "Primus-Turbo in-tree TurboEPBackend through dispatch_permute_normal_topk_tokens/unpermute_combine_normal_topk_tokens",
+    "not_active": "native Primus-Turbo compact hot/cold/helper row ABI"
+  },
+  "step_2_metric": {
+    "tok_per_gpu_s": 5503.0,
+    "tflops_per_gpu": 272.45,
+    "max_memory_gib": 263.54,
+    "note": "Timing hooks are active; use this as a profile, not a throughput promotion."
+  },
+  "additive_step_2_rankmax_ms": {
+    "step_train_step": 10411.178,
+    "train_step_microbatch_forward_backward": 10300.588,
+    "train_step_forward_backward_call": 10300.381,
+    "forward_backward_model_forward": 2566.199,
+    "forward_backward_loss": 615.279,
+    "forward_backward_backward": 7119.407,
+    "train_step_optimizer_step": 48.413,
+    "train_step_grad_clip": 29.374
+  },
+  "current_best_profile_reference_rankmax_ms": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_currentbest_sparse_profile_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps2_20260608.json",
+    "step_train_step": 8496.781,
+    "train_step_microbatch_forward_backward": 8385.036,
+    "forward_backward_model_forward": 2046.788,
+    "forward_backward_loss": 408.854,
+    "forward_backward_backward": 5959.396,
+    "note": "Reference profile is also diagnostic/intrusive; compare direction and buckets, not absolute retained throughput."
+  },
+  "step_2_standard_ep_kind_rankmax_ms": {
+    "chunked_ce_loss": 608.394,
+    "standard_ep_dispatch": 374.6,
+    "standard_ep_hot_split": 337.907,
+    "standard_ep_combine": 201.249,
+    "standard_ep_hot_weight": 74.361
+  },
+  "step_2_top_standard_ep_stage_rankmax_ms": {
+    "standard_ep.combine.backend_normal_topk_unpermute_combine": 201.249,
+    "standard_ep.dispatch.backend_normal_topk_dispatch_permute": 162.458,
+    "standard_ep.dispatch.count_all_to_all": 159.714,
+    "standard_ep.hot_split.broadcast_hot_weights": 85.005,
+    "standard_ep.hot_split.weighted_scatter_tokens": 79.301,
+    "standard_ep.hot_split.grouped_w3": 62.939,
+    "standard_ep.hot_split.grouped_w2": 54.863,
+    "standard_ep.hot_split.grouped_w1": 49.599,
+    "standard_ep_hot_weight.w2.forward.all_reduce_hot_weight": 43.83,
+    "standard_ep.dispatch.build_hot_plan": 22.842,
+    "standard_ep.dispatch.hot_mask": 19.646
+  },
+  "read": [
+    "The mixed path is not native hot-helper. It keeps the standard hot/cold/helper policy and helper graph, but adds Primus-Turbo raw top-k dispatch+permute/combine for normal/cold rows.",
+    "The inserted Turbo edge is visible: dispatch+permute is 162.458 ms rank-max and unpermute/combine is 201.249 ms rank-max at step 2, while standard count exchange, hot-mask planning, hot-weight movement, helper grouped MLP, and weighted scatter remain.",
+    "Because the wrapper graph is still present, this path can be slower than raw Turbo no-helper and slower than standard-EP hot-helper. The next code target should not be another raw top-k adapter; it should be native compact hot/cold/helper ABI support in Primus-Turbo."
+  ],
+  "next_target": [
+    "Expose a Primus-Turbo compact-row ABI that consumes the saved owner-compact partition directly instead of rebuilding a token-major [tokens, top_k] normal-route tensor.",
+    "Keep normal/cold and helper-hot rows in one backend-owned dispatch plan so helper rows are not a source-rank sidecar.",
+    "Return compact dX/dTopK and reduce hot partial dW through the backend contract, rather than leaving weighted scatter and helper VJP as separate TorchTitan wrapper work."
+  ]
+}

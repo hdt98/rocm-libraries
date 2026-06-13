@@ -1,0 +1,294 @@
+{
+  "active_group_density": {
+    "dense_slot_overhead_x": 1.0666666666666667,
+    "nonempty_tiles": 16,
+    "tiles": 16,
+    "unique_groups_max": 128,
+    "unique_groups_mean_all_tiles": 68.0,
+    "unique_groups_mean_nonempty": 68.0,
+    "unique_groups_total": 1088
+  },
+  "active_route_workspace": {
+    "active_counts_bytes": 64,
+    "active_groups_bytes": 8192
+  },
+  "arch": "gfx950",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "blocks": {
+    "block_d": 16,
+    "dense_group_dynamic_shared_bytes": 8704,
+    "dense_group_threads": 256,
+    "group_block": 64,
+    "selected_block": 256,
+    "selected_tiles_for_dense_group": 1,
+    "seq_chunk": 32
+  },
+  "boundary_route_fanin": {
+    "actual_compressed": {
+      "gini": 0.33462009803921566,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 128,
+      "p50_all_rows": 255.0,
+      "p50_nonzero_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p90_nonzero_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p99_nonzero_rows": 503.92,
+      "rows": 128,
+      "top16_share": 0.23480392156862745,
+      "top1_share": 0.01559436274509804,
+      "top64_share": 0.7509803921568627,
+      "top8_share": 0.1213235294117647,
+      "total_selections": 32640,
+      "zero_rows": 0
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "atomic_estimates": {
+      "block_h_16": {
+        "actual_atomic_add_elements": 66846720,
+        "head_blocks": 4,
+        "prefix_atomic_add_elements": 66846720
+      },
+      "block_h_64": {
+        "actual_atomic_add_elements": 16711680,
+        "head_blocks": 1,
+        "prefix_atomic_add_elements": 16711680
+      }
+    },
+    "compress_ratio": 4,
+    "compressed_groups": 128,
+    "prefix_compressed_same_topk": {
+      "gini": 0.33462009803921566,
+      "max": 509,
+      "mean_all_rows": 255.0,
+      "mean_nonzero_rows": 255.0,
+      "min": 1,
+      "min_nonzero": 1,
+      "nonzero_rows": 128,
+      "p50_all_rows": 255.0,
+      "p50_nonzero_rows": 255.0,
+      "p90_all_rows": 458.2,
+      "p90_nonzero_rows": 458.2,
+      "p99_all_rows": 503.92,
+      "p99_nonzero_rows": 503.92,
+      "rows": 128,
+      "top16_share": 0.23480392156862745,
+      "top1_share": 0.01559436274509804,
+      "top64_share": 0.7509803921568627,
+      "top8_share": 0.1213235294117647,
+      "total_selections": 32640,
+      "zero_rows": 0
+    },
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology.",
+    "topk": 128,
+    "valid_selected_per_query": {
+      "gini": 0.33464307598039217,
+      "max": 128,
+      "mean_all_rows": 63.75,
+      "mean_nonzero_rows": 64.12573673870334,
+      "min": 0,
+      "min_nonzero": 1,
+      "nonzero_rows": 509,
+      "p50_all_rows": 64.0,
+      "p50_nonzero_rows": 64.0,
+      "p90_all_rows": 115.0,
+      "p90_nonzero_rows": 115.0,
+      "p99_all_rows": 126.0,
+      "p99_nonzero_rows": 126.0,
+      "rows": 512,
+      "top16_share": 0.0616421568627451,
+      "top1_share": 0.00392156862745098,
+      "top64_share": 0.23480392156862745,
+      "top8_share": 0.031066176470588236,
+      "total_selections": 32640,
+      "zero_rows": 3
+    }
+  },
+  "build_seconds": 16.486667521996424,
+  "contract_rung": {
+    "block_d": 16,
+    "expected_write_reduction_x": 12.338365924856399,
+    "group_block": 64,
+    "name": "32x256_d16_smoke",
+    "p99_combined_scratch_kib": 115.3870703125,
+    "read": "Lower-pressure compile/parity/perf rung from compressed_dkv_mfma_segmented_reducer_next_contract_20260602. It is the first S4096 timing gate before widening to the full selected span.",
+    "selected_block": 256,
+    "seq_chunk": 32
+  },
+  "correctness": null,
+  "dense_group_tile_correctness": {
+    "candidate_norm": 756.64013671875,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 3.4332275390625e-05,
+    "mean_abs_diff": 1.4430665373765805e-07,
+    "passed": true,
+    "reference_norm": 756.64013671875
+  },
+  "device": "cuda",
+  "device_name": "AMD Instinct MI350X VF",
+  "dtype": "bfloat16",
+  "extension_dir": "/tmp/dsv4_compressed_dkv_hip_accumulator",
+  "included_headers": [
+    "rocprim/device/device_reduce_by_key.hpp",
+    "rocprim/device/device_segmented_reduce.hpp",
+    "hipcub/device/device_segmented_reduce.hpp",
+    "ck_tile/core.hpp"
+  ],
+  "layer_id": 2,
+  "materialized_workspace": {
+    "grad_logits_bytes": 16777216,
+    "probs_bytes": 16777216,
+    "safe_groups_bytes": 524288,
+    "valid_bytes": 65536
+  },
+  "modeled_write_reduction": {
+    "coalesced_active_list_atomic_elements": 557056,
+    "coalesced_active_list_reduction_x": 30.0,
+    "dense_group_tile_global_atomic_elements": 557056,
+    "dense_group_tile_reduction_x": 30.0,
+    "dense_group_tile_vs_active_list_global_atomic_x": 1.0,
+    "dense_tile_partial_slab_elements": 1048576,
+    "dense_tile_partial_slab_over_active_coalesced_x": 1.8823529411764706,
+    "query_major_raw_atomic_elements": 16711680
+  },
+  "perf_reporting_context": {
+    "multi_gpu_targets": {
+      "eight_mi350": {
+        "global_batch_size": 128,
+        "sequence_length": 4096,
+        "target_step_time_s": [
+          27,
+          30
+        ],
+        "target_tok_per_gpu_s": [
+          2200,
+          2400
+        ],
+        "tokens_per_step": 524288
+      },
+      "four_mi350": {
+        "global_batch_size": 64,
+        "sequence_length": 4096,
+        "target_step_time_s": [
+          27,
+          30
+        ],
+        "target_tok_per_gpu_s": [
+          2200,
+          2400
+        ],
+        "tokens_per_step": 262144
+      },
+      "read": "Final reporting must include end-to-end tok/GPU/s and TFLOPs, not just this standalone accumulator timing."
+    },
+    "reducer_slice_gates_ms": {
+      "s4096_mfma_bf16_floor_context": 4.727312088012695,
+      "s4096_mfma_mixed_floor_context": 7.052491188049316,
+      "s4096_must_beat_sparse_atomic_wall": 8.80629825592041,
+      "s512_must_beat_rejected_scalar_local_branches": 3.081876039505005,
+      "s512_reference_materialized_pytorch_context": 1.575103998184204
+    },
+    "single_layer": {
+      "current_best_full_layer_ms": 68.2089,
+      "read": "Reducer timings are accumulator-slice timings, not full-layer latency. Use this context to decide whether the slice improvement is large enough to matter for the single-layer 24.9 ms target.",
+      "required_layer_reduction_ms": 43.3089,
+      "target_full_layer_ms": 24.9
+    }
+  },
+  "read": "First HIP extension accumulator for actual-LI compressed dKV. It consumes materialized probs/grad_logits and active-group lists, so it is an accumulator-path smoke only. The body is scalar and serves as the binding/correctness rung before a CK-Tile/MFMA schedule. The optional tile-partial mode removes final global atomics by writing one partial row per seq-tile/group/D and then reducing those rows. The optional dense-group-tile mode keeps a dense local compressed-group table in LDS per seq/selected/D16 tile, then emits sparse global atomics only for touched groups. It is a runtime diagnostic for the coalesced-write budget, not the final CK-Tile/MFMA body.",
+  "reducer_promotion_gate": {
+    "candidate_event_median_ms": 4.182168960571289,
+    "candidate_label": "hip_dense_group_tile_local_table",
+    "gate": "s512_must_beat_rejected_scalar_local_branches",
+    "reference_context_ms": 1.575103998184204,
+    "scope": "isolated compressed-dKV accumulator slice; not full-layer or multi-GPU end-to-end throughput",
+    "status": "failed",
+    "threshold_ms": 3.081876039505005
+  },
+  "scope": "compressed_dkv_segmented_hip_accumulator_smoke",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 128,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 640,
+    "seq_len": 512,
+    "topk": 128,
+    "valid_pairs": 32640
+  },
+  "skip_correctness": false,
+  "status": "ok",
+  "tile_partial_correctness": null,
+  "timing": {
+    "hip_dense_group_tile_local_table": {
+      "checksum_norm": 756.64013671875,
+      "event": {
+        "enabled": true,
+        "max_ms": 4.186809062957764,
+        "mean_ms": 4.17227570215861,
+        "median_ms": 4.182168960571289,
+        "min_ms": 4.147849082946777,
+        "samples_ms": [
+          4.186809062957764,
+          4.147849082946777,
+          4.182168960571289
+        ],
+        "stdev_ms": 0.02128091708853608
+      },
+      "label": "hip_dense_group_tile_local_table",
+      "peak_memory_allocated_bytes": 762197504,
+      "peak_memory_allocated_gib": 0.7098517417907715,
+      "wall": {
+        "enabled": true,
+        "max_ms": 4.217654000967741,
+        "mean_ms": 4.193190019577742,
+        "median_ms": 4.197543021291494,
+        "min_ms": 4.1643730364739895,
+        "samples_ms": [
+          4.217654000967741,
+          4.1643730364739895,
+          4.197543021291494
+        ],
+        "stdev_ms": 0.02690588713062726
+      }
+    },
+    "pytorch_reference_dkv": {
+      "checksum_norm": 756.64013671875,
+      "event": {
+        "enabled": true,
+        "max_ms": 2.136504888534546,
+        "mean_ms": 1.7599406242370605,
+        "median_ms": 1.5726189613342285,
+        "min_ms": 1.5706980228424072,
+        "samples_ms": [
+          2.136504888534546,
+          1.5726189613342285,
+          1.5706980228424072
+        ],
+        "stdev_ms": 0.3261156334195007
+      },
+      "label": "pytorch_reference_dkv",
+      "peak_memory_allocated_bytes": 1635921920,
+      "peak_memory_allocated_gib": 1.5235710144042969,
+      "wall": {
+        "enabled": true,
+        "max_ms": 2.20575206913054,
+        "mean_ms": 1.8027093416700761,
+        "median_ms": 1.6040480695664883,
+        "min_ms": 1.5983278863132,
+        "samples_ms": [
+          2.20575206913054,
+          1.5983278863132,
+          1.6040480695664883
+        ],
+        "stdev_ms": 0.34905695845118184
+      }
+    }
+  }
+}

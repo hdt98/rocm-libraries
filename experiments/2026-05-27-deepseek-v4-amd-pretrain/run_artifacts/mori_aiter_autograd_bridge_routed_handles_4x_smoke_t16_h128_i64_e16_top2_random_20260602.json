@@ -1,0 +1,437 @@
+{
+  "probe": "mori_aiter_moe_autograd_bridge",
+  "created_unix": 1780339643.1653569,
+  "world_size": 4,
+  "shape": {
+    "tokens_per_rank": 16,
+    "hidden": 128,
+    "intermediate": 64,
+    "experts": 16,
+    "num_local_experts": 4,
+    "topk": 2,
+    "topk_pattern": "random",
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.05,
+    "warmup": 0,
+    "iters": 1,
+    "backward_mode": "routed"
+  },
+  "thresholds": {
+    "output_atol": 0.0625,
+    "grad_atol": 0.0005
+  },
+  "contract": {
+    "forward": "actual MORI dispatch -> local AITER fused_moe with preshuffled w13/w2 -> MORI combine",
+    "backward": "MORI-routed PyTorch VJP; redispatch x and grad_output to expert owners, compute local owned-expert VJP only, then MORI-combine dX and dTopkWeight back to source tokens",
+    "scope": "training API semantics probe; routed mode is an intermediate contract, not the final fused MoE backward kernel"
+  },
+  "runtime": {
+    "torch": "2.13.0a0+gitccf72d7",
+    "hip": "7.2.53211",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "summary": {
+    "all_ranks_pass": false,
+    "max_forward_abs_diff_across_ranks": 3.814697265625e-06,
+    "max_grad_abs_diff_across_ranks": 0.00101470947265625,
+    "bridge_fwd_bwd_ms_rank_median": 5.753803491592407
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "expert_owner_range": [
+        0,
+        4
+      ],
+      "forward_compare": {
+        "shape": [
+          16,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.2179301595315337e-07,
+        "max_rel_diff": 1.3703703880310059,
+        "cosine_distance": 5.7220458984375e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.000812530517578125,
+          "mean_abs_diff": 0.0001855593582149595,
+          "max_rel_diff": 3546.791015625,
+          "cosine_distance": 0.9778648018836975,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0003414154052734375,
+          "mean_abs_diff": 2.5851632017293014e-05,
+          "max_rel_diff": 3838.058837890625,
+          "cosine_distance": 1.0020307302474976,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00028228759765625,
+          "mean_abs_diff": 2.671253605512902e-05,
+          "max_rel_diff": 7200.5498046875,
+          "cosine_distance": 0.9419842958450317,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0002722740173339844,
+          "mean_abs_diff": 2.635636701597832e-05,
+          "max_rel_diff": 6499.681640625,
+          "cosine_distance": 0.9903175234794617,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.00032123998971655965,
+          "mean_abs_diff": 9.275229967897758e-05,
+          "max_rel_diff": 166.79664611816406,
+          "cosine_distance": 1.0099568367004395,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.000812530517578125,
+      "passes_atol": false,
+      "bridge_fwd_bwd_ms": {
+        "median": 5.739822864532471,
+        "min": 5.739822864532471,
+        "max": 5.739822864532471
+      },
+      "timing_read": "Includes real MORI+AITER forward plus selected backward mode; routed mode still clones dispatch buffers for probe safety and uses PyTorch local VJP, so it is not a fused-kernel target."
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "expert_owner_range": [
+        4,
+        8
+      ],
+      "forward_compare": {
+        "shape": [
+          16,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.0330617189756595e-07,
+        "max_rel_diff": 4.968992233276367,
+        "cosine_distance": 4.887580871582031e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0007276535034179688,
+          "mean_abs_diff": 0.00017802012735046446,
+          "max_rel_diff": 18502.130859375,
+          "cosine_distance": 1.0114887952804565,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00032138824462890625,
+          "mean_abs_diff": 2.807614509947598e-05,
+          "max_rel_diff": 4714.20556640625,
+          "cosine_distance": 1.0291459560394287,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00028324127197265625,
+          "mean_abs_diff": 2.6540496037341654e-05,
+          "max_rel_diff": 4272.54296875,
+          "cosine_distance": 0.9457110166549683,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00030231475830078125,
+          "mean_abs_diff": 2.8334497983451e-05,
+          "max_rel_diff": 7009.005859375,
+          "cosine_distance": 0.9576697945594788,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.00026436554617248476,
+          "mean_abs_diff": 0.00010731611109804362,
+          "max_rel_diff": 50.6656494140625,
+          "cosine_distance": 1.265251874923706,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.0007276535034179688,
+      "passes_atol": false,
+      "bridge_fwd_bwd_ms": {
+        "median": 5.77726411819458,
+        "min": 5.77726411819458,
+        "max": 5.77726411819458
+      },
+      "timing_read": "Includes real MORI+AITER forward plus selected backward mode; routed mode still clones dispatch buffers for probe safety and uses PyTorch local VJP, so it is not a fused-kernel target."
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "expert_owner_range": [
+        8,
+        12
+      ],
+      "forward_compare": {
+        "shape": [
+          16,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 3.814697265625e-06,
+        "mean_abs_diff": 2.1510345504793804e-07,
+        "max_rel_diff": 4.423868179321289,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00101470947265625,
+          "mean_abs_diff": 0.00018079995061270893,
+          "max_rel_diff": 18060.63671875,
+          "cosine_distance": 1.010331392288208,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0003638267517089844,
+          "mean_abs_diff": 3.335458313813433e-05,
+          "max_rel_diff": 3194.6591796875,
+          "cosine_distance": 1.0445951223373413,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00032520294189453125,
+          "mean_abs_diff": 3.200944047421217e-05,
+          "max_rel_diff": 3909.753662109375,
+          "cosine_distance": 0.9984945058822632,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0003275871276855469,
+          "mean_abs_diff": 3.2809799449751154e-05,
+          "max_rel_diff": 7724.80419921875,
+          "cosine_distance": 0.9874416589736938,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.00035200160345993936,
+          "mean_abs_diff": 0.00012491295638028532,
+          "max_rel_diff": 81.93879699707031,
+          "cosine_distance": 1.2676920890808105,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.00101470947265625,
+      "passes_atol": false,
+      "bridge_fwd_bwd_ms": {
+        "median": 5.763864040374756,
+        "min": 5.763864040374756,
+        "max": 5.763864040374756
+      },
+      "timing_read": "Includes real MORI+AITER forward plus selected backward mode; routed mode still clones dispatch buffers for probe safety and uses PyTorch local VJP, so it is not a fused-kernel target."
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "expert_owner_range": [
+        12,
+        16
+      ],
+      "forward_compare": {
+        "shape": [
+          16,
+          128
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 1.9073486328125e-06,
+        "mean_abs_diff": 2.2571367708223988e-07,
+        "max_rel_diff": 12.211678504943848,
+        "cosine_distance": 5.125999450683594e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "gradient_compare": {
+        "x": {
+          "shape": [
+            16,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00099945068359375,
+          "mean_abs_diff": 0.00018359989917371422,
+          "max_rel_diff": 3490.221435546875,
+          "cosine_distance": 0.982866108417511,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w1_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0003223419189453125,
+          "mean_abs_diff": 3.0629678803961724e-05,
+          "max_rel_diff": 3852.763427734375,
+          "cosine_distance": 1.0323981046676636,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w3_local": {
+          "shape": [
+            4,
+            64,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.0002841949462890625,
+          "mean_abs_diff": 3.0462670110864565e-05,
+          "max_rel_diff": 6897.94140625,
+          "cosine_distance": 1.0005993843078613,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "w2_local": {
+          "shape": [
+            4,
+            128,
+            64
+          ],
+          "dtype": "torch.bfloat16",
+          "max_abs_diff": 0.00034427642822265625,
+          "mean_abs_diff": 3.0137951398501173e-05,
+          "max_rel_diff": 5507.0732421875,
+          "cosine_distance": 1.0485904216766357,
+          "actual_finite": true,
+          "expected_finite": true
+        },
+        "topk_weight": {
+          "shape": [
+            16,
+            2
+          ],
+          "dtype": "torch.float32",
+          "max_abs_diff": 0.00034273607889190316,
+          "mean_abs_diff": 0.00010663868306437507,
+          "max_rel_diff": 7.4613165855407715,
+          "cosine_distance": 1.169255018234253,
+          "actual_finite": true,
+          "expected_finite": true
+        }
+      },
+      "max_grad_abs_diff": 0.00099945068359375,
+      "passes_atol": false,
+      "bridge_fwd_bwd_ms": {
+        "median": 5.743742942810059,
+        "min": 5.743742942810059,
+        "max": 5.743742942810059
+      },
+      "timing_read": "Includes real MORI+AITER forward plus selected backward mode; routed mode still clones dispatch buffers for probe safety and uses PyTorch local VJP, so it is not a fused-kernel target."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "status": "passed",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "mode": "mixed-muon-adamw",
+  "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh",
+  "config": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/targets/torchtitan_deepseek_v3_16b_bf16_8xmi350_mixed_muon_canary.yaml",
+  "optimizer_overlay": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/legacy_torchtitan_optimizer_mixed_muon.py",
+  "remote_config": "/local/data/sonle5/dsv4_pretrain_canary_20260527/config/torchtitan_deepseek_v3_16b_bf16_8xmi350_mixed_muon_canary.yaml",
+  "remote_output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "command": "env CANARY_OPTIMIZER_MODE=mixed-muon-adamw RUN_ID=torchtitan_mixed_muon_1step_s4096_gbs8_20260531 CANARY_STEPS=1 CANARY_GBS=8 CANARY_CHECKPOINT_ENABLE=true CANARY_CHECKPOINT_INTERVAL=1 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh run-save",
+  "shape": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 8,
+    "seq_len": 4096
+  },
+  "optimizer": {
+    "default": "AdamW",
+    "mixed_groups": "Muon for most rank-2 matrix weights and rank-3 MoE expert weights; AdamW for embeddings, output head, norms, bias, and unmatched exceptions",
+    "overlay_confirmed": "optimizer_overlay=/workspace/Primus/third_party/torchtitan/torchtitan/components/optimizer.py has_muon=True"
+  },
+  "result": {
+    "steps_completed": 1,
+    "loss": 12.0105,
+    "grad_norm": 31.5899,
+    "tokens_per_gpu_s": 48,
+    "reported_tflops_per_gpu_s": 0.86,
+    "mfu_percent": 0.28,
+    "rank0_memory": "25.90GiB(9.00%)",
+    "torchrun_exit_code": 0
+  },
+  "checkpoint": {
+    "enabled": true,
+    "path": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+    "shard_files": [
+      "__0_0.distcp",
+      "__1_0.distcp",
+      "__2_0.distcp",
+      "__3_0.distcp",
+      "__4_0.distcp",
+      "__5_0.distcp",
+      "__6_0.distcp",
+      "__7_0.distcp"
+    ],
+    "metadata_file": ".metadata",
+    "output_tree_size": "120G"
+  },
+  "evidence": [
+    "outer log contains optimizer overlay import with has_muon=True",
+    "rank 0 and rank 7 reported step 1 with loss 12.0105 and grad_norm 31.5899",
+    "rank 0 reported Training completed and torchrun finished successfully with code 0",
+    "checkpoint/step-1 contains 8 distcp shards plus metadata"
+  ],
+  "caveats": [
+    "This is a one-step correctness canary at GBS=8, not a throughput run.",
+    "Resume for the mixed Muon/AdamW checkpoint is still pending; the node was occupied by an external TorchTitan Llama run after this save completed.",
+    "The optimizer overlay patches the image-bundled legacy TorchTitan optimizer in the disposable container; this is a bring-up path, not a final upstream integration."
+  ]
+}

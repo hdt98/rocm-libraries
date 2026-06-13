@@ -1,0 +1,248 @@
+{
+  "artifact": "ascend_autofuse_amd_mapping_20260531",
+  "created_at": "2026-05-31",
+  "purpose": "Map the Ascend TorchTitan-NPU/CANN AutoFuse DeepSeek-V4-Flash performance recipe items to the active AMD MI350 DeepSeek-V4-style pretraining benchmark work.",
+  "source_reference": {
+    "local_doc": "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md",
+    "commit": "55315e2ee4e6b1f21ff6b040631075bbb84628fb",
+    "notable_lines": {
+      "headline_gains": "lines 1-16: pure FSDP plus large EP, AutoFuse vector fusion, sparse attention fused operators, 1100 tokens/p/s on 64 A3 cards.",
+      "parallel_shape": "lines 40-44: TP=1, PP=1, VPP=1, EP=128, FSDP=128, MBS=1, GBS=1024.",
+      "fsdp_memory_and_overlap": "lines 107-141: FSDP memory relief, compute-hidden communication, and separate FSDP/EP process groups.",
+      "optimizer_offload": "lines 143-149: SwapOptimizer reduces AdamW resident memory.",
+      "autofuse": "lines 151-225: torch.compile plus AutoFuse vector fusion and host-bound reduction.",
+      "custom_attention_ops": "lines 231-359: LightningIndexer, SparseAttnSharedkv, SparseAttnSharedkvGrad, and SparseLightningIndexerGradKLLoss.",
+      "perf_breakdown": "lines 363-406: throughput from 397 to 1100 tokens/p/s, custom ops about 90 percent gain, AutoFuse about 30 percent gain, compute 84.68 percent, EP plus FSDP 12.53 percent, MFU 28.78 percent."
+    }
+  },
+  "active_amd_targets": {
+    "execution_policy": {
+      "selected_path": "direct TorchTitan torchrun with a real DeepSeek-V4 config",
+      "target_contract": "sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml",
+      "proxy_only": "DeepSeek-V3 16B evidence is retained for systems plumbing only and must not be promoted as DeepSeek-V4."
+    },
+    "one_mi350": {
+      "full_layer_fwd_bwd_grads_ms_s4096": 24.9,
+      "attention_forward_ms_s4096": 3.6,
+      "moe_routed_expert_gemm_family_fwd_bwd_all_experts_ms_s4096": 12.9,
+      "source_artifact": "run_artifacts/single_layer_target_correction_20260531.json"
+    },
+    "eight_mi350": {
+      "target_mfu": 0.288,
+      "tokens_per_gpu_s": 3245,
+      "node_tokens_per_s": 25960,
+      "shape": "TP=1 PP=1 CP=1 EP=8 FSDP=8 MBS=1 S=4096 GBS=128",
+      "target_step_time_s": 20.2,
+      "source": "README.md and recipe.yaml active target basis"
+    }
+  },
+  "mapping": [
+    {
+      "ascend_item": "TorchTitan plus hardware plugin stack",
+      "ascend_role": "TorchTitan-NPU adapts TorchTitan to CANN communication and operator acceleration while preserving a TorchTitan-shaped training flow.",
+      "amd_relevance": "high",
+      "amd_status": "execution_policy_updated_to_direct_torchtitan",
+      "amd_evidence": "sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml defines the real DeepSeek-V4 target contract, and launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh uses direct torchrun while refusing to substitute DeepSeek-V3 16B. The old Primus path remains proxy-only in run_artifacts/torchtitan_canary_runtime.yaml.",
+      "gap_or_action": "Materialize torchtitan.models.deepseek_v4 and a DeepSeek-V4 Flash 4-layer registry/config in the selected TorchTitan checkout, then run the direct launcher."
+    },
+    {
+      "ascend_item": "Pure FSDP plus large EP with no TP or PP",
+      "ascend_role": "Avoids TP/PP complexity and reduces memory pressure with EP128 and FSDP128.",
+      "amd_relevance": "high",
+      "amd_status": "adopted_as_scaled_target_real_dsv4_contract_added",
+      "amd_evidence": "AMD target is TP=1 PP=1 CP=1 EP=4/8 FSDP=4/8 MBS=1 S=4096 GBS=64/128. The new target contract records DeepSeek-V4-Flash 4-layer model identity and the DeepSeek-V3 16B proxy is labeled proxy-only.",
+      "gap_or_action": "Still need the real TorchTitan DeepSeek-V4 model implementation and a direct 4x/8x training run."
+    },
+    {
+      "ascend_item": "Avoid TP for DeepSeek-V4 attention/indexer semantics",
+      "ascend_role": "Indexer/head reductions make TP costly or correctness-sensitive because extra AllGather would be needed.",
+      "amd_relevance": "high",
+      "amd_status": "adopted_for_first_canary",
+      "amd_evidence": "The experiment goal and configs defer TP: tensor_parallel_degree=1 for the 8x target.",
+      "gap_or_action": "Full DSv4 indexer and sparse-attention TorchTitan integration remains missing; TP deferral avoids this for first canary only."
+    },
+    {
+      "ascend_item": "Avoid PP imbalance",
+      "ascend_role": "Embedding, LmHead, MTP, and MoE load imbalance make PP hard to tune.",
+      "amd_relevance": "medium",
+      "amd_status": "adopted_for_first_canary",
+      "amd_evidence": "pipeline_parallel_degree=1 in the AMD target.",
+      "gap_or_action": "No immediate PP work; revisit only if memory forces PP after FSDP/EP and activation policy are exhausted."
+    },
+    {
+      "ascend_item": "FSDP memory relief for non-expert parameters",
+      "ascend_role": "After EP sharding, non-expert parameters become the memory bottleneck; FSDP shards parameters, gradients, and optimizer state.",
+      "amd_relevance": "high",
+      "amd_status": "proxy_validated_not_final",
+      "amd_evidence": "DeepSeek-V3 16B proxy canary reached about 40.55 GiB rank-0 memory at GBS128 checkpoint-free clean steps.",
+      "gap_or_action": "Need real 43-layer Flash model memory audit, including optimizer state, activation checkpointing, and checkpoint save/resume size."
+    },
+    {
+      "ascend_item": "FSDP communication hidden under compute",
+      "ascend_role": "A3 SuperPod bandwidth lets FSDP AllGather and ReduceScatter overlap with model compute.",
+      "amd_relevance": "high",
+      "amd_status": "not_proven",
+      "amd_evidence": "The AMD proxy has throughput logs but no RCCL stream-level trace proving FSDP AG/RS is hidden.",
+      "gap_or_action": "Run a short 8x rocprof/RCCL trace once do-sonle5-mi350-gpu is idle, with FSDP AG/RS, EP AllToAll, and compute ranges separated."
+    },
+    {
+      "ascend_item": "Separate FSDP and EP communication domains",
+      "ascend_role": "Ascend found shared ProcessGroup serialized FSDP and EP communication; splitting domains reduced MoE communication wait from about 10 ms to about 3 ms and improved training throughput.",
+      "amd_relevance": "very_high",
+      "amd_status": "4x_patch_probe_passed_needs_direct_runtime_and_trace",
+      "amd_evidence": "The unpatched 4x runtime probe in run_artifacts/torchtitan_fsdp_ep_pg_probe_4x_20260531.json reports fsdp_group_is_ep_group=true on every rank. The patched 4x probe in run_artifacts/torchtitan_fsdp_ep_pg_probe_4x_dedicated_ep_20260531.json reports fsdp_group_is_ep_group=false on every rank and passes FSDP all_reduce plus EP all_to_all smoke.",
+      "gap_or_action": "Carry the EP DeviceMesh ProcessGroup isolation into the selected direct TorchTitan runtime, rerun 4x/8x pg-probe, then run a short RCCL/rocprof overlap trace."
+    },
+    {
+      "ascend_item": "SwapOptimizer or optimizer-state offload",
+      "ascend_role": "Reduces resident AdamW optimizer state memory by offloading moments to host and pipelining load-update-unload.",
+      "amd_relevance": "medium",
+      "amd_status": "not_tackled",
+      "amd_evidence": "Current AMD milestone intentionally uses AdamW for bring-up; Muon and optimizer offload are future work.",
+      "gap_or_action": "Defer until real DSv4-Flash memory shows optimizer state pressure; keep checkpointable AdamW stable first."
+    },
+    {
+      "ascend_item": "torch.compile plus AutoFuse vector fusion",
+      "ascend_role": "AutoFuse produces about 31.8 percent end-to-end gain by fusing vector ops and reducing host-bound gaps.",
+      "amd_relevance": "high",
+      "amd_status": "not_tackled_end_to_end",
+      "amd_evidence": "The AMD canary launcher forces --compile.enable false. Single-layer work has hand/prototype Triton and AITER kernels but no broad graph compiler fusion pass.",
+      "gap_or_action": "First profile vector and launch-bound time on AMD. Then evaluate TorchInductor/Triton/CK/AITER fusion selectively instead of assuming AutoFuse maps directly."
+    },
+    {
+      "ascend_item": "Host-bound reduction",
+      "ascend_role": "Compiled/fused execution reduces host dispatcher and launch bubbles between heavyweight matmuls.",
+      "amd_relevance": "high",
+      "amd_status": "not_measured_for_8x",
+      "amd_evidence": "Single-layer rocprof artifacts exist, but the 8x proxy runtime has no full host-bound/launch attribution.",
+      "gap_or_action": "Add 8x profiler run with trace kept outside repo and summarize FREE/host-bound equivalent in run_artifacts."
+    },
+    {
+      "ascend_item": "LightningIndexer fused op",
+      "ascend_role": "Computes top-k indexer path with pipelined cube/vector phases.",
+      "amd_relevance": "high_for_final_dsv4",
+      "amd_status": "missing",
+      "amd_evidence": "Current AMD single-layer sparse MLA work covers attention-style kernels; production TorchTitan DSv4 LightningIndexer is not integrated.",
+      "gap_or_action": "Use NVIDIA/Ascend references to define LI forward/backward contracts before final DSv4 model bring-up."
+    },
+    {
+      "ascend_item": "SparseAttnSharedkv forward fused op",
+      "ascend_role": "Fuses gather, QK, online softmax with sink, PV, and rescale for sparse/shared-KV attention.",
+      "amd_relevance": "very_high",
+      "amd_status": "partially_implemented_in_microbench",
+      "amd_evidence": "Flash S4096 sparse MLA forward is about 4.02 ms versus 3.6 ms target in run_artifacts/single_layer_target_correction_20260531.json.",
+      "gap_or_action": "Continue sparse attention forward specialization only after backward/whole-layer priorities; current gap is about 1.12x."
+    },
+    {
+      "ascend_item": "SparseAttnSharedkvGrad fused backward op",
+      "ascend_role": "Fuses backward gather/cube/process/scatter with preload and CV pipeline.",
+      "amd_relevance": "very_high",
+      "amd_status": "active_kernel_work",
+      "amd_evidence": "Split-compressed sparse MLA backward improved median from 5.07 ms to 4.60 ms with exact checks; CSA, split softmax, and sparse window families remain the largest local primitives.",
+      "gap_or_action": "Next kernel focus: CSA compressed-score/grad/value-add sequence, split softmax backward, and sparse window q/selected accumulation."
+    },
+    {
+      "ascend_item": "SparseLightningIndexerGradKLLoss fused op",
+      "ascend_role": "Fuses main attention score, LI backward, and KL loss to avoid sequence-squared memory.",
+      "amd_relevance": "conditional",
+      "amd_status": "not_tackled",
+      "amd_evidence": "The first AMD canary is a synthetic/small-token training-system path; LI auxiliary/KL training is not yet in scope.",
+      "gap_or_action": "Mark as required only once the full DSv4 training objective includes LI auxiliary/indexer loss."
+    },
+    {
+      "ascend_item": "Selective recompute",
+      "ascend_role": "Ascend future work calls out avoiding redundant recompute of vector ops that do not need saved activations.",
+      "amd_relevance": "high",
+      "amd_status": "not_tackled",
+      "amd_evidence": "Current 8x canary uses activation_checkpoint.mode full.",
+      "gap_or_action": "Profile activation recompute cost and introduce selective policy after correctness and group/comm tracing are stable."
+    },
+    {
+      "ascend_item": "EP communication/compute overlap or MC2-style scheduling",
+      "ascend_role": "Ascend lists this as future work; EP communication remains a named optimization frontier.",
+      "amd_relevance": "high",
+      "amd_status": "not_tackled_for_torchtitan_canary",
+      "amd_evidence": "TorchTitan token dispatcher uses all_to_all_single_autograd for EP dispatch/combine. Primus/Megatron references include DeepEP-related controls, but the current TorchTitan canary uses standard EP AllToAll.",
+      "gap_or_action": "Trace EP AllToAll exposure first; then decide whether ROCm path needs RCCL stream scheduling, fused dispatch/compute, or a ROCm DeepEP-equivalent."
+    },
+    {
+      "ascend_item": "Muon optimizer",
+      "ascend_role": "Ascend lists Muon as future convergence work, not a prerequisite for reported perf.",
+      "amd_relevance": "low_for_current_perf_gate",
+      "amd_status": "deferred",
+      "amd_evidence": "AMD mixed Muon/AdamW smoke/preflight artifacts exist, but current milestone remains AdamW.",
+      "gap_or_action": "Do not block the first DSv4-style systems canary on Muon."
+    }
+  ],
+  "torchtitan_process_group_source_audit": {
+    "local_wip_torchtitan": {
+      "parallel_dims": {
+        "file": "sources/wip/torchtitan/torchtitan/distributed/parallel_dims.py",
+        "evidence": [
+          "lines 127-136: dense and sparse meshes are created by separate unflatten operations; comment says DeviceMesh currently recreates process groups for each dimension.",
+          "lines 167-203: for TP=1 CP=1 PP=1 EP=8 FSDP=8 world_size=8, fsdp=8 and efsdp=1, and the sparse mesh has ep=8.",
+          "lines 213-226: ep comes from full_sparse_mesh['ep']; fsdp comes from full_dense_mesh['fsdp']."
+        ],
+        "read": "Static local source suggests FSDP and EP can be distinct meshes even when rank sets match, but this must be verified in the active runtime because DeviceMesh/process-group behavior is backend and version sensitive."
+      },
+      "ep_dispatch": {
+        "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+        "evidence": [
+          "lines 218-230: GroupedExperts wires ep_mesh into the token dispatcher.",
+          "lines 276-310: dispatch uses ep_mesh for all_to_all_single and all_to_all_single_autograd.",
+          "combine uses all_to_all_single_autograd with the same ep_mesh."
+        ],
+        "read": "EP traffic is tied to the DeviceMesh object passed from ParallelDims, so the runtime group identity of ep_mesh is the thing to inspect."
+      },
+      "fsdp_application": {
+        "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v3/parallelize.py",
+        "evidence": [
+          "lines 75-100: FSDP uses fsdp mesh for dense params and optional efsdp mesh for EP regions, then calls apply_fsdp with ep_degree and edp_mesh."
+        ],
+        "read": "For the 8x EP8/FSDP8 target, efsdp is size 1, so expert-region FSDP is mostly mixed-precision wrapping rather than a second sharding axis; dense FSDP is the main all-gather/reduce-scatter domain."
+      },
+      "graph_trainer_passes": {
+        "files": [
+          "sources/wip/torchtitan/torchtitan/experiments/graph_trainer/ep_process_group_pass.py",
+          "sources/wip/torchtitan/torchtitan/experiments/graph_trainer/fsdp_passes.py"
+        ],
+        "evidence": [
+          "ep_process_group_pass.py lines 7-15: explicitly scans EP all-to-alls and rewrites them to an extra process group if they share a process-group object with non-EP collectives.",
+          "ep_process_group_pass.py lines 140-165: creates and rewrites EP process groups only when object-identical sharing is detected.",
+          "fsdp_passes.py lines 61-64 and 110-126: creates extra FSDP all-gather process groups to put all-gathers and reduce-scatters on different streams."
+        ],
+        "read": "This is a source-level match to the Ascend process-group concern, but it belongs to graph_trainer/compile passes."
+      }
+    },
+    "active_proxy_runtime": {
+      "evidence": [
+        "launchers/torchtitan_dsv4_style_8xmi350_canary.sh passes --compile.enable false.",
+        "run_artifacts/torchtitan_canary_runtime.yaml records the effective runtime as image-bundled Primus/TorchTitan, not the local WIP snapshot.",
+        "run_artifacts/torchtitan_fsdp_ep_pg_probe_4x_20260531.json records that the unpatched image-backed FSDP4/EP4 runtime uses the same ProcessGroup object for FSDP and EP on every rank.",
+        "run_artifacts/torchtitan_fsdp_ep_pg_probe_4x_dedicated_ep_20260531.json records that the temporary EP DeviceMesh patch makes FSDP and EP ProcessGroup objects distinct on every rank."
+      ],
+      "read": "The proxy runtime can be patched for 4x ProcessGroup separation, but the promoted DeepSeek-V4 runtime should be direct TorchTitan and must repeat this probe on the selected image/source tuple."
+    },
+    "next_probe": {
+      "name": "fsdp_ep_group_identity_and_overlap_trace",
+      "when": "after patching or swapping the active TorchTitan runtime, or when validating the 8x path",
+      "checks": [
+        "Print fsdp mesh group name, ep mesh group name, rank sets, and object identity from the active image-bundled TorchTitan runtime and require fsdp_group_is_ep_group=false.",
+        "Run a 2-step GBS128 trace with RCCL/c10d/rocprof markers and summarize whether FSDP AG/RS and EP AllToAll use different process groups and streams.",
+        "Compare exposed EP communication time and FSDP communication time against the Ascend profile categories."
+      ]
+    }
+  },
+  "decision": {
+    "read": "The Ascend recipe's highest-transfer AMD lessons are not just sparse kernels. The immediate AMD systems risk was confirmed on the unpatched image-backed 4x runtime and remediated in a patched 4x pg-probe, but the real DeepSeek-V4 canary still needs direct TorchTitan, a materialized DSv4 model/config, and an 8x communication trace. The current DeepSeek-V3 16B proxy canary is useful but does not prove final DSv4-Flash parity.",
+    "next_actions_ranked": [
+      "Materialize torchtitan.models.deepseek_v4 and the DeepSeek-V4 Flash 4-layer BF16 config in the selected TorchTitan checkout.",
+      "Run the direct TorchTitan launcher; do not promote the Primus-wrapped DeepSeek-V3 proxy.",
+      "Carry the dedicated EP ProcessGroup fix into the selected direct runtime, then rerun the 4x/8x pg-probe.",
+      "Preserve current AdamW proxy path; do not switch to Muon or optimizer offload until real model memory or convergence requires it.",
+      "Continue single-layer sparse MLA backward fusion around CSA, softmax, and sparse-window families.",
+      "Define final DSv4 LightningIndexer and SparseLightningIndexerGradKLLoss contracts before claiming full DeepSeek-V4-Flash coverage."
+    ]
+  },
+  "dependency_pin_changes": []
+}

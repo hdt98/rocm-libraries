@@ -1,0 +1,157 @@
+{
+  "artifact": "sparse_mla_query_major_scorepage_dparallel_tokenchunk_decision",
+  "date": "2026-06-05",
+  "status": "serial_token_chunk_rejected_keep_seq_chunk_1",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "selected_block": 512,
+    "block_d": 16,
+    "threads": 256
+  },
+  "kernel_contract": {
+    "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "wrapper": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "scope": "source-boundary producer-only HIP/CK score-page rung",
+    "inputs": [
+      "q[B,S,H,D]",
+      "grad_output[B,S,H,D]",
+      "output[B,S,H,D]",
+      "lse[B,S,H]",
+      "kv_bank[B,S+G,D]",
+      "safe_groups[B,S,K]",
+      "valid_u8[B,S,K]"
+    ],
+    "outputs": [
+      "checksum sink in grad_kv storage"
+    ],
+    "emits_valid_dq": false,
+    "emits_valid_dkv": false,
+    "materialized_probs_grad_logits": false,
+    "read": "This is a producer-latency surface for the future fused sparse-MLA backward kernel. It is not a promoted full sparse-attention backward implementation."
+  },
+  "baseline_context_ms": {
+    "triton_full_sparse_attention_backward_boundary": 11.13,
+    "triton_sparse_atomic_dkv_wall": 8.80629825592041,
+    "strict_producer_budget_to_beat_materialized_floor": 3.1633769,
+    "previous_selected64_producer_only": 11.512803077697754,
+    "previous_selected256_producer_only": 5.816722869873047,
+    "previous_selected512_producer_only": 4.791790962219238
+  },
+  "token_chunk_sweep": [
+    {
+      "seq_chunk": 1,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_v2_20260605.json",
+      "event_median_ms": 4.796220779418945,
+      "route_atomic_reduction_x_model": 1.0,
+      "build_seconds": 27.544202798977494
+    },
+    {
+      "seq_chunk": 2,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc2_20260605.json",
+      "event_median_ms": 5.319389820098877,
+      "route_atomic_reduction_x_model": 1.6596495672366476,
+      "build_seconds": 27.316163973184302
+    },
+    {
+      "seq_chunk": 4,
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc4_20260605.json",
+      "event_median_ms": 5.286421775817871,
+      "route_atomic_reduction_x_model": 3.04843444037302,
+      "build_seconds": 27.227166248951107
+    }
+  ],
+  "rejected_micro_optimizations": [
+    {
+      "name": "softmax_dot_4way_per_head_shared_reduction",
+      "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_dotpart4_20260605.json",
+      "event_median_ms": 7.075130939483643,
+      "regression_vs_best_seq_chunk1_x": 1.4751470511623912,
+      "read": "Splitting the row term sum_d grad_output * output across four threads per head regressed because the added shared-memory traffic and synchronization outweighed any scalar dot parallelism. This rejects the simple row-term dot split; it does not reject a lower-level fused row-term design inside a persistent producer."
+    },
+    {
+      "name": "kv_lds_double_buffer",
+      "macro": "SCOREPAGE_KV_DOUBLE_BUFFER=1",
+      "full_mode_artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_db_20260605.json",
+      "mode0_artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode0_db_20260605.json",
+      "full_mode_event_median_ms": 4.860015869140625,
+      "mode0_event_median_ms": 2.2319839000701904,
+      "full_mode_regression_vs_best_seq_chunk1_x": 1.0133011161611722,
+      "mode0_speedup_vs_single_buffer_x": 1.007115230039946,
+      "read": "Ping-ponging two LDS KV pages trims the non-MFMA floor by only 0.016 ms but regresses the full score+grad producer by 0.064 ms. The source keeps the macro for reproducibility, but the retained schedule remains single-buffer because the full producer is the promotion gate."
+    }
+  ],
+  "producer_mode_split": {
+    "source_macro": "SCOREPAGE_PRODUCER_MODE",
+    "default_mode": 2,
+    "modes": [
+      {
+        "mode": -1,
+        "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode_neg1_20260605.json",
+        "event_median_ms": 2.062861919403076,
+        "read": "Route, row-term, selected metadata, LDS KV staging, and barriers; probability/scaled-dP sink and CK score/grad MFMA disabled."
+      },
+      {
+        "mode": 0,
+        "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode0_20260605.json",
+        "event_median_ms": 2.2478649616241455,
+        "read": "Route, row-term, selected metadata, LDS staging, barriers, and probability bookkeeping with CK score/grad MFMA disabled."
+      },
+      {
+        "mode": 1,
+        "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_mode1_20260605.json",
+        "event_median_ms": 3.7804839611053467,
+        "read": "Mode 0 plus QK score MFMA and score/prob writeback, with dO.V grad-prob MFMA disabled."
+      },
+      {
+        "mode": 2,
+        "artifact": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_sb512_sc1_v2_20260605.json",
+        "event_median_ms": 4.796220779418945,
+        "read": "Full retained producer: row terms plus QK score MFMA plus dO.V grad-prob MFMA plus prob/scaled-dP bookkeeping."
+      }
+    ],
+    "deltas_ms": {
+      "route_row_kv_staging_barrier_floor": 2.062861919403076,
+      "probability_scaled_dp_scalar_sink": 0.18500304222106934,
+      "qk_score_mfma_and_score_writeback": 1.5326189994812012,
+      "dov_grad_prob_mfma_and_writeback": 1.0157368183135986,
+      "non_mfma_floor_with_probability_sink": 2.2478649616241455
+    },
+    "shares_of_full_mode2": {
+      "route_row_kv_staging_barrier_floor": 0.43010153499501513,
+      "probability_scaled_dp_scalar_sink": 0.03857267017709768,
+      "qk_score_mfma_and_score_writeback": 0.31954721643712064,
+      "dov_grad_prob_mfma_and_writeback": 0.21177857839076655
+    },
+    "read": "The producer wall is split, not a single dKV write problem: route/row/KV staging/barrier floor is 2.06 ms, scalar probability bookkeeping is only 0.19 ms, QK score replay adds 1.53 ms, and dO.V grad-prob replay adds 1.02 ms. A production kernel needs persistent/cooperative score-page consumption and fewer stage barriers, not only final dKV accumulation tuning."
+  },
+  "derived": {
+    "best_seq_chunk": 1,
+    "seq_chunk_2_regression_vs_best_x": 1.109113838330215,
+    "seq_chunk_4_regression_vs_best_x": 1.102202989261906,
+    "best_vs_selected64_speedup_x": 2.4007923177806364,
+    "best_vs_selected256_speedup_x": 1.2128005881125744,
+    "best_over_strict_producer_budget_x": 1.5161773257482338,
+    "best_margin_vs_triton_full_boundary_ms": 6.333779220581055,
+    "best_margin_vs_atomic_wall_ms": 4.010077476501465
+  },
+  "decision": {
+    "promote_to_full_dq_dkv": false,
+    "run_e2e_tflops": false,
+    "retain_surface": true,
+    "retained_schedule": "query-major selected512 seq_chunk1 producer-only",
+    "rejected_branch": "serial token chunking",
+    "read": "Serial token chunking increases modeled coalescing opportunity but regresses realized latency because it reduces token-level parallelism and serializes score/prob/scaled-dP replay inside one CTA. The next real fix is a HIP/CK/rocWMMA cooperative or persistent producer-consumer design where a tiny score page is consumed by D-parallel dQ/dKV workers without moving through HBM, not a simple token loop in one CTA."
+  },
+  "next_kernel_contract": [
+    "Keep selected_block=512 row-term amortization.",
+    "Keep token-level parallelism at seq_chunk=1 unless a persistent/cooperative kernel can overlap producer and D consumers.",
+    "Add a real score-page handoff to D-parallel dQ/dKV consumers only if producer-only latency can move toward the 3.16 ms budget.",
+    "Do not run e2e TFLOPs until a source-boundary dQ+dKV kernel beats the 11.13 ms sparse-attention backward boundary."
+  ]
+}

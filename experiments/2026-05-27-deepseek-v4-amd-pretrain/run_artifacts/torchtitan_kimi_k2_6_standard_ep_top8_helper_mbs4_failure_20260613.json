@@ -1,0 +1,90 @@
+{
+  "artifact": "torchtitan_kimi_k2_6_standard_ep_top8_helper_mbs4_failure_20260613",
+  "created_local": "2026-06-13",
+  "question": "Does the Kimi-K2.6 reduced native-hidden-7168 standard-EP top-8 hot-helper row fit at MBS4 on the same retained knobs?",
+  "answer": {
+    "completed": false,
+    "completed_steps": 0,
+    "first_metric_step_reached": false,
+    "read": "MBS4 standard-EP top-8 hot-helper does not fit on the current Kimi native-hidden-7168 attention-only activation-checkpointing surface. It initializes the model and trainer, then aborts in the first backward with PyTorch CUDA OOM while trying to allocate 16.00 GiB."
+  },
+  "surface": {
+    "model": "Kimi-K2.6 reduced 6-layer",
+    "topology": "6 layers, 384 routed experts, top-k 8 plus one shared expert, moe_intermediate_size 2048, MLA, native hidden 7168",
+    "hardware": "8xMI350",
+    "node": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-devdeps",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "selective attention_only",
+    "checkpoint_enable": false,
+    "loss": "Chunked CE8",
+    "optimizer": "AdamW",
+    "planned_steps": 20
+  },
+  "run": {
+    "run_id": "kimi_k2_6_reduced_native7168_standard_ep_top8_helper_mbs4_retainedknobs_steps20_20260613",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/kimi_k2_6_reduced_native7168_standard_ep_top8_helper_mbs4_retainedknobs_steps20_20260613/docker-run.log",
+    "backend_identification": {
+      "backend_name": "plain standard EP plus standard-EP top-8 hot-helper",
+      "external_deepep_backend_available": false,
+      "hot_helper": true,
+      "raw_topk_dispatch": false
+    },
+    "env_knobs": {
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+      "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+      "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+      "CANARY_WEIGHTED_SCATTER_BWD_SCORE_MODE": "torch",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "torch",
+      "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "torch",
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd"
+    },
+    "failure": {
+      "stage": "first_backward",
+      "root_rank": 5,
+      "exitcode": 1,
+      "error": "torch.OutOfMemoryError: CUDA out of memory",
+      "requested_allocation_gib": 16.0,
+      "rank5_free_memory_gib": 10.12,
+      "rank5_allocated_by_pytorch_gib": 235.05,
+      "rank5_reserved_unallocated_gib": 33.91,
+      "other_failing_ranks": [
+        {
+          "rank": 1,
+          "free_memory_gib": 7.16,
+          "allocated_by_pytorch_gib": 235.98,
+          "reserved_unallocated_gib": 35.66
+        },
+        {
+          "rank": 3,
+          "free_memory_gib": 2.84,
+          "allocated_by_pytorch_gib": 236.73,
+          "reserved_unallocated_gib": 39.25
+        }
+      ],
+      "trace_top": [
+        "torch.autograd.graph._engine_run_backward",
+        "torch.autograd.backward",
+        "Tensor.backward",
+        "torchtitan/trainer.py:809:forward_backward_step"
+      ]
+    },
+    "post_run_node_check": {
+      "docker_ps": "only lighthouse container remains running",
+      "rocm_smi_showpidgpus": "only lighthouse PID 5874 using 0 DRM devices"
+    }
+  },
+  "decision": {
+    "promote_mbs4_standard_ep_top8_helper": false,
+    "read": "Kimi MBS1/MBS2 are the retained native-hidden-7168 standard-EP top-8 helper rows for now. At MBS4, both raw Primus-Turbo no-helper and standard-EP top-8 helper fail before the first metric on this surface, so Kimi highest-MBS behavior needs a lower-memory variant before it can be used as a backend-native promotion gate."
+  }
+}

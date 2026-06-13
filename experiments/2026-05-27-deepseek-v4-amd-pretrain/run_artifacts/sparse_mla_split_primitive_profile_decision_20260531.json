@@ -1,0 +1,89 @@
+{
+  "artifact": "sparse_mla_split_primitive_profile_decision_20260531",
+  "created_at": "2026-05-31",
+  "scope": "Flash S=4096 split-compressed sparse MLA backward primitive profile on one MI350.",
+  "source_artifacts": {
+    "split_compressed_triton_softmax_gpu_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_backward_flash_split_triton_primitive_s4096_20260531.json",
+    "retained_baseline_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_backward_flash_s4096_20260531.json",
+    "previous_ready_or_blocked_attempt": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_split_primitive_profile_ready_20260531.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seqlen": 4096,
+    "heads": 64,
+    "kv_dim": 512,
+    "window_size": 128,
+    "csa_tokens": 1024,
+    "hca_tokens": 32,
+    "keys_excluding_sink": 1184,
+    "keys_including_sink": 1185,
+    "dtype": "bfloat16",
+    "device": "cuda"
+  },
+  "correctness": {
+    "checked_against_retained": true,
+    "ok": true,
+    "checked_tensors": [
+      "out",
+      "q",
+      "kv",
+      "csa",
+      "hca",
+      "attn_sink"
+    ],
+    "max_abs_all": 0.0,
+    "rel_l2_all": 0.0,
+    "atol": 0.02,
+    "rtol": 0.02
+  },
+  "timing_ms": {
+    "retained_backward_median": 5.068769931793213,
+    "split_compressed_triton_softmax_backward_median": 4.601122856140137,
+    "median_ms_saved": 0.46764707565307617,
+    "speedup_vs_retained": 1.1016375980982571,
+    "retained_modeled_primitive_median_sum": 5.285250008106232,
+    "split_modeled_primitive_median_sum": 5.042005963623524,
+    "modeled_primitive_ms_saved": 0.24324404448270798
+  },
+  "split_primitive_medians_ms": {
+    "softmax_backward_scores_split": 1.2468119859695435,
+    "csa_grad_probs": 0.6304849982261658,
+    "csa_grad_from_probs": 0.531844973564148,
+    "grad_q_csa_add": 0.4603250026702881,
+    "grad_selected_q_add": 0.48956501483917236,
+    "grad_csa_q_add": 0.30280300974845886,
+    "sparse_grad_selected_from_probs": 0.2775219976902008,
+    "grad_q_hca_add": 0.25008198618888855,
+    "sparse_grad_probs_window": 0.22492200136184692,
+    "grad_q_from_window_scores": 0.19628199934959412,
+    "window_grad_reduce_body_tail": 0.1462009996175766,
+    "hca_grad_probs": 0.09436099976301193,
+    "hca_grad_from_probs": 0.08936099708080292,
+    "grad_hca_q_add": 0.08079999685287476,
+    "sink_grad_reduce": 0.020640000700950623
+  },
+  "primitive_family_rollup_ms": {
+    "csa_family": 1.9254579842090607,
+    "softmax_split": 1.2468119859695435,
+    "sparse_window_family": 1.1882910132408142,
+    "hca_family": 0.5146039798855782,
+    "window_reduce_plus_sink": 0.16684100031852722
+  },
+  "decision": {
+    "status": "promote_split_compressed_triton_softmax_as_current_sparse_mla_backward_probe",
+    "read": "The split-compressed Triton-softmax sparse MLA backward path is correctness-clean and about 10.2% faster than the retained standalone backward probe at Flash S=4096. It does not close the full attention gap by itself; the modeled primitive sum remains about 5.04 ms.",
+    "next_kernel_focus": [
+      "Fusing the CSA compressed-score/grad/value-add sequence is the largest local primitive family at about 1.93 ms.",
+      "The split softmax backward kernel is still about 1.25 ms and remains a fusion or specialization target.",
+      "Sparse window-side q/selected accumulation is about 1.19 ms and is the next meaningful local family after CSA and softmax.",
+      "HCA, window reduction, and sink-gradient reduction are small; do not prioritize them first."
+    ],
+    "target_context": "The one-MI350 layer target is 24.9 ms full fwd+bwd+grads; current Flash split full-layer evidence remains above target, so this is a useful sub-ms step rather than the final attention solution."
+  },
+  "run_control": {
+    "command": "RUN_TAG=sparse_mla_split_primitive_flash_s4096_retry_20260531 SPARSE_MLA_BWD_VARIANT=split-compressed-triton-softmax SPARSE_MLA_BWD_ITERS=5 SPARSE_MLA_BWD_PRIMITIVE_PROFILE=true SPARSE_MLA_BWD_CHECK_VARIANTS=retained WAIT_IDLE_SECONDS=300 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-sparse-mla-backward-4096",
+    "remote_summary": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/sparse_mla_split_primitive_flash_s4096_retry_20260531/sparse_mla_backward_s4096_split_compressed_triton_softmax/summary.json",
+    "local_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_backward_flash_split_triton_primitive_s4096_20260531.json"
+  },
+  "dependency_pin_changes": []
+}

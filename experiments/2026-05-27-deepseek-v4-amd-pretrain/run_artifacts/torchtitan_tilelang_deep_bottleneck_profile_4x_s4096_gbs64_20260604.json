@@ -1,0 +1,193 @@
+{
+  "status": "profile_complete",
+  "scope": "TorchTitan DeepSeek-V4 Flash 4-layer 4xMI350 S4096 TileLang shared-KV deep bottleneck profile",
+  "date": "2026-06-04",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604",
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "sequence_length": 4096,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "activation_checkpoint": "full",
+    "checkpoint_enabled": false
+  },
+  "active_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton"
+  },
+  "profile_knobs": {
+    "dense_linear_backward": true,
+    "mori_aiter_timing": true,
+    "activation_checkpoint_block_timing": true,
+    "sharedkv_backward_timing": true,
+    "additive_timing": true,
+    "torch_profiler_trace": false,
+    "read": "This run is intentionally intrusive. Use it for bottleneck attribution, not for promoted throughput."
+  },
+  "step_metrics": {
+    "step_1": {
+      "read": "TileLang first-use compile and warmup polluted.",
+      "loss": 12.11042,
+      "grad_norm": 13.0625,
+      "tflops_per_gpu": 15.74
+    },
+    "step_2": {
+      "loss": 8.5857,
+      "grad_norm": 25.25,
+      "tokens_per_gpu_s": 1810,
+      "tflops_per_gpu": 34.24,
+      "peak_logged_memory_gib": 116.26
+    },
+    "step_3": {
+      "read": "Warmed attribution step.",
+      "loss": 21.1904,
+      "grad_norm": 28.25,
+      "tokens_per_gpu_s": 1840,
+      "tflops_per_gpu": 34.81,
+      "peak_logged_memory_gib": 144.19
+    }
+  },
+  "additive_step3_rank_max_wall_ms": {
+    "step.train_step": 35616.915,
+    "train_step.microbatch_forward_backward": 35225.56,
+    "train_step.forward_backward_call": 35223.294,
+    "forward_backward.model_forward": 5764.744,
+    "forward_backward.loss": 1915.164,
+    "forward_backward.backward": 25413.127,
+    "forward_backward_wrapper_residual": 3707.259,
+    "train_step.accumulated_loss_reduce": 171.618,
+    "train_step.grad_clip": 123.256,
+    "train_step.optimizer_step": 31.427,
+    "train_step.valid_tokens_all_reduce": 24.355
+  },
+  "final_step_bottleneck_read": {
+    "ranked_targets": [
+      {
+        "target": "MORI routed MoE backward and dX return skew",
+        "evidence": {
+          "mori_backward_local_vjp_padded_rank_total_max_ms": 7339.389,
+          "mori_combine_dx_rank_total_max_ms": 4988.902,
+          "mori_dispatch_grad_inputs_rollup_rank_total_max_ms": 2573.433,
+          "mori_combine_dtopk_rollup_rank_total_max_ms": 1069.837
+        },
+        "read": "This is the largest profiled subsystem inside the backward wall. combine_dx is still mostly peer-arrival wait/skew, not raw combine math."
+      },
+      {
+        "target": "Owner-rank local MoE VJP math",
+        "evidence": {
+          "local_vjp_gemm_math_rollup_rank_total_max_ms": 6261.576,
+          "local_vjp_elementwise_route_rollup_rank_total_max_ms": 1053.067,
+          "w13_forward_gemm_rank_total_max_ms": 1298.019,
+          "w13_wgrad_gemm_rank_total_max_ms": 1189.913,
+          "w13_xgrad_gemm_reduce_rank_total_max_ms": 2009.576,
+          "w2_dgrad_gemm_rank_total_max_ms": 742.542,
+          "w2_forward_gemm_rank_total_max_ms": 637.963,
+          "w2_wgrad_gemm_rank_total_max_ms": 568.908
+        },
+        "read": "The VJP substage is still GEMM-heavy plus SwiGLU/route work. This is where fused/grouped MoE training backward should pay first."
+      },
+      {
+        "target": "Activation-checkpoint recompute",
+        "evidence": {
+          "ac_recompute_unknown_sum_of_layer_rank_max_ms": 5710.908,
+          "ac_forward_sum_of_layer_rank_max_ms": 3911.001,
+          "layer_unknown_rank_total_max_ms": {
+            "layers.0": 2383.434,
+            "layers.1": 1391.09,
+            "layers.2": 1164.654,
+            "layers.3": 771.734
+          }
+        },
+        "read": "Full activation checkpointing is a real wall, but no-AC is not yet a promoted path because the longer 8x run hit memory growth and a MORI VJP fault."
+      },
+      {
+        "target": "Loss/lm-head path",
+        "evidence": {
+          "loss_rank_total_max_ms": 1899.069,
+          "loss_chunk_7_backward_rank_total_max_ms": 1152.412,
+          "loss_chunk_0_lm_head_forward_rank_total_max_ms": 338.351
+        },
+        "read": "Visible but below MoE/AC. Still worth a separate fused or sharded CE/lm-head branch after MoE skew is reduced."
+      },
+      {
+        "target": "Sparse-MLA shared-KV TileLang backward",
+        "evidence": {
+          "layer2_shape": {
+            "layer_idx": 2,
+            "compress_ratio": 4,
+            "topk": 512,
+            "compressed_groups": 1024,
+            "selected_keys": 640
+          },
+          "layer2_compressed_tilelang_rank_total_max_ms": 302.569,
+          "layer2_tilelang_inner_rank_total_max_ms": 224.753,
+          "layer2_tilelang_inner_call_median_ms": 8.356,
+          "layer3_shape": {
+            "layer_idx": 3,
+            "compress_ratio": 128,
+            "topk": 32,
+            "compressed_groups": 32,
+            "selected_keys": 160
+          },
+          "layer3_compressed_tilelang_rank_total_max_ms": 59.687,
+          "layer3_tilelang_inner_rank_total_max_ms": 5.789,
+          "layer3_tilelang_inner_call_median_ms": 0.35
+        },
+        "read": "TileLang is promising inside sparse attention, especially layer 2, but it is not the step-level latency bottleneck in the composed canary. The warmed layer-2 inner dKV body is only about 0.225s/rank/step in this 4-layer run."
+      },
+      {
+        "target": "Tagged dense linear backward outside routed experts",
+        "evidence": {
+          "attention_projection_rank_total_max_ms": 341.53,
+          "shared_expert_rank_total_max_ms": 87.412,
+          "router_rank_total_max_ms": 20.784,
+          "indexer_rank_total_max_ms": 18.134
+        },
+        "read": "The tagged dense linear bucket is not the current wall. The larger prior MmBackward bucket was mostly checkpoint/recompute and untagged MoE/autograd context rather than these tagged linears alone."
+      }
+    ],
+    "plain_english": "The current latency bottleneck is not TileLang sparse attention. TileLang improved the dKV body into a useful range, but the full canary is dominated by MoE routed backward, owner-rank VJP math, dX return skew, and activation-checkpoint recompute. Sparse attention still needs final production fusion, but it should not be the first step-level optimization lever until the MoE/AC wall is reduced."
+  },
+  "tilelang_compile_read": {
+    "observed": "TileLang compiled two first-use shape variants during step 1.",
+    "interpretation": "This is per layer/route shape first-use JIT, not evidence that TileLang recompiles every step. The run still needs a prewarm/cache discipline before any promoted throughput measurement."
+  },
+  "comparison_to_profiler_off_tilelang_run": {
+    "artifact": "run_artifacts/torchtitan_sharedkv_tilelang_fullrun_stage_profile_4x_s4096_gbs64_20260604.json",
+    "profiler_off_or_minimal_step2_tflops_per_gpu": 76.5,
+    "this_deep_profile_step3_tflops_per_gpu": 34.81,
+    "read": "The deep timers roughly halve observed throughput. Keep this run for attribution only."
+  },
+  "next_actions": [
+    "Prioritize MoE backward: reduce owner-rank VJP tail, start dX return earlier or in chunks, and test overlap/AsyncLL only after the VJP skew is reduced.",
+    "Prototype a fused/grouped local MoE training backward path that targets w13 forward/recompute, w13/w2 wgrad, w2 dgrad, xgrad/reduce, and SwiGLU together rather than only swapping one grouped GEMM.",
+    "Treat activation checkpointing as the second major lever: selective saves for expensive MoE/attention work may be safer than full no-AC until the no-AC memory/fault branch is fixed.",
+    "Keep TileLang sparse attention work, but focus it on production integration: prewarm/cache, reduce selected-state bridge overhead, and preserve the current selected-limit dKV body or final-fold contract.",
+    "Run promoted throughput only with intrusive profiling disabled; use additive-only or no-profile runs for TFLOPs."
+  ],
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_sharedkv_tilelang_layer_meta_profile_4x_s4096_gbs64_steps2_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_layer_meta_profile_4x_s4096_gbs64_steps2_20260604/profiling/profile_timing CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_sharedkv_tilelang_layer_meta_profile_4x_s4096_gbs64_steps2_20260604/profiling/additive_timing.jsonl experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_PROFILE_DENSE_LINEAR_BACKWARD=true CANARY_DSV4_PROFILE_AC_BLOCKS=true CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604/profiling/profile_timing CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604/profiling/mori_timing CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604/profiling/additive_timing.jsonl experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu 'python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run deep=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_deep_profile_4x_s4096_gbs64_steps3_20260604/profiling --dsv4-steady-after-call-id 96 --pretty'"
+  ],
+  "dependency_pin_changes": "none"
+}

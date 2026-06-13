@@ -1,0 +1,83 @@
+{
+  "artifact": "actual_li_query_recompute_tblock4_tblock8_split_projection_20260605",
+  "status": "projection_only",
+  "question": "Can the split schedule win if dQ/no-dKV stays on the fast single-token Triton path and only dKV-only widens from T2 to T4/T8?",
+  "source_artifacts": {
+    "measured_t2_split_gate": "run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+    "route_reduction_projection": "run_artifacts/query_major_t2_t4_t8_cache_projection_20260605.json"
+  },
+  "shape": {
+    "hardware": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "batch": 1,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "split_fixed_path": "single-token query-recompute no-dKV",
+    "split_variable_path": "token-block dKV-only full"
+  },
+  "measured_t2": {
+    "baseline_full_ms": 11.076744079589844,
+    "single_token_no_dkv_ms": 1.990291953086853,
+    "dkv_only_target_to_beat_ms": 9.08645212650299,
+    "t2_dkv_only_sink_ms": 3.0649380683898926,
+    "t2_dkv_only_global_accum_ms": 7.648528575897217,
+    "t2_dkv_only_full_ms": 10.71346664428711,
+    "t2_split_schedule_ms": 12.703758597373962,
+    "t2_split_delta_vs_baseline_ms": 1.6270145177841187
+  },
+  "route_model_selected512": [
+    {
+      "token_block": 2,
+      "cache_reduction_x": 1.6596495672366476,
+      "cache_stream_mib": 1966.0556602478027,
+      "hit_rate": 0.3974631634646695
+    },
+    {
+      "token_block": 4,
+      "cache_reduction_x": 3.04843444037302,
+      "cache_stream_mib": 1070.3728065490723,
+      "hit_rate": 0.6719627666069684
+    },
+    {
+      "token_block": 8,
+      "cache_reduction_x": 5.992058108427399,
+      "cache_stream_mib": 544.5476112365723,
+      "hit_rate": 0.833112432839466
+    }
+  ],
+  "latency_projection": {
+    "assumption": "Keep measured T2 dKV-only sink/producer cost fixed at 3.0649 ms and scale only the global dKV accumulation slice by modeled selected512 route reduction relative to T2.",
+    "rows": [
+      {
+        "token_block": 2,
+        "projected_global_ms": 7.648528575897217,
+        "projected_dkv_only_full_ms": 10.71346664428711,
+        "projected_split_ms": 12.703758597373962,
+        "projected_split_delta_vs_baseline_ms": 1.6270145177841187
+      },
+      {
+        "token_block": 4,
+        "projected_global_ms": 4.164064338359748,
+        "projected_dkv_only_full_ms": 7.229002406749641,
+        "projected_split_ms": 9.219294359836493,
+        "projected_split_delta_vs_baseline_ms": -1.857449719753351
+      },
+      {
+        "token_block": 8,
+        "projected_global_ms": 2.1184502738936932,
+        "projected_dkv_only_full_ms": 5.183388342283585,
+        "projected_split_ms": 7.173680295370438,
+        "projected_split_delta_vs_baseline_ms": -3.9030637842194054
+      }
+    ]
+  },
+  "decision": {
+    "implement_t4_dkv_only_next": true,
+    "implement_t8_after_t4": "only if T4 compiles and dKV-only sink/producer overhead does not grow enough to erase the write-reduction gain",
+    "promotion_gate": "measured split schedule must beat 11.0767 ms before any e2e TorchTitan TFLOPs run",
+    "read": "The T4/T8 branch is worth a real latency gate because the split target only needs dKV-only below 9.086 ms. The projection says T4 could reach 9.22 ms split and T8 could reach 7.17 ms split, but this is not a measured candidate. The key risk is wider-token producer/register overhead; if dKV-only sink grows materially above the T2 3.065 ms, the projected win can disappear."
+  }
+}

@@ -1,0 +1,271 @@
+{
+  "artifact": "mori_aiter_moe_forward_floor",
+  "created_unix": 1780327341.8856714,
+  "world_size": 8,
+  "shape": {
+    "tokens_per_rank": 4096,
+    "hidden": 4096,
+    "intermediate": 2048,
+    "experts": 256,
+    "num_local_experts": 32,
+    "topk": 6,
+    "weight_experts_per_rank": 32,
+    "weights_scope": "local",
+    "topk_pattern": "balanced"
+  },
+  "mori": {
+    "kernel_type": "IntraNode",
+    "block_num": 64,
+    "warp_num_per_block": 8,
+    "rdma_block_num": 32,
+    "max_total_recv_tokens": 0
+  },
+  "timing_summary": {
+    "e2e_ms_rank_median": 2.619709014892578,
+    "e2e_ms_rank_min": 2.6120269298553467,
+    "e2e_ms_rank_max": 2.6293890476226807
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5463650226593018,
+          "min": 0.5299260020256042,
+          "max": 0.6110060214996338
+        },
+        "fused_moe_ms": {
+          "median": 1.82709801197052,
+          "min": 1.7338180541992188,
+          "max": 1.890058994293213
+        },
+        "combine_ms": {
+          "median": 0.34800300002098083,
+          "min": 0.32304298877716064,
+          "max": 0.8913689851760864
+        },
+        "e2e_ms": {
+          "median": 2.6120269298553467,
+          "min": 2.515784978866577,
+          "max": 2.707427978515625
+        }
+      }
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5488860011100769,
+          "min": 0.5308459997177124,
+          "max": 0.6372069716453552
+        },
+        "fused_moe_ms": {
+          "median": 1.8257800340652466,
+          "min": 1.7940590381622314,
+          "max": 1.9086610078811646
+        },
+        "combine_ms": {
+          "median": 0.283282995223999,
+          "min": 0.2748430073261261,
+          "max": 2.7806310653686523
+        },
+        "e2e_ms": {
+          "median": 2.6293890476226807,
+          "min": 2.523668050765991,
+          "max": 2.7779109477996826
+        }
+      }
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5423660278320312,
+          "min": 0.5266860127449036,
+          "max": 0.6052060127258301
+        },
+        "fused_moe_ms": {
+          "median": 1.7910200357437134,
+          "min": 1.7608989477157593,
+          "max": 1.8415800333023071
+        },
+        "combine_ms": {
+          "median": 0.35612401366233826,
+          "min": 0.2705230116844177,
+          "max": 1.9067009687423706
+        },
+        "e2e_ms": {
+          "median": 2.619508981704712,
+          "min": 2.52046799659729,
+          "max": 2.7316300868988037
+        }
+      }
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5424060225486755,
+          "min": 0.5268059968948364,
+          "max": 0.6009659767150879
+        },
+        "fused_moe_ms": {
+          "median": 1.8150399923324585,
+          "min": 1.7412190437316895,
+          "max": 1.8437399864196777
+        },
+        "combine_ms": {
+          "median": 0.3477639853954315,
+          "min": 0.28908300399780273,
+          "max": 1.6403390169143677
+        },
+        "e2e_ms": {
+          "median": 2.613468885421753,
+          "min": 2.5291879177093506,
+          "max": 2.682729959487915
+        }
+      }
+    },
+    {
+      "rank": 4,
+      "local_rank": 4,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5439260005950928,
+          "min": 0.5299249887466431,
+          "max": 0.615805983543396
+        },
+        "fused_moe_ms": {
+          "median": 1.7792600393295288,
+          "min": 1.682739019393921,
+          "max": 1.8424999713897705
+        },
+        "combine_ms": {
+          "median": 0.38344401121139526,
+          "min": 0.30120399594306946,
+          "max": 0.857928991317749
+        },
+        "e2e_ms": {
+          "median": 2.626749038696289,
+          "min": 2.5283079147338867,
+          "max": 2.6879889965057373
+        }
+      }
+    },
+    {
+      "rank": 5,
+      "local_rank": 5,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5477659702301025,
+          "min": 0.531686007976532,
+          "max": 0.5714460015296936
+        },
+        "fused_moe_ms": {
+          "median": 1.8122199773788452,
+          "min": 1.7357399463653564,
+          "max": 1.9100209474563599
+        },
+        "combine_ms": {
+          "median": 0.379364013671875,
+          "min": 0.28372400999069214,
+          "max": 2.5040669441223145
+        },
+        "e2e_ms": {
+          "median": 2.6191489696502686,
+          "min": 2.5323081016540527,
+          "max": 2.7671499252319336
+        }
+      }
+    },
+    {
+      "rank": 6,
+      "local_rank": 6,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5406460165977478,
+          "min": 0.5274059772491455,
+          "max": 0.5993260145187378
+        },
+        "fused_moe_ms": {
+          "median": 1.8089799880981445,
+          "min": 1.7195789813995361,
+          "max": 1.8426200151443481
+        },
+        "combine_ms": {
+          "median": 0.34844401478767395,
+          "min": 0.28988298773765564,
+          "max": 0.430525004863739
+        },
+        "e2e_ms": {
+          "median": 2.6199090480804443,
+          "min": 2.5217480659484863,
+          "max": 2.7172300815582275
+        }
+      }
+    },
+    {
+      "rank": 7,
+      "local_rank": 7,
+      "recv_count_median": 4608.0,
+      "recv_count_min": 4608,
+      "recv_count_max": 4608,
+      "finite_output": true,
+      "timings": {
+        "dispatch_ms": {
+          "median": 0.5430859923362732,
+          "min": 0.5290859937667847,
+          "max": 0.5996860265731812
+        },
+        "fused_moe_ms": {
+          "median": 1.8094600439071655,
+          "min": 1.7359399795532227,
+          "max": 1.8595000505447388
+        },
+        "combine_ms": {
+          "median": 0.3452039957046509,
+          "min": 0.31004300713539124,
+          "max": 0.39068400859832764
+        },
+        "e2e_ms": {
+          "median": 2.6199889183044434,
+          "min": 2.527587890625,
+          "max": 2.7200300693511963
+        }
+      }
+    }
+  ],
+  "read": "Forward-only serving-style MoE path. This is a latency floor for the TorchTitan forward adapter, not a training-capable replacement until backward/autograd is implemented."
+}

@@ -1,0 +1,350 @@
+{
+  "backend": "standard_ep",
+  "balanced_load_stats": {
+    "calculated_reduction_pct": {
+      "count": 1536,
+      "max": 23.14893103031767,
+      "mean": 10.990127433444478,
+      "median": 10.54836604785661,
+      "min": -1.2669612481914518,
+      "p95": 19.342648459828517
+    },
+    "owner_max_over_mean_after": {
+      "count": 1536,
+      "max": 1.2071533203125,
+      "mean": 1.0775287416246202,
+      "median": 1.0622762044270833,
+      "min": 1.0115152994791667,
+      "p95": 1.16259765625
+    },
+    "owner_max_over_mean_before": {
+      "count": 1536,
+      "max": 1.4150390625,
+      "mean": 1.2148634592692058,
+      "median": 1.2051188151041665,
+      "min": 1.01611328125,
+      "p95": 1.3668619791666667
+    },
+    "owner_max_rows_after": {
+      "count": 1536,
+      "max": 29667.0,
+      "mean": 26481.346354166668,
+      "median": 26106.5,
+      "min": 24859.0,
+      "p95": 28572.0
+    },
+    "owner_max_rows_before": {
+      "count": 1536,
+      "max": 34776.0,
+      "mean": 29856.484375,
+      "median": 29617.0,
+      "min": 24972.0,
+      "p95": 33592.0
+    }
+  },
+  "decision": "standard fast-path hot-expert planner is validated; top-4 has enough modeled load reduction to justify implementing real hot-row split on the standard/AOTorch path or promoting MORI only after parity.",
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS": "4",
+    "CANARY_MORI_AITER_BALANCED_MOE_MODE": "plan"
+  },
+  "expected_record_shape": "12 layers x 32 gradient-accumulation microbatches x 4 ranks",
+  "layer_index_modeled_reduction_pct": {
+    "0": {
+      "count": 128,
+      "max": 7.243007628042136,
+      "mean": 5.304489829567329,
+      "median": 5.865634399677523,
+      "min": 1.2658227848101267,
+      "p95": 7.014336917562725
+    },
+    "1": {
+      "count": 128,
+      "max": 12.411153635866594,
+      "mean": 8.794917892742026,
+      "median": 9.601531437431799,
+      "min": 3.6021867745076013,
+      "p95": 12.038734220992565
+    },
+    "10": {
+      "count": 128,
+      "max": 19.342648459828517,
+      "mean": 12.443106276745311,
+      "median": 11.425765959066627,
+      "min": 9.359640013845622,
+      "p95": 17.686658506731945
+    },
+    "11": {
+      "count": 128,
+      "max": 18.759210138520483,
+      "mean": 15.549445711448932,
+      "median": 15.482385513313023,
+      "min": 11.073815169525451,
+      "p95": 18.638204771900778
+    },
+    "2": {
+      "count": 128,
+      "max": 17.7819387316594,
+      "mean": 14.339125886728457,
+      "median": 14.33163088824039,
+      "min": 8.127368164911184,
+      "p95": 17.217651915960733
+    },
+    "3": {
+      "count": 128,
+      "max": 14.807417974322396,
+      "mean": 9.787243945771147,
+      "median": 9.116440256815036,
+      "min": 6.39168978818434,
+      "p95": 14.41048034934498
+    },
+    "4": {
+      "count": 128,
+      "max": 13.283200389697376,
+      "mean": 8.30205620277928,
+      "median": 8.243656561067937,
+      "min": 4.861623320398936,
+      "p95": 10.80386871729824
+    },
+    "5": {
+      "count": 128,
+      "max": 9.002450627072221,
+      "mean": 4.343236734413586,
+      "median": 5.1402879492473605,
+      "min": -1.2669612481914518,
+      "p95": 8.42546980478015
+    },
+    "6": {
+      "count": 128,
+      "max": 11.857278048438541,
+      "mean": 6.8300557854495665,
+      "median": 7.197589349787034,
+      "min": 1.748605234582694,
+      "p95": 11.38561069244988
+    },
+    "7": {
+      "count": 128,
+      "max": 21.70749942489073,
+      "mean": 18.052387116326365,
+      "median": 17.67522621646205,
+      "min": 13.691518446840536,
+      "p95": 21.625739905057728
+    },
+    "8": {
+      "count": 128,
+      "max": 12.507708119218911,
+      "mean": 10.090959260733667,
+      "median": 10.454815182398121,
+      "min": 5.374054768372366,
+      "p95": 11.874760026527976
+    },
+    "9": {
+      "count": 128,
+      "max": 23.14893103031767,
+      "mean": 18.044504558628066,
+      "median": 17.770869136437312,
+      "min": 13.065025777482123,
+      "p95": 22.48035424722465
+    }
+  },
+  "numeric_stats": {
+    "local_owner_expert_max_over_mean": {
+      "count": 1536,
+      "max": 17.190459798377184,
+      "mean": 6.119457718049305,
+      "median": 5.882991879434831,
+      "min": 3.245508982035928,
+      "p95": 8.384298806847656
+    },
+    "local_top8_remote_rows": {
+      "count": 1536,
+      "max": 13411.0,
+      "mean": 8704.323567708334,
+      "median": 8581.5,
+      "min": 4820.0,
+      "p95": 11480.0
+    },
+    "local_top8_remote_share": {
+      "count": 1536,
+      "max": 0.5612983900380347,
+      "mean": 0.355161379933637,
+      "median": 0.3491707261477089,
+      "min": 0.2669042483353653,
+      "p95": 0.4296098861158226
+    },
+    "local_top8_rows": {
+      "count": 1536,
+      "max": 17550.0,
+      "mean": 11598.778645833334,
+      "median": 11383.5,
+      "min": 6350.0,
+      "p95": 15285.0
+    },
+    "local_top8_share": {
+      "count": 1536,
+      "max": 0.7367564929783658,
+      "mean": 0.47327342729171895,
+      "median": 0.46413690191548895,
+      "min": 0.37304052847705765,
+      "p95": 0.5699470334268038
+    },
+    "modeled_max_load_reduction_pct": {
+      "count": 1536,
+      "max": 23.14893103031767,
+      "mean": 10.990127433444478,
+      "median": 10.54836604785661,
+      "min": -1.2669612481914518,
+      "p95": 19.342648459828517
+    },
+    "remote_hot_rows_total": {
+      "count": 1536,
+      "max": 9416.0,
+      "mean": 6879.958333333333,
+      "median": 6749.0,
+      "min": 5113.0,
+      "p95": 8423.0
+    },
+    "selected_rows_total": {
+      "count": 1536,
+      "max": 12491.0,
+      "mean": 9171.7734375,
+      "median": 9022.5,
+      "min": 7133.0,
+      "p95": 11140.0
+    }
+  },
+  "record_count": 1536,
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_balanced_plan_top4_4x_s4096_gbs128_mbs1_step1_20260606",
+  "selected_owner_rank_frequency": {
+    "0": 2044,
+    "1": 1236,
+    "2": 984,
+    "3": 1880
+  },
+  "shape": {
+    "ep": 4,
+    "fsdp": 4,
+    "global_batch_size": 128,
+    "gpus": 4,
+    "gradient_accumulation_steps": 32,
+    "micro_batch_size": 1,
+    "seq_len": 4096,
+    "steps": 1
+  },
+  "source_timing_jsonl_local": "/tmp/dsv4_standard_ep_balanced_plan_top4_4x_20260606.jsonl",
+  "source_timing_jsonl_remote": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_balanced_plan_top4_4x_s4096_gbs128_mbs1_step1_20260606/standard_ep_hot_plan.jsonl",
+  "step1_observed": {
+    "grad_norm": 19.25,
+    "loss": 12.31251,
+    "peak_memory_gib_range": [
+      167.17,
+      167.18
+    ],
+    "tflops_per_gpu_range": [
+      142.92,
+      143.01
+    ],
+    "tok_per_gpu_s_range": [
+      2823.0,
+      2825.0
+    ]
+  },
+  "top_selected_expert_frequency": [
+    {
+      "expert_id": 228,
+      "records": 300
+    },
+    {
+      "expert_id": 15,
+      "records": 256
+    },
+    {
+      "expert_id": 200,
+      "records": 232
+    },
+    {
+      "expert_id": 214,
+      "records": 216
+    },
+    {
+      "expert_id": 112,
+      "records": 208
+    },
+    {
+      "expert_id": 53,
+      "records": 172
+    },
+    {
+      "expert_id": 49,
+      "records": 152
+    },
+    {
+      "expert_id": 125,
+      "records": 148
+    },
+    {
+      "expert_id": 178,
+      "records": 144
+    },
+    {
+      "expert_id": 186,
+      "records": 132
+    },
+    {
+      "expert_id": 93,
+      "records": 128
+    },
+    {
+      "expert_id": 194,
+      "records": 128
+    },
+    {
+      "expert_id": 39,
+      "records": 128
+    },
+    {
+      "expert_id": 129,
+      "records": 128
+    },
+    {
+      "expert_id": 223,
+      "records": 128
+    },
+    {
+      "expert_id": 173,
+      "records": 128
+    },
+    {
+      "expert_id": 10,
+      "records": 128
+    },
+    {
+      "expert_id": 31,
+      "records": 124
+    },
+    {
+      "expert_id": 26,
+      "records": 124
+    },
+    {
+      "expert_id": 124,
+      "records": 120
+    },
+    {
+      "expert_id": 23,
+      "records": 120
+    },
+    {
+      "expert_id": 211,
+      "records": 120
+    },
+    {
+      "expert_id": 219,
+      "records": 120
+    },
+    {
+      "expert_id": 3,
+      "records": 112
+    }
+  ]
+}

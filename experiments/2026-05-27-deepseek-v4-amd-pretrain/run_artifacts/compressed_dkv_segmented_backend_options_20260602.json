@@ -1,0 +1,166 @@
+{
+  "artifact": "compressed_dkv_segmented_backend_options_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Implementation-surface decision record for the compressed shared-KV dKV many-to-one accumulation wall on MI350.",
+  "remote_node": "do-sonle5-mi350-gpu",
+  "container_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "why_this_exists": "The current dot_k_sparse and dot_k_slot_sparse Triton branches reach the coalesced-write accounting target at small shapes but are rejected because their local sparse accumulation body is scalar-shaped. The next prototype needs a backend that can express a query-major, D16, segmented/MFMA-friendly route reduction rather than another per-selected Triton loop.",
+  "module_probe": {
+    "torch": {
+      "found": true,
+      "origin": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/__init__.py",
+      "version": "2.13.0a0+gitccf72d7",
+      "hip": "7.2.53211"
+    },
+    "triton": {
+      "found": true,
+      "origin": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/triton/__init__.py"
+    },
+    "tilelang": {
+      "found": false,
+      "read": "TileLang is not installed in the current TorchTitan/MORI image, so a TileLang implementation would require adding a dependency or switching images before it can be the first production branch."
+    },
+    "aiter": {
+      "found": true,
+      "origin": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/aiter/__init__.py",
+      "read": "AITER is present and has MoE/GMM and grouped row-reduction utilities, but the inspected surfaces are serving/MoE reductions rather than the sparse-attention training dKV route accumulation needed here. A broad package walk also triggers JIT compilation and can fail without an active Triton driver, so use source-file inspection or narrow imports."
+    },
+    "mori": {
+      "found": true,
+      "origin": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/mori/__init__.py"
+    }
+  },
+  "toolchain_probe": {
+    "hipcc": "/opt/rocm/bin/hipcc",
+    "rocprofv3": "/opt/rocm/bin/rocprofv3",
+    "omniperf": null,
+    "rocm_headers": {
+      "rocprim": "/opt/rocm/include/rocprim",
+      "hipcub": "/opt/rocm/include/hipcub",
+      "ck": "/opt/rocm/include/ck",
+      "ck_tile": "/opt/rocm/include/ck_tile"
+    },
+    "header_features_seen": [
+      "rocprim device_reduce_by_key",
+      "rocprim device_segmented_reduce",
+      "rocprim warp segmented reduce",
+      "hipCUB device_segmented_reduce",
+      "ck_tile tile_scatter_gather",
+      "ck_tile BlockReduce2D"
+    ],
+    "compile_smoke": {
+      "command_shape": "hipcc --offload-arch=gfx950 -std=c++17 -I/opt/rocm/include -c /tmp/ck_rocprim_smoke.cpp -o /tmp/ck_rocprim_smoke.o",
+      "includes": [
+        "cstring",
+        "rocprim/device/device_segmented_reduce.hpp",
+        "rocprim/device/device_reduce_by_key.hpp",
+        "hipcub/device/device_segmented_reduce.hpp",
+        "ck_tile/core.hpp"
+      ],
+      "status": "passed",
+      "result": "CK_ROCPRIM_HEADER_COMPILE_OK_GFX950",
+      "negative_control": "The same broad-header smoke without an explicit MI350 arch defaulted to gfx906 and failed in rocPRIM texture-cache iterator host memset resolution; use --offload-arch=gfx950 for MI350 smokes."
+    },
+    "pytorch_extension_smoke": {
+      "artifact": "run_artifacts/compressed_dkv_segmented_hip_extension_smoke_20260602.json",
+      "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_extension.py",
+      "status": "passed",
+      "device": "AMD Instinct MI350X VF",
+      "arch": "gfx950",
+      "build_seconds": 16.59484494011849,
+      "run_seconds": 0.0008940550033003092,
+      "max_abs_diff": 0.0,
+      "read": "The actual PyTorch HIP extension build/call surface works in the device-enabled MORI image with CK-Tile, rocPRIM, and hipCUB headers included. The kernel is a copy smoke, not a dKV accumulator."
+    },
+    "first_accumulator_smoke": {
+      "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py",
+      "s128_artifact": "run_artifacts/compressed_dkv_segmented_hip_accumulator_s128_layer2_20260602.json",
+      "s128_status": "passed",
+      "s128_max_abs_diff": 0.0000362396240234375,
+      "s128_hip_ms": 0.4878860116004944,
+      "s128_triton_scalar_ms": 0.41660401225090027,
+      "s128_pytorch_reference_ms": 0.44132500886917114,
+      "s128_write_reduction_x": 14.0,
+      "s512_artifact": "run_artifacts/compressed_dkv_segmented_hip_accumulator_s512_layer2_20260602.json",
+      "s512_status": "passed_but_performance_rejected",
+      "s512_max_abs_diff": 0.000064849853515625,
+      "s512_hip_ms": 7.3960089683532715,
+      "s512_triton_scalar_ms": 3.232516050338745,
+      "s512_pytorch_reference_ms": 1.5840200185775757,
+      "s512_write_reduction_x": 30.0,
+      "read": "This is the first actual compressed-dKV accumulator through the HIP extension surface. It consumes the materialized diagnostic tensors and active-group lists, emits the real grad_kv tensor, and passes S128/S512 parity. The scalar body is rejected as an optimization path at S512, so the next body must replace it with CK-Tile/MFMA-friendly segmented accumulation."
+    },
+    "tile_partial_no_atomic_followup": {
+      "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_segmented_hip_accumulator.py --include-tile-partial",
+      "s128_artifact": "run_artifacts/compressed_dkv_segmented_hip_accumulator_tilepartial_s128_layer2_20260602.json",
+      "s128_status": "passed",
+      "s128_tile_partial_max_abs_diff": 0.0000324249267578125,
+      "s128_scalar_atomic_ms": 0.4913659989833832,
+      "s128_tile_partial_emit_ms": 0.499646008014679,
+      "s128_tile_partial_full_ms": 0.4995250105857849,
+      "s128_triton_scalar_ms": 0.40100398659706116,
+      "s128_pytorch_reference_ms": 0.4647650122642517,
+      "s128_dense_partial_slab_over_active_coalesced_x": 1.7777777777777777,
+      "s512_artifact": "run_artifacts/compressed_dkv_segmented_hip_accumulator_tilepartial_s512_layer2_20260602.json",
+      "s512_status": "passed_but_performance_rejected",
+      "s512_tile_partial_max_abs_diff": 0.00006866455078125,
+      "s512_scalar_atomic_ms": 7.197120189666748,
+      "s512_tile_partial_emit_ms": 7.305121898651123,
+      "s512_tile_partial_full_ms": 7.280561923980713,
+      "s512_triton_scalar_ms": 3.1621549129486084,
+      "s512_pytorch_reference_ms": 1.586258053779602,
+      "s512_dense_partial_slab_over_active_coalesced_x": 1.8823529411764706,
+      "read": "This explicitly removes the final global atomic from the scalar HIP accumulator by emitting one [seq_tile, compressed_group, D] partial row and reducing across seq tiles. It passes parity but does not improve S128/S512 timing; S512 remains about 7.3 ms. The immediate bottleneck is therefore the scalar selected-loop/local contraction body, not only the final global atomic instruction. The production body needs MFMA/vectorized selected-key contraction plus in-tile segmented reduction, not a dense partial slab."
+    }
+  },
+  "backend_decision": {
+    "preferred_first_surface": "HIP C++ extension using CK-Tile block/tile primitives plus rocPRIM/hipCUB segmented-reduction patterns where useful.",
+    "fallback_surface": "A new Triton kernel is still acceptable for metadata packing and small reductions, but the rejected branches and the HIP scalar smoke show the production body must avoid scalar per-selected active-list loops.",
+    "not_first_surface": [
+      {
+        "surface": "TileLang",
+        "reason": "Not installed in the current MI350 TorchTitan/MORI image."
+      },
+      {
+        "surface": "AITER generic reduce_grouped",
+        "reason": "It reduces K rows per group for MoE/split-K row reductions; it does not directly match the shared-KV dKV route contraction without materializing partial rows."
+      },
+      {
+        "surface": "external rocPRIM reduce_by_key over materialized partials",
+        "reason": "Materialized compact partials are already negative: production must reduce before writing the large partial buffer."
+      }
+    ]
+  },
+  "next_kernel_contract": {
+    "preserve": [
+      "query-major selected-key schedule",
+      "no selected K/V or probability saved tensor contract",
+      "active compressed-group list packing",
+      "selected-key batched dot-K mechanism where it helps"
+    ],
+    "replace": [
+      "global per-route dKV atomics",
+      "scalar per-selected local active-list accumulation",
+      "external dense route matrices",
+      "external compact partial buffers"
+    ],
+    "first_candidate_shape": {
+      "token_block": 32,
+      "selected_block": 512,
+      "head_block": 64,
+      "d_block": 16,
+      "micro_selected": 64,
+      "expected_write_reduction_x": 23.813051840857806,
+      "modeled_write_elements_before": 805044224,
+      "modeled_write_elements_after": 33806848
+    },
+    "first_validation_ladder": [
+      "Compile HIP/CK-Tile extension for gfx950 with a tiny no-op kernel and PyTorch binding.",
+      "Implement a synthetic S128 segmented D16 accumulator that consumes materialized probs/grad_logits and active-group lists, matching the existing reference.",
+      "Scale to S512 and require beating dot_k_sparse/dot_k_slot_sparse. The first scalar HIP body passes parity but is rejected at S512; the no-global-atomic tile-partial variant also passes but remains around 7.3 ms, so keep the HIP extension surface and replace the scalar body.",
+      "Run S4096 timing-only against the dot_k_atomic 8.806 ms and query-major full-atomic 11.081 ms baselines.",
+      "Only after accumulator parity/timing is favorable, fuse score/prob/grad-logit recompute and LI/compressor gradients."
+    ]
+  },
+  "decision": "Proceed with the gfx950 HIP/CK-Tile/rocPRIM segmented accumulator surface, but do not promote the first scalar HIP body or the no-global-atomic tile-partial scalar variant. The next cycle should replace that scalar body with a CK-Tile/MFMA-friendly reduction schedule rather than polishing row lookup or writing external partial reductions."
+}

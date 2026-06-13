@@ -1,0 +1,291 @@
+{
+  "artifact": "sparse_mla_coop_workgroup_feasibility",
+  "candidates": [
+    {
+      "classification": "single_workgroup_feasible_but_reduction_too_small",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": true,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 10.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 129.125,
+        "with_dense_group_table_p99_kib": 127.985625,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": true,
+        "fully_parallel_threads": 1024,
+        "fully_parallel_waves": 16,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 1,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 973.0,
+        "mean_segments_per_tile": 503.701171875,
+        "p99_segments_per_tile": 954.77,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "segment_p50": 3.0,
+        "segment_p90": 4.0,
+        "segment_p99": 4.0,
+        "tile_local_write_reduction_x": 3.04843444037302
+      },
+      "selected_block": 512,
+      "token_block": 4
+    },
+    {
+      "classification": "not_useful",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 20.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.0625,
+        "with_dense_group_table_p99_kib": 131.36124999999998,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 2048,
+        "fully_parallel_waves": 32,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 2,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1020.0,
+        "mean_segments_per_tile": 512.51171875,
+        "p99_segments_per_tile": 1008.78,
+        "pair_share_ge16": 0.0,
+        "pair_share_ge32": 0.0,
+        "segment_p50": 6.0,
+        "segment_p90": 8.0,
+        "segment_p99": 8.0,
+        "tile_local_write_reduction_x": 5.992058108427399
+      },
+      "selected_block": 512,
+      "token_block": 8
+    },
+    {
+      "classification": "requires_serial_or_persistent_producer",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 40.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.3125,
+        "with_dense_group_table_p99_kib": 131.6125,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 4096,
+        "fully_parallel_waves": 64,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 4,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1024.0,
+        "mean_segments_per_tile": 513.84765625,
+        "p99_segments_per_tile": 1012.8,
+        "pair_share_ge16": 0.37893804949527843,
+        "pair_share_ge32": 0.0,
+        "segment_p50": 12.0,
+        "segment_p90": 16.0,
+        "segment_p99": 16.0,
+        "tile_local_write_reduction_x": 11.952959063438367
+      },
+      "selected_block": 512,
+      "token_block": 16
+    },
+    {
+      "classification": "requires_serial_or_persistent_producer",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 80.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.3125,
+        "with_dense_group_table_p99_kib": 131.615,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 8192,
+        "fully_parallel_waves": 128,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 8,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1024.0,
+        "mean_segments_per_tile": 515.8515625,
+        "p99_segments_per_tile": 1012.84,
+        "pair_share_ge16": 0.9493561238196028,
+        "pair_share_ge32": 0.35116818625854773,
+        "segment_p50": 23.0,
+        "segment_p90": 32.0,
+        "segment_p99": 32.0,
+        "tile_local_write_reduction_x": 23.813051840857806
+      },
+      "selected_block": 512,
+      "token_block": 32
+    },
+    {
+      "classification": "requires_serial_or_persistent_producer",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 160.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.3125,
+        "with_dense_group_table_p99_kib": 131.643125,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 16384,
+        "fully_parallel_waves": 256,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 16,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1024.0,
+        "mean_segments_per_tile": 519.90625,
+        "p99_segments_per_tile": 1013.29,
+        "pair_share_ge16": 0.9985047877320091,
+        "pair_share_ge32": 0.9519624104526213,
+        "segment_p50": 45.0,
+        "segment_p90": 64.0,
+        "segment_p99": 64.0,
+        "tile_local_write_reduction_x": 47.254673318506946
+      },
+      "selected_block": 512,
+      "token_block": 64
+    },
+    {
+      "classification": "requires_serial_or_persistent_producer",
+      "lds_model": {
+        "d_block": 16,
+        "fits_dense_table_budget": false,
+        "fits_dense_table_target": false,
+        "fits_sparse_epilogue_budget": true,
+        "fits_sparse_epilogue_target": false,
+        "full_window_route_metadata_kib": 320.0,
+        "k_micro": 16,
+        "micro_working_set_kib": 68.3125,
+        "with_dense_group_table_max_kib": 132.3125,
+        "with_dense_group_table_p99_kib": 131.6925,
+        "with_sparse_epilogue_p99_kib": 72.3125
+      },
+      "parallel_score_model": {
+        "fully_parallel_feasible": false,
+        "fully_parallel_threads": 32768,
+        "fully_parallel_waves": 512,
+        "head_tile": 16,
+        "heads": 64,
+        "max_threads_per_block": 1024,
+        "max_waves_per_block": 16,
+        "serial_token_batches_if_single_cta": 32,
+        "tokens_parallel_under_thread_cap": 4,
+        "waves_per_token_for_h64_score": 4
+      },
+      "route_reduction": {
+        "max_segments_per_tile": 1024.0,
+        "mean_segments_per_tile": 527.9375,
+        "p99_segments_per_tile": 1014.08,
+        "pair_share_ge16": 0.9992762434874634,
+        "pair_share_ge32": 0.9968575738765875,
+        "segment_p50": 89.0,
+        "segment_p90": 128.0,
+        "segment_p99": 128.0,
+        "tile_local_write_reduction_x": 93.07162306144193
+      },
+      "selected_block": 512,
+      "token_block": 128
+    }
+  ],
+  "decision": {
+    "best_fully_parallel_tile": {
+      "classification": "single_workgroup_feasible_but_reduction_too_small",
+      "selected_block": 512,
+      "tile_local_write_reduction_x": 3.04843444037302,
+      "token_block": 4
+    },
+    "first_useful_reduction_requires": {
+      "fully_parallel_threads": 4096,
+      "selected_block": 512,
+      "serial_token_batches_if_single_cta": 4,
+      "tile_local_write_reduction_x": 11.952959063438367,
+      "token_block": 16
+    },
+    "next_kernel_surface": "standard_single_cta_t4_is_not_enough; useful T32/T64 reduction needs a persistent producer-consumer or multi-CTA design, or a two-level partial stream that avoids the measured route-owned scalar reducer.",
+    "single_workgroup_candidate_exists": false
+  },
+  "resource_assumptions": {
+    "d_block": 16,
+    "dim": 512,
+    "head_tile": 16,
+    "heads": 64,
+    "k_micro": 16,
+    "lds_budget_kib": 128,
+    "lds_target_kib": 64,
+    "max_threads_per_block": 1024,
+    "read": "This assumes a source-boundary backward producer where score/prob/dP for H64 is produced with H16 MFMA waves. If token_block exceeds thread capacity, a normal CTA must serialize token batches or use a persistent/multi-CTA design.",
+    "score_waves_per_token": 4,
+    "wave_size": 64
+  },
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512
+  },
+  "source_artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/actual_li_tile_segment_lengths_token_sweep_s4096_layer2_20260605.json",
+  "status": "analyzed"
+}

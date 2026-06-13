@@ -1,0 +1,79 @@
+{
+  "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260610T031629Z",
+  "date": "2026-06-10",
+  "scope": "native_mori_compact_fixedcap_noallreduce_gate",
+  "result": "invalid_no_throughput_metric",
+  "host": "do-sonle5-mi350-gpu",
+  "host_ip_used": "165.245.166.41",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260610T031629Z/docker-run.log",
+  "remote_scratch_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "candidate_env": {
+    "TORCHTITAN_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "TORCHTITAN_STANDARD_EP_MORI_NATIVE_COMPACT_MAX_PEER_ROWS": "131072",
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_SINK_DOT_CHUNK": "32"
+  },
+  "source_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "summary": "Fixed-cap native MORI compact dispatch/combine skips the per-call scalar max-peer-row all-reduce; auto-cap mode keeps synchronized capacity negotiation."
+  },
+  "validation": {
+    "local_py_compile_token_dispatcher": "passed",
+    "local_launcher_bash_n": "passed",
+    "remote_launcher_bash_n": "passed",
+    "remote_source_synced": true
+  },
+  "invalid_attempts": [
+    {
+      "stage": "scratch_root_direct_remote_launcher",
+      "result": "failed_preflight",
+      "reason": "LOCAL_TORCHTITAN_DIR was not set for the scratch source tree"
+    },
+    {
+      "stage": "local_launcher_wrong_gpu_env",
+      "result": "failed_before_training",
+      "reason": "Set CANARY_NUM_GPUS=8, but launcher uses GPUS_PER_NODE; launched WORLD_SIZE=4 with FSDP8/EP8"
+    },
+    {
+      "stage": "local_launcher_visible_devices_all",
+      "result": "failed_before_training",
+      "reason": "CANARY_VISIBLE_DEVICES=all produced CUDA_VISIBLE_DEVICES=all, which ROCm PyTorch rejected"
+    },
+    {
+      "stage": "correct_8gpu_launch",
+      "result": "interrupted_before_valid_metric",
+      "reason": "Unrelated external nexus-titan-training workload started on the same node before step metrics, contaminating throughput"
+    },
+    {
+      "stage": "clean_rerun_after_idle_check",
+      "result": "launcher_idle_guard_refused",
+      "reason": "External two-rank nexus-titan-training fault-tolerance smoke restarted on GPUs 0 and 1 between the idle check and launch on do-sonle5"
+    },
+    {
+      "stage": "alternate_node_check",
+      "result": "blocked_by_external_workload",
+      "reason": "do-vunguyen-mi350-gpu was also occupied by the paired replica of the same external two-node nexus-titan-training fault-tolerance smoke"
+    }
+  ],
+  "throughput": {
+    "tokens_per_gpu_s": null,
+    "node_tokens_s": null,
+    "tflops_per_gpu": null,
+    "valid": false
+  },
+  "cleanup": {
+    "action": "killed_only_candidate_run_pids",
+    "external_workload_touched": false
+  },
+  "read": "The fixed-cap noallreduce source patch is valid and synced, but this pass produces no promotable performance evidence. The corrected 8x gate was first contaminated and then blocked by the launcher idle guard while an external two-node smoke occupied GPUs 0/1 on both candidate nodes. Rerun a clean 6-step gate on an idle 8xMI350 node before any 20-step promotion comparison."
+}

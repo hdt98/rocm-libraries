@@ -1,0 +1,40 @@
+{
+  "backend_path": "/workspace/sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "env": {
+    "backward_mode_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_BACKWARD_MODE",
+    "local_count_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_LOCAL_COUNT",
+    "scatter_mode": "index_add_flat",
+    "tilelang_block_d": null,
+    "tilelang_block_k": null,
+    "tilelang_group_panel_size": null,
+    "tilelang_panel_capacity": null,
+    "tilelang_threads": null,
+    "tilelang_token_block": null
+  },
+  "notes": [
+    "This verifies the opt-in TorchTitan autograd bridge, not a final production sparse-MLA backward.",
+    "The TileLang mode still materializes probs/grad_logits and performs route planning inside backward."
+  ],
+  "parity": {
+    "enabled": false
+  },
+  "scope": "torchtitan_shared_kv_tilelang_backward_bridge",
+  "shape": {
+    "batch": 1,
+    "compressed_count": 512,
+    "dim": 512,
+    "group_count": 1024,
+    "heads": 64,
+    "local_count": 128,
+    "selected": 640,
+    "seq_len": 4096
+  },
+  "timing": {
+    "explicit_tilelang_dkv": {
+      "median_ms": 75.74524688720703,
+      "times_ms": [
+        75.74524688720703
+      ]
+    }
+  }
+}

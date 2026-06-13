@@ -1,0 +1,78 @@
+{
+  "status": "passed_selected_cpu_tensor_load_restore_pending",
+  "validated_at": "2026-05-31",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "run_id": "torchtitan_mixed_muon_1step_s4096_gbs8_20260531",
+  "checkpoint": "/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1",
+  "tool": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_optimizer_preflight/inspect_dcp_checkpoint.py",
+  "remote_tool": "/local/data/sonle5/dsv4_pretrain_canary_20260527/tools/inspect_dcp_checkpoint.py",
+  "command": "ssh do-sonle5-mi350-gpu \"docker run --rm --network=none --volume /local/data/sonle5/dsv4_pretrain_canary_20260527:/data rocm/primus:v26.2 python3 /data/tools/inspect_dcp_checkpoint.py /data/output/torchtitan_mixed_muon_1step_s4096_gbs8_20260531/checkpoint/step-1 --tensor-sample-max-elements 1000000\"",
+  "metadata": {
+    "type": "torch.distributed.checkpoint.metadata.Metadata",
+    "key_count": 912,
+    "optimizer_key_count": 519,
+    "optimizer_prefix_counts": {
+      "optimizer_0": 210,
+      "optimizer_1": 309
+    }
+  },
+  "selected_scalar_load": {
+    "train_state_step": 1,
+    "adamw_param_group_0": {
+      "lr": 0.00022,
+      "weight_decay": 0.1,
+      "eps": 1e-08
+    },
+    "muon_param_group_0": {
+      "lr": 0.00022,
+      "weight_decay": 0.1,
+      "momentum": 0.95,
+      "nesterov": true,
+      "ns_steps": 5,
+      "eps": 1e-07
+    }
+  },
+  "selected_tensor_load": [
+    {
+      "label": "adamw_exp_avg",
+      "key": "optimizer.optimizer_0.state.0.exp_avg",
+      "shape": [2048],
+      "dtype": "torch.float32",
+      "numel": 2048,
+      "finite": true,
+      "abs_max": 3.376365566509776e-05,
+      "l2_norm": 0.00023805067758075893
+    },
+    {
+      "label": "adamw_exp_avg_sq",
+      "key": "optimizer.optimizer_0.state.0.exp_avg_sq",
+      "shape": [2048],
+      "dtype": "torch.float32",
+      "numel": 2048,
+      "finite": true,
+      "abs_max": 5.699922311919181e-09,
+      "l2_norm": 1.7899340676308384e-08
+    },
+    {
+      "label": "muon_momentum_buffer",
+      "key": "optimizer.optimizer_1.state.105.momentum_buffer",
+      "shape": [64, 2048],
+      "dtype": "torch.float32",
+      "numel": 131072,
+      "finite": true,
+      "abs_max": 3.610633939388208e-06,
+      "l2_norm": 0.00012847143807448447
+    }
+  ],
+  "interpretation": [
+    "The checkpoint can be opened and selected-loaded through torch.distributed.checkpoint from a CPU-only Primus container.",
+    "Scalar state proves train_state.step and mixed optimizer param-group fields are restorable.",
+    "Tensor state proves representative AdamW moment tensors and Muon momentum tensors are restorable and finite.",
+    "The real training proof still requires an idle-node load_step=1 resume through step 2."
+  ],
+  "caveats": [
+    "This selected load intentionally samples small tensors under one million elements and does not load the full 120G checkpoint.",
+    "This is stronger than metadata/scalar restore but still not a full distributed optimizer restore or training continuation."
+  ]
+}

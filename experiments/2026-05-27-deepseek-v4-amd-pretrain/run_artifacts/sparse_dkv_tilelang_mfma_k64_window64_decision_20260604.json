@@ -1,0 +1,94 @@
+{
+  "status": "partial_progress_not_promoted",
+  "scope": "sparse_dkv_tilelang_mfma_k64_window64_gate",
+  "date": "2026-06-04",
+  "read": "TileLang can run the sparse dKV materialized-prob MFMA contribution body correctly on MI350 when block_k=64, block_d=32, and selected_window=64. This fixes the earlier K32 NaN/lowering branch and gives a real compact reduced-write kernel at small slot-aligned shape. It is not yet a target-shape speed candidate: full selected_window=512 still produces NaNs in the shared-staged contribution sink, the full active-group table does not lower once max_active_groups exceeds roughly 64, and the row-block workaround recomputes the MFMA body for every active-row block.",
+  "artifacts": {
+    "mfma_contrib_sink_s16_slot_aligned_sw64_k64d32": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_contrib_sink_s16_slot_aligned_sw64_k64d32_20260604.json",
+    "mfma_contrib_sink_s128_tb32_sw64_k64d32": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_contrib_sink_s128_tb32_sw64_k64d32_20260604.json",
+    "mfma_contrib_sink_s4096_tb32_sw64_k64d32_timing": "run_artifacts/tilelang_sparse_dkv_compact_partial_mfma_contrib_sink_s4096_tb32_sw64_k64d32_timing_20260604.json",
+    "route_mfma_reduced_s16_slot_aligned_sw64_k64d32": "run_artifacts/tilelang_sparse_dkv_compact_partial_route_mfma_reduced_s16_slot_aligned_sw64_k64d32_20260604.json",
+    "route_mfma_reduced_s128_tb32_sw64_k64d32": "run_artifacts/tilelang_sparse_dkv_compact_partial_route_mfma_reduced_s128_tb32_sw64_k64d32_20260604.json"
+  },
+  "passing_gates": [
+    {
+      "kernel": "mfma_contrib_sink",
+      "shape": "S16,H64,D512,topk512,token_block16,selected_window64,block_k64,block_d32,slot_aligned",
+      "median_ms": 0.19630299508571625,
+      "max_abs_diff": 1.7881393432617188e-7,
+      "output_mib": 0.015625,
+      "read": "MFMA contribution body is finite and matches the PyTorch sink oracle at small shape."
+    },
+    {
+      "kernel": "mfma_contrib_sink",
+      "shape": "S128,H64,D512,topk512,token_block32,selected_window64,block_k64,block_d32,clustered_unique",
+      "median_ms": 0.5301269888877869,
+      "max_abs_diff": 2.980232238769531e-7,
+      "output_mib": 0.0625,
+      "read": "The same contribution body remains correct at a clustered S128 route when selected_window is one K64 chunk."
+    },
+    {
+      "kernel": "mfma_contrib_sink",
+      "shape": "S4096,H64,D512,topk512,token_block32,selected_window64,block_k64,block_d32,clustered_unique,timing_only",
+      "median_ms": 13.279725074768066,
+      "output_mib": 2.0,
+      "checksum": 1216.5252685546875,
+      "read": "Contribution production alone is finite but already slower than the retained Triton active-list compact sink, so the TileLang materialized-prob sink is not a speed path as-is."
+    },
+    {
+      "kernel": "route_mfma_reduced",
+      "shape": "S16,H64,D512,topk512,token_block16,selected_window64,block_k64,block_d32,row_block16,slot_aligned",
+      "median_ms": 0.33224400877952576,
+      "max_abs_diff": 5.587935447692871e-9,
+      "output_mib": 1.0,
+      "read": "The real compact row-block reducer is correct at small shape after moving from K32 to K64."
+    },
+    {
+      "kernel": "route_mfma_reduced",
+      "shape": "S128,H64,D512,topk512,token_block32,selected_window64,block_k64,block_d32,row_block16,clustered_unique",
+      "median_ms": 16.345762252807617,
+      "max_abs_diff": 3.725290298461914e-9,
+      "output_mib": 42.373046875,
+      "read": "The row-block reducer stays correct, but it recomputes the contribution body per active-row block and is therefore much slower than the sink."
+    }
+  ],
+  "failed_or_rejected_gates": [
+    {
+      "kernel": "mfma_contrib_sink",
+      "shape": "S16,selected_window64,block_k32,block_d32",
+      "result": "compiled_but_nan",
+      "read": "K32/D32 was the source of the earlier NaN branch."
+    },
+    {
+      "kernel": "mfma_contrib_sink",
+      "shape": "S128,selected_window512,block_k64,block_d32",
+      "result": "compiled_but_nan",
+      "read": "Full selected-window accumulation remains poisoned in this materialized-prob layout."
+    },
+    {
+      "kernel": "mfma_contrib_sink_direct_fragment",
+      "shape": "S128,selected_window512,block_k64,block_d32",
+      "result": "layout_inference_failed",
+      "error": "loop_var_to_thread = d_i // 4 * 16 + k_i % 16 contains inner var k_i",
+      "read": "Direct fragment reduction is not a valid TileLang lowering escape hatch for the sink."
+    },
+    {
+      "kernel": "mfma_reduced_full_active_table",
+      "shape": "S128,token_block2,selected_window64,block_k64,block_d32,clustered_unique,max_active_groups127",
+      "result": "layout_inference_failed",
+      "error": "no available layout found",
+      "read": "The full active-group table lowers only at max_active_groups around 64; useful clustered shapes need a blocked active table or a different backend."
+    }
+  ],
+  "decision": {
+    "promote_to_torchtitan": false,
+    "keep_tilelang_branch": true,
+    "next_kernel_step": "Implement a blocked active-table TileLang/HIP/CK producer that keeps the K64 MFMA body but reduces only a bounded group block without recomputing the contribution body for every group block, or move this sparse segmented reduction to HIP/rocWMMA where LDS layout and warp segmented reduction can be controlled directly.",
+    "do_not_retry": [
+      "K32/D32 TileLang MFMA contribution body",
+      "direct fragment sink reduction",
+      "one giant active-group table for clustered S128/S4096 routes",
+      "row-block route reducer as a performance candidate"
+    ]
+  }
+}

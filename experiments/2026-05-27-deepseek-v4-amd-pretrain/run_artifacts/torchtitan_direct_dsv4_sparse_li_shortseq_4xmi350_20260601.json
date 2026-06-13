@@ -1,0 +1,84 @@
+{
+  "artifact": "torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601",
+  "date": "2026-06-01",
+  "result": "passed_two_steps_checkpoint_free_direct_torchtitan",
+  "purpose": "Exercise the bounded PyTorch sparse-MLA plus LightningIndexer path in direct TorchTitan training on a 4xMI350 slice without Primus.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+  "run_id": "torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000",
+  "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+  "command": "env GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_REQUIRE_IDLE_GPUS=true CANARY_SEQ_LEN=128 CANARY_STEPS=2 CANARY_MBS=1 CANARY_GBS=64 CANARY_CHECKPOINT_ENABLE=false CANARY_DEDICATED_EP_PG=true RUN_ID=torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "parallelism": {
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "mbs": 1,
+    "gbs": 64,
+    "sequence_length": 128,
+    "gradient_accumulation_steps": 16
+  },
+  "direct_torchtitan": true,
+  "primus_used": false,
+  "dedicated_ep_process_group": true,
+  "checkpoint_enable": false,
+  "checkpoint_directory_created": false,
+  "remote": {
+    "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000/docker-run.log",
+    "output_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000",
+    "output_size": "1.1M",
+    "structured_logs": [
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000/structured_logs/training.global_rank_0.20260531-190328-NXXTGM.jsonl",
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000/structured_logs/training.global_rank_1.20260531-190328-MI76U8.jsonl",
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000/structured_logs/training.global_rank_2.20260531-190328-DSNWY8.jsonl",
+      "/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_sparse_li_shortseq_4xmi350_20260601T000000/structured_logs/training.global_rank_3.20260531-190328-QMH80N.jsonl"
+    ]
+  },
+  "model": {
+    "name": "deepseek_v4 flash_4layer",
+    "dense_parameters": 1900587008,
+    "sparse_parameters": 25874661376,
+    "active_parameters": 2609424384,
+    "total_parameters": 27775248384,
+    "attention_contract": "compressed layers use bounded PyTorch sparse MLA plus LightningIndexer at seq_len <= 512; uncompressed layers remain dense; S4096 remains dense fallback until fused sparse kernel exists"
+  },
+  "mesh": {
+    "active_dimensions": [
+      "batch",
+      "loss",
+      "ep",
+      "fsdp"
+    ],
+    "ranks_reporting_mesh": 4
+  },
+  "steps": [
+    {
+      "step": 1,
+      "loss": 12.30273,
+      "grad_norm": 9.375,
+      "memory_gib": 76.41,
+      "tokens_per_gpu_s_range": [
+        115,
+        116
+      ],
+      "tflops_per_gpu_range": [
+        1.46,
+        1.47
+      ],
+      "mfu_pct": 0.47
+    },
+    {
+      "step": 2,
+      "loss": 11.79978,
+      "grad_norm": 18.25,
+      "memory_gib": 95.11,
+      "tokens_per_gpu_s": 461,
+      "node_tokens_per_s": 1844,
+      "implied_step_time_s_at_gbs64_s128": 4.44,
+      "tflops_per_gpu": 5.85,
+      "mfu_pct": 1.87
+    }
+  ],
+  "read": "This is correctness and integration evidence for the direct TorchTitan short-sequence sparse-MLA/LightningIndexer path. It is intentionally not comparable to the S4096 throughput target because S128 uses a materializing PyTorch sparse path and avoids the long-sequence dense fallback guard."
+}

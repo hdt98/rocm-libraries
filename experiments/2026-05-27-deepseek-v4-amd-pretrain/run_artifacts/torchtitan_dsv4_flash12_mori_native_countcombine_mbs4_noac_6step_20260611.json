@@ -1,0 +1,176 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_countcombine_mbs4_noac_6step_20260611",
+  "created_utc": "2026-06-11T00:24:00Z",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "purpose": "Six-step stability/performance gate for the rebuilt remote-source MORI count-aware native compact combine path.",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "key_env": {
+    "CANARY_MORI_IMPORT_MODE": "remote",
+    "CANARY_MORI_REBUILD_REMOTE": "false_after_explicit_countaware_rebuild",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_HOT_SPLIT_W13": "true",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_ORDER": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND": "triton_flat",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "none",
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_USE_HYPER_CONNECTIONS": "false",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G"
+  },
+  "native_countaware_run": {
+    "run_id": "torchtitan_dsv4_flash12_mori_native_countcombine_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611b",
+    "status": "completed",
+    "console_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_countcombine_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611b/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_countcombine_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611b",
+    "steps": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s_mean": 1802.25,
+        "tflops_per_gpu_mean": 91.2525,
+        "memory_gib_max": 154.52,
+        "loss": 12.31518,
+        "grad_norm": 20.375
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s_mean": 6690.0,
+        "tflops_per_gpu_mean": 338.74,
+        "memory_gib_max": 195.29,
+        "loss": 7.83628,
+        "grad_norm": 38.0
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s_mean": 7079.0,
+        "tflops_per_gpu_mean": 358.4,
+        "memory_gib_max": 195.29,
+        "loss": 20.61935,
+        "grad_norm": 107.0
+      },
+      {
+        "step": 4,
+        "tokens_per_gpu_s_mean": 7251.0,
+        "tflops_per_gpu_mean": 367.11,
+        "memory_gib_max": 195.29,
+        "loss": 14.11895,
+        "grad_norm": 108.5
+      },
+      {
+        "step": 5,
+        "tokens_per_gpu_s_mean": 7873.0,
+        "tflops_per_gpu_mean": 398.62,
+        "memory_gib_max": 195.29,
+        "loss": 7.53701,
+        "grad_norm": 35.25
+      },
+      {
+        "step": 6,
+        "tokens_per_gpu_s_mean": 7911.0,
+        "tflops_per_gpu_mean": 400.55,
+        "memory_gib_max": 195.29,
+        "loss": 6.35496,
+        "grad_norm": 29.625
+      }
+    ],
+    "windows": {
+      "steps_2_to_6": {
+        "tokens_per_gpu_s_mean": 7360.8,
+        "node_tokens_s_mean": 58886.4,
+        "tflops_per_gpu_mean": 372.684,
+        "peak_logged_memory_gib": 195.29
+      },
+      "steps_4_to_6": {
+        "tokens_per_gpu_s_mean": 7678.333333333333,
+        "node_tokens_s_mean": 61426.666666666664,
+        "tflops_per_gpu_mean": 388.76,
+        "peak_logged_memory_gib": 195.29
+      }
+    }
+  },
+  "comparisons": {
+    "native_countaware_vs_prior_native_noac_steps_2_to_6": {
+      "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_source_scatter_mbs4_ab_20260611.json",
+      "baseline_tokens_per_gpu_s": 7235.0,
+      "baseline_tflops_per_gpu": 366.30825,
+      "tokens_per_gpu_s_delta": 125.80000000000018,
+      "tokens_per_gpu_s_delta_pct": 1.738769868693852,
+      "tflops_per_gpu_delta": 6.375750000000009
+    },
+    "native_countaware_vs_prior_native_noac_steps_4_to_6": {
+      "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_native_source_scatter_mbs4_ab_20260611.json",
+      "baseline_tokens_per_gpu_s": 7392.333333333333,
+      "baseline_tflops_per_gpu": 374.27333333333337,
+      "tokens_per_gpu_s_delta": 286.0,
+      "tokens_per_gpu_s_delta_pct": 3.868874690615317,
+      "tflops_per_gpu_delta": 14.486666666666622
+    },
+    "native_countaware_vs_old_standard_ownercompact_control_steps_2_to_6": {
+      "control_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+      "control_tokens_per_gpu_s": 8051.75,
+      "control_tflops_per_gpu": 407.6725,
+      "tokens_per_gpu_s_delta": -690.9499999999998,
+      "tokens_per_gpu_s_delta_pct": -8.581363874308045,
+      "tflops_per_gpu_delta": -34.98850000000004,
+      "memory_gib_delta": 0.3900000000000148
+    },
+    "native_countaware_vs_old_standard_ownercompact_control_steps_4_to_6": {
+      "control_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.json",
+      "control_tokens_per_gpu_s": 8163.666666666667,
+      "control_tflops_per_gpu": 413.35,
+      "tokens_per_gpu_s_delta": -485.33333333333394,
+      "tokens_per_gpu_s_delta_pct": -5.945041627958808,
+      "tflops_per_gpu_delta": -24.590000000000032,
+      "memory_gib_delta": 0.3900000000000148
+    }
+  },
+  "current_source_standard_control_attempt": {
+    "run_id": "torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611",
+    "status": "failed_before_metric_step",
+    "console_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ownercompact_current_mbs4_sdma_noac_steps6_8x_s4096_gbs128_20260611/docker-run.log",
+    "failure": "GPU memory access fault during backward before the first logged metric step; root cause shown by torch elastic as SIGABRT after HSA memory access faults on all ranks.",
+    "interpretation": "Invalid as a performance control. The post-failure node check returned all GPUs to idle with only driver VRAM allocation, so this is not evidence of node occupancy. It needs a separate isolation pass before replacing the older completed owner-compact control."
+  },
+  "post_failure_node_check": {
+    "time_utc": "2026-06-11T00:19:15Z",
+    "gpu_use_pct": [0, 0, 0, 0, 0, 0, 0, 0],
+    "vram_used_bytes_per_gpu": 299532288,
+    "training_processes": "none"
+  },
+  "decision": {
+    "promote": false,
+    "read": "Count-aware native compact combine is real and stable for this 6-step MBS4/no-AC gate, and it improves the prior native no-AC line by about 1.74% over steps 2-6 and 3.87% over steps 4-6. It still trails the completed standard owner-compact control by about 8.58% over steps 2-6 and 5.95% over steps 4-6. The same-source standard control attempt failed before metrics and must be isolated separately rather than treated as a new control."
+  }
+}

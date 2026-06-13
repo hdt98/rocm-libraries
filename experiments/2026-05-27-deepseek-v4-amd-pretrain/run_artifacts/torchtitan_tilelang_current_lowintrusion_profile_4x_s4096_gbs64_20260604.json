@@ -1,0 +1,161 @@
+{
+  "status": "profile_complete",
+  "scope": "TorchTitan DeepSeek-V4 Flash 4-layer current TileLang shared-KV low-intrusion bottleneck profile",
+  "date": "2026-06-04",
+  "host": "do-sonle5-mi350-gpu",
+  "why_4x_not_8x": "GPUs 0-3 were occupied by an unrelated active TorchTitan/Qwen workload; the profile used idle GPUs 4-7 only.",
+  "run": {
+    "run_id": "torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604",
+    "status": "completed_3_steps",
+    "process_groups_destroyed": true,
+    "local_wrapper_note": "The local launcher wrapper stayed open after remote completion and was killed locally after verifying the remote run had completed and no matching remote process remained."
+  },
+  "shape": {
+    "gpus": 4,
+    "visible_devices": "4,5,6,7",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "parallelism": "TP1_PP1_CP1_FSDP4_EP4",
+    "activation_checkpointing": "full",
+    "checkpoint_enable": false
+  },
+  "active_path": {
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "explicit_tilelang_dkv",
+    "sharedkv_tilelang_dkv_backend": "selected_limit_hsk_bf16_scaled_source",
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_backward_combine_input_mode": "registered",
+    "mori_aiter_dx_return_mode": "sync"
+  },
+  "profile_knobs": {
+    "torch_profiler_trace": false,
+    "dense_linear_backward_timing": false,
+    "activation_checkpoint_block_timing": false,
+    "sharedkv_backward_timing": true,
+    "mori_aiter_timing": true,
+    "additive_timing": true,
+    "read": "This is lower-intrusion than the prior deep profile, but still synchronizes timing regions. Use it for bottleneck ranking, not as a promoted throughput baseline."
+  },
+  "step_metrics": {
+    "step_1": {
+      "read": "TileLang first-use compile/warmup polluted.",
+      "loss": 12.32141,
+      "grad_norm": 12.8125,
+      "tokens_per_gpu_s_range": [1753, 1756],
+      "tflops_per_gpu_range": [33.18, 33.24],
+      "peak_logged_memory_gib_range": [76.59, 76.96]
+    },
+    "step_2": {
+      "loss": 8.88797,
+      "grad_norm": 23.875,
+      "tokens_per_gpu_s": 3990,
+      "tflops_per_gpu": 75.51,
+      "mfu_percent_mi350x_bf16_peak": 3.27,
+      "peak_logged_memory_gib_range": [102.55, 126.18]
+    },
+    "step_3": {
+      "loss": 20.76294,
+      "grad_norm": 29.75,
+      "tokens_per_gpu_s": 3188,
+      "tflops_per_gpu": 60.32,
+      "mfu_percent_mi350x_bf16_peak": 2.61,
+      "peak_logged_memory_gib_range": [137.35, 144.95]
+    }
+  },
+  "jit_read": {
+    "tilelang_compile_lines_in_log": 7,
+    "tilelang_data_race_warning_lines_in_log": 8,
+    "read": "Compile and data-race warning lines appeared before the step-1 metric. Steps 2-3 are the useful steady read for this run."
+  },
+  "additive_rank_max_gpu_ms": {
+    "step_2": {
+      "step.train_step": 16403.188,
+      "train_step.microbatch_forward_backward": 16179.73,
+      "forward_backward.model_forward": 2024.991,
+      "forward_backward.loss": 732.495,
+      "forward_backward.backward": 11548.967,
+      "train_step.accumulated_loss_reduce": 132.133,
+      "train_step.optimizer_step": 31.229,
+      "train_step.grad_clip": 23.706
+    },
+    "step_3": {
+      "step.train_step": 20553.766,
+      "train_step.microbatch_forward_backward": 20330.19,
+      "forward_backward.model_forward": 2097.296,
+      "forward_backward.loss": 731.932,
+      "forward_backward.backward": 15563.431,
+      "train_step.accumulated_loss_reduce": 131.627,
+      "train_step.optimizer_step": 31.006,
+      "train_step.grad_clip": 22.558
+    }
+  },
+  "sharedkv_attention_local_read": {
+    "stage_rank_median_ms_per_call": {
+      "sharedkv_bwd.compressed_tilelang": 12.204,
+      "sharedkv_bwd.compressed.tilelang_hsk_bf16_scaled_source_b0": 8.199,
+      "sharedkv_bwd.compressed.plan_b0": 2.591,
+      "sharedkv_bwd.gather_selected_kv_fp32": 2.014,
+      "sharedkv_bwd.grad_logits_terms": 2.293,
+      "sharedkv_bwd.local_scatter": 2.1,
+      "sharedkv_bwd.local_dkv_math": 1.7,
+      "sharedkv_bwd.grad_q": 1.431,
+      "sharedkv_bwd.scores_qk": 1.287,
+      "sharedkv_bwd.probs": 0.569
+    },
+    "read": "The TileLang compressed-dKV body is useful locally at about 8.2 ms per call, but the current shared-KV backward bridge still pays route planning, materialized selected-KV/probs/grad-logits, separate dQ/QK/PV stages, and local scatter around it."
+  },
+  "mori_moe_local_read": {
+    "stage_rank_median_ms_per_call": {
+      "backward.local_vjp.padded": 50.936,
+      "backward.combine_dx.call": 20.933,
+      "backward.dispatch_x.call": 1.144,
+      "backward.dispatch_grad_output.call": 0.705,
+      "local_padded_vjp.w13_forward_gemm": 10.164,
+      "local_padded_vjp.w13_wgrad_gemm": 8.434,
+      "local_padded_vjp.w13_xgrad_gemm_reduce": 11.203,
+      "local_padded_vjp.w2_dgrad_gemm": 5.087,
+      "local_padded_vjp.w2_forward_gemm": 5.284,
+      "local_padded_vjp.w2_wgrad_gemm": 4.338,
+      "local_padded_vjp.swiglu_forward": 0.887,
+      "local_padded_vjp.swiglu_backward": 1.282,
+      "local_padded_vjp.gather_scale_scatter": 2.079
+    },
+    "group_rank_total_max_ms_over_profile": {
+      "local_vjp_recompute_forward": 2877.376,
+      "local_vjp_wgrad": 2363.826,
+      "local_vjp_xgrad_reduce": 2075.142,
+      "local_vjp_w2_dgrad_swiglu": 1248.446,
+      "combine_dx": 6491.552,
+      "dispatch_grad_inputs": 282.427
+    },
+    "read": "The MoE backward path remains larger than the sparse-attention TileLang slice. The core issue is local owner-rank VJP plus dX return skew/wait; combine_dx is still mostly arrival skew rather than raw combine math."
+  },
+  "bottleneck_read": [
+    "Step-level: backward dominates. Step 2 spends 11.55s of 16.40s in backward; step 3 spends 15.56s of 20.55s in backward.",
+    "MoE-level: MORI routed backward is the largest concrete timed subsystem. Local padded VJP is about 50.9 ms median per call and combine_dx about 20.9 ms median per call, with large rank-total skew.",
+    "Attention-level: TileLang is promising but not enough by itself. The selected-limit dKV body is about 8.2 ms per call, while the current bridge adds roughly another double-digit-ms envelope around it.",
+    "The TFLOPs drop from step 2 to step 3 is consistent with backward growth and memory growth, not with repeated TileLang compile after warmup."
+  ],
+  "next_actions": [
+    "Keep TileLang for sparse attention, but move from final dKV-only replacement toward a fused/adjacent backward boundary that avoids materialized selected-KV, probs, and grad-logits HBM slabs.",
+    "Prioritize MoE backward for end-to-end TFLOPs: reduce padded local VJP recompute and wgrad/xgrad cost, then revisit dX return overlap once route identity is production-safe.",
+    "Run a longer no-heavy-profile durability pass after the next memory fix, because the step-3 TFLOPs drop and memory climb still make this path non-promoted.",
+    "Defer AsyncLL staged/flattened as a performance path until route-key identity is fixed; the existing S4096 artifacts mark it diagnostic-only."
+  ],
+  "commands": [
+    "ssh do-sonle5-mi350-gpu 'hostname; date; rocm-smi --showuse --showmemuse --showpidgpus 2>/dev/null || rocm-smi'",
+    "env TARGET_HOST=do-sonle5-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 RUN_ID=torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=4,5,6,7 CANARY_EP=4 CANARY_GBS=64 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=explicit_tilelang_dkv CANARY_SHAREDKV_TILELANG_DKV_BACKEND=selected_limit_hsk_bf16_scaled_source CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=registered CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_DSV4_PROFILE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/profile_timing CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/mori_timing CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/additive_timing.jsonl experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "ssh do-sonle5-mi350-gpu 'cd /scratch/sonle5/dsv4_pretrain_canary_20260527 && python3 tools/dsv4_runtime_probe/summarize_full_run_profile.py --run low=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling --dsv4-steady-after-call-id 0 --pretty'",
+    "scp do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_current_lowintrusion_profile_4x_s4096_gbs64_steps3_20260604/profiling/additive_timing.jsonl /tmp/torchtitan_dsv4_tilelang_current_lowintrusion_additive_20260604.jsonl"
+  ],
+  "dependency_pin_changes": "none"
+}

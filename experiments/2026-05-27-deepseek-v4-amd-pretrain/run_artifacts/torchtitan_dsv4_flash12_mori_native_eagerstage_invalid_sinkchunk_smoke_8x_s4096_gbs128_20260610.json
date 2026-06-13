@@ -1,0 +1,41 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_mori_native_fixedcap131k_eagerstage_smoke2_8x_s4096_gbs128_20260610",
+  "host": "do-sonle5-mi350-gpu",
+  "host_ip": "165.245.166.41",
+  "date_utc": "2026-06-10",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "native_mori_compact": {
+    "backend": "mori_native",
+    "fixed_peer_rows": 131072,
+    "prereset": false,
+    "debug_cache": false,
+    "stage_handle_policy": "dispatch_eagerly_creates_dispatch_and_combine_handles"
+  },
+  "result": "invalid_failure_not_a_throughput_or_native_mori_stability_read",
+  "failure": {
+    "phase": "first_backward_before_step_metrics",
+    "root_rank": 4,
+    "error": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+    "available_free_memory_mb": 50,
+    "stack_surface": "torch.autograd.backward"
+  },
+  "invalid_reason": "The launch omitted CANARY_SHAREDKV_SINK_DOT_CHUNK=32, and the log header showed sharedkv_sink_dot_chunk=default. This re-entered the known sparse SharedKV sink-gradient transient allocation surface instead of the prior chunked-sink contract.",
+  "followup": {
+    "required_env": {
+      "CANARY_SHAREDKV_SINK_DOT_CHUNK": "32"
+    },
+    "next_gate": "rerun the same eager-stage-handle patch with chunked sink dot, first as a two-step smoke, then as a matched 20-step non-profiled gate"
+  },
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_fixedcap131k_eagerstage_smoke2_8x_s4096_gbs128_20260610/docker-run.log"
+}

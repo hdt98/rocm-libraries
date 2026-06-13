@@ -1,0 +1,151 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_c128_mori_step2_skew",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "source_profile_artifact": "run_artifacts/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_20260606.json",
+  "run_id": "torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "raw_mori_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_aiter_timing.jsonl",
+  "analyzer": {
+    "path": "tools/dsv4_runtime_probe/analyze_mori_step_skew.py",
+    "change": "Teach the analyzer to prefer MORI timing files, skip non-MORI JSONL payloads, and decode the retained expert_loop owner-VJP stages instead of assuming padded VJP."
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "sparse_mla_compress_ratio_allowlist": "128"
+  },
+  "analysis_command": "python3 /tmp/analyze_mori_step_skew_20260606.py --run c128=/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606 --steady-after-call-id 384 --top-k 4",
+  "steady_state_filter": {
+    "steady_after_call_id": 384,
+    "call_count": 192,
+    "kept_records": 768,
+    "rank_count": 4,
+    "timing_files": [
+      "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_aiter_timing.jsonl"
+    ]
+  },
+  "record_summaries_ms": {
+    "local_vjp": {
+      "n": 768,
+      "median": 20.965,
+      "p90": 26.110,
+      "max": 37.192
+    },
+    "combine_dx": {
+      "n": 768,
+      "median": 7.511,
+      "p90": 13.330,
+      "max": 23.975
+    },
+    "dispatch_grad_output": {
+      "rank_total_max_s": 0.820
+    },
+    "recv_count": {
+      "n": 768,
+      "median": 27971.5,
+      "p90": 31952.9,
+      "max": 32736
+    }
+  },
+  "per_call_rankmax_summaries_ms": {
+    "local_vjp_max": {
+      "n": 192,
+      "median": 25.536,
+      "p90": 28.641,
+      "max": 37.192
+    },
+    "local_vjp_spread": {
+      "n": 192,
+      "median": 9.455,
+      "p90": 12.469,
+      "max": 20.568
+    },
+    "combine_dx_max": {
+      "n": 192,
+      "median": 12.170,
+      "p90": 15.479,
+      "max": 23.975
+    },
+    "combine_dx_spread": {
+      "n": 192,
+      "median": 9.783,
+      "p90": 12.657,
+      "max": 20.847
+    },
+    "recv_count_spread": {
+      "n": 192,
+      "median": 9635,
+      "p90": 12783.6,
+      "max": 16340
+    },
+    "recv_count_max_over_median": {
+      "n": 192,
+      "median": 1.128,
+      "p90": 1.264,
+      "max": 1.297
+    }
+  },
+  "rank_totals_step2_s": {
+    "rank0": {
+      "owner_local_vjp": 3.786,
+      "combine_dx": 1.714,
+      "dispatch_grad_output": 0.731,
+      "recv_count_sum": 4966291,
+      "recv_count_median": 26420.5
+    },
+    "rank1": {
+      "owner_local_vjp": 4.036,
+      "combine_dx": 1.451,
+      "dispatch_grad_output": 0.820,
+      "recv_count_sum": 5198527,
+      "recv_count_median": 27843.0
+    },
+    "rank2": {
+      "owner_local_vjp": 4.083,
+      "combine_dx": 1.427,
+      "dispatch_grad_output": 0.744,
+      "recv_count_sum": 5309431,
+      "recv_count_median": 28439.5
+    },
+    "rank3": {
+      "owner_local_vjp": 4.303,
+      "combine_dx": 1.174,
+      "dispatch_grad_output": 0.731,
+      "recv_count_sum": 5319144,
+      "recv_count_median": 29117.5
+    }
+  },
+  "correlations": {
+    "recv_count_vs_local_vjp_ms": 0.8004,
+    "recv_count_vs_combine_dx_ms": -0.8163,
+    "local_vjp_ms_vs_combine_dx_ms": -0.8608,
+    "read": "The owner local VJP grows with route volume, while combine_dx shrinks on the heavy owner ranks and grows on the lighter ranks. This confirms combine_dx is mostly peer-arrival wait caused by owner-rank VJP skew, not raw combine compute."
+  },
+  "local_vjp_stage_read": {
+    "expert_loop_total_median_ms": 19.539,
+    "expert_loop_total_p90_ms": 24.484,
+    "route_pack_median_ms": 0.128,
+    "sort_counts_median_ms": 0.480,
+    "gather_median_ms": 0.279,
+    "note": "This C128 profile was not run with expert_loop_detail granularity, so the inner expert-loop total is sharp but its GEMM/SwiGLU/dTopK split comes from the separate owner-VJP detail profile."
+  },
+  "decision": {
+    "promotion": "analysis_tooling_and_profile_attribution_only",
+    "read": "For the active C128 12-layer candidate, MORI combine tuning alone is the wrong first lever. The primary MoE branch should reduce owner local VJP latency and skew by replacing the Python per-expert loop with a fused compact grouped owner-rank training backward. dX return overlap can help only after or alongside reducing this owner-rank tail.",
+    "next_actions": [
+      "Keep using analyze_mori_step_skew.py for active-shape MORI step attribution.",
+      "Prioritize fused compact grouped owner VJP over more MORI dispatch/combine tuple sweeps.",
+      "Use the separate expert_loop_detail artifact for the inner owner-VJP split: wgrads and forward recompute are the first fused-backward targets."
+    ]
+  }
+}

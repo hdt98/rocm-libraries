@@ -1,0 +1,66 @@
+{
+  "status": "native_layout_tilelang_adapter_promoted_as_dkv_kernel_candidate",
+  "scope": "sparse_mla_backward_compressed_dkv_tilelang_selected_limit_adapter",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "kernel_change": "Add a native [S,H,D] TileLang selected-limit compressed-dKV producer so TorchTitan-shaped q/dO tensors no longer need to be copied to [S,D,H] before launch.",
+    "contract": "static LI route plan plus dynamic materialized probs/grad_logits packing feeds the TileLang in-CTA active-group reducer and returns final fp32 [compressed_groups,D] dKV"
+  },
+  "s512_correctness": {
+    "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s512_correct_20260604.json",
+    "seq_len": 512,
+    "compressed_groups": 128,
+    "actual_li_topk": 128,
+    "input_layout": "bshd",
+    "max_abs_diff": 0.0000095367431640625,
+    "mean_abs_diff": 2.843747495262505e-7,
+    "kernel_only_median_ms": 1.5380580425262451,
+    "pack_plus_kernel_median_ms": 1.6460189819335938
+  },
+  "s4096_target_shape": {
+    "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_20260604.json",
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "actual_li_topk": 512,
+    "packed_topk": 1024,
+    "input_layout": "bshd",
+    "token_block": 16,
+    "group_panel_size": 512,
+    "panel_capacity": 512,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "kernel_only_median_ms": 6.180109977722168,
+    "pack_only_median_ms": 2.0046629905700684,
+    "pack_plus_kernel_median_ms": 8.177932739257812,
+    "write_reduction_x": 11.953140798066032,
+    "route_limit_modeled_chunk_fraction": 0.431396484375,
+    "packed_probs_mib": 512.0,
+    "packed_grad_logits_mib": 512.0,
+    "final_dkv_mib": 2.0
+  },
+  "comparison": {
+    "previous_cli_sdh_kernel_artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_boundary_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+    "previous_cli_sdh_kernel_median_ms": 6.910138130187988,
+    "adapter_sdh_artifact": "run_artifacts/tilelang_selected_limit_adapter_s4096_tb16_cap512_20260604.json",
+    "adapter_sdh_kernel_only_median_ms": 7.649653911590576,
+    "adapter_sdh_pack_plus_kernel_median_ms": 9.671318054199219,
+    "native_bshd_speedup_vs_adapter_sdh_kernel_only": 1.262051589961638,
+    "native_bshd_speedup_vs_previous_cli_sdh_kernel": 1.118127285315196,
+    "current_triton_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "read": "The native-layout kernel removes the q/dO [S,H,D] -> [S,D,H] copy from the adapter and gives a real target-shape kernel-only promotion. Pack+kernel lands near the old sparse-atomic wall because the bridge still materializes and repacks two 512 MiB per-head probability tensors."
+  },
+  "decision": {
+    "promote_native_layout_tilelang_kernel": true,
+    "promote_materialized_pack_bridge_as_production": false,
+    "next_work": [
+      "Fuse or adjacent-produce per-head probs and scaled grad_logits so the 2.0 ms materialized packing bridge disappears.",
+      "Connect final compressed dKV into compressor and LightningIndexer backward while preserving the no-selected-state saved-tensor contract.",
+      "Use native [S,H,D] q/dO layout for any TorchTitan integration attempt; do not reintroduce the [S,D,H] copy."
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "artifact": "triton_fused_moe_backward_s4096_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "S4096 one-MI350 BF16 Triton fused routed-MoE backward probes for W2 dgrad+SwiGLU and W1/W3 xgrad+token reduce.",
+  "source_artifacts": {
+    "w2_dgrad_swiglu_s4096": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_fused_w2_dgrad_swiglu_s4096_20260531.json",
+    "xgrad_reduce_s4096": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_fused_xgrad_reduce_s4096_20260531.json",
+    "w2_dgrad_swiglu_s2048_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_fused_w2_dgrad_swiglu_decision_20260531.json",
+    "xgrad_reduce_s2048_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_fused_xgrad_reduce_decision_20260531.json",
+    "compact_grouped_gemm_s4096_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_s4096_decision_20260531.json",
+    "grouped_bmm_s4096_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/grouped_bmm_s4096_decision_20260531.json"
+  },
+  "run": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "gpu_selection": "HIP_VISIBLE_DEVICES=0",
+    "dtype": "bfloat16",
+    "tokens": 4096,
+    "assignments": 24576,
+    "experts": 384,
+    "topk": 6,
+    "route": {
+      "min_per_expert": 45,
+      "mean_per_expert": 64.0,
+      "max_per_expert": 88,
+      "padded_rows_global_max": 33792,
+      "padding_multiplier_global_max": 1.375,
+      "compact_vs_padded_flop_ratio": 0.7272727272727273
+    }
+  },
+  "correctness": {
+    "w2_dgrad_swiglu": {
+      "ok": true,
+      "dgate_max_abs": 0.0,
+      "dup_max_abs": 0.0,
+      "pct_close": 100.0,
+      "atol": 0.5,
+      "rtol": 0.025
+    },
+    "xgrad_reduce": {
+      "ok": true,
+      "max_abs": 0.029541015625,
+      "pct_close": 100.0,
+      "rel_l2": 0.002030453512688807,
+      "atol": 1.0,
+      "rtol": 0.025,
+      "out_dtype": "float32"
+    }
+  },
+  "measurements": {
+    "w2_dgrad_swiglu": {
+      "contract": "dy_compact [24576, 7168] x W2 [384, 7168, 3072] with SwiGLU backward epilogue -> dgate_compact, dup_compact",
+      "best_triton": {
+        "median_ms": 9.64948844909668,
+        "min_ms": 9.550287246704102,
+        "compact_tflops_median": 112.16467736103883,
+        "config": {
+          "block_m": 32,
+          "block_n": 128,
+          "block_k": 64,
+          "num_warps": 4
+        }
+      },
+      "torch_padded_w2_dgrad_only": {
+        "median_ms": 3.272890090942383,
+        "min_ms": 3.135166883468628,
+        "padded_tflops_median": 454.70704078409545
+      },
+      "torch_padded_w2_dgrad_swiglu": {
+        "median_ms": 3.52209210395813,
+        "min_ms": 3.2917680740356445,
+        "padded_tflops_median": 422.53471066005136
+      },
+      "torch_padded_w2_dgrad_gather_compact_swiglu": {
+        "median_ms": 3.214246988296509,
+        "min_ms": 3.2131669521331787
+      },
+      "triton_over_torch_padded_w2_dgrad_swiglu": 2.7397036091851708,
+      "triton_over_torch_gather_compact_swiglu": 3.0020992426007465
+    },
+    "xgrad_reduce": {
+      "contract": "dgate_compact/dup_compact [24576, 3072] x W1/W3 [384, 3072, 7168] with direct FP32 token reduction -> dX [4096, 7168]",
+      "best_triton": {
+        "median_ms": 75.23686218261719,
+        "min_ms": 74.88699340820312,
+        "compact_tflops_median": 28.77131574054568,
+        "config": {
+          "block_m": 8,
+          "block_n": 64,
+          "block_k": 64,
+          "num_warps": 4
+        }
+      },
+      "torch_padded_xgrad_only": {
+        "median_ms": 8.132125854492188,
+        "min_ms": 8.061824798583984,
+        "padded_tflops_median": 366.0066739478496
+      },
+      "torch_input_reduce_only": {
+        "median_ms": 1.0352354943752289,
+        "min_ms": 0.9716150164604187
+      },
+      "torch_padded_xgrad_reduce": {
+        "median_ms": 8.939329147338867,
+        "min_ms": 8.762006759643555,
+        "padded_tflops_median": 332.9570135600212
+      },
+      "triton_over_torch_padded_xgrad_reduce": 8.416387957368626,
+      "triton_over_torch_padded_xgrad_only": 9.25180740298754
+    }
+  },
+  "decision": {
+    "status": "demote_simple_triton_fused_moe_backward_at_s4096",
+    "promote": [
+      "The fused tensor contracts and correctness probes as oracles for later CK/TileLang/HIP implementations"
+    ],
+    "demote": [
+      "Simple Triton W2 dgrad plus SwiGLU epilogue schedule for full-size S4096",
+      "Direct FP32 atomic Triton W1/W3 xgrad plus token reduce schedule for full-size S4096"
+    ],
+    "read": "Both fused contracts are correct at the target S4096 shape, but simple Triton schedules do not retain the padded library path's MFMA efficiency. W2 dgrad+SwiGLU is 2.7-3.0x slower than padded torch baselines, while direct atomic xgrad+reduce is 8.4x slower. The remaining MoE route must be library-like grouped GEMM efficiency plus separate/fused low-cost reductions, not direct atomics or naive per-expert Triton tiles.",
+    "focus_next": [
+      "Use the S4096 fused probes as correctness oracles for a CK/CK-Tile or TileLang implementation specialized for expert M about 45-88.",
+      "Avoid direct FP32 token-gradient atomics in the first production candidate; keep xgrad math and token reduction as separately optimized stages or use a split/reduce design.",
+      "For W2 dgrad, the epilogue fusion is algebraically valid, but performance depends on a backend that can match padded torch.bmm efficiency on compact rows."
+    ]
+  },
+  "commands": {
+    "stage": "RUN_TAG=triton_fused_s4096_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh stage",
+    "w2_dgrad_swiglu": "ssh do-sonle-kernel \"docker exec -e HIP_VISIBLE_DEVICES=0 -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc 'PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_triton_fused_w2_dgrad_swiglu.py --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --dtype bfloat16 --warmup 2 --iters 5 --init fill --check --check-atol 0.5 --check-rtol 0.025 --block-m 16 32 --block-n 64 128 --block-k 64 128 --num-warps 4 8 --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/triton_fused_s4096_20260531/triton_fused_w2_dgrad_swiglu_s4096/summary.json'\"",
+    "xgrad_reduce": "ssh do-sonle-kernel \"docker exec -e HIP_VISIBLE_DEVICES=0 -w /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 b9d33e6e8227 bash -lc 'PYTHONPATH=/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531 python3 dsv4_layer_microbench/probe_triton_fused_xgrad_reduce.py --tokens 4096 --hidden 7168 --intermediate 3072 --experts 384 --topk 6 --dtype bfloat16 --out-dtype float32 --warmup 1 --iters 2 --init randn --check --check-atol 1.0 --check-rtol 0.025 --block-m 8 --block-n 64 --block-k 64 --num-warps 4 --json --summary-path /local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/triton_fused_s4096_20260531/triton_fused_xgrad_reduce_s4096/summary.json'\""
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,72 @@
+{
+  "status": "not_promoted_speed_candidate",
+  "scope": "tilelang_sparse_dkv_dynamic_slot_mutable_gate",
+  "tool": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+  "remote_node": "do-sonle-kernel",
+  "container": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "read": "A real TileLang dynamic-slot dKV partial kernel now works when it mirrors the vendored sparse-MQA backward contract: one query token per CTA, caller-owned mutable output, output layout [route_tile, dynamic_slot, D], and T.atomic_addx4 from shared memory. However, the same kernel fails TileLang LayoutInference as soon as token_block > 1, so it cannot yet implement the token-window segmented accumulation needed for compressed-group write reduction.",
+  "working_kernel": {
+    "math_mode": "padded_slot3_vec_atomicx4_mutable",
+    "contract": "caller-owned mutable Partials[route_tiles, max_active_groups, D], dynamic PairSlots[token, selected] as the second output dimension, T.atomic_addx4 writeback",
+    "why_it_lowers": "token_block=1 makes the query token effectively a kernel axis, matching the vendored TileLang sparse-MQA dynamic-index pattern"
+  },
+  "successful_runs": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_padded_slot3_vec_atomicx4_mutable_s32_k32_tb1_sw32_d32_clustered_20260604.json",
+      "seq_len": 32,
+      "topk": 32,
+      "token_block": 1,
+      "selected_window": 32,
+      "write_reduction_x": 1.0,
+      "partials_mib": 2.0,
+      "median_ms": 0.13244099915027618,
+      "max_abs_diff": 2.2814609110355377e-05
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_compact_partial_padded_slot3_vec_atomicx4_mutable_s128_k128_tb1_sw128_d32_clustered_20260604.json",
+      "seq_len": 128,
+      "topk": 128,
+      "token_block": 1,
+      "selected_window": 128,
+      "write_reduction_x": 1.0,
+      "partials_mib": 32.0,
+      "median_ms": 0.9224479794502258,
+      "max_abs_diff": 2.6562483981251717e-05
+    }
+  ],
+  "failed_lowering_checks": [
+    {
+      "math_mode": "padded_slot_scalar",
+      "shape": "S32/H64/D512/topk32/token_block8/selected_window32",
+      "failure": "TileLang LayoutInference: no available layout found",
+      "lesson": "Removing compact TileOffsets is insufficient; dynamic PairSlots in a flat output row remains unsupported."
+    },
+    {
+      "math_mode": "padded_slot3_atomicx4",
+      "shape": "S32/H64/D512/topk32/token_block8/selected_window32",
+      "failure": "TileLang LayoutInference: no available layout found after vector-source staging fix",
+      "lesson": "A 3D output layout and T.atomic_addx4 alone are insufficient when the dynamic slot is not tied to a selected-row parallel lane."
+    },
+    {
+      "math_mode": "padded_slot3_vec_atomicx4",
+      "shape": "S32/H64/D512/topk32/token_block8/selected_window32",
+      "failure": "TileLang LayoutInference: no available layout found",
+      "lesson": "Making the dynamic slot depend on a selected-row T.Parallel lane is still insufficient when the output is an allocated out_idx tensor."
+    },
+    {
+      "math_mode": "padded_slot3_vec_atomicx4_mutable",
+      "shape": "S32/H64/D512/topk32/token_block2/selected_window32 and token_block4/selected_window32",
+      "failure": "TileLang LayoutInference: no available layout found",
+      "lesson": "Caller-owned mutable output fixes the per-token pattern, but token-window ownership breaks layout inference."
+    }
+  ],
+  "target_shape_implication": {
+    "target_seq_len": 4096,
+    "target_topk": 512,
+    "target_raw_selected_rows": 2097152,
+    "target_raw_fp32_partial_workspace_mib": 4096.0,
+    "linear_assignment_extrapolation_from_s128_k128_ms": 118.0733413696289,
+    "read": "The working token_block=1 TileLang kernel has no compressed-group write reduction. It scales like raw selected-row emission and is therefore not competitive with the current 8.0-8.8 ms sparse-atomic wall."
+  },
+  "decision": "Keep the TileLang harness and the working mutable per-token kernel as a lowering/correctness reference. Do not pursue this exact TileLang path as the speed candidate until TileLang can lower token_window > 1 with dynamic route slots, or until the segmented reducer is rewritten in HIP/CK/rocWMMA where dynamic keyed local accumulation can be controlled directly."
+}

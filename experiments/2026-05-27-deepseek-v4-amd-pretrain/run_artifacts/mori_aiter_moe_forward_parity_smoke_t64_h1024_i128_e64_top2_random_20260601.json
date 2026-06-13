@@ -1,0 +1,232 @@
+{
+  "probe": "mori_aiter_moe_forward_parity",
+  "created_unix": 1780330179.0628457,
+  "runtime": {
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "hip": "7.2.26015-fc0010cf6a",
+    "device_name": "AMD Instinct MI350X VF"
+  },
+  "world_size": 8,
+  "shape": {
+    "tokens_per_rank": 64,
+    "hidden": 1024,
+    "intermediate": 128,
+    "experts": 64,
+    "num_local_experts": 8,
+    "topk": 2,
+    "topk_pattern": "random",
+    "dtype": "torch.bfloat16",
+    "weight_scale": 0.2
+  },
+  "contract": {
+    "reference": "TorchTitan routed SwiGLU over identical global weights for each rank's original local tokens",
+    "mori_path": "MORI dispatch -> local AITER fused_moe with preshuffled w13/w2 and expert_mask -> MORI combine",
+    "w13_layout": "cat([w1_gate, w3_up]) then shuffle_weight(layout=(16,16)); gate_mode=separated",
+    "scope": "forward-only dispatch/combine semantic parity; does not validate backward"
+  },
+  "thresholds": {
+    "output_atol": 0.0625
+  },
+  "summary": {
+    "all_ranks_pass": true,
+    "max_abs_diff_across_ranks": 0.0625,
+    "max_rank_mean_abs_diff": 0.0031067365780472755,
+    "e2e_ms_rank_median": 0.8982694745063782,
+    "e2e_ms_rank_min": 0.8354489803314209,
+    "e2e_ms_rank_max": 0.915569007396698
+  },
+  "rank_results": [
+    {
+      "rank": 0,
+      "local_rank": 0,
+      "recv_count": 113,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.00302232732065022,
+        "max_rel_diff": 251.06153869628906,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.893530011177063,
+        "min": 0.893530011177063,
+        "max": 0.893530011177063
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 1,
+      "local_rank": 1,
+      "recv_count": 132,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.0625,
+        "mean_abs_diff": 0.0030319441575556993,
+        "max_rel_diff": 486.45184326171875,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.899370014667511,
+        "min": 0.899370014667511,
+        "max": 0.899370014667511
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 2,
+      "local_rank": 2,
+      "recv_count": 125,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.0625,
+        "mean_abs_diff": 0.003060570452362299,
+        "max_rel_diff": 63.06060791015625,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.8839690089225769,
+        "min": 0.8839690089225769,
+        "max": 0.8839690089225769
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 3,
+      "local_rank": 3,
+      "recv_count": 120,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.0030937744304537773,
+        "max_rel_diff": 1393.3829345703125,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.8978899717330933,
+        "min": 0.8978899717330933,
+        "max": 0.8978899717330933
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 4,
+      "local_rank": 4,
+      "recv_count": 126,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.0030801338143646717,
+        "max_rel_diff": 5460.33349609375,
+        "cosine_distance": 5.7220458984375e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.9132099747657776,
+        "min": 0.9132099747657776,
+        "max": 0.9132099747657776
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 5,
+      "local_rank": 5,
+      "recv_count": 127,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.0030634996946901083,
+        "max_rel_diff": 164.83999633789062,
+        "cosine_distance": 5.543231964111328e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.915569007396698,
+        "min": 0.915569007396698,
+        "max": 0.915569007396698
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 6,
+      "local_rank": 6,
+      "recv_count": 116,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.0030012268107384443,
+        "max_rel_diff": 38.40639114379883,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.8354489803314209,
+        "min": 0.8354489803314209,
+        "max": 0.8354489803314209
+      },
+      "passes_atol": true
+    },
+    {
+      "rank": 7,
+      "local_rank": 7,
+      "recv_count": 119,
+      "forward_compare": {
+        "shape": [
+          64,
+          1024
+        ],
+        "dtype": "torch.bfloat16",
+        "max_abs_diff": 0.03125,
+        "mean_abs_diff": 0.0031067365780472755,
+        "max_rel_diff": 50.468597412109375,
+        "cosine_distance": 5.602836608886719e-06,
+        "actual_finite": true,
+        "expected_finite": true
+      },
+      "e2e_ms": {
+        "median": 0.8986489772796631,
+        "min": 0.8986489772796631,
+        "max": 0.8986489772796631
+      },
+      "passes_atol": true
+    }
+  ]
+}

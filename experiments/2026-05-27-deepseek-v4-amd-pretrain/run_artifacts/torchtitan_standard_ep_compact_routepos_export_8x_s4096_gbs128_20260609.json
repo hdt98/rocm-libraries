@@ -1,0 +1,139 @@
+{
+  "artifact": "torchtitan_standard_ep_compact_routepos_export_8x_s4096_gbs128_20260609",
+  "date": "2026-06-09",
+  "status": "completed_diagnostic_not_promoted",
+  "purpose": "Validate an opt-in compact route-position ABI for future native MORI cold/normal standard-EP dispatch/combine.",
+  "source_changes": [
+    "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh"
+  ],
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260609T093953Z",
+  "output_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260609T093953Z",
+  "profile_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/standard_ep_compact_routepos_export_8x_mbs8_steps3_20260609_v2",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12,
+    "model": "deepseek_v4_flash_12layer_ceiling_probe"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_STANDARD_EP_EXPORT_COMPACT_ROUTE_POSITIONS": "true",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_CHUNKED_CE_NUM_CHUNKS": "8"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "tokens_per_gpu_s_range": [1683, 1686],
+      "tflops_per_gpu_range": [85.21, 85.35],
+      "max_logged_memory_gib": 225.27,
+      "loss": 12.14869,
+      "grad_norm": 13.5
+    },
+    {
+      "step": 2,
+      "tokens_per_gpu_s": 6658,
+      "tflops_per_gpu_range": [337.1, 337.11],
+      "max_logged_memory_gib": 262.81,
+      "loss": 9.45023,
+      "grad_norm": 29.5
+    },
+    {
+      "step": 3,
+      "tokens_per_gpu_s": 6745,
+      "tflops_per_gpu_range": [341.52, 341.53],
+      "max_logged_memory_gib": 262.82,
+      "loss": 19.11098,
+      "grad_norm": 26.25
+    }
+  ],
+  "profile_parse": {
+    "files": 8,
+    "standard_ep_dispatch_records": 576,
+    "records_by_phase": {
+      "forward": 576
+    },
+    "violation_count": 0,
+    "validated_invariants": [
+      "export_compact_route_positions == true for every standard_ep_dispatch record",
+      "has_recv_global_flat_positions == true for every standard_ep_dispatch record",
+      "recv_global_flat_positions_rows == routed_rows_after_all_to_all for every record",
+      "normal_flat_positions_rows == routed_rows_after_hot_mask for every record",
+      "flat_position_rank_stride == x_shape[0] * top_k for every record"
+    ],
+    "routed_rows_after_hot_mask": {
+      "min": 80647,
+      "median": 139114.0,
+      "max": 182739
+    },
+    "routed_rows_after_all_to_all": {
+      "min": 23586,
+      "median": 146660.5,
+      "max": 208939
+    },
+    "stage_rank_totals_ms": {
+      "standard_ep.dispatch.route_pos_all_to_all": {
+        "rank_max": 592.594,
+        "rank_mean": 397.633,
+        "rank_sum_by_rank": {
+          "0": 274.457,
+          "1": 285.205,
+          "2": 270.557,
+          "3": 316.418,
+          "4": 592.594,
+          "5": 590.467,
+          "6": 259.969,
+          "7": 591.398
+        }
+      },
+      "standard_ep.dispatch.all_to_all": {
+        "rank_max": 9.388,
+        "rank_mean": 8.494
+      },
+      "standard_ep.dispatch.permute": {
+        "rank_max": 65.07,
+        "rank_mean": 62.601
+      },
+      "standard_ep.dispatch.local_reorder": {
+        "rank_max": 750.553,
+        "rank_mean": 739.413
+      },
+      "standard_ep.dispatch.count_all_to_all": {
+        "rank_max": 10789.471,
+        "rank_mean": 10446.337
+      }
+    }
+  },
+  "read": "The compact route-position ABI is valid, but exporting it as a separate int64 all-to-all sidecar is too expensive to promote. This reinforces the native MORI direction: consume the standard-EP hot/cold/helper compact layout directly, or generate route/source positions inside the same native dispatch/combine primitive, instead of adding a second metadata collective around the existing standard-EP graph.",
+  "first_attempts": [
+    {
+      "result": "local_launcher_fork_failed_before_remote_run",
+      "note": "Transient local shell fork pressure; retry succeeded."
+    },
+    {
+      "result": "completed_but_export_flag_not_propagated",
+      "run_id": "torchtitan_direct_dsv4_flash_12layer_ceiling_probe_bf16_8xmi350_20260609T093410Z",
+      "profile_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/standard_ep_compact_routepos_export_8x_mbs8_steps3_20260609",
+      "note": "Launcher whitelist did not pass CANARY_STANDARD_EP_EXPORT_COMPACT_ROUTE_POSITIONS into the container; patched launcher and reran."
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "artifact": "forward_dgrad_floor_decision_20260531",
+  "date": "2026-05-31",
+  "target_basis": {
+    "source": "user_updated_goal_2026_05_31",
+    "normalized_layer_tokens_per_s": 128100,
+    "targets_ms": {
+      "s2048": 16.0,
+      "s4096": 32.0
+    }
+  },
+  "method": {
+    "forward_only": "Run retained full-layer path with --forward-only.",
+    "dgrad_only": "Run retained full-layer path with --freeze-params so hidden input keeps gradients but model parameters do not produce wgrads.",
+    "retained_full_train": "Compare against current retained full forward + loss + backward + parameter gradients.",
+    "note": "--freeze-params is a lower-bound ablation only; it is not a valid pretraining iteration because parameter gradients are intentionally absent."
+  },
+  "evidence": {
+    "s2048": {
+      "target_ms": 16.0,
+      "forward_only": {
+        "artifact": "run_artifacts/forward_only_s2048_20260531.json",
+        "avg_ms": 16.07335063939293,
+        "min_ms": 15.941680991090834,
+        "tokens_per_s": 127415.87276648563,
+        "ratio_to_target_avg": 1.0045844149620582
+      },
+      "dgrad_only_freeze_params": {
+        "artifact": "run_artifacts/dgrad_only_s2048_20260531.json",
+        "avg_ms": 33.38545240694657,
+        "min_ms": 33.27130898833275,
+        "tokens_per_s": 61344.084094959544,
+        "ratio_to_target_avg": 2.0865907754341606
+      },
+      "dgrad_only_fixed_balanced_router_freeze_params": {
+        "artifact": "run_artifacts/dgrad_only_fixed_router_s2048_20260531.json",
+        "avg_ms": 30.840944673400372,
+        "min_ms": 30.724789947271347,
+        "tokens_per_s": 66405.2292070792,
+        "ratio_to_target_avg": 1.9275590420875233,
+        "delta_vs_learned_dgrad_only_avg_ms": -2.5445077335461974,
+        "router_override_stats": {
+          "assignments": 12288,
+          "experts": 384,
+          "max_per_expert": 32,
+          "mean_per_expert": 32.0,
+          "min_per_expert": 32,
+          "nonzero_experts": 384,
+          "padded_rows_32": 12288,
+          "padding_multiplier_32": 1.0
+        }
+      },
+      "full_train_retained": {
+        "artifact": "run_artifacts/paired_compact_reduce_full_layer_s2048_20260531.json",
+        "avg_ms": 52.328626019880176,
+        "min_ms": 52.19650699291378,
+        "tokens_per_s": 39137.2783077076,
+        "ratio_to_target_avg": 3.270539126242511
+      },
+      "implied_wgrad_and_param_grad_overhead_ms": 18.943173612933606
+    },
+    "s4096": {
+      "target_ms": 32.0,
+      "forward_only": {
+        "artifact": "run_artifacts/forward_only_s4096_20260531.json",
+        "avg_ms": 26.68372398087134,
+        "min_ms": 26.34082396980375,
+        "tokens_per_s": 153501.81267563268,
+        "ratio_to_target_avg": 0.8338663744022293
+      },
+      "dgrad_only_freeze_params": {
+        "artifact": "run_artifacts/dgrad_only_s4096_20260531.json",
+        "avg_ms": 55.00145441813705,
+        "min_ms": 54.71321102231741,
+        "tokens_per_s": 74470.75797052596,
+        "ratio_to_target_avg": 1.7187954505667828
+      },
+      "full_train_retained": {
+        "artifact": "run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+        "avg_ms": 76.57323967820655,
+        "min_ms": 76.30661700386554,
+        "tokens_per_s": 53491.27211037617,
+        "ratio_to_target_avg": 2.3929137399439546
+      },
+      "remaining_budget_after_forward_avg_ms": 5.3162760191286615,
+      "dgrad_only_gap_to_full_target_ms": 23.00145441813705,
+      "implied_wgrad_and_param_grad_overhead_ms": 21.571785260069497
+    }
+  },
+  "decision": {
+    "read": "Wgrad-only optimization cannot close the updated target gap. S2048 forward-only is already at the full 16 ms budget, and S2048 forward+dgrad-only is 2.09x over target. Even the non-training fixed-balanced router plus frozen-parameter lower bound is still 30.84 ms at S2048, or 1.93x target. S4096 forward-only leaves only 5.32 ms for all backward work, while dgrad-only is still 55.00 ms.",
+    "promote_next_focus": [
+      "compact-native routed-MoE dgrad path, including W2 dgrad, W1/W3 xgrad, score-gradient, and input reduce as one backward-first family",
+      "forward MoE/attention launch and memory-traffic reduction because S2048 forward-only has no remaining budget",
+      "then parameter-gradient fusion once forward+dgrad is below target"
+    ],
+    "demote_next_focus": [
+      "standalone routed-MoE wgrad-only work as the primary path to the target",
+      "more stock grouped-GEMM examples with large per-expert row padding"
+    ]
+  }
+}

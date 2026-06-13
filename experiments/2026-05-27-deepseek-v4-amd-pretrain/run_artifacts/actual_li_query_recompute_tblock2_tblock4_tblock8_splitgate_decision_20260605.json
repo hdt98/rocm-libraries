@@ -1,0 +1,74 @@
+{
+  "baseline": {
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "retained_single_token_full_ms": 11.1347
+  },
+  "decision": "reject_wider_token_block_inside_current_triton_query_major_epilogue",
+  "correctness_smokes": [
+    {
+      "artifact": "run_artifacts/actual_li_query_recompute_tblock4_triton_s512_layer2_h64n64d128_correctness_20260605.json",
+      "max_abs_diff": 0.08120918273925781,
+      "mean_abs_diff": 0.0007194417412392795,
+      "passed": true,
+      "seq_len": 512,
+      "token_block": 4
+    },
+    {
+      "artifact": "run_artifacts/actual_li_query_recompute_tblock8_triton_s512_layer2_h64n64d128_correctness_20260605.json",
+      "max_abs_diff": 0.09096145629882812,
+      "mean_abs_diff": 0.0007550646550953388,
+      "passed": true,
+      "seq_len": 512,
+      "token_block": 8
+    }
+  ],
+  "read": "Real S4096 layer-2 measurements show that widening the Triton token tile from T2 to T4/T8 reduces modeled and measured final global dKV accumulation, but the dKV-only producer/sink path grows faster. The split schedule remains worse than the matched single-token 11.08 ms source-boundary baseline, so the next sparse-attention backward branch should not be another T{4,8} N64 sidecar knob. It needs a schedule that keeps the single-token fast producer and moves group-aware reduction into a lower-overhead epilogue or separate cooperative reducer.",
+  "runs": [
+    {
+      "artifact": "run_artifacts/actual_li_query_recompute_tblock2_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+      "dkv_only_full_ms": 10.71346664428711,
+      "dkv_only_global_accum_ms": 7.648528575897217,
+      "dkv_only_sink_ms": 3.0649380683898926,
+      "route_atomic_reduction_x": 1.0709589884563935,
+      "split_schedule_beats_matched_single_token": false,
+      "split_schedule_ms": 12.703758597373962,
+      "split_vs_matched_single_token_speedup_x": 0.8719265243185238,
+      "token_block": 2
+    },
+    {
+      "artifact": "run_artifacts/actual_li_query_recompute_tblock4_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+      "dkv_only_full_ms": 11.556740760803223,
+      "dkv_only_global_accum_ms": 5.120883941650391,
+      "dkv_only_sink_ms": 6.435856819152832,
+      "route_atomic_reduction_x": 1.2078495718932107,
+      "split_schedule_beats_matched_single_token": false,
+      "split_schedule_ms": 13.547032713890076,
+      "split_vs_matched_single_token_speedup_x": 0.8176509434595673,
+      "token_block": 4
+    },
+    {
+      "artifact": "run_artifacts/actual_li_query_recompute_tblock8_triton_s4096_layer2_h64n64d128_splitgate_20260605.json",
+      "dkv_only_full_ms": 19.40089988708496,
+      "dkv_only_global_accum_ms": 3.126068115234375,
+      "dkv_only_sink_ms": 16.274831771850586,
+      "route_atomic_reduction_x": 1.4862027702213492,
+      "split_schedule_beats_matched_single_token": false,
+      "split_schedule_ms": 21.391191840171814,
+      "split_vs_matched_single_token_speedup_x": 0.5178179954792493,
+      "token_block": 8
+    }
+  ],
+  "shape": {
+    "block_d": 128,
+    "block_h": 64,
+    "block_n": 64,
+    "compressed_groups": 1024,
+    "dtype": "bfloat16",
+    "heads": 64,
+    "layer_id": 2,
+    "seq_len": 4096,
+    "topk": 512,
+    "valid_pairs": 1572352
+  }
+}

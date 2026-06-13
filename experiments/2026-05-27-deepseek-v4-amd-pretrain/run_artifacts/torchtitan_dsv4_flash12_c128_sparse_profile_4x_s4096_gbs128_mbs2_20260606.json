@@ -1,0 +1,177 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_c128_only_sparse_profile",
+  "created_at": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+  "raw_timing_logs": {
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/additive_timing.jsonl",
+    "sharedkv_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/dsv4_profile_timing.jsonl",
+    "mori_aiter_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_c128_sparse_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_aiter_timing.jsonl"
+  },
+  "shape": {
+    "gpus": 4,
+    "gpu": "MI350X",
+    "model_spec": "deepseek_v4 flash_12layer_ceiling_probe",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "activation_checkpointing": "none",
+    "checkpointing": false,
+    "optimizer": "AdamW"
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "mori_shmem_heap_size": "40G",
+    "allocator": "expandable_segments:True",
+    "chunked_ce_num_chunks": 8,
+    "moe_comm_backend": "mori",
+    "mori_forward_mode": "aiter",
+    "mori_backward_mode": "routed",
+    "local_vjp_mode": "expert_loop",
+    "save_forward_dispatch": true,
+    "swiglu_backend": "triton",
+    "xgrad_mode": "compact",
+    "dsv4_profile_sharedkv_backward": true,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "li_kl_backend": "triton_tl_dot",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend"
+  },
+  "check_config": {
+    "attention_compress_ratio_by_layer": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "sparse_mla_compress_ratio_allowlist": "128",
+    "read": "C128 sparse MLA is enabled; C4 sparse MLA is guarded to dense fallback by the compress-ratio allowlist."
+  },
+  "logged_steps": [
+    {
+      "step": 1,
+      "loss": 12.30243,
+      "grad_norm": 15.625,
+      "tokens_per_gpu_s_values": [2521, 2520, 2523, 2522],
+      "tokens_per_gpu_s_mean": 2521.5,
+      "node_tokens_s_mean": 10086.0,
+      "tflops_per_gpu_values": [127.62, 127.61, 127.73, 127.71],
+      "tflops_per_gpu_mean": 127.665,
+      "memory_gib_values": [173.54, 173.01, 171.11, 171.78],
+      "memory_gib_max": 173.54,
+      "mfu_percent": 5.53
+    },
+    {
+      "step": 2,
+      "loss": 9.30604,
+      "grad_norm": 43.5,
+      "tokens_per_gpu_s_values": [3663, 3663, 3663, 3663],
+      "tokens_per_gpu_s_mean": 3663.0,
+      "node_tokens_s_mean": 14652.0,
+      "tflops_per_gpu_values": [185.46, 185.46, 185.46, 185.46],
+      "tflops_per_gpu_mean": 185.46,
+      "memory_gib_values": [217.01, 217.11, 217.55, 217.14],
+      "memory_gib_max": 217.55,
+      "mfu_percent": 8.03,
+      "target_tokens_per_gpu_s": 12200,
+      "target_ratio_tokens_per_gpu": 0.3002
+    }
+  ],
+  "comparison_to_nonprofile_c128_materialized": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_c128_sparse_likltriton_4x_s4096_gbs128_mbs2_20260606.json",
+    "nonprofile_step2_tokens_per_gpu_s": 3792.0,
+    "profile_step2_tokens_per_gpu_s": 3663.0,
+    "profile_overhead_step2_tokens_per_gpu_pct": -3.4,
+    "nonprofile_steps_2_to_4_tokens_per_gpu_s": 3867.67,
+    "nonprofile_steps_2_to_4_tflops_per_gpu": 195.84,
+    "nonprofile_peak_logged_memory_gib": 218.42,
+    "profile_peak_logged_memory_gib": 217.55,
+    "read": "The timing sidecars slow step 2 by about 3.4% versus the matching non-profile C128 sparse run, so use this artifact for attribution only and keep the non-profile four-step run as the promoted throughput candidate."
+  },
+  "additive_rankmax": {
+    "step2": {
+      "step_train_step_s": 35.7623,
+      "microbatch_forward_backward_s": 35.1928,
+      "forward_s": 7.8625,
+      "loss_s": 0.9853,
+      "backward_s": 20.9869,
+      "microbatch_wrapper_residual_s": 5.3936,
+      "accumulated_loss_reduce_s": 0.3517,
+      "grad_clip_s": 0.0565,
+      "optimizer_step_s": 0.0879
+    },
+    "step1": {
+      "step_train_step_s": 51.3105,
+      "microbatch_forward_backward_s": 50.0498,
+      "forward_s": 15.3092,
+      "loss_s": 4.2365,
+      "backward_s": 25.1303,
+      "microbatch_wrapper_residual_s": 5.4088,
+      "accumulated_loss_reduce_s": 0.3527,
+      "grad_clip_s": 0.2703,
+      "optimizer_step_s": 0.5511
+    }
+  },
+  "sharedkv_profile": {
+    "compress_ratio_128": {
+      "record_counts_by_rank": {
+        "0": 320,
+        "1": 320,
+        "2": 320,
+        "3": 320
+      },
+      "sharedkv_bwd_query_recompute_ms": {
+        "n": 640,
+        "median": 32.2935,
+        "min": 31.7345,
+        "max": 402.6429,
+        "total": 22142.5645
+      },
+      "sharedkv_bwd_grad_attn_sink_ms": {
+        "n": 640,
+        "median": 1.3595,
+        "min": 1.3306,
+        "max": 23.2737,
+        "total": 1005.4009
+      },
+      "read": "C128 query-recompute is materializable e2e, but the median per-call sparse-attention backward boundary is still about 32 ms. C4 remains guarded because the all-sparse A/B measured roughly 110 ms/call for C4."
+    }
+  },
+  "mori_aiter_profile_all_records": {
+    "note": "These are rank-total max values over the parsed MORI timing file, not a strict step-2-only additive decomposition.",
+    "backward_local_vjp_expert_loop_rank_total_max_s": 9.8144,
+    "backward_combine_dx_call_rank_total_max_s": 2.4057,
+    "backward_dispatch_grad_output_call_rank_total_max_s": 1.5278,
+    "backward_align_grad_output_rank_total_max_s": 1.0701,
+    "forward_aiter_save_dispatch_for_backward_rank_total_max_s": 0.08,
+    "rank_call_median_ms": {
+      "local_vjp_expert_loop": 24.3929,
+      "combine_dx_call": 4.3965,
+      "dispatch_grad_output_call": 3.4273,
+      "align_grad_output": 0.7386,
+      "save_dispatch_for_backward": 0.1956
+    }
+  },
+  "loss_path_profile_all_records": {
+    "loss_backward_rank_total_max_s": 4.5483,
+    "lm_head_forward_rank_total_max_s": 0.4502,
+    "cross_entropy_forward_rank_total_max_s": 0.1979,
+    "read": "The loss path remains visible but is not the lead target versus backward/MORI/shared-KV in this C128 profile."
+  },
+  "decision": {
+    "promote_as_throughput_candidate": false,
+    "promoted_throughput_artifact": "run_artifacts/torchtitan_dsv4_flash12_c128_sparse_likltriton_4x_s4096_gbs128_mbs2_20260606.json",
+    "read": "This profile confirms the C128 sparse candidate should remain promoted on the four-step non-profile run, while attribution should focus on backward. The largest current named walls are MORI owner-rank local VJP/dX return, C128 shared-KV query-recompute, and residual backward/projection/FSDP/autograd work. C4 sparse MLA remains the attention rewrite target.",
+    "next_actions": [
+      "Keep C128 sparse MLA enabled by ratio allowlist for materialized 12-layer runs.",
+      "Continue C4 sparse MLA backward kernel rewrite because all-compressed C4 query-recompute is about 110 ms/call.",
+      "Continue MORI/AITER compact fused owner-rank training backward, because local expert_loop VJP remains the dominant named MORI wall.",
+      "Treat wrapper residual and residual backward-minus-MORI work as profile targets before claiming any isolated kernel win has materialized e2e."
+    ]
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Does owner-compact hot-row materialization with selected hot-weight layout materialize into 8xMI350 standard-EP top-8 throughput?",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608",
+  "local_log": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_ownercompact_materialized_8x_s4096_gbs128_mbs4_steps6_20260608.log",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [
+      1,
+      1,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "torchtitan_code_compress_ratios": [
+      0,
+      0,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128,
+      4,
+      128
+    ],
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled",
+    "data": "tests/assets/c4_test"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "mori_sdma",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "1": {
+      "tokens_per_gpu_s": 1662.125,
+      "node_tokens_s": 13297.0,
+      "tflops_per_gpu": 84.1625,
+      "mfu_pct": 3.645,
+      "loss": 12.40887,
+      "grad_norm": 19.375,
+      "memory_gib_min": 153.78,
+      "memory_gib_max": 155.62
+    },
+    "2": {
+      "tokens_per_gpu_s": 7717.75,
+      "node_tokens_s": 61742.0,
+      "tflops_per_gpu": 390.75,
+      "mfu_pct": 16.92,
+      "loss": 7.7891,
+      "grad_norm": 27.625,
+      "memory_gib_min": 191.37,
+      "memory_gib_max": 194.9
+    },
+    "3": {
+      "tokens_per_gpu_s": 8050.0,
+      "node_tokens_s": 64400.0,
+      "tflops_per_gpu": 407.5625,
+      "mfu_pct": 17.65,
+      "loss": 21.35434,
+      "grad_norm": 66.5,
+      "memory_gib_min": 191.95,
+      "memory_gib_max": 194.9
+    },
+    "4": {
+      "tokens_per_gpu_s": 8120.0,
+      "node_tokens_s": 64960.0,
+      "tflops_per_gpu": 411.14,
+      "mfu_pct": 17.8,
+      "loss": 24.32354,
+      "grad_norm": 123.0,
+      "memory_gib_min": 191.95,
+      "memory_gib_max": 194.9
+    },
+    "5": {
+      "tokens_per_gpu_s": 8187.0,
+      "node_tokens_s": 65496.0,
+      "tflops_per_gpu": 414.53,
+      "mfu_pct": 17.95,
+      "loss": 20.35842,
+      "grad_norm": 19.75,
+      "memory_gib_min": 191.95,
+      "memory_gib_max": 194.9
+    },
+    "6": {
+      "tokens_per_gpu_s": 8184.0,
+      "node_tokens_s": 65472.0,
+      "tflops_per_gpu": 414.38,
+      "mfu_pct": 17.94,
+      "loss": 14.22946,
+      "grad_norm": 20.25,
+      "memory_gib_min": 192.5,
+      "memory_gib_max": 194.9
+    }
+  },
+  "windows": {
+    "steps_2_to_6": {
+      "steps": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "tokens_per_gpu_s_mean": 8051.75,
+      "node_tokens_s_mean": 64414.0,
+      "tflops_per_gpu_mean": 407.6725,
+      "peak_logged_memory_gib": 194.9
+    },
+    "steps_4_to_6": {
+      "steps": [
+        4,
+        5,
+        6
+      ],
+      "tokens_per_gpu_s_mean": 8163.666666666667,
+      "node_tokens_s_mean": 65309.333333333336,
+      "tflops_per_gpu_mean": 413.34999999999997,
+      "peak_logged_memory_gib": 194.9
+    }
+  },
+  "comparisons": {
+    "lower_memory_mbs4_reference": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_sdma_hotweight_8x_s4096_gbs128_mbs4_steps6_20260607.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8029.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 406.522,
+      "peak_logged_memory_gib": 193.8,
+      "delta_tokens_per_gpu_s": 22.75,
+      "delta_tokens_per_gpu_pct": 0.283348,
+      "delta_tflops_per_gpu": 1.1505,
+      "delta_tflops_pct": 0.283011,
+      "delta_peak_memory_gib": 1.1
+    },
+    "throughput_best_mbs8_attention_only_adamw": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_mbs8_selective_attention_ac_8x_s4096_gbs128_steps6_20260608.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 8151.0,
+      "steps_2_to_6_tflops_per_gpu_mean": 413.292,
+      "peak_logged_memory_gib": 260.04,
+      "delta_tokens_per_gpu_s": -99.25,
+      "delta_tokens_per_gpu_pct": -1.217642,
+      "delta_tflops_per_gpu": -5.6195,
+      "delta_tflops_pct": -1.359692,
+      "delta_peak_memory_gib": -65.14
+    }
+  },
+  "decision": {
+    "promote_as_lower_memory_mbs4_reference": true,
+    "promote_as_throughput_best": false,
+    "read": "Owner-compact materialized hot rows are stable and slightly faster than the previous lower-memory MBS4 reference, but the uplift is only about 0.28% over steps 2-6. This is useful baseline polish, not a major MoE/EP scaling fix.",
+    "next_action": "Keep the standard-EP hot/cold/helper layout and focus on remaining helper backward VJP, combine wait/scatter, hot-weight movement, and sparse-MLA C4 SharedKV backward rather than more dense hot-weight ABI adapter swaps."
+  }
+}

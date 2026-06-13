@@ -1,0 +1,63 @@
+{
+  "artifact": "torchtitan_adamw_dryrun_20260531",
+  "created": "2026-05-31",
+  "status": "passed",
+  "scope": "Canonical 8xMI350 TorchTitan/Primus AdamW dry-run for the current canary path.",
+  "run": {
+    "node": "do-sonle5-mi350-gpu",
+    "run_id": "torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_adamw_dryrun_20260531T000000Z",
+    "started_utc": "2026-05-31T15:24:30Z",
+    "image": "rocm/primus:v26.2",
+    "optimizer_mode": "adamw",
+    "dry_run": true,
+    "result": "Primus direct dry-run built the 8-rank torchrun command and did not execute training."
+  },
+  "shape": {
+    "model_proxy": "DeepSeek-V3 16B used as the DeepSeek-V4-style TorchTitan integration proxy",
+    "precision": "bf16",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 16,
+    "seq_len": 4096,
+    "checkpoint_enable": true,
+    "checkpoint_interval": 1,
+    "checkpoint_load_step": -1,
+    "activation_checkpoint": "full"
+  },
+  "config": {
+    "local": "sources/targets/torchtitan_deepseek_v3_16b_bf16_8xmi350_canary.yaml",
+    "remote": "/local/data/sonle5/dsv4_pretrain_canary_20260527/config/torchtitan_deepseek_v3_16b_bf16_8xmi350_canary.yaml",
+    "optimizer": {
+      "name": "AdamW",
+      "implementation": "fused",
+      "lr": 0.00022,
+      "eps": 1e-8
+    },
+    "optimizer_overlay_used": false
+  },
+  "remote_artifacts": {
+    "log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_adamw_dryrun_20260531T000000Z",
+    "docker_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_adamw_dryrun_20260531T000000Z/docker-run.log",
+    "docker_log_lines": 182,
+    "raw_outputs_policy": "Remote logs stay under /local/data; this repo artifact records the compact result and pointers."
+  },
+  "command": {
+    "local": "RUN_ID=torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_adamw_dryrun_20260531T000000Z CANARY_OPTIMIZER_MODE=adamw bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_dsv4_style_8xmi350_canary.sh dry-run",
+    "built_torchrun": "torchrun --nproc_per_node 8 --nnodes 1 --node_rank 0 --master_addr localhost --master_port 29527 --local-ranks-filter 0,7 --no-python /workspace/Primus/runner/helpers/numa_bind.sh primus/cli/main.py train pretrain --config /local/data/sonle5/dsv4_pretrain_canary_20260527/config/torchtitan_deepseek_v3_16b_bf16_8xmi350_canary.yaml --backend_path /workspace/Primus/third_party/torchtitan --job.dump_folder /local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_adamw_dryrun_20260531T000000Z --training.steps 2 --training.local_batch_size 1 --training.global_batch_size 16 --training.seq_len 4096 --training.debug_moe_force_load_balance false --parallelism.tensor_parallel_degree 1 --parallelism.pipeline_parallel_degree 1 --parallelism.context_parallel_degree 1 --parallelism.expert_parallel_degree 8 --parallelism.data_parallel_shard_degree -1 --activation_checkpoint.mode full --checkpoint.enable true --checkpoint.interval 1 --checkpoint.last_save_model_only false --checkpoint.load_step -1 --compile.enable false --model.hf_assets_path /workspace/Primus/third_party/torchtitan/tests/assets/tokenizer --backend_path /workspace/Primus/third_party/torchtitan"
+  },
+  "observations": [
+    "The canonical launcher defaults to CANARY_OPTIMIZER_MODE=adamw and stages the AdamW target config.",
+    "No mixed-Muon optimizer overlay was copied or installed for this run.",
+    "Primus hooks resolved the image-local TorchTitan tokenizer fixture and appended the resolved backend path.",
+    "Dry-run reported 8 visible GPUs and warned that AMD GPU devices were in a low-power state, which is expected when idle."
+  ],
+  "next": [
+    "Use the same launcher for the next real AdamW save/resume or GBS128 perf smoke when the node is intentionally allocated.",
+    "Keep mixed Muon/AdamW artifacts as future-work references rather than a current milestone gate."
+  ],
+  "dependency_pin_changes": []
+}

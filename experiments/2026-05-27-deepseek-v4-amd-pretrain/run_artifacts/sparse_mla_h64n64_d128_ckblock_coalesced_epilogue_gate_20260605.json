@@ -1,0 +1,100 @@
+{
+  "artifact": "sparse_mla_h64n64_d128_ckblock_coalesced_epilogue_gate",
+  "created_at": "2026-06-05",
+  "status": "implemented_measured_not_promoted",
+  "scope": "HIP/CK branch for source-boundary sparse-MLA backward dKV: keep Triton-like one-query/H64 owner and internal N64 selected loop, replace warp-fragment contribution with CK block GEMM, then control final dKV atomic epilogue.",
+  "source": {
+    "hip_source": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip",
+    "python_probe": "tools/dsv4_runtime_probe/probe_sparse_mla_source_boundary_hip_coop.py",
+    "remote_workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "image": "rocm/sgl-dev:rocm720-mi35x-f96ac98-20260527-DSv4",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352,
+    "dtype": "bf16_source_fp32_accum"
+  },
+  "baseline_triton_actual_li": {
+    "artifact": "actual_li_query_recompute_profile_s4096_layer2_h64n64_20260602.json",
+    "no_dkv_dq_recompute_ms": 1.974266,
+    "dkv_reduce_sink_ms": 2.79503,
+    "full_dq_dkv_atomic_ms": 11.08092,
+    "global_dkv_accumulation_estimate_ms": 8.28589
+  },
+  "prior_best_hip_h64n64_d128": {
+    "producer_only_ms": 12.194915771484375,
+    "qgo_staged_contribution_sink_ms": 29.29522705078125,
+    "qgo_staged_full_atomic_ms": 30.67487907409668,
+    "decision_artifact": "sparse_mla_h64n64_d128_inner_schedule_gate_20260605.json"
+  },
+  "implemented_changes": {
+    "ck_block_contribution": "Guarded by TRITON_QM_BLOCK_GEMM_CONTRIB=1. Uses CK BlockGemmASmemBSmemCRegV1 over a N64 x D64 contribution tile with K=H64, computing grad_logits^T q and probs^T grad_output from LDS score/prob and Q/dO tiles.",
+    "coalesced_epilogue": "Guarded by TRITON_QM_BLOCK_GEMM_COALESCED_EPILOGUE=1. Stages the CK C tile as N64 x D64 in LDS, then emits final atomicAdd in the original wave-coalesced N16/D16 order instead of CK's native distributed C-tile sweep order.",
+    "final_source_state": "The selected-window grid experiment was reverted. Final source keeps the Triton-like one CTA per query token, loops selected slots internally in N64 panels, and leaves global dKV atomicAdd as the final accumulation."
+  },
+  "measurements_ms": {
+    "h32_mfma_rejected": {
+      "mode1_contribution_sink_ms": 31.44742774963379,
+      "mode2_full_atomic_ms": 33.49732971191406,
+      "artifacts": [
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_h32mfma_s4096_layer2_mode1_20260605.json",
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_h32mfma_s4096_layer2_mode2_20260605.json"
+      ]
+    },
+    "ck_block_direct_sweep": {
+      "mode1_contribution_sink_ms": 17.715877532958984,
+      "mode2_full_atomic_ms": 88.81649017333984,
+      "mode2_minus_mode1_ms": 70.10061264038086,
+      "read": "CK block GEMM improves contribution math, but direct C-tile sweep makes final atomics catastrophically uncoalesced.",
+      "artifacts": [
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_s4096_layer2_mode1_20260605.json",
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_s4096_layer2_mode2_20260605.json"
+      ]
+    },
+    "ck_block_coalesced_epilogue_retained": {
+      "mode1_contribution_sink_ms": 19.795028686523438,
+      "mode2_full_atomic_ms": 21.24036407470703,
+      "mode2_minus_mode1_ms": 1.4453353881835938,
+      "improvement_vs_prior_qgo_staged_mode2_x": 1.4432364822577016,
+      "read": "Coalesced epilogue fixes the final atomic ordering regression, but the producer plus CK contribution remains too slow.",
+      "artifacts": [
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_coalesced_s4096_layer2_mode1_20260605.json",
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_coalesced_s4096_layer2_mode2_20260605.json"
+      ]
+    },
+    "selected_window_grid_rejected": {
+      "mode0_score_only_ms": 14.570242881774902,
+      "mode1_contribution_sink_ms": 20.657400131225586,
+      "mode2_full_atomic_ms": 20.728839874267578,
+      "read": "Moving selected-window into the grid does not improve latency and no longer matches Triton's token/head program shape, which computes softmax_dot once and loops top-k internally.",
+      "artifacts": [
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_gridz_scoreonly_s4096_layer2_mode0_20260605.json",
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_gridz_coalesced_s4096_layer2_mode1_20260605.json",
+        "sparse_mla_source_boundary_triton_qm_h64n64_d128_ckblock_gridz_coalesced_s4096_layer2_mode2_20260605.json"
+      ]
+    }
+  },
+  "decision": {
+    "promoted": false,
+    "passes_triton_full_boundary_gate": false,
+    "best_retained_full_atomic_ms": 21.24036407470703,
+    "gap_vs_triton_full_boundary_x": 1.916867304886434,
+    "root_cause": "The coalesced final atomic epilogue is no longer the primary wall for this branch. The remaining wall is producer plus contribution math: even after CK block GEMM, mode1 is 19.80 ms versus Triton's 2.80 ms dKV-reduce-sink and 11.08 ms full dQ+dKV boundary.",
+    "keep": [
+      "CK block contribution as evidence that block-tile math is better than the hand H16 contribution loop.",
+      "LDS-staged coalesced epilogue; it turns the 88.82 ms direct-sweep atomic failure into 21.24 ms full-atomic.",
+      "Triton-like token/H64 owner with internal N64 selected loop; selected-window grid is rejected."
+    ],
+    "next_required_step": "Move the epilogue hook onto the faster selected512 scorepage producer surface or build an FMHA-style block pipeline whose producer-only latency is below roughly 3-5 ms before adding dQ/dKV. This branch should not be materialized into e2e TFLOPs until a full source-boundary dQ+dKV kernel beats the 11.13 ms Triton gate."
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,2512 @@
+{
+  "artifact": "torchtitan_ep4_ep8_deeper_mori_ranges_identical_order_comparison_20260603",
+  "created_date": "2026-06-03",
+  "status": "comparison_complete",
+  "inputs": {
+    "ep4_baseline": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_ep4_deeper_mori_ranges_baseline_20260603.json",
+    "ep8_baseline": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_ep8_deeper_mori_ranges_baseline_20260603.json",
+    "ep4_identical": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_ep4_deeper_mori_ranges_identical_order_20260603.json",
+    "ep8_identical": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_ep8_deeper_mori_ranges_identical_order_20260603.json",
+    "ep8_clean": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_20260603.json"
+  },
+  "comparison": {
+    "ep4": {
+      "shape": {
+        "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+        "distributed": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+        "gpus_per_node": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "micro_batch_size": 1,
+        "global_batch_size": 64,
+        "sequence_length": 4096,
+        "gradient_accumulation_steps": 16,
+        "layers": 4,
+        "activation_checkpoint_mode": "full"
+      },
+      "step_summary": {
+        "1": {
+          "loss": 12.13034,
+          "grad_norm": 10.6875,
+          "memory_gib_range": [
+            100.11,
+            105.34
+          ],
+          "tokens_per_gpu_s_range": [
+            2060,
+            2064
+          ],
+          "tflops_per_gpu_range": [
+            38.98,
+            39.05
+          ],
+          "mfu_pct_range": [
+            1.69,
+            1.69
+          ],
+          "mfu_pct": 1.69
+        },
+        "2": {
+          "loss": 8.43209,
+          "grad_norm": 61.75,
+          "memory_gib_range": [
+            126.67,
+            184.03
+          ],
+          "tokens_per_gpu_s_range": [
+            3335,
+            3335
+          ],
+          "tokens_per_gpu_s": 3335,
+          "tflops_per_gpu_range": [
+            63.1,
+            63.1
+          ],
+          "tflops_per_gpu": 63.1,
+          "mfu_pct_range": [
+            2.73,
+            2.73
+          ],
+          "mfu_pct": 2.73
+        }
+      },
+      "mori_ranges": [
+        {
+          "range": "mori_aiter.backward.routed_vjp",
+          "baseline_mean_ms_per_rank": 8694.486,
+          "identical_order_mean_ms_per_rank": 4331.813,
+          "delta_ms_per_rank": -4362.673,
+          "saved_ms_per_rank": 4362.673
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x",
+          "baseline_mean_ms_per_rank": 2079.772,
+          "identical_order_mean_ms_per_rank": 94.614,
+          "delta_ms_per_rank": -1985.158,
+          "saved_ms_per_rank": 1985.158
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x.total_recv_item",
+          "baseline_mean_ms_per_rank": 1685.805,
+          "identical_order_mean_ms_per_rank": 87.39,
+          "delta_ms_per_rank": -1598.415,
+          "saved_ms_per_rank": 1598.415
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x.get_src_pos",
+          "baseline_mean_ms_per_rank": 375.346,
+          "identical_order_mean_ms_per_rank": 0.0,
+          "delta_ms_per_rank": -375.346,
+          "saved_ms_per_rank": 375.346
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_grad_output",
+          "baseline_mean_ms_per_rank": 52.794,
+          "identical_order_mean_ms_per_rank": 4.929,
+          "delta_ms_per_rank": -47.865,
+          "saved_ms_per_rank": 47.865
+        },
+        {
+          "range": "mori_aiter.backward.local_vjp.padded",
+          "baseline_mean_ms_per_rank": 4055.769,
+          "identical_order_mean_ms_per_rank": 4175.479,
+          "delta_ms_per_rank": 119.71,
+          "saved_ms_per_rank": -119.71
+        },
+        {
+          "range": "mori_aiter.local_padded_vjp.swiglu_forward",
+          "baseline_mean_ms_per_rank": 1833.182,
+          "identical_order_mean_ms_per_rank": 1897.65,
+          "delta_ms_per_rank": 64.468,
+          "saved_ms_per_rank": -64.468
+        },
+        {
+          "range": "mori_aiter.local_padded_vjp.swiglu_backward",
+          "baseline_mean_ms_per_rank": 1942.921,
+          "identical_order_mean_ms_per_rank": 1988.319,
+          "delta_ms_per_rank": 45.398,
+          "saved_ms_per_rank": -45.398
+        },
+        {
+          "range": "mori_aiter.backward.combine_dx",
+          "baseline_mean_ms_per_rank": 1302.544,
+          "identical_order_mean_ms_per_rank": 22.146,
+          "delta_ms_per_rank": -1280.398,
+          "saved_ms_per_rank": 1280.398
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_topk_dummy",
+          "baseline_mean_ms_per_rank": 1128.424,
+          "identical_order_mean_ms_per_rank": 7.969,
+          "delta_ms_per_rank": -1120.455,
+          "saved_ms_per_rank": 1120.455
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_topk_dummy.total_recv_item",
+          "baseline_mean_ms_per_rank": 1111.941,
+          "identical_order_mean_ms_per_rank": 0.0,
+          "delta_ms_per_rank": -1111.941,
+          "saved_ms_per_rank": 1111.941
+        },
+        {
+          "range": "mori_aiter.backward.combine_dtopk",
+          "baseline_mean_ms_per_rank": 33.802,
+          "identical_order_mean_ms_per_rank": 15.791,
+          "delta_ms_per_rank": -18.011,
+          "saved_ms_per_rank": 18.011
+        }
+      ],
+      "headline": {
+        "routed_vjp_baseline_ms": 8694.486,
+        "routed_vjp_identical_ms": 4331.813,
+        "routed_vjp_saved_ms": 4362.673,
+        "routed_vjp_speedup": 2.007,
+        "local_vjp_remaining_ms": 4175.479,
+        "swiglu_recompute_remaining_ms": 3885.969,
+        "dispatch_x_total_recv_item_saved_ms": 1598.415,
+        "topk_total_recv_item_removed_ms": 1111.941,
+        "get_src_pos_removed_ms": 375.346
+      },
+      "dense_and_mm": {
+        "dense_groups_child_only": {
+          "attention": {
+            "sum_child_mean_ms_per_rank": 66.825,
+            "top_children": [
+              {
+                "name": "dsv4.linear.attention.wq_b.bwd.dinput",
+                "sum_ms_all_ranks": 44.897,
+                "mean_ms_per_rank": 11.224,
+                "max_ms_per_rank": 11.553,
+                "min_ms_per_rank": 11.011,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 11.187,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 11.146,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 11.011,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 11.553,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_a.bwd.dinput",
+                "sum_ms_all_ranks": 29.896,
+                "mean_ms_per_rank": 7.474,
+                "max_ms_per_rank": 7.59,
+                "min_ms_per_rank": 7.391,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 7.446,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 7.469,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 7.391,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 7.59,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wo.bwd.dinput",
+                "sum_ms_all_ranks": 28.398,
+                "mean_ms_per_rank": 7.1,
+                "max_ms_per_rank": 7.295,
+                "min_ms_per_rank": 6.961,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 7.13,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 7.012,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.961,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 7.295,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_a.bwd.dweight",
+                "sum_ms_all_ranks": 26.311,
+                "mean_ms_per_rank": 6.578,
+                "max_ms_per_rank": 6.73,
+                "min_ms_per_rank": 6.42,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.58,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.58,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.42,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.73,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_a.bwd.dinput",
+                "sum_ms_all_ranks": 25.83,
+                "mean_ms_per_rank": 6.458,
+                "max_ms_per_rank": 6.617,
+                "min_ms_per_rank": 6.34,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.457,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.417,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.34,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.617,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_a.bwd.dweight",
+                "sum_ms_all_ranks": 25.326,
+                "mean_ms_per_rank": 6.331,
+                "max_ms_per_rank": 6.559,
+                "min_ms_per_rank": 6.16,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.338,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.269,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.16,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.559,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wo.bwd.dweight",
+                "sum_ms_all_ranks": 25.112,
+                "mean_ms_per_rank": 6.278,
+                "max_ms_per_rank": 6.51,
+                "min_ms_per_rank": 6.155,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.28,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.155,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.168,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.51,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_b.bwd.dweight",
+                "sum_ms_all_ranks": 25.077,
+                "mean_ms_per_rank": 6.269,
+                "max_ms_per_rank": 6.508,
+                "min_ms_per_rank": 6.104,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.275,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.19,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.104,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.508,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_b.bwd.dinput",
+                "sum_ms_all_ranks": 23.552,
+                "mean_ms_per_rank": 5.888,
+                "max_ms_per_rank": 6.014,
+                "min_ms_per_rank": 5.778,
+                "total_count": 128,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 5.88,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 5.778,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 5.881,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.014,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_b.bwd.dweight",
+                "sum_ms_all_ranks": 12.9,
+                "mean_ms_per_rank": 3.225,
+                "max_ms_per_rank": 3.366,
+                "min_ms_per_rank": 3.136,
+                "total_count": 128,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.235,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.163,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.136,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.366,
+                    "count": 32
+                  }
+                ]
+              }
+            ]
+          },
+          "moe_router": {
+            "sum_child_mean_ms_per_rank": 30.96,
+            "top_children": [
+              {
+                "name": "dsv4.linear.moe.router_gate.bwd.dweight",
+                "sum_ms_all_ranks": 64.236,
+                "mean_ms_per_rank": 16.059,
+                "max_ms_per_rank": 16.331,
+                "min_ms_per_rank": 15.768,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 16.213,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 15.925,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 15.768,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 16.331,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.moe.router_gate.bwd.dinput",
+                "sum_ms_all_ranks": 59.603,
+                "mean_ms_per_rank": 14.901,
+                "max_ms_per_rank": 15.081,
+                "min_ms_per_rank": 14.806,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 14.831,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 14.886,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 14.806,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 15.081,
+                    "count": 64
+                  }
+                ]
+              }
+            ]
+          },
+          "feed_forward": {
+            "sum_child_mean_ms_per_rank": 25.788,
+            "top_children": [
+              {
+                "name": "dsv4.linear.feed_forward.w2.bwd.dinput",
+                "sum_ms_all_ranks": 42.377,
+                "mean_ms_per_rank": 10.594,
+                "max_ms_per_rank": 11.835,
+                "min_ms_per_rank": 9.124,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 11.247,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 9.124,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 10.171,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 11.835,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w2.bwd.dweight",
+                "sum_ms_all_ranks": 14.82,
+                "mean_ms_per_rank": 3.705,
+                "max_ms_per_rank": 4.019,
+                "min_ms_per_rank": 3.488,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 4.019,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.488,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.543,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.771,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w3.bwd.dinput",
+                "sum_ms_all_ranks": 14.208,
+                "mean_ms_per_rank": 3.552,
+                "max_ms_per_rank": 4.006,
+                "min_ms_per_rank": 3.111,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.69,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.111,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.401,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 4.006,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w3.bwd.dweight",
+                "sum_ms_all_ranks": 11.447,
+                "mean_ms_per_rank": 2.862,
+                "max_ms_per_rank": 3.008,
+                "min_ms_per_rank": 2.659,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 2.948,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 2.659,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 2.831,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.008,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w1.bwd.dinput",
+                "sum_ms_all_ranks": 10.455,
+                "mean_ms_per_rank": 2.614,
+                "max_ms_per_rank": 2.809,
+                "min_ms_per_rank": 2.452,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 2.734,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 2.46,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 2.452,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 2.809,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w1.bwd.dweight",
+                "sum_ms_all_ranks": 9.845,
+                "mean_ms_per_rank": 2.461,
+                "max_ms_per_rank": 2.641,
+                "min_ms_per_rank": 2.331,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 2.641,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 2.331,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 2.371,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 2.501,
+                    "count": 64
+                  }
+                ]
+              }
+            ]
+          },
+          "indexer": {
+            "sum_child_mean_ms_per_rank": 13.71,
+            "top_children": [
+              {
+                "name": "dsv4.linear.indexer.weights_proj.bwd.dweight",
+                "sum_ms_all_ranks": 26.909,
+                "mean_ms_per_rank": 6.727,
+                "max_ms_per_rank": 6.92,
+                "min_ms_per_rank": 6.63,
+                "total_count": 128,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.724,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.63,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.635,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.92,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.indexer.wk.bwd.dweight",
+                "sum_ms_all_ranks": 14.663,
+                "mean_ms_per_rank": 3.666,
+                "max_ms_per_rank": 3.832,
+                "min_ms_per_rank": 3.581,
+                "total_count": 128,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.651,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.581,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.598,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.832,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.indexer.wq.bwd.dweight",
+                "sum_ms_all_ranks": 13.269,
+                "mean_ms_per_rank": 3.317,
+                "max_ms_per_rank": 3.439,
+                "min_ms_per_rank": 3.257,
+                "total_count": 128,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.291,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.282,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.257,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.439,
+                    "count": 32
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "top_cpu_mm_related": [
+          {
+            "name": "aten::mm",
+            "sum_ms_all_ranks": 1061.974,
+            "mean_ms_per_rank": 265.493,
+            "max_ms_per_rank": 273.742,
+            "min_ms_per_rank": 259.594,
+            "total_count": 11392,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 266.437,
+                "count": 2848
+              },
+              {
+                "rank": 1,
+                "ms": 262.201,
+                "count": 2848
+              },
+              {
+                "rank": 2,
+                "ms": 259.594,
+                "count": 2848
+              },
+              {
+                "rank": 3,
+                "ms": 273.742,
+                "count": 2848
+              }
+            ]
+          },
+          {
+            "name": "aten::matmul",
+            "sum_ms_all_ranks": 962.087,
+            "mean_ms_per_rank": 240.522,
+            "max_ms_per_rank": 248.008,
+            "min_ms_per_rank": 235.7,
+            "total_count": 10368,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 242.14,
+                "count": 2592
+              },
+              {
+                "rank": 1,
+                "ms": 235.7,
+                "count": 2592
+              },
+              {
+                "rank": 2,
+                "ms": 236.237,
+                "count": 2592
+              },
+              {
+                "rank": 3,
+                "ms": 248.008,
+                "count": 2592
+              }
+            ]
+          },
+          {
+            "name": "aten::bmm",
+            "sum_ms_all_ranks": 550.01,
+            "mean_ms_per_rank": 137.503,
+            "max_ms_per_rank": 144.508,
+            "min_ms_per_rank": 124.52,
+            "total_count": 2944,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 140.186,
+                "count": 736
+              },
+              {
+                "rank": 1,
+                "ms": 124.52,
+                "count": 736
+              },
+              {
+                "rank": 2,
+                "ms": 140.796,
+                "count": 736
+              },
+              {
+                "rank": 3,
+                "ms": 144.508,
+                "count": 736
+              }
+            ]
+          },
+          {
+            "name": "autograd::engine::evaluate_function: MmBackward0",
+            "sum_ms_all_ranks": 145.188,
+            "mean_ms_per_rank": 36.297,
+            "max_ms_per_rank": 37.766,
+            "min_ms_per_rank": 34.39,
+            "total_count": 512,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 35.424,
+                "count": 128
+              },
+              {
+                "rank": 1,
+                "ms": 37.766,
+                "count": 128
+              },
+              {
+                "rank": 2,
+                "ms": 34.39,
+                "count": 128
+              },
+              {
+                "rank": 3,
+                "ms": 37.609,
+                "count": 128
+              }
+            ]
+          },
+          {
+            "name": "MmBackward0",
+            "sum_ms_all_ranks": 142.965,
+            "mean_ms_per_rank": 35.741,
+            "max_ms_per_rank": 37.13,
+            "min_ms_per_rank": 33.902,
+            "total_count": 512,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 34.908,
+                "count": 128
+              },
+              {
+                "rank": 1,
+                "ms": 37.13,
+                "count": 128
+              },
+              {
+                "rank": 2,
+                "ms": 33.902,
+                "count": 128
+              },
+              {
+                "rank": 3,
+                "ms": 37.026,
+                "count": 128
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ep8": {
+      "shape": {
+        "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+        "distributed": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+        "gpus_per_node": 8,
+        "fsdp": 8,
+        "ep": 8,
+        "micro_batch_size": 1,
+        "global_batch_size": 128,
+        "sequence_length": 4096,
+        "gradient_accumulation_steps": 16,
+        "layers": 4,
+        "activation_checkpoint_mode": "full"
+      },
+      "step_summary": {
+        "1": {
+          "loss": 12.26614,
+          "grad_norm": 10.75,
+          "memory_gib_range": [
+            72.22,
+            75.74
+          ],
+          "memory_gib_values": [
+            74.95,
+            75.74,
+            74.36,
+            75.1,
+            72.87,
+            72.22,
+            73.96,
+            74.06
+          ],
+          "tokens_per_gpu_s_range": [
+            1623,
+            1626
+          ],
+          "tokens_per_gpu_s_values": [
+            1626,
+            1624,
+            1623,
+            1623,
+            1623,
+            1623,
+            1624,
+            1626
+          ],
+          "tflops_per_gpu_range": [
+            30.71,
+            30.76
+          ],
+          "mfu_pct_range": [
+            1.33,
+            1.33
+          ]
+        },
+        "2": {
+          "loss": 8.48032,
+          "grad_norm": 60.75,
+          "memory_gib_range": [
+            81.88,
+            180.49
+          ],
+          "memory_gib_values": [
+            84.76,
+            107.93,
+            180.49,
+            87.07,
+            86.38,
+            174.24,
+            84.11,
+            81.88
+          ],
+          "tokens_per_gpu_s_range": [
+            2255,
+            2255
+          ],
+          "tokens_per_gpu_s_values": [
+            2255,
+            2255,
+            2255,
+            2255,
+            2255,
+            2255,
+            2255,
+            2255
+          ],
+          "tflops_per_gpu_range": [
+            42.66,
+            42.66
+          ],
+          "mfu_pct_range": [
+            1.85,
+            1.85
+          ]
+        }
+      },
+      "mori_ranges": [
+        {
+          "range": "mori_aiter.backward.routed_vjp",
+          "baseline_mean_ms_per_rank": 7935.903,
+          "identical_order_mean_ms_per_rank": 4524.486,
+          "delta_ms_per_rank": -3411.417,
+          "saved_ms_per_rank": 3411.417
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x",
+          "baseline_mean_ms_per_rank": 1758.32,
+          "identical_order_mean_ms_per_rank": 213.609,
+          "delta_ms_per_rank": -1544.711,
+          "saved_ms_per_rank": 1544.711
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x.total_recv_item",
+          "baseline_mean_ms_per_rank": 1606.203,
+          "identical_order_mean_ms_per_rank": 205.334,
+          "delta_ms_per_rank": -1400.869,
+          "saved_ms_per_rank": 1400.869
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_x.get_src_pos",
+          "baseline_mean_ms_per_rank": 135.445,
+          "identical_order_mean_ms_per_rank": 0.0,
+          "delta_ms_per_rank": -135.445,
+          "saved_ms_per_rank": 135.445
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_grad_output",
+          "baseline_mean_ms_per_rank": 51.906,
+          "identical_order_mean_ms_per_rank": 5.137,
+          "delta_ms_per_rank": -46.769,
+          "saved_ms_per_rank": 46.769
+        },
+        {
+          "range": "mori_aiter.backward.local_vjp.padded",
+          "baseline_mean_ms_per_rank": 4066.578,
+          "identical_order_mean_ms_per_rank": 4247.994,
+          "delta_ms_per_rank": 181.416,
+          "saved_ms_per_rank": -181.416
+        },
+        {
+          "range": "mori_aiter.local_padded_vjp.swiglu_forward",
+          "baseline_mean_ms_per_rank": 1846.765,
+          "identical_order_mean_ms_per_rank": 1931.852,
+          "delta_ms_per_rank": 85.087,
+          "saved_ms_per_rank": -85.087
+        },
+        {
+          "range": "mori_aiter.local_padded_vjp.swiglu_backward",
+          "baseline_mean_ms_per_rank": 1918.928,
+          "identical_order_mean_ms_per_rank": 2006.722,
+          "delta_ms_per_rank": 87.794,
+          "saved_ms_per_rank": -87.794
+        },
+        {
+          "range": "mori_aiter.backward.combine_dx",
+          "baseline_mean_ms_per_rank": 945.671,
+          "identical_order_mean_ms_per_rank": 22.772,
+          "delta_ms_per_rank": -922.899,
+          "saved_ms_per_rank": 922.899
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_topk_dummy",
+          "baseline_mean_ms_per_rank": 1025.912,
+          "identical_order_mean_ms_per_rank": 8.29,
+          "delta_ms_per_rank": -1017.622,
+          "saved_ms_per_rank": 1017.622
+        },
+        {
+          "range": "mori_aiter.backward.dispatch_topk_dummy.total_recv_item",
+          "baseline_mean_ms_per_rank": 1008.286,
+          "identical_order_mean_ms_per_rank": 0.0,
+          "delta_ms_per_rank": -1008.286,
+          "saved_ms_per_rank": 1008.286
+        },
+        {
+          "range": "mori_aiter.backward.combine_dtopk",
+          "baseline_mean_ms_per_rank": 40.708,
+          "identical_order_mean_ms_per_rank": 15.244,
+          "delta_ms_per_rank": -25.464,
+          "saved_ms_per_rank": 25.464
+        }
+      ],
+      "headline": {
+        "routed_vjp_baseline_ms": 7935.903,
+        "routed_vjp_identical_ms": 4524.486,
+        "routed_vjp_saved_ms": 3411.417,
+        "routed_vjp_speedup": 1.754,
+        "local_vjp_remaining_ms": 4247.994,
+        "swiglu_recompute_remaining_ms": 3938.574,
+        "dispatch_x_total_recv_item_saved_ms": 1400.869,
+        "topk_total_recv_item_removed_ms": 1008.286,
+        "get_src_pos_removed_ms": 135.445
+      },
+      "dense_and_mm": {
+        "dense_groups_child_only": {
+          "attention": {
+            "sum_child_mean_ms_per_rank": 67.79,
+            "top_children": [
+              {
+                "name": "dsv4.linear.attention.wq_b.bwd.dinput",
+                "sum_ms_all_ranks": 91.223,
+                "mean_ms_per_rank": 11.403,
+                "max_ms_per_rank": 11.655,
+                "min_ms_per_rank": 11.09,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 11.426,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 11.09,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 11.445,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 11.431,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 11.465,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 11.655,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 11.415,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 11.295,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_a.bwd.dinput",
+                "sum_ms_all_ranks": 60.632,
+                "mean_ms_per_rank": 7.579,
+                "max_ms_per_rank": 7.752,
+                "min_ms_per_rank": 7.467,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 7.467,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 7.503,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 7.704,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 7.623,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 7.628,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 7.752,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 7.474,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 7.48,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wo.bwd.dinput",
+                "sum_ms_all_ranks": 58.463,
+                "mean_ms_per_rank": 7.308,
+                "max_ms_per_rank": 7.401,
+                "min_ms_per_rank": 7.234,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 7.327,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 7.239,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 7.248,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 7.401,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 7.395,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 7.323,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 7.234,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 7.297,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_a.bwd.dweight",
+                "sum_ms_all_ranks": 53.73,
+                "mean_ms_per_rank": 6.716,
+                "max_ms_per_rank": 6.833,
+                "min_ms_per_rank": 6.537,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.75,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.569,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.721,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.793,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.819,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.833,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.537,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.708,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_a.bwd.dinput",
+                "sum_ms_all_ranks": 51.97,
+                "mean_ms_per_rank": 6.496,
+                "max_ms_per_rank": 6.684,
+                "min_ms_per_rank": 6.368,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.449,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.559,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.454,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.413,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.684,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.658,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.368,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.385,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_a.bwd.dweight",
+                "sum_ms_all_ranks": 51.145,
+                "mean_ms_per_rank": 6.393,
+                "max_ms_per_rank": 6.562,
+                "min_ms_per_rank": 6.28,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.343,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.328,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.385,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.515,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.562,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.432,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.28,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.3,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wo.bwd.dweight",
+                "sum_ms_all_ranks": 51.12,
+                "mean_ms_per_rank": 6.39,
+                "max_ms_per_rank": 6.524,
+                "min_ms_per_rank": 6.172,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.373,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.172,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.417,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.462,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.524,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.474,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.329,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.369,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wq_b.bwd.dweight",
+                "sum_ms_all_ranks": 50.857,
+                "mean_ms_per_rank": 6.357,
+                "max_ms_per_rank": 6.544,
+                "min_ms_per_rank": 6.162,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.296,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.162,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.432,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.364,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.496,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.544,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.22,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.342,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_b.bwd.dinput",
+                "sum_ms_all_ranks": 47.667,
+                "mean_ms_per_rank": 5.958,
+                "max_ms_per_rank": 6.079,
+                "min_ms_per_rank": 5.838,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.039,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 5.838,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 5.916,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 5.975,
+                    "count": 32
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.041,
+                    "count": 32
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.079,
+                    "count": 32
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 5.858,
+                    "count": 32
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 5.921,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.attention.wkv_b.bwd.dweight",
+                "sum_ms_all_ranks": 25.521,
+                "mean_ms_per_rank": 3.19,
+                "max_ms_per_rank": 3.3,
+                "min_ms_per_rank": 3.048,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.189,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.048,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.184,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.3,
+                    "count": 32
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 3.218,
+                    "count": 32
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 3.245,
+                    "count": 32
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 3.161,
+                    "count": 32
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 3.177,
+                    "count": 32
+                  }
+                ]
+              }
+            ]
+          },
+          "moe_router": {
+            "sum_child_mean_ms_per_rank": 31.548,
+            "top_children": [
+              {
+                "name": "dsv4.linear.moe.router_gate.bwd.dweight",
+                "sum_ms_all_ranks": 130.863,
+                "mean_ms_per_rank": 16.358,
+                "max_ms_per_rank": 16.616,
+                "min_ms_per_rank": 16.086,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 16.439,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 16.086,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 16.46,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 16.429,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 16.616,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 16.309,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 16.165,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 16.361,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.moe.router_gate.bwd.dinput",
+                "sum_ms_all_ranks": 121.517,
+                "mean_ms_per_rank": 15.19,
+                "max_ms_per_rank": 15.462,
+                "min_ms_per_rank": 14.832,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 14.832,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 15.413,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 14.905,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 15.084,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 15.249,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 15.375,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 15.462,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 15.196,
+                    "count": 64
+                  }
+                ]
+              }
+            ]
+          },
+          "feed_forward": {
+            "sum_child_mean_ms_per_rank": 30.589,
+            "top_children": [
+              {
+                "name": "dsv4.linear.feed_forward.w2.bwd.dinput",
+                "sum_ms_all_ranks": 101.877,
+                "mean_ms_per_rank": 12.735,
+                "max_ms_per_rank": 13.937,
+                "min_ms_per_rank": 11.514,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 13.937,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 12.009,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 13.288,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 13.346,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 12.005,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 13.037,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 12.742,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 11.514,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w3.bwd.dinput",
+                "sum_ms_all_ranks": 34.997,
+                "mean_ms_per_rank": 4.375,
+                "max_ms_per_rank": 4.618,
+                "min_ms_per_rank": 3.965,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 4.363,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 4.553,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 4.586,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 4.193,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 3.965,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 4.618,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 4.606,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 4.113,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w2.bwd.dweight",
+                "sum_ms_all_ranks": 34.942,
+                "mean_ms_per_rank": 4.368,
+                "max_ms_per_rank": 4.627,
+                "min_ms_per_rank": 4.076,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 4.53,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 4.076,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 4.601,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 4.627,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 4.103,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 4.513,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 4.328,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 4.166,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w3.bwd.dweight",
+                "sum_ms_all_ranks": 26.511,
+                "mean_ms_per_rank": 3.314,
+                "max_ms_per_rank": 3.696,
+                "min_ms_per_rank": 2.948,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.053,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.404,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.539,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.451,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 2.948,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 3.081,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 3.696,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 3.338,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w1.bwd.dinput",
+                "sum_ms_all_ranks": 23.95,
+                "mean_ms_per_rank": 2.994,
+                "max_ms_per_rank": 3.081,
+                "min_ms_per_rank": 2.804,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 2.917,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.031,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 2.999,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.054,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 2.804,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 2.991,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 3.071,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 3.081,
+                    "count": 64
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.feed_forward.w1.bwd.dweight",
+                "sum_ms_all_ranks": 22.422,
+                "mean_ms_per_rank": 2.803,
+                "max_ms_per_rank": 2.956,
+                "min_ms_per_rank": 2.606,
+                "total_count": 512,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 2.851,
+                    "count": 64
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 2.929,
+                    "count": 64
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 2.855,
+                    "count": 64
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 2.956,
+                    "count": 64
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 2.606,
+                    "count": 64
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 2.731,
+                    "count": 64
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 2.778,
+                    "count": 64
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 2.716,
+                    "count": 64
+                  }
+                ]
+              }
+            ]
+          },
+          "indexer": {
+            "sum_child_mean_ms_per_rank": 13.886,
+            "top_children": [
+              {
+                "name": "dsv4.linear.indexer.weights_proj.bwd.dweight",
+                "sum_ms_all_ranks": 54.775,
+                "mean_ms_per_rank": 6.847,
+                "max_ms_per_rank": 6.969,
+                "min_ms_per_rank": 6.749,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 6.884,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 6.763,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 6.765,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 6.899,
+                    "count": 32
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 6.969,
+                    "count": 32
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 6.938,
+                    "count": 32
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 6.807,
+                    "count": 32
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 6.749,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.indexer.wk.bwd.dweight",
+                "sum_ms_all_ranks": 29.53,
+                "mean_ms_per_rank": 3.691,
+                "max_ms_per_rank": 3.78,
+                "min_ms_per_rank": 3.558,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.651,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.663,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.741,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.755,
+                    "count": 32
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 3.692,
+                    "count": 32
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 3.78,
+                    "count": 32
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 3.558,
+                    "count": 32
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 3.69,
+                    "count": 32
+                  }
+                ]
+              },
+              {
+                "name": "dsv4.linear.indexer.wq.bwd.dweight",
+                "sum_ms_all_ranks": 26.78,
+                "mean_ms_per_rank": 3.348,
+                "max_ms_per_rank": 3.403,
+                "min_ms_per_rank": 3.245,
+                "total_count": 256,
+                "per_rank": [
+                  {
+                    "rank": 0,
+                    "ms": 3.35,
+                    "count": 32
+                  },
+                  {
+                    "rank": 1,
+                    "ms": 3.319,
+                    "count": 32
+                  },
+                  {
+                    "rank": 2,
+                    "ms": 3.346,
+                    "count": 32
+                  },
+                  {
+                    "rank": 3,
+                    "ms": 3.375,
+                    "count": 32
+                  },
+                  {
+                    "rank": 4,
+                    "ms": 3.403,
+                    "count": 32
+                  },
+                  {
+                    "rank": 5,
+                    "ms": 3.403,
+                    "count": 32
+                  },
+                  {
+                    "rank": 6,
+                    "ms": 3.245,
+                    "count": 32
+                  },
+                  {
+                    "rank": 7,
+                    "ms": 3.338,
+                    "count": 32
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "top_cpu_mm_related": [
+          {
+            "name": "aten::mm",
+            "sum_ms_all_ranks": 2241.756,
+            "mean_ms_per_rank": 280.219,
+            "max_ms_per_rank": 289.103,
+            "min_ms_per_rank": 273.141,
+            "total_count": 22784,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 289.103,
+                "count": 2848
+              },
+              {
+                "rank": 1,
+                "ms": 273.141,
+                "count": 2848
+              },
+              {
+                "rank": 2,
+                "ms": 281.7,
+                "count": 2848
+              },
+              {
+                "rank": 3,
+                "ms": 281.606,
+                "count": 2848
+              },
+              {
+                "rank": 4,
+                "ms": 283.11,
+                "count": 2848
+              },
+              {
+                "rank": 5,
+                "ms": 281.724,
+                "count": 2848
+              },
+              {
+                "rank": 6,
+                "ms": 274.539,
+                "count": 2848
+              },
+              {
+                "rank": 7,
+                "ms": 276.831,
+                "count": 2848
+              }
+            ]
+          },
+          {
+            "name": "aten::matmul",
+            "sum_ms_all_ranks": 2020.084,
+            "mean_ms_per_rank": 252.51,
+            "max_ms_per_rank": 257.586,
+            "min_ms_per_rank": 247.148,
+            "total_count": 20736,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 257.586,
+                "count": 2592
+              },
+              {
+                "rank": 1,
+                "ms": 247.148,
+                "count": 2592
+              },
+              {
+                "rank": 2,
+                "ms": 255.923,
+                "count": 2592
+              },
+              {
+                "rank": 3,
+                "ms": 255.38,
+                "count": 2592
+              },
+              {
+                "rank": 4,
+                "ms": 249.727,
+                "count": 2592
+              },
+              {
+                "rank": 5,
+                "ms": 254.168,
+                "count": 2592
+              },
+              {
+                "rank": 6,
+                "ms": 249.558,
+                "count": 2592
+              },
+              {
+                "rank": 7,
+                "ms": 250.594,
+                "count": 2592
+              }
+            ]
+          },
+          {
+            "name": "aten::bmm",
+            "sum_ms_all_ranks": 1124.468,
+            "mean_ms_per_rank": 140.558,
+            "max_ms_per_rank": 169.789,
+            "min_ms_per_rank": 124.629,
+            "total_count": 5888,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 125.787,
+                "count": 736
+              },
+              {
+                "rank": 1,
+                "ms": 124.629,
+                "count": 736
+              },
+              {
+                "rank": 2,
+                "ms": 127.636,
+                "count": 736
+              },
+              {
+                "rank": 3,
+                "ms": 129.679,
+                "count": 736
+              },
+              {
+                "rank": 4,
+                "ms": 143.597,
+                "count": 736
+              },
+              {
+                "rank": 5,
+                "ms": 168.361,
+                "count": 736
+              },
+              {
+                "rank": 6,
+                "ms": 169.789,
+                "count": 736
+              },
+              {
+                "rank": 7,
+                "ms": 134.991,
+                "count": 736
+              }
+            ]
+          },
+          {
+            "name": "autograd::engine::evaluate_function: MmBackward0",
+            "sum_ms_all_ranks": 317.464,
+            "mean_ms_per_rank": 39.683,
+            "max_ms_per_rank": 45.093,
+            "min_ms_per_rank": 36.772,
+            "total_count": 1024,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 43.598,
+                "count": 128
+              },
+              {
+                "rank": 1,
+                "ms": 37.68,
+                "count": 128
+              },
+              {
+                "rank": 2,
+                "ms": 37.909,
+                "count": 128
+              },
+              {
+                "rank": 3,
+                "ms": 38.051,
+                "count": 128
+              },
+              {
+                "rank": 4,
+                "ms": 45.093,
+                "count": 128
+              },
+              {
+                "rank": 5,
+                "ms": 39.8,
+                "count": 128
+              },
+              {
+                "rank": 6,
+                "ms": 36.772,
+                "count": 128
+              },
+              {
+                "rank": 7,
+                "ms": 38.56,
+                "count": 128
+              }
+            ]
+          },
+          {
+            "name": "MmBackward0",
+            "sum_ms_all_ranks": 313.032,
+            "mean_ms_per_rank": 39.129,
+            "max_ms_per_rank": 44.541,
+            "min_ms_per_rank": 36.294,
+            "total_count": 1024,
+            "per_rank": [
+              {
+                "rank": 0,
+                "ms": 43.089,
+                "count": 128
+              },
+              {
+                "rank": 1,
+                "ms": 37.178,
+                "count": 128
+              },
+              {
+                "rank": 2,
+                "ms": 37.3,
+                "count": 128
+              },
+              {
+                "rank": 3,
+                "ms": 37.536,
+                "count": 128
+              },
+              {
+                "rank": 4,
+                "ms": 44.541,
+                "count": 128
+              },
+              {
+                "rank": 5,
+                "ms": 39.177,
+                "count": 128
+              },
+              {
+                "rank": 6,
+                "ms": 36.294,
+                "count": 128
+              },
+              {
+                "rank": 7,
+                "ms": 37.918,
+                "count": 128
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "clean_8x_nonprofiled_validation": {
+    "artifact": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/torchtitan_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_20260603.json",
+    "status": "passed_two_steps",
+    "step2_tokens_per_gpu_s": 2720,
+    "prior_step2_tokens_per_gpu_s": 2648,
+    "absolute_gain_tokens_per_gpu_s": 72,
+    "relative_gain_pct": 2.72
+  },
+  "read": {
+    "what_changed": "The identical-dispatch-order shortcut removes most MORI routed backward synchronization/alignment overhead. EP8 routed_vjp falls 7.94s/rank to 4.52s/rank in profiler; EP4 falls 8.69s/rank to 4.33s/rank.",
+    "what_remains": "The dominant remaining MORI backward bucket is local_vjp.padded. In both EP4 and EP8 profiled traces, its largest child ranges are SwiGLU forward/backward recompute; actual GEMM child ranges inside local VJP are tens of ms, not seconds.",
+    "non_mori_gemm_read": "Dense attention/indexer/router linear backward child ranges are small compared with MORI local VJP. Raw MmBackward0 in the EP8 shortcut trace is ~39 ms/rank; EP4 is similar scale in the artifact. The earlier giant generic GEMM/BMM bucket was mostly because MORI local VJP and autograd ranges were not separated enough.",
+    "next_lever": "Stop spending effort on dispatch/combine-only glue after the shortcut. The next MoE backward lever is replacing local padded VJP recompute, especially separate SwiGLU forward/backward, with a fused training VJP that reuses/saves forward intermediates or fuses W2 dgrad + SwiGLU backward + W13 xgrad/wgrad in the owner-rank expert path."
+  }
+}

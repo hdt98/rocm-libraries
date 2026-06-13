@@ -1,0 +1,123 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mhc_hcpost_custom_autograd_rejection_20260611",
+  "created_utc": "2026-06-10T18:36:00Z",
+  "purpose": "Test whether wrapping the DeepSeek-V4 mHC post helper in an opt-in custom autograd boundary reduces enough saved-tensor lifetime or backward temporary pressure to recover MBS8 mHC headroom.",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "common_shape": {
+    "model": "deepseek_v4 flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "ep": 8,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "use_hyper_connections": true,
+    "activation_checkpoint_mode": "selective",
+    "activation_checkpoint_scope": "attention_and_hyper_connections",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "moe_comm_backend": "standard",
+    "moe_balanced_moe_mode": "execute",
+    "moe_balanced_moe_hot_experts": 8,
+    "standard_ep_local_expert_backend": "grouped_mm",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd"
+  },
+  "source_change": {
+    "torch_titan_model_file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/model.py",
+    "launcher_file": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "enabled_by": [
+      "TORCHTITAN_DSV4_HC_CUSTOM_AUTOGRAD",
+      "CANARY_DSV4_HC_CUSTOM_AUTOGRAD"
+    ],
+    "optional_chunk_env": "CANARY_DSV4_HC_CHUNK_TOKENS",
+    "contract": "Forward computes post[..., None] * x[..., None, :] + comb.transpose(-1, -2) @ residual; backward returns gradients for x, residual, post, and comb using explicit matmul/einsum formulas instead of relying on the default PyTorch autograd graph for this boundary."
+  },
+  "validation": {
+    "local_py_compile": "passed",
+    "launcher_bash_n": "passed",
+    "remote_container_py_compile": "passed",
+    "tiny_cpu_parity": {
+      "status": "passed before runtime gate",
+      "unchunked_out_max_diff": 0.0,
+      "unchunked_grad_max_diffs": [0.0, 0.0, 0.0, 0.0],
+      "chunked_out_max_diff": 0.0,
+      "chunked_grad_max_diffs": [0.0, 0.0, 0.0, 0.0]
+    }
+  },
+  "current_nomhc_node_control": {
+    "artifact": "torchtitan_dsv4_flash12_nomhc_current_nodecheck_20260611.json",
+    "run_id": "torchtitan_dsv4_flash12_nomHC_current_nodecheck_mbs8_steps6_8x_s4096_gbs128_20260611",
+    "status": "completed_six_steps",
+    "steps_2_to_6_tokens_per_gpu_s": 8365.8,
+    "steps_2_to_6_tflops_per_gpu": 423.562,
+    "peak_logged_memory_gib": 256.87,
+    "read": "The same node and no-mHC retained shape are healthy; the mHC failures are not explained by stale GPU state or a broken node."
+  },
+  "previous_chunk_only_reference": {
+    "artifact": "torchtitan_dsv4_flash12_mhc_bmm_chunk1024_mbs8_fit_vs_nodecheck_20260610.json",
+    "fit3_run_id": "torchtitan_dsv4_flash12_mhc_hcpost_bmm_chunk1024_mbs8_nockpt_fit3_8x_s4096_gbs128_20260610",
+    "fit3_status": "completed_3_steps_fit_only",
+    "fit3_steps_2_to_3_tokens_per_gpu_s": 3627.69,
+    "fit3_steps_2_to_3_tflops_per_gpu": 183.88,
+    "fit3_peak_logged_memory_gib": 270.29,
+    "steps6_status": "failed_after_one_completed_step",
+    "steps6_failure": "HSA_STATUS_ERROR_OUT_OF_RESOURCES with Available Free mem : 156 MB"
+  },
+  "custom_autograd_no_chunk": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_hcpost_customautograd_mbs8_fit3_backend_8x_s4096_gbs128_20260611",
+    "status": "failed_after_one_completed_step",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_hcpost_customautograd_mbs8_fit3_backend_8x_s4096_gbs128_20260611/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_hcpost_customautograd_mbs8_fit3_backend_8x_s4096_gbs128_20260611",
+    "steps": [
+      {
+        "step": 1,
+        "loss": 12.38654,
+        "grad_norm": 23.625,
+        "memory_gib": 262.38,
+        "tokens_per_gpu_s": 1742.0,
+        "tflops_per_gpu": 88.29
+      }
+    ],
+    "failure": {
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "available_free_mem_mb_markers": [0, 0]
+    }
+  },
+  "custom_autograd_chunk1024": {
+    "run_id": "torchtitan_dsv4_flash12_mhc_hcpost_customautograd_chunk1024_mbs8_fit3_8x_s4096_gbs128_20260611",
+    "status": "failed_after_one_completed_step",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mhc_hcpost_customautograd_chunk1024_mbs8_fit3_8x_s4096_gbs128_20260611/docker-run.log",
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mhc_hcpost_customautograd_chunk1024_mbs8_fit3_8x_s4096_gbs128_20260611",
+    "steps": [
+      {
+        "step": 1,
+        "loss": 12.16146,
+        "grad_norm": 19.375,
+        "memory_gib": 258.74,
+        "tokens_per_gpu_s": 1501.0,
+        "tflops_per_gpu": 76.08
+      }
+    ],
+    "failure": {
+      "primary_marker": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+      "available_free_mem_mb_markers": [42]
+    }
+  },
+  "decision": "Reject hc_post custom autograd as the MBS8 mHC recovery path. Keep the code opt-in as a correctness-smoked diagnostic boundary, but do not promote it and do not treat it as sufficient for mHC memory/lifetime headroom.",
+  "next_action": "The next mHC source target should move below a Python autograd wrapper: either port Ascend-style custom mHC pre/post kernels or reduce earlier mHC activation/residual lifetime. Meanwhile, keep the corrected mHC throughput baseline at MBS4 attention_and_hyper_connections and continue the MORI/EP native compact work in parallel."
+}

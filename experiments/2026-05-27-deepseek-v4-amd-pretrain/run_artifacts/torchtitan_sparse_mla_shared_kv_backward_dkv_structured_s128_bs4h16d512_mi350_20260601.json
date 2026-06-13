@@ -1,0 +1,104 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 623.9188232421875,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 2.09808349609375e-05,
+    "mean_abs_diff": 4.92975971155829e-07,
+    "passed": true,
+    "reference_norm": 623.9188232421875
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This diagnostic uses the benchmark's structured local-window plus prefix-compressed routing formula, writes per-key partials, then reduces them without hot-path atomics. It is not a generic LI top-k backend; it tests whether an inverse-route reduction shape is promising enough to justify building the real LI inverse map.",
+  "scope": "sparse_mla_shared_latent_kv_backward_dkv_structured_two_pass_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 32,
+    "csa_count": 32,
+    "csa_partial_blocks": 32,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 160,
+    "local_count": 128,
+    "local_partial_blocks": 32,
+    "materialized_probs_fp32_gib": 0.0048828125,
+    "materialized_shared_selected_kv_fp32_gib": 0.0390625,
+    "partial_buffer_fp32_gib": 0.009765625,
+    "selected_count": 160,
+    "seq_len": 128,
+    "total_partial_rows": 5120
+  },
+  "status": "passed",
+  "tile": {
+    "atomic_compare_block_d": 512,
+    "atomic_compare_block_h": 64,
+    "atomic_compare_block_m": 16,
+    "block_d": 512,
+    "block_h": 16,
+    "block_s": 4
+  },
+  "timing": {
+    "triton_dkv_atomic_recompute": {
+      "checksum_norm": 623.9058227539062,
+      "event": {
+        "enabled": true,
+        "max_ms": 0.32860299944877625,
+        "mean_ms": 0.26478250324726105,
+        "median_ms": 0.26478250324726105,
+        "min_ms": 0.20096200704574585,
+        "samples_ms": [
+          0.32860299944877625,
+          0.20096200704574585
+        ],
+        "stdev_ms": 0.09025581128556338
+      },
+      "label": "triton_dkv_atomic_recompute",
+      "peak_memory_allocated_bytes": 105546752,
+      "peak_memory_allocated_gib": 0.0982980728149414,
+      "wall": {
+        "enabled": true,
+        "max_ms": 0.41112897451967,
+        "mean_ms": 0.3154840087518096,
+        "median_ms": 0.3154840087518096,
+        "min_ms": 0.21983904298394918,
+        "samples_ms": [
+          0.41112897451967,
+          0.21983904298394918
+        ],
+        "stdev_ms": 0.1352624077616186
+      }
+    },
+    "triton_dkv_structured_recompute": {
+      "checksum_norm": 623.9188232421875,
+      "event": {
+        "enabled": true,
+        "max_ms": 1.1210509538650513,
+        "mean_ms": 1.1089709997177124,
+        "median_ms": 1.1089709997177124,
+        "min_ms": 1.0968910455703735,
+        "samples_ms": [
+          1.1210509538650513,
+          1.0968910455703735
+        ],
+        "stdev_ms": 0.017083634988011742
+      },
+      "label": "triton_dkv_structured_recompute",
+      "peak_memory_allocated_bytes": 116032000,
+      "peak_memory_allocated_gib": 0.1080632209777832,
+      "wall": {
+        "enabled": true,
+        "max_ms": 1.1621250305324793,
+        "mean_ms": 1.1400755029171705,
+        "median_ms": 1.1400755029171705,
+        "min_ms": 1.1180259753018618,
+        "samples_ms": [
+          1.1621250305324793,
+          1.1180259753018618
+        ],
+        "stdev_ms": 0.03118274099748974
+      }
+    }
+  }
+}

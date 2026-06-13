@@ -1,0 +1,78 @@
+{
+  "artifact": "query_major_nohsk_compact_reducer_contract_20260605",
+  "status": "next_sparse_mla_backward_kernel_contract",
+  "question": "What concrete whole-boundary kernel shape can make recompute plus group-aware dKV accumulation materialize, after rejecting late dKV-only, HSK slab, group-owned, and scalar segment reducers?",
+  "inputs": [
+    "q [B,S,H,D]",
+    "grad_output dO [B,S,H,D]",
+    "kv/shared compressed bank [B,S+G,D]",
+    "LI selected indices/groups [B,S,K]",
+    "forward output [B,S,H,D]",
+    "lse [B,S,H]",
+    "attn_sink/delta as needed for sink gradients"
+  ],
+  "outputs": [
+    "grad_q [B,S,H,D]",
+    "grad_kv [B,S+G,D]",
+    "grad_attn_sink [H]"
+  ],
+  "must_not_materialize": [
+    "selected_kv [B,S,K,D]",
+    "probability HSK slab [B,H,S,K]",
+    "scaled_dP/grad_logits HSK slab [B,H,S,K]",
+    "selected-row dKV partial slab whose size is O(S*K*D)"
+  ],
+  "evidence_closing_bad_branches": [
+    {
+      "branch": "late TileLang dKV drop-in after PyTorch materialization",
+      "status": "rejected",
+      "reason": "Kernel-only dKV wins did not materialize e2e because TorchTitan had already paid selected_kv/probs/grad_logits bridge cost."
+    },
+    {
+      "branch": "source-HSK export plus selected-limit reducer",
+      "status": "rejected",
+      "source": "run_artifacts/torchtitan_tilelang_whole_backward_boundary_decision_20260604.json",
+      "reason": "Correct after no-merge fix, but HSK export was about 34.8 ms and the branch was non-durable e2e."
+    },
+    {
+      "branch": "direct source group-owned reducer",
+      "status": "rejected",
+      "source": "run_artifacts/torchtitan_tilelang_nohsk_boundary_branches_20260604.json",
+      "reason": "Avoided HSK slabs and reduced writes, but group ownership reloaded/recomputed q/dO too often and destroyed query-major reuse."
+    },
+    {
+      "branch": "HIP scalar tile-segment D-block reducer",
+      "status": "rejected",
+      "source": "run_artifacts/compressed_dkv_tile_segment_dblock_hip_min_decision_20260605.json",
+      "reason": "Modeled 23.8x write reduction still timed at 116.04 ms because each segment/D-block CTA serialized too much contribution work."
+    }
+  ],
+  "current_query_major_kernel_read": {
+    "source_file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "function": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+    "current_owner": "one (token, head_block) CTA",
+    "good_property": "Recomputes QK/probs/grad_logits inside the kernel and keeps q/dO reuse for one query token while producing dQ.",
+    "bad_property": "The CTA sees only one token, so the dKV epilogue cannot reduce many tokens that select the same compressed group before global memory. It emits raw tl.atomic_add for safe_idx x D chunks."
+  },
+  "next_kernel_contract": {
+    "name": "query_major_token_tile_nohsk_compact_reducer",
+    "owner": "token tile x head block x selected window, with optional group panel metadata from prepacked LI route",
+    "producer_loop": [
+      "Load q and dO for a token tile and head block once into registers/shared memory.",
+      "For each selected window, gather compressed/shared KV rows through LI indices.",
+      "Recompute qk, probabilities, grad_probs, softmax row term, and scaled dP inside the kernel.",
+      "Produce dQ with the same query-major accumulation path.",
+      "Produce dKV contributions with MFMA/dot math while q/dO are still hot."
+    ],
+    "group_aware_epilogue": [
+      "Map each contribution row (token, selected_slot) to compressed group g before any global write.",
+      "Within the token tile, perform lane/warp/block segmented reduction keyed by g and D block.",
+      "Emit one reduced atomic or compact partial row per active (group, D block) per producer tile, not one write per (token, selected_slot, D).",
+      "If compact partial rows are emitted, use the already-cheap final fold/reduce path; do not emit an O(S*K*D) slab."
+    ],
+    "why_this_can_be_group_aware": "Unlike the current one-token query-major Triton CTA, the token-tile producer sees several tokens' selected groups at once, so it can find repeated compressed groups inside the tile and reduce them before HBM. Unlike group-owned reducers, it still keeps q/dO hot across the selected sweep instead of reloading q/dO for every group.",
+    "first_latency_gate": "Beat the 42.54 ms no-HSK direct atomic whole-boundary path at S4096, then beat the 8.0-8.8 ms compressed dKV atomic slice before an e2e TFLOPs A/B.",
+    "promotion_gate": "Only promote after a clean 4x or 8x TorchTitan S4096 e2e run shows sustained late-step TFLOPs and memory improvement."
+  },
+  "implementation_note": "This is not a final performance result. It is the concrete replacement contract for the sparse-MLA backward work after today’s HIP tile-segment scalar reducer rejection."
+}

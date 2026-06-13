@@ -1,0 +1,80 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_aiter_routemask_local_skip_failure_8x_s4096_gbs128_mbs2_20260607",
+  "date": "2026-06-07",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask",
+  "status": "failed_collective_order_mismatch_diagnostic",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint": "none",
+    "checkpoint": false,
+    "moe_comm_backend": "mori",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 2,
+    "balanced_moe_execute_impl": "route_mask",
+    "balanced_moe_min_helper_rows": 512,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sharedkv_backward_mode": "query_recompute"
+  },
+  "failed_change_under_test": {
+    "summary": "Skip _compute_mori_aiter_hot_split_forward on ranks whose local remote-hot row count is zero.",
+    "result": "Rejected. Hot expert weight broadcast and backward partial dW reduction are all-rank collectives, so a per-rank local empty skip breaks collective order.",
+    "code_status": "Reverted to all-rank-safe behavior: if any hot experts remain selected, every rank enters _compute_mori_aiter_hot_split_forward even when remote_positions is empty locally."
+  },
+  "failure": {
+    "phase": "forward_mori_op_construction_after_rank_divergent_hot_split_skip",
+    "root_rank": 2,
+    "error": "ProcessGroupNCCL watchdog timeout",
+    "collective": "ALLREDUCE NumelIn=1 NumelOut=1",
+    "timeout_ms": 300000,
+    "stack_marker": "mori/ops/dispatch_combine.py:205 __init__ -> _get_or_create_mori_op"
+  },
+  "partial_timing_records": {
+    "jsonl_records": 49,
+    "call_ids_seen": [1, 2, 3, 4, 5, 6, 7],
+    "local_no_remote_skip_events": [
+      {
+        "call_id": 7,
+        "rank": 2,
+        "layer_idx": 3,
+        "remote_rows_local": 0
+      }
+    ],
+    "first_call_warmup_rankmax_ms": {
+      "plan": 9865.893,
+      "remote_mask": 457.052,
+      "hot_split_broadcast_w1": 54.845,
+      "hot_split_sort_counts": 83.317,
+      "hot_split_grouped_rows": 15.678
+    },
+    "steady_calls_3_and_5_rankmax_ms": {
+      "plan_sum": 46.882,
+      "remote_mask_sum": 1.288,
+      "hot_split_broadcast_w1_sum": 1.178,
+      "hot_split_broadcast_w2_sum": 0.425,
+      "hot_split_broadcast_w3_sum": 0.425,
+      "hot_split_sort_counts_sum": 0.455,
+      "hot_split_grouped_rows_sum": 1.598,
+      "hot_split_scatter_tokens_sum": 0.205
+    }
+  },
+  "comparison_reference": {
+    "standard_ep_hot_weight_reduce_artifact": "run_artifacts/torchtitan_dsv4_flash12_standard_ep_top8_hotweight_reduce_profile_8x_s4096_gbs128_mbs4_steps2_20260607.json",
+    "standard_ep_hot_dW_reduce_rankmax_over_two_steps_ms": 462.531,
+    "standard_ep_hot_dW_reduce_approx_per_step_ms": 231.265,
+    "standard_ep_owner_scatter_grad_over_two_steps_ms": 4.671,
+    "read": "Helper partial dW reduction back to the hot expert owner already exists and is a moderate communication cost in the working standard-EP branch. It is not the missing multi-second mechanism. The MORI/AITER gap is preserving fused MORI dispatch/AITER expert efficiency while adding helper-side hot-row execution without rank-divergent collectives or tiny route-mask helper calls."
+  },
+  "commands": {
+    "run": "env TARGET_HOST=do-vunguyen-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori-routemask REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_DP_SHARD=8 CANARY_MBS=2 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_MORI_SHMEM_HEAP_SIZE=80G CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MOE_COMM_BACKEND=mori CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH=1 CANARY_MORI_AITER_REUSE_FORWARD_ROUTE_METADATA=1 CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER=1 CANARY_MORI_AITER_LOCAL_VJP_MODE=aiter_stage1_recompute CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP=ptgmm CANARY_MORI_AITER_STAGE1_SHUFFLE_CACHE_SIZE=12 CANARY_MORI_AITER_XGRAD_MODE=full CANARY_MORI_AITER_LOCAL_VJP_TRANSPOSE_CACHE_SIZE=0 CANARY_MORI_AITER_DTOPK_RETURN_MODE=dense_allreduce CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_BALANCED_MOE_MODE=execute CANARY_MORI_AITER_BALANCED_MOE_HOT_EXPERTS=2 CANARY_MORI_AITER_BALANCED_MOE_EXECUTE_IMPL=route_mask CANARY_MORI_AITER_BALANCED_MOE_MIN_HELPER_ROWS=512 CANARY_DEBUG_MOE_FORCE_LOAD_BALANCE=false CANARY_PERSIST_JIT_CACHE=auto CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST=4,128 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_SHAREDKV_BLOCK_H=64 CANARY_SHAREDKV_BLOCK_N=64 CANARY_SHAREDKV_BLOCK_D=128 CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD=false CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_aiter_routemask_skip_zero_remote_timing_8x_s4096_gbs128_mbs2_steps2_20260607/mori_timing.jsonl RUN_ID=torchtitan_dsv4_flash12_mori_aiter_routemask_skip_zero_remote_timing_8x_s4096_gbs128_mbs2_steps2_20260607 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "validation_after_revert": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py; git diff --check -- sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py"
+  }
+}

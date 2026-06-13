@@ -1,0 +1,169 @@
+{
+  "artifact": "rocprof_s4096_after_m12288_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "S4096 selected-region rocprof block attribution after direct M=12288 expert GEMM floor measurements.",
+  "source_artifacts": {
+    "torch_block_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_retained_compact_reduce_s4096_blocks_after_m12288_20260531.json",
+    "rocprof_block_summary": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/rocprof_retained_compact_reduce_s4096_blocks_after_m12288_20260531.json",
+    "rocprof_kernel_stats": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/rocprof_retained_compact_reduce_s4096_kernel_stats_after_m12288_20260531.csv",
+    "rocprof_domain_stats": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/rocprof_retained_compact_reduce_s4096_domain_stats_after_m12288_20260531.csv",
+    "expert_gemm_decision": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/expert_gemm_m12288_decision_20260531.json"
+  },
+  "remote_raw_trace_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_compact_reduce_s4096_blocks_after_m12288_20260531/rocprof_s4096_backward_blocks_1iter",
+  "run": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "shape": {
+      "batch": 1,
+      "seqlen": 4096,
+      "hidden": 7168,
+      "dtype": "bfloat16"
+    },
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum"
+  },
+  "torch_block_profile": {
+    "phase_ms": {
+      "forward": 28.65736500825733,
+      "loss": 0.14362006913870573,
+      "backward": 50.52481999155134
+    },
+    "forward_subsystems_ms": {
+      "attention": 11.321553844027221,
+      "moe": 16.045117052271962,
+      "boundary": 0.7247468456625938
+    },
+    "backward_subsystems_ms": {
+      "attention_dgrad": 15.60960803180933,
+      "attention_wgrad": 16.205736086703837,
+      "moe_dgrad": 33.1440590089187,
+      "moe_wgrad": 32.667259918525815,
+      "boundary_dgrad": 1.6864928184077144,
+      "boundary_wgrad": 1.265175873413682
+    },
+    "dominant_backward_blocks_ms": {
+      "moe.routed.dgrad": 31.75443399231881,
+      "moe.routed.wgrad": 31.325525022111833,
+      "attention.wgrad": 16.205736086703837,
+      "attention.dgrad": 15.60960803180933,
+      "attention.sparse_mla.sink_wgrad": 8.778095012530684,
+      "attention.sparse_mla.dgrad_qkv": 8.75095499213785,
+      "moe.routed.w2.wgrad": 6.8028130335733294,
+      "moe.routed.w1_w3.dgrad": 6.793081993237138,
+      "moe.routed.w1.wgrad": 6.757172988727689,
+      "moe.routed.w3.wgrad": 6.17365597281605,
+      "moe.routed.w2.dgrad": 3.133186954073608
+    }
+  },
+  "rocprof_summary": {
+    "total_kernel_duration_ms": 163.247306,
+    "attributed_kernel_duration_ms": 163.219986,
+    "unattributed_kernel_duration_ms": 0.02732,
+    "kernel_dispatch_count": 919,
+    "marker_range_count": 39,
+    "top_blocks": [
+      {
+        "name": "backward.moe.routed.dgrad",
+        "marker_duration_ms": 31.740954,
+        "kernel_duration_ms": 31.604772,
+        "kernel_count": 33,
+        "top_kernel_groups": [
+          {
+            "kind": "batched GEMM Ailk_Bjlk",
+            "duration_ms": 19.245313,
+            "count": 3,
+            "avg_ms": 6.415104333333333
+          },
+          {
+            "kind": "batched GEMM Ailk_Bljk",
+            "duration_ms": 9.639716,
+            "count": 3,
+            "avg_ms": 3.213238666666667
+          },
+          {
+            "kind": "index_add_reduce",
+            "duration_ms": 0.886648,
+            "count": 1,
+            "avg_ms": 0.886648
+          },
+          {
+            "kind": "gather",
+            "duration_ms": 0.516004,
+            "count": 4,
+            "avg_ms": 0.129001
+          }
+        ]
+      },
+      {
+        "name": "backward.moe.routed.wgrad",
+        "marker_duration_ms": 31.312535,
+        "kernel_duration_ms": 31.165207,
+        "kernel_count": 32,
+        "top_kernel_groups": [
+          {
+            "kind": "batched GEMM Ailk_Bjlk",
+            "duration_ms": 18.898949,
+            "count": 3,
+            "avg_ms": 6.299649666666667
+          },
+          {
+            "kind": "batched GEMM Ailk_Bljk",
+            "duration_ms": 9.604516,
+            "count": 3,
+            "avg_ms": 3.2015053333333334
+          },
+          {
+            "kind": "index_add_reduce",
+            "duration_ms": 0.864767,
+            "count": 1,
+            "avg_ms": 0.864767
+          },
+          {
+            "kind": "gather",
+            "duration_ms": 0.515804,
+            "count": 4,
+            "avg_ms": 0.128951
+          }
+        ]
+      },
+      {
+        "name": "backward.attention.wgrad",
+        "marker_duration_ms": 16.194506,
+        "kernel_duration_ms": 16.040448,
+        "kernel_count": 176
+      },
+      {
+        "name": "backward.attention.dgrad",
+        "marker_duration_ms": 15.598378,
+        "kernel_duration_ms": 15.439843,
+        "kernel_count": 177
+      },
+      {
+        "name": "backward.attention.sparse_mla.sink_wgrad",
+        "marker_duration_ms": 8.767085,
+        "kernel_duration_ms": 8.60079,
+        "kernel_count": 31
+      },
+      {
+        "name": "backward.attention.sparse_mla.dgrad_qkv",
+        "marker_duration_ms": 8.739645,
+        "kernel_duration_ms": 8.583429,
+        "kernel_count": 31
+      }
+    ]
+  },
+  "read": {
+    "moe": "The direct M=12288 one-expert GEMM floor is 0.40-0.60 ms, but integrated routed MoE emits grouped/ragged batched GEMMs that take 3.2-6.4 ms per major contraction plus gather/reduce. The next optimization should attack grouped/ragged scheduling and compact-native dispatch, not raw large dense GEMM.",
+    "attention": "Attention remains a parallel target: forward attention is 11.32 ms vs the 3.6 ms anchor, and backward sparse MLA subblocks are around 8.7 ms each inside 15-16 ms attention dgrad/wgrad attribution.",
+    "target_gap": "The S4096 full-layer path is still roughly 3x over the 24.9 ms target; MoE routed backward alone is larger than the full target, so step-change kernels are required."
+  },
+  "next_actions": [
+    "Prototype or integrate compact-native grouped MoE dgrad/wgrad kernels that consume group_sizes/group_offsets directly and avoid padding all experts to the global max.",
+    "Keep dense large-GEMM library selection as a sanity check only; it already passes the M=12288 anchor.",
+    "For attention, profile sparse MLA forward/backward kernels separately against the 3.6 ms attention anchor."
+  ],
+  "commands": {
+    "rocprof_blocks_4096": "RUN_TAG=retained_compact_reduce_s4096_blocks_after_m12288_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh rocprof-blocks-4096"
+  },
+  "dependency_pin_changes": []
+}

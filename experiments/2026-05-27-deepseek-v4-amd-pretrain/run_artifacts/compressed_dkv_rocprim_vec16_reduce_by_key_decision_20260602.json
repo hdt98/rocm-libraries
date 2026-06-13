@@ -1,0 +1,69 @@
+{
+  "artifact": "compressed_dkv_rocprim_vec16_reduce_by_key_decision_20260602",
+  "date_local": "2026-06-02",
+  "scope": "compressed_shared_kv_actual_li_dkv_pair_level_vec16_reduce_by_key_floor",
+  "tool": "tools/dsv4_runtime_probe/probe_compressed_dkv_rocprim_reduce_by_key.py",
+  "runtime": {
+    "host": "do-sonle5-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "device": "AMD Instinct MI350X VF",
+    "arch": "gfx950",
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  },
+  "source_artifacts": {
+    "s512_random_smoke": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_vec16_s512_random_smoke_20260602.json",
+    "s4096_sorted_timing": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_vec16_s4096_validproxy_sorted_timing_20260602.json",
+    "s4096_random_sort_timing": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_vec16_s4096_validproxy_random_sort_timing_20260602.json",
+    "scalar_decision_baseline": "run_artifacts/compressed_dkv_rocprim_reduce_by_key_decision_20260602.json"
+  },
+  "contract": {
+    "keys": "int32 pair key = compressed_group",
+    "values": "float32[16] dKV contribution vector per selected route pair",
+    "d_tile": 16,
+    "groups": 1024,
+    "s4096_valid_pair_proxy": 1572864,
+    "full_d512_multiplier": 32,
+    "reason_for_probe": "Test whether sorting/reducing route pairs once with a D16 vector payload avoids the scalar per-D global sort cost."
+  },
+  "results": {
+    "s512_random_parity": {
+      "passed": true,
+      "max_abs_diff": 0.0000095367431640625,
+      "reduce_only_d16_ms": 0.02844100072979927,
+      "sort_reorder_reduce_d16_ms": 0.09476099908351898,
+      "full_d512_reduce_only_extrapolated_ms": 0.9101120233535767,
+      "full_d512_sort_reorder_reduce_extrapolated_ms": 3.0323519706726074
+    },
+    "s4096_sorted_timing": {
+      "reduce_only_d16_ms": 0.31880301237106323,
+      "full_d512_reduce_only_extrapolated_ms": 10.201696395874023,
+      "resident_tensor_gib": 0.20014960318803787
+    },
+    "s4096_random_sort_timing": {
+      "reduce_only_d16_ms": 0.32824400067329407,
+      "sort_only_pairs_ms": 0.14784100651741028,
+      "sort_reorder_vec16_values_ms": 0.5110459923744202,
+      "sort_reorder_reduce_d16_ms": 0.8352490067481995,
+      "full_d512_reduce_only_extrapolated_ms": 10.50380802154541,
+      "full_d512_sort_reorder_reduce_extrapolated_ms": 26.727968215942383,
+      "resident_tensor_gib": 0.2997589781880379
+    },
+    "scalar_baseline_for_comparison": {
+      "s4096_sorted_scalar_reduce_only_full_d512_ms": 3.5417920351028442,
+      "s4096_random_scalar_sort_reorder_reduce_full_d512_ms": 45.858943939208984
+    }
+  },
+  "decision": {
+    "pair_level_sorting": "partially_positive",
+    "rocprim_vec16_value_reduce": "rejected_as_standalone_s4096_production_body",
+    "why": [
+      "Pair-level route sorting and D16 value reordering avoids the worst scalar per-D sort cost: S4096 full-D512 extrapolation drops from 45.86 ms scalar random sort/reduce to 26.73 ms Vec16 random sort/reduce.",
+      "The generic rocPRIM Vec16 reduction body itself is slower than scalar reduce-by-key when keys are already grouped: S4096 sorted reduce extrapolates to 10.20 ms over D512 versus 3.54 ms for scalar reduce.",
+      "Even the better Vec16 random sort/reduce floor remains far above the current 8.6-8.8 ms sparse-atomic dKV wall and the desired fused sparse-attention backward budget."
+    ],
+    "retained_lesson": "Reuse or cheaply produce pair-level route ordering, but do not rely on a generic rocPRIM Vec16 reduce_by_key as the final compressed-dKV reducer.",
+    "next_branch": "CK-Tile/MFMA-friendly segmented reducer or split-wave/CTA grouped reducer that keeps selected-key contribution math parallel while reducing repeated compressed-group writes before global memory."
+  },
+  "dependency_pin_changes": []
+}

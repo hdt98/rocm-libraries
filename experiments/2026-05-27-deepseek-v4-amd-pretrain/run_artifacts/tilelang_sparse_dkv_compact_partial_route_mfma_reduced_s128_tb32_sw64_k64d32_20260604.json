@@ -1,0 +1,90 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "read": "TileLang query-major route-block dKV producer. Each CTA owns a static block of compact active rows for one token/selected tile and D block, computes selected-row contributions with TileLang GEMM, then reduces matching selected rows into the static compact row block before a non-atomic compact partial write. This avoids the dynamic-slot store pattern that fails TileLang layout inference in scalar_reduced/mfma_reduced.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 128,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "token_block": 32,
+    "selected_window": 64,
+    "block_k": 64,
+    "block_d": 32,
+    "row_block": 16,
+    "threads": 128,
+    "math_mode": "route_mfma_reduced",
+    "route_pattern": "clustered_unique",
+    "cluster_width": 640,
+    "cluster_stride": 4,
+    "output_layout": "[rows, D]"
+  },
+  "compact_route": {
+    "raw_selected_rows": 65536,
+    "active_partial_rows": 21695,
+    "output_partial_rows": 21695,
+    "padded_partial_rows": 22240,
+    "write_reduction_x": 3.0207882000460935,
+    "padded_write_reduction_x": 2.9467625899280576,
+    "token_tiles": 4,
+    "selected_tiles": 8,
+    "route_tiles": 32,
+    "max_active_groups": 695,
+    "active_count_mean": 677.96875,
+    "active_count_min": 661,
+    "active_count_max": 695,
+    "partials_bytes": 44431360,
+    "partials_mib": 42.373046875,
+    "output_partials_bytes": 44431360,
+    "output_partials_mib": 42.373046875,
+    "raw_selected_write_bytes_fp32": 134217728,
+    "raw_selected_write_mib_fp32": 128.0
+  },
+  "prepacked_pairs": null,
+  "correctness": {
+    "enabled": true,
+    "max_abs_diff": 3.725290298461914e-09,
+    "mean_abs_diff": 1.8370828469560507e-10,
+    "candidate_checksum": -66.33452606201172,
+    "reference_checksum": -66.33451843261719
+  },
+  "timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        16.429964065551758,
+        16.345762252807617,
+        16.284042358398438
+      ],
+      "mean_ms": 16.353256225585938,
+      "median_ms": 16.345762252807617,
+      "min_ms": 16.284042358398438,
+      "max_ms": 16.429964065551758,
+      "stdev_ms": 0.0732489308839146
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        16.582067939452827,
+        16.365478979423642,
+        16.30008895881474
+      ],
+      "mean_ms": 16.41587862589707,
+      "median_ms": 16.365478979423642,
+      "min_ms": 16.30008895881474,
+      "max_ms": 16.582067939452827,
+      "stdev_ms": 0.1475910893445417
+    },
+    "median_ms": 16.345762252807617,
+    "min_ms": 16.284042358398438,
+    "max_ms": 16.429964065551758,
+    "mean_ms": 16.353256225585938,
+    "peak_memory_allocated_bytes": 228321792,
+    "peak_memory_allocated_gib": 0.21264123916625977,
+    "checksum": -66.33452606201172
+  }
+}

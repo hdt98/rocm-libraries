@@ -1,0 +1,46 @@
+{
+  "artifact": "triton_compact_grouped_gemm_decision_20260531",
+  "decision": "do_not_promote_naive_triton_compact_grouped_gemm",
+  "candidate": "standalone Triton compact variable-row grouped GEMM tile probe",
+  "source_artifacts": {
+    "smoke": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_smoke_20260531.json",
+    "s2048_w2_dgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_s2048_w2_dgrad_20260531.json",
+    "s2048_w1_xgrad": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/triton_compact_grouped_gemm_s2048_w1_xgrad_20260531.json"
+  },
+  "shape": {
+    "tokens": 2048,
+    "assignments": 12288,
+    "experts": 384,
+    "topk": 6,
+    "dtype": "bfloat16",
+    "device": "AMD Instinct MI350X VF",
+    "route_padding_multiplier_global_max": 1.46875
+  },
+  "correctness": {
+    "smoke_ok": true,
+    "s2048_w2_dgrad_ok": true,
+    "s2048_w1_xgrad_ok": true,
+    "max_abs_observed": 0.0,
+    "pct_close_observed": 100.0,
+    "atol": 0.5,
+    "rtol": 0.025
+  },
+  "median_ms": {
+    "s2048_w2_dgrad_torch_padded_bmm_out": 3.0006649494171143,
+    "s2048_w2_dgrad_triton_compact_best": 7.771063804626465,
+    "s2048_w1_xgrad_torch_padded_bmm_out": 3.0533499717712402,
+    "s2048_w1_xgrad_triton_compact_best": 6.85789680480957
+  },
+  "tflops_median": {
+    "s2048_w2_dgrad_torch_padded_bmm_out_padded_flops": 264.8870829015412,
+    "s2048_w2_dgrad_triton_compact_flops": 69.6385839701663,
+    "s2048_w1_xgrad_torch_padded_bmm_out_padded_flops": 260.316502387349,
+    "s2048_w1_xgrad_triton_compact_flops": 78.91134770597165
+  },
+  "implementation_notes": {
+    "fixed_probe_bug": "The first full-size attempt faulted because the Triton B operand offset used 32-bit element arithmetic for expert * K * N. The probe now casts the expert base offset to int64 before full-size runs.",
+    "best_tile": "BM=32, BN=64, BK=64, num_warps=4, num_stages=1",
+    "read": "The compact row count saves about 31.9% of rows versus global max padding, but this naive Triton grouped-GEMM schedule loses more than 2x to rocBLAS/hipBLASLt-backed padded torch.bmm(out=) on both dgrad-style contractions."
+  },
+  "next_action": "Do not integrate this naive Triton compact grouped GEMM into the full layer. Keep the retained compact-reduce padded torch.bmm path as the baseline; future compact work needs a library/CK/TileLang schedule that reaches high MFMA utilization for tiny-M grouped GEMMs, plus wgrad and compact reduce kernels."
+}

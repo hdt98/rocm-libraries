@@ -1,0 +1,260 @@
+{
+  "artifact_type": "diagnostic_profile",
+  "created_at": "2026-06-06",
+  "decision": {
+    "promote": false,
+    "reason": "This run intentionally enables per-expert CUDA-event timing inside the compact expert_loop owner VJP. It is useful for ranking owner-VJP substages, but the extra event load makes throughput lower than the retained MBS2 materialized baseline."
+  },
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "shape": {
+    "config": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 16,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false,
+    "mori_shmem_heap_size": "40G"
+  },
+  "env": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "visible_devices": "0,1,2,3",
+    "moe_comm_backend": "mori",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_save_forward_dispatch": true,
+    "mori_aiter_local_vjp_mode": "expert_loop",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_xgrad_mode": "compact",
+    "mori_aiter_backward_combine_input_mode": "external",
+    "mori_aiter_timing_granularity": "expert_loop_detail",
+    "chunked_ce_num_chunks": 8,
+    "pytorch_alloc_conf": "expandable_segments:True"
+  },
+  "logged_step_metrics": {
+    "step1": {
+      "loss": 12.29446,
+      "grad_norm": 12.9375,
+      "tokens_per_gpu_s": 1454,
+      "node_tokens_s": 5816,
+      "tflops_per_gpu": 73.61,
+      "peak_memory_gib_max": 174.70
+    },
+    "step2": {
+      "loss": 9.34707,
+      "grad_norm": 26.625,
+      "tokens_per_gpu_s": 3460,
+      "node_tokens_s": 13840,
+      "tflops_per_gpu": 175.20,
+      "peak_memory_gib_max": 223.15,
+      "target_ratio_tokens_per_gpu_vs_12200": 0.2836
+    }
+  },
+  "additive_step2": {
+    "rank_step_wall_s_max": 37.861309,
+    "microbatch_forward_backward_s_max": 37.306655,
+    "forward_s_max": 8.431279,
+    "loss_s_max": 0.976981,
+    "backward_s_max": 22.871933,
+    "microbatch_wrapper_residual_s_derived": 5.026462,
+    "optimizer_step_s_max": 0.08689,
+    "grad_clip_s_max": 0.053974,
+    "accumulated_loss_reduce_s_max": 0.342565
+  },
+  "mori_detail_step2": {
+    "call_id_filter": "call_id > 384",
+    "all_records": 3072,
+    "kept_records": 1536,
+    "recv_count_rank_medians": {
+      "min": 26389,
+      "median": 27912,
+      "max": 29732,
+      "n": 4
+    },
+    "rank_total_s_summary": {
+      "backward.local_vjp.expert_loop": {
+        "min": 5.404464,
+        "median": 5.830765,
+        "max": 5.940219
+      },
+      "combine_dx": {
+        "min": 0.888973,
+        "median": 1.008646,
+        "max": 1.439988
+      },
+      "dispatch_grad_inputs": {
+        "min": 0.574635,
+        "median": 0.699149,
+        "max": 0.770873
+      },
+      "dispatch_clone_align": {
+        "min": 0.135395,
+        "median": 0.141507,
+        "max": 0.145639
+      },
+      "dispatch_dtopk_dummy": {
+        "min": 0.101428,
+        "median": 0.103417,
+        "max": 0.110576
+      },
+      "combine_dtopk": {
+        "min": 0.042416,
+        "median": 0.043259,
+        "max": 0.054242
+      }
+    },
+    "owner_vjp_group_rank_total_s": {
+      "local_vjp_wgrad": {
+        "min": 1.277661,
+        "median": 1.408345,
+        "max": 1.422093
+      },
+      "local_vjp_recompute_forward": {
+        "min": 1.163976,
+        "median": 1.250827,
+        "max": 1.272881
+      },
+      "local_vjp_pack_scatter": {
+        "min": 0.642442,
+        "median": 0.693876,
+        "max": 0.720260
+      },
+      "local_vjp_xgrad_reduce": {
+        "min": 0.596887,
+        "median": 0.668963,
+        "max": 0.682907
+      },
+      "local_vjp_w2_dgrad_swiglu": {
+        "min": 0.528791,
+        "median": 0.554019,
+        "max": 0.574792
+      },
+      "local_vjp_dtopk_weight": {
+        "min": 0.410256,
+        "median": 0.442083,
+        "max": 0.449490
+      }
+    },
+    "owner_vjp_detail_rank_total_s": {
+      "dw2_wgrad_gemm": {
+        "min": 0.447251,
+        "median": 0.487150,
+        "max": 0.495372
+      },
+      "dw1_wgrad_gemm": {
+        "min": 0.438600,
+        "median": 0.480839,
+        "max": 0.487981
+      },
+      "dw3_wgrad_gemm": {
+        "min": 0.391810,
+        "median": 0.438030,
+        "max": 0.443392
+      },
+      "w1_forward_gemm": {
+        "min": 0.389026,
+        "median": 0.422467,
+        "max": 0.430967
+      },
+      "w2_forward_gemm": {
+        "min": 0.328983,
+        "median": 0.360624,
+        "max": 0.364397
+      },
+      "w3_forward_gemm": {
+        "min": 0.291853,
+        "median": 0.324441,
+        "max": 0.329767
+      },
+      "xgrad_gemm": {
+        "min": 0.596887,
+        "median": 0.668963,
+        "max": 0.682907
+      },
+      "w2_dgrad_gemm": {
+        "min": 0.364321,
+        "median": 0.393841,
+        "max": 0.407300
+      },
+      "dtopk_weight": {
+        "min": 0.410256,
+        "median": 0.442083,
+        "max": 0.449490
+      },
+      "scale_grad": {
+        "min": 0.253175,
+        "median": 0.266186,
+        "max": 0.277279
+      },
+      "scatter_dx": {
+        "min": 0.228425,
+        "median": 0.256913,
+        "max": 0.265013
+      },
+      "swiglu_backward": {
+        "min": 0.153896,
+        "median": 0.165466,
+        "max": 0.167492
+      },
+      "swiglu_forward": {
+        "min": 0.135544,
+        "median": 0.149399,
+        "max": 0.154113
+      },
+      "route_pack": {
+        "min": 0.023328,
+        "median": 0.024163,
+        "max": 0.025393
+      },
+      "sort_counts": {
+        "min": 0.087945,
+        "median": 0.091253,
+        "max": 0.096584
+      },
+      "gather": {
+        "min": 0.048252,
+        "median": 0.055148,
+        "max": 0.057736
+      }
+    }
+  },
+  "read": {
+    "owner_vjp_rank_order": [
+      "wgrad is the largest detailed owner-VJP bucket: rank-max 1.422s, split almost evenly across dw2, dw1, and dw3 grouped-by-expert GEMMs.",
+      "forward recompute is second: rank-max 1.273s across W1/W3/W2 forward GEMMs plus SwiGLU.",
+      "xgrad/reduce is rank-max 0.683s, and pack/scatter plus route metadata is rank-max 0.720s.",
+      "W2 dgrad plus SwiGLU backward is rank-max 0.575s; dTopK is rank-max 0.449s."
+    ],
+    "interpretation": "The next materializable MoE target should not be another MORI dispatch/combine knob sweep. The local owner VJP is still many per-expert Python-issued GEMMs and scatter/index operations. A fused compact grouped training backward should first attack wgrads and recompute-forward reuse, then xgrad/reduce and pack/scatter. combine_dx remains visible at rank-max 1.44s and likely reflects downstream wait/skew, but the larger owner-VJP math/issue bucket is the first lever.",
+    "caveat": "The detailed profile adds per-expert CUDA events inside the loop, so absolute local_vjp time is inflated versus the previous low-intrusion MBS2 profile. Use this artifact for substage ranking, not for promoted throughput."
+  },
+  "remote_paths": {
+    "output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+    "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+    "mori_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_timing",
+    "additive_timing": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/additive_timing"
+  },
+  "commands": {
+    "local_validation": [
+      "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+      "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+      "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/summarize_full_run_profile.py",
+      "git diff --check -- experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/summarize_full_run_profile.py"
+    ],
+    "remote_validation": [
+      "docker py_compile /workspace/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py in onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "check_mori_expert_loop_dx_first.py --module /workspace/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py --device cpu --dtype float32"
+    ],
+    "profile": "RUN_ID=torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606 TARGET_HOST=do-vunguyen-mi350-gpu IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_DP_SHARD=4 CANARY_MBS=2 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH=1 CANARY_MORI_AITER_LOCAL_VJP_MODE=expert_loop CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_XGRAD_MODE=compact CANARY_MORI_AITER_BACKWARD_COMBINE_INPUT_MODE=external CANARY_MORI_SHMEM_HEAP_SIZE=40G CANARY_CHUNKED_CE_NUM_CHUNKS=8 CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_MORI_AITER_TIMING_GRANULARITY=expert_loop_detail CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/mori_timing CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/additive_timing bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "mori_summary": "python3 /scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run detail=/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_owner_vjp_detail_profile_4x_s4096_gbs128_mbs2_heap40_steps2_20260606 --steady-after-call-id 384 --dsv4-steady-after-call-id 0 --pretty"
+  },
+  "dependency_pin_changes": []
+}

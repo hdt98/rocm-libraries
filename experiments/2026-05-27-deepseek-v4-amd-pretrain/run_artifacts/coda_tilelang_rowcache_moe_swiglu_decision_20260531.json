@@ -1,0 +1,164 @@
+{
+  "artifact": "coda_tilelang_rowcache_moe_swiglu_decision_20260531",
+  "date_local": "2026-05-31",
+  "scope": "External CODA/TileLang rowcache routed-MoE-SwiGLU sweep inspected as reference evidence for the DeepSeek V4 AMD pretrain single-layer MoE path.",
+  "source_dir": "do-sonle-kernel:/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/artifacts/coda_tilelang_rowcache_tile_sweep_20260531T153000Z",
+  "source_file_count": 15,
+  "source_contract": {
+    "scenario": "dsv4-flash-routed",
+    "operator_contract": "routed-row proxy for DSv4 Flash local expert Linear-1 plus SwiGLU/down/combine path",
+    "shape": {
+      "valid_m": 49152,
+      "output_shape": [
+        8192,
+        4096
+      ],
+      "experts": 256,
+      "h": 4096,
+      "i": 256,
+      "topk": 6,
+      "dtype": "bf16"
+    },
+    "layout": "interleaved",
+    "metadata_contract": "aiter-sorted",
+    "token_slot_store": "compact-all",
+    "coda_impl": "lds",
+    "combine_impl": "rowcache"
+  },
+  "runtime": {
+    "host": "do-sonle-kernel",
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.9.1+rocm7.2.0.git7e1940d4",
+    "torch_hip": "7.2.26015-fc0010cf6a",
+    "tilelang": "0.1.7.post3+cuda.gita55a8230"
+  },
+  "best_by_total_coda_mean_ms": [
+    {
+      "file": "flash_bm16_bh64.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 64,
+      "coda_mean_ms": 1.4881649971008302,
+      "coda_median_ms": 1.4474129676818848,
+      "nocoda_mean_ms": 1.5514932155609131,
+      "speedup_vs_nocoda": 1.0425545679299377,
+      "stage1_mean_ms": 0.7554946064949035,
+      "down_single_mean_ms": 0.49035600423812864,
+      "combine_mean_ms": 0.1019129991531372,
+      "down_plus_combine_mean_ms": 0.5719889998435974,
+      "stage1_plus_down_combine_mean_ms": 1.327483606338501,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    },
+    {
+      "file": "flash_bm64_bh128.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 128,
+      "coda_mean_ms": 1.4888772010803222,
+      "coda_median_ms": 1.4692529439926147,
+      "nocoda_mean_ms": 1.5525897979736327,
+      "speedup_vs_nocoda": 1.042792378610594,
+      "stage1_mean_ms": 0.7670709967613221,
+      "down_single_mean_ms": 0.5002686023712158,
+      "combine_mean_ms": 0.09616900086402894,
+      "down_plus_combine_mean_ms": 0.5667490005493164,
+      "stage1_plus_down_combine_mean_ms": 1.3338199973106386,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    },
+    {
+      "file": "flash_bm8_bh128.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 128,
+      "coda_mean_ms": 1.4908843994140626,
+      "coda_median_ms": 1.4513720273971558,
+      "nocoda_mean_ms": 1.5215885877609252,
+      "speedup_vs_nocoda": 1.020594613746666,
+      "stage1_mean_ms": 0.7729264020919799,
+      "down_single_mean_ms": 0.4943479895591736,
+      "combine_mean_ms": 0.09888100028038024,
+      "down_plus_combine_mean_ms": 0.5732050061225891,
+      "stage1_plus_down_combine_mean_ms": 1.346131408214569,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    }
+  ],
+  "best_by_combine_mean_ms": [
+    {
+      "file": "flash_bm16_bh256.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 256,
+      "coda_mean_ms": 1.512068796157837,
+      "nocoda_mean_ms": 1.528301191329956,
+      "speedup_vs_nocoda": 1.0107352226389206,
+      "combine_mean_ms": 0.09552880078554153,
+      "down_plus_combine_mean_ms": 0.5819169998168945,
+      "stage1_plus_down_combine_mean_ms": 1.3647957921028135,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    },
+    {
+      "file": "flash_bm64_bh128.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 128,
+      "coda_mean_ms": 1.4888772010803222,
+      "nocoda_mean_ms": 1.5525897979736327,
+      "speedup_vs_nocoda": 1.042792378610594,
+      "combine_mean_ms": 0.09616900086402894,
+      "down_plus_combine_mean_ms": 0.5667490005493164,
+      "stage1_plus_down_combine_mean_ms": 1.3338199973106386,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    },
+    {
+      "file": "flash_bm4_bh256.json",
+      "block_m": 64,
+      "block_h": 64,
+      "combine_block_h": 256,
+      "coda_mean_ms": 1.5190612077713013,
+      "nocoda_mean_ms": 1.5295648097991943,
+      "speedup_vs_nocoda": 1.0069145350919095,
+      "combine_mean_ms": 0.09636100083589554,
+      "down_plus_combine_mean_ms": 0.5634289979934692,
+      "stage1_plus_down_combine_mean_ms": 1.3330036044120788,
+      "determinism_unique_hashes": 1,
+      "determinism_iters": 5
+    }
+  ],
+  "comparison_to_active_microbench": {
+    "active_shape": {
+      "tokens": 4096,
+      "hidden": 7168,
+      "intermediate": 3072,
+      "experts": 384,
+      "topk": 6,
+      "assignments": 24576
+    },
+    "active_bottleneck": "Backward routed-MoE grouped GEMM family: W2 dgrad, W1/W3 xgrad, W1/W2/W3 wgrad.",
+    "not_a_direct_replacement_reason": [
+      "The CODA sweep is a DSv4-Flash forward-style routed local-expert proxy with H=4096 and I=256, not the current DeepSeek V4-Pro training microbench contract with H=7168 and I=3072.",
+      "It measures stage1 Linear-1/SwiGLU, down, and rowcache combine paths; it does not cover expert weight gradients or the W2/W1/W3 backward grouped-GEMM family that dominates the active profile.",
+      "Observed CODA over non-CODA speedup is small, about 1.01-1.04x, so it is an implementation clue rather than promotion evidence."
+    ],
+    "useful_signals": [
+      "The rowcache combine stage is deterministic and around 0.096-0.102 ms in the best configurations.",
+      "A full forward-style stage1 plus down plus combine path reaches about 1.33 ms in this smaller Flash proxy.",
+      "The metadata layout exercises AITER-sorted compact rows and token-slot storage, which is directionally aligned with the compact grouped-MoE training-kernel manifest."
+    ]
+  },
+  "decision": {
+    "status": "reference_only_for_forward_combine_and_metadata",
+    "promote_to_active_single_layer_path": false,
+    "read": "Keep this CODA/TileLang rowcache sweep as external reference evidence for compact metadata, rowcache combine, and forward fusion shape. Do not treat it as solving the current single-layer backward bottleneck: the active wall is still BF16 routed-MoE training GEMMs and wgrads at H=7168/I=3072.",
+    "next_action": "Continue with backward-first compact-native grouped-MoE kernels for the active contract, using CODA rowcache only as a possible reduce/combine design reference after W2 dgrad, W1/W3 xgrad, and wgrad kernels show isolated wins."
+  },
+  "commands": {
+    "list_source_files": "ssh do-sonle-kernel \"python3 -c 'import glob, os; p=\\\"/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/artifacts/coda_tilelang_rowcache_tile_sweep_20260531T153000Z\\\"; xs=sorted(glob.glob(p+\\\"/*.json\\\")); print(len(xs)); print(\\\"\\\\n\\\".join(os.path.basename(x) for x in xs))'\"",
+    "summarize_source_files": "ssh do-sonle-kernel 'python3 - <<PY ... parse paths.tilelang-coda latency and stage_profile ... PY'"
+  },
+  "dependency_pin_changes": []
+}

@@ -1,0 +1,32 @@
+{
+  "artifact": "standard_ep_hot_expert_integrated_torchtitan",
+  "scope": "Integrated TorchTitan AllToAllTokenDispatcher + GroupedExperts execute-mode hot-row split.",
+  "passed": false,
+  "result": "timeout_or_hang",
+  "date": "2026-06-06",
+  "timeout_seconds": 45,
+  "command_shape": {
+    "host": "do-vunguyen-mi350-gpu",
+    "container": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "launcher": "torchrun --standalone --nproc_per_node=4",
+    "probe": "/workspace/dsv4/tools/dsv4_runtime_probe/probe_standard_ep_hot_expert_integrated_torchtitan.py",
+    "args": {
+      "backend": "gloo",
+      "device": "cpu",
+      "balanced_mode": "execute",
+      "tokens_per_rank": 8,
+      "hidden": 32,
+      "intermediate": 16,
+      "experts_per_rank": 4,
+      "topk": 2,
+      "hot_experts": 2
+    }
+  },
+  "evidence": [
+    "The matching forward-only execute-mode probe passed with exact output parity on 4 CPU/Gloo ranks.",
+    "The matching full backward probe with balanced_mode=off passed on 4 CPU/Gloo ranks.",
+    "The full backward execute-mode probe printed differentiable all_reduce warnings and was terminated by the 45-second timeout."
+  ],
+  "read": "The source-local hot-row split is forward-correct, and the standard EP backward harness is valid. The remaining issue is the integrated execute-mode hot-weight gradient path: differentiable hot-weight all_reduce is not yet safe when composed with the standard EP autograd all_to_all ordering.",
+  "next_action": "Replace the differentiable hot-weight all_reduce path with an explicit hot-weight broadcast plus explicit hot-grad reduce, or a custom autograd function that controls collective participation and ordering before attempting e2e TFLOPs materialization."
+}

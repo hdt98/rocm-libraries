@@ -1,0 +1,114 @@
+{
+  "artifact": "actual_li_fixed_panel_triton_dkv_sweep_20260602",
+  "created_date": "2026-06-02",
+  "scope": "First executable fixed-panel Triton compressed-dKV accumulator for actual LightningIndexer routes.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_fixed_panel_triton.py",
+  "host": "do-sonle5-mi350-gpu",
+  "device": "1xMI350",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "read": "The probe consumes materialized probs and grad_logits, so it isolates only the fixed-panel reduced-write accumulator. It is not a production sparse-MLA backward kernel because production must fuse score/prob/grad-logit recompute and avoid materialized selected state.",
+  "status": "correct_but_fixed_panel_dense_work_shapes_rejected",
+  "s128_layer2": {
+    "seq_len": 128,
+    "compress_ratio": 4,
+    "topk": 32,
+    "compressed_groups": 32,
+    "best_artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s128_layer2_sc16_g16d16h64k16_20260602.json",
+    "best_blocks": {
+      "seq_chunk": 16,
+      "block_g": 16,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 16
+    },
+    "max_abs_diff": 0.0000152587890625,
+    "fixed_panel_median_ms": 0.37924501299858093,
+    "pytorch_reference_median_ms": 0.4526050090789795,
+    "modeled_atomic_element_reduction_x": 7.875,
+    "materialized_workspace_bytes": {
+      "probs": 1048576,
+      "grad_logits": 1048576,
+      "safe_groups": 32768,
+      "valid": 4096
+    }
+  },
+  "s512_layer2": {
+    "seq_len": 512,
+    "compress_ratio": 4,
+    "topk": 128,
+    "compressed_groups": 128,
+    "best_artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc32_g128d16h64k16_20260602.json",
+    "best_blocks": {
+      "seq_chunk": 32,
+      "block_g": 128,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 16
+    },
+    "max_abs_diff": 0.000030517578125,
+    "fixed_panel_median_ms": 3.081876039505005,
+    "pytorch_reference_median_ms": 1.575103998184204,
+    "modeled_atomic_element_reduction_x": 15.9375,
+    "dense_slot_overhead_x": 2.007843137254902,
+    "materialized_workspace_bytes": {
+      "probs": 16777216,
+      "grad_logits": 16777216,
+      "safe_groups": 524288,
+      "valid": 65536
+    }
+  },
+  "s512_sweep": [
+    {
+      "artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc32_g16d16h64k16_20260602.json",
+      "seq_chunk": 32,
+      "block_g": 16,
+      "median_ms": 13.913607597351074,
+      "max_abs_diff": 0.000041961669921875
+    },
+    {
+      "artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc32_g32d16h64k16_20260602.json",
+      "seq_chunk": 32,
+      "block_g": 32,
+      "median_ms": 6.943441867828369,
+      "max_abs_diff": 0.00003814697265625
+    },
+    {
+      "artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc32_g64d16h64k16_20260602.json",
+      "seq_chunk": 32,
+      "block_g": 64,
+      "median_ms": 3.755484104156494,
+      "max_abs_diff": 0.000041961669921875
+    },
+    {
+      "artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc32_g128d16h64k16_20260602.json",
+      "seq_chunk": 32,
+      "block_g": 128,
+      "median_ms": 3.081876039505005,
+      "max_abs_diff": 0.000030517578125
+    },
+    {
+      "artifact": "run_artifacts/actual_li_fixed_panel_triton_dkv_s512_layer2_sc64_g128d16h64k16_20260602.json",
+      "seq_chunk": 64,
+      "block_g": 128,
+      "median_ms": 5.182140827178955,
+      "max_abs_diff": 0.000034332275390625
+    }
+  ],
+  "dot_heads_followup": {
+    "read": "The dot_heads mode replaces the scalar per-selected head reduction with tl.dot over heads for each selected key and panel. It is parity-clean at BF16 tolerance, but it makes the dense panel work explicit and is slower than the scalar loop, especially at S512.",
+    "s128_artifact": "run_artifacts/actual_li_fixed_panel_triton_dotheads_dkv_s128_layer2_sc16_g16d16h64k16_20260602.json",
+    "s128_max_abs_diff": 0.0632786750793457,
+    "s128_median_ms": 0.8414139747619629,
+    "s128_scalar_loop_best_ms": 0.37924501299858093,
+    "s512_artifact": "run_artifacts/actual_li_fixed_panel_triton_dotheads_dkv_s512_layer2_sc32_g16d16h64k16_20260602.json",
+    "s512_max_abs_diff": 0.0670318603515625,
+    "s512_median_ms": 37.222816467285156,
+    "s512_same_block_scalar_loop_ms": 13.913607597351074,
+    "s512_scalar_loop_best_ms": 3.081876039505005
+  },
+  "interpretation": {
+    "positive": "The formula and reduced-write fixed-panel accumulation are parity-clean at S128 and S512.",
+    "negative": "The scalar K-loop Triton implementation scales poorly, and the dot-heads MFMA-flavored variant is worse because it computes dense panel work for one routed group at a time. S512 scalar-loop best is 3.08 ms, while dot-heads is 37.22 ms at the same small-panel shape.",
+    "next_step": "Do not pursue dense fixed-panel work without active-group compaction. The next sparse-attention branch should be dynamic unique-group D16 accumulation inside the query-major tile, or a fused LI/compressor path that avoids writing compressed dKV in this form."
+  }
+}

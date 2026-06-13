@@ -1,0 +1,129 @@
+{
+  "artifact": "mori_asyncll_dx_staged_smokes_20260603",
+  "date_utc": "2026-06-03",
+  "context": {
+    "holistic_target_rank": 1,
+    "target": "MoE backward return skew / overlap",
+    "reason": "The EP8 holistic profile ranks combine_dx peer-arrival skew ahead of attention, loss, copies, and RCCL for the current guarded systems canary.",
+    "related_artifacts": [
+      "run_artifacts/holistic_optimization_targets_ep8_s4096_20260603.json",
+      "run_artifacts/mori_asyncll_dx_overlap_contract_20260603.json"
+    ]
+  },
+  "code_changes": [
+    "Added an opt-in staged AsyncLL dX return path behind TORCHTITAN_MORI_AITER_DX_RETURN_MODE=asyncll_staged.",
+    "Made x, grad, and top-k dummy dispatch use the same AsyncLL route family under staged mode.",
+    "Changed dTopk combine to use AsyncLL combine_send/combine_recv when topk_op is AsyncLL.",
+    "Added an AsyncLL max_total_recv_tokens default of max_tokens * top_k * 2 to avoid long-sequence receive overflow while staying below all-to-one worst-case buffers."
+  ],
+  "local_validation": {
+    "py_compile_mori_aiter_moe": "pass",
+    "bash_n_direct_launcher": "pass"
+  },
+  "remote_validation": {
+    "host": "do-sonle5-mi350-gpu",
+    "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "runs": [
+      {
+        "run_id": "torchtitan_dsv4_asyncll_dx_4x_s128_smoke_topkroute_20260603",
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S128",
+        "activation_checkpointing": "none",
+        "assume_identical_dispatch_order": false,
+        "status": "pass",
+        "result": {
+          "step": 1,
+          "loss": 12.34595,
+          "grad_norm": 12.0,
+          "memory_gib": 73.79,
+          "clean_process_group_teardown": true
+        },
+        "timing_sidecar": {
+          "records": 16,
+          "last_recv_count": 427,
+          "dx_return_mode": "asyncll_staged",
+          "dx_combine_input_mode": "external",
+          "dtopk_combine_input_mode": "external"
+        },
+        "read": "Strict source-position guard passes at S128 after making the top-k return route AsyncLL-consistent."
+      },
+      {
+        "run_id": "torchtitan_dsv4_asyncll_dx_4x_s4096_gbs4_smoke_topkroute_20260603",
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+        "activation_checkpointing": "full",
+        "assume_identical_dispatch_order": false,
+        "status": "fail",
+        "failure": "AsyncLL device assert: totalTokens <= config.MaxNumTokensToRecv(); increase maxTotalRecvTokens.",
+        "read": "The S4096 path reached AsyncLL dispatch/receive and failed on capacity, not on the earlier route-family mismatch."
+      },
+      {
+        "run_id": "torchtitan_dsv4_asyncll_dx_4x_s4096_gbs4_smoke_recvbudget_20260603",
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+        "activation_checkpointing": "full",
+        "assume_identical_dispatch_order": false,
+        "status": "fail",
+        "failure": "grad_output MORI source-position set mismatch after the AsyncLL receive budget fix.",
+        "timing_sidecar": {
+          "records": 4,
+          "last_recv_count": 14919,
+          "last_grad_recv_count": 14919,
+          "dx_return_mode": "asyncll_staged",
+          "dx_combine_input_mode": "external",
+          "dtopk_combine_input_mode": "external"
+        },
+        "read": "The capacity fix clears the receive-token assert; the remaining strict-mode blocker is AsyncLL source-position metadata/order validation at long sequence."
+      },
+      {
+        "run_id": "torchtitan_dsv4_asyncll_dx_4x_s4096_gbs4_smoke_assumeorder_20260603",
+        "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS4_S4096",
+        "activation_checkpointing": "full",
+        "assume_identical_dispatch_order": true,
+        "status": "pass_diagnostic_only",
+        "result": {
+          "step": 1,
+          "loss": 12.29587,
+          "grad_norm": 8.3125,
+          "rank_memory_gib_range": [71.17, 93.15],
+          "tps_per_gpu_logged": 195,
+          "fwd_bwd_ms_rank0_structured": 20148.48,
+          "step_end_ms_rank0_structured": 20622.58,
+          "clean_process_group_teardown": true
+        },
+        "timing_sidecar": {
+          "records": 16,
+          "last_recv_count": 15749,
+          "last_grad_recv_count": 15749,
+          "dx_return_mode": "asyncll_staged",
+          "dx_combine_input_mode": "external",
+          "dtopk_combine_input_mode": "external",
+          "median_stage_gpu_ms": {
+            "backward.local_vjp.padded.dx_first": 19.78,
+            "backward.local_vjp.padded.wgrad_after_dx_send": 7.953,
+            "backward.combine_dx.asyncll_send": 539.764,
+            "backward.combine_dx.asyncll_recv": 63.71,
+            "backward.combine_dtopk.asyncll_send": 1.648,
+            "backward.combine_dtopk.asyncll_recv": 0.098
+          }
+        },
+        "read": "Long-sequence staged AsyncLL can complete a full TorchTitan backward only when the source-position guard is bypassed. This is a route-contract diagnostic, not a retained performance setting."
+      }
+    ]
+  },
+  "interpretation": {
+    "what_is_confirmed": [
+      "Top-k route consistency is fixed for staged AsyncLL.",
+      "AsyncLL receive capacity must be set explicitly or derived for S4096 routed rows.",
+      "The S4096 data path can complete with assumed dispatch order, so the remaining immediate blocker is source-position metadata/order validation rather than the staged dX compute split itself."
+    ],
+    "what_is_not_confirmed": [
+      "No retained throughput win is proven.",
+      "The assume-order run is not a correctness proof; it needs parity against the strict sync/intranode path or a trustworthy AsyncLL source-position mapping.",
+      "CUDA-event timing sidecars synchronize profiled regions and should not be used as a no-profile throughput baseline."
+    ]
+  },
+  "next_actions": [
+    "Build a deterministic parity probe for AsyncLL staged dX/dTopk versus the retained sync route, using the same top-k tensor and checking dX, dTopk, and local expert gradients.",
+    "Inspect or replace AsyncLL get_dispatch_src_token_pos handling for long S4096 routes; if metadata is unreliable, derive ordering from a shared route-state map rather than assuming it.",
+    "Only after parity passes, run no-profile 4x S4096 GBS8/GBS64 A/B against retained sync combine, then promote to EP8."
+  ]
+}

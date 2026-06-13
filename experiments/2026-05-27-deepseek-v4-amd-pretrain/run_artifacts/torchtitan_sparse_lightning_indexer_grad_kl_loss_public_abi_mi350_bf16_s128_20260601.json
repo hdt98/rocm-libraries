@@ -1,0 +1,45 @@
+{
+  "deferred_forward_loss": 0.0,
+  "deferred_grad_norms": {
+    "index_k": 0.0009140665642917156,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "device": "cuda",
+  "direct_grad_norms": {
+    "index_k": 0.0009139414760284126,
+    "index_q": 0.0009185621165670455,
+    "weights": 0.000768651079852134
+  },
+  "direct_loss": 0.016752004623413086,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {
+    "index_k": 1.9073486328125e-06,
+    "index_q": 0.0,
+    "weights": 0.0
+  },
+  "max_grad_diff": 1.9073486328125e-06,
+  "read": "The deferred Ascend-style public wrapper intentionally returns a zero scalar in forward, then recomputes the selected sparse LI KL objective in backward and matches the direct oracle parameter gradients.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 32,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "top_indices_equal": true,
+  "top_indices_shape": [
+    1,
+    128,
+    32
+  ]
+}

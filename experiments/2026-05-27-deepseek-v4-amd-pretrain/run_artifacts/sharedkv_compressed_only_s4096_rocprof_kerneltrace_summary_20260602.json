@@ -1,0 +1,73 @@
+{
+  "artifact": "sharedkv_compressed_only_s4096_rocprof_kerneltrace_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "S4096 compressed-only shared latent-KV sparse MLA backward query-major retained tile",
+  "status": "rocprof_kernel_trace_confirms_dkv_accumulation_wall",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 0,
+    "csa_count": 512,
+    "compressed_groups": 1024,
+    "selected_count": 512,
+    "kv_len": 5120
+  },
+  "retained_tile_env": {
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TRITON_SCATTER_BLOCK_M": 16,
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_SHAREDKV_BLOCK_H": 64,
+    "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TRITON_SCATTER_BLOCK_D": 512
+  },
+  "normal_event_controls_ms": {
+    "query_full_atomic": 11.171058654785156,
+    "no_dkv": 1.3239070177078247,
+    "dkv_reduce_sink": 2.1207358837127686,
+    "estimated_dkv_dot_math": 0.7968288660049438,
+    "estimated_full_dkv_atomic_accumulation": 9.050322771072388,
+    "estimated_atomic_share_of_full": 0.8101638921117856
+  },
+  "rocprof_kernel_stats": {
+    "query_full_atomic": {
+      "target_kernel": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+      "calls": 4,
+      "avg_ms": 11.06122375,
+      "min_ms": 11.005233,
+      "max_ms": 11.127942,
+      "percentage": 95.34
+    },
+    "no_dkv": {
+      "target_kernel": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+      "calls": 4,
+      "avg_ms": 1.1442145,
+      "min_ms": 1.104374,
+      "max_ms": 1.227096,
+      "percentage": 67.81
+    },
+    "dkv_reduce_sink": {
+      "target_kernel": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+      "calls": 4,
+      "avg_ms": 1.882611,
+      "min_ms": 1.771739,
+      "max_ms": 2.066464,
+      "percentage": 77.45
+    },
+    "estimated_dkv_dot_math_ms": 0.7383965000000001,
+    "estimated_full_dkv_atomic_accumulation_ms": 9.17861275,
+    "estimated_atomic_share_of_full": 0.829813356589587
+  },
+  "artifact_references": {
+    "normal_query_control": "run_artifacts/sharedkv_compressed_only_s4096_only_query_h64d512_control_20260602.json",
+    "normal_no_dkv_control": "run_artifacts/sharedkv_compressed_only_s4096_only_no_dkv_h64d512_control_20260602.json",
+    "normal_dkv_reduce_sink_control": "run_artifacts/sharedkv_compressed_only_s4096_only_dkv_reduce_sink_h64d512_control_20260602.json",
+    "rocprof_query_profile": "run_artifacts/sharedkv_compressed_only_s4096_rocprof_query_h64d512_profile_20260602.json",
+    "rocprof_no_dkv_profile": "run_artifacts/sharedkv_compressed_only_s4096_rocprof_no_dkv_h64d512_profile_20260602.json",
+    "rocprof_dkv_reduce_sink_profile": "run_artifacts/sharedkv_compressed_only_s4096_rocprof_dkv_reduce_sink_h64d512_profile_20260602.json"
+  },
+  "remote_raw_profile_dirs": {
+    "query_full_atomic": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/profiles/rocprof_sharedkv_query_h64d512_20260602",
+    "no_dkv": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/profiles/rocprof_sharedkv_no_dkv_h64d512_20260602",
+    "dkv_reduce_sink": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602/profiles/rocprof_sharedkv_dkv_reduce_sink_h64d512_20260602"
+  },
+  "read": "The retained H64/D512 compressed-only query-major kernel spends about 11.1 ms in the full atomic path. Skipping dKV leaves about 1.1-1.3 ms, and computing dKV dot products while replacing full dKV atomic accumulation with a checksum sink is about 1.9-2.1 ms. Both normal CUDA events and rocprof kernel stats therefore point to full compressed dKV atomic accumulation as the dominant mechanism, not QK/probability/dQ math or dKV dot math."
+}

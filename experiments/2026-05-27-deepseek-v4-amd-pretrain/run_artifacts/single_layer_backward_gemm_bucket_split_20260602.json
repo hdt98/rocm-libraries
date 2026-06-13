@@ -1,0 +1,1980 @@
+{
+  "all_cijk_kernels": [
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.536726,
+      "external_id": 1156,
+      "input_dims": [
+        [
+          384,
+          7168,
+          64
+        ],
+        [
+          384,
+          64,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          1,
+          7168
+        ],
+        [
+          196608,
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.096562,
+      "external_id": 1165,
+      "input_dims": [
+        [
+          384,
+          3072,
+          64
+        ],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          1,
+          3072
+        ],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.041041,
+      "external_id": 1170,
+      "input_dims": [
+        [
+          384,
+          3072,
+          64
+        ],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          1,
+          3072
+        ],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 3.3378270000000003,
+      "external_id": 1173,
+      "input_dims": [
+        [
+          384,
+          64,
+          3072
+        ],
+        [
+          384,
+          3072,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          3072,
+          1
+        ],
+        [
+          22020096,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::baddbmm",
+      "duration_ms": 3.330508,
+      "external_id": 1175,
+      "input_dims": [
+        [
+          384,
+          64,
+          7168
+        ],
+        [
+          384,
+          64,
+          3072
+        ],
+        [
+          384,
+          3072,
+          7168
+        ],
+        [],
+        [],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          7168,
+          1
+        ],
+        [
+          196608,
+          3072,
+          1
+        ],
+        [
+          22020096,
+          7168,
+          1
+        ],
+        [],
+        [],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 3.110465,
+      "external_id": 1151,
+      "input_dims": [
+        [
+          384,
+          64,
+          7168
+        ],
+        [
+          384,
+          7168,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          7168,
+          1
+        ],
+        [
+          22020096,
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 1.0078880000000001,
+      "external_id": 1396,
+      "input_dims": [
+        [
+          128,
+          4096,
+          512
+        ],
+        [
+          128,
+          512,
+          1056
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          65536,
+          1
+        ],
+        [
+          0,
+          1,
+          512
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT224x256x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.9678479999999999,
+      "external_id": 1474,
+      "input_dims": [
+        [
+          128,
+          1056,
+          4096
+        ],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          4325376,
+          1,
+          1056
+        ],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x224x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.9232469999999999,
+      "external_id": 1415,
+      "input_dims": [
+        [
+          128,
+          1056,
+          4096
+        ],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          4325376,
+          1,
+          1056
+        ],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x224x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.870006,
+      "external_id": 2069,
+      "input_dims": [
+        [
+          65536,
+          4096
+        ],
+        [
+          4096,
+          1536
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          65536
+        ],
+        [
+          1536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::baddbmm",
+      "duration_ms": 0.8381660000000001,
+      "external_id": 1464,
+      "input_dims": [
+        [
+          128,
+          4096,
+          512
+        ],
+        [
+          128,
+          4096,
+          1056
+        ],
+        [
+          128,
+          1056,
+          512
+        ],
+        [],
+        [],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          65536,
+          1
+        ],
+        [
+          4325376,
+          1056,
+          1
+        ],
+        [
+          0,
+          512,
+          1
+        ],
+        [],
+        [],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA2_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.696645,
+      "external_id": 1290,
+      "input_dims": [
+        [
+          8,
+          4096,
+          1024
+        ],
+        [
+          8,
+          1024,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          1024,
+          8192,
+          1
+        ],
+        [
+          8388608,
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "BmmBackward0",
+        "autograd::engine::evaluate_function: BmmBackward0"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.681765,
+      "external_id": 2058,
+      "input_dims": [
+        [
+          4096,
+          65536
+        ],
+        [
+          65536,
+          1536
+        ]
+      ],
+      "input_strides": [
+        [
+          65536,
+          1
+        ],
+        [
+          1536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT192x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.5304030000000001,
+      "external_id": 1287,
+      "input_dims": [
+        [
+          8,
+          8192,
+          4096
+        ],
+        [
+          8,
+          4096,
+          1024
+        ]
+      ],
+      "input_strides": [
+        [
+          8192,
+          1,
+          65536
+        ],
+        [
+          1024,
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "BmmBackward0",
+        "autograd::engine::evaluate_function: BmmBackward0"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.525764,
+      "external_id": 1248,
+      "input_dims": [
+        [
+          4096,
+          7168
+        ],
+        [
+          7168,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          7168,
+          1
+        ],
+        [
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.515043,
+      "external_id": 1259,
+      "input_dims": [
+        [
+          7168,
+          4096
+        ],
+        [
+          4096,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          7168
+        ],
+        [
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::baddbmm",
+      "duration_ms": 0.367682,
+      "external_id": 1446,
+      "input_dims": [
+        [
+          4096,
+          128,
+          512
+        ],
+        [
+          4096,
+          128,
+          128
+        ],
+        [
+          4096,
+          128,
+          512
+        ],
+        [],
+        [],
+        [
+          4096,
+          128,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          65536,
+          512,
+          1
+        ],
+        [
+          16384,
+          1,
+          128
+        ],
+        [
+          65536,
+          512,
+          1
+        ],
+        [],
+        [],
+        [
+          65536,
+          512,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x128x32_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.29352100000000003,
+      "external_id": 1379,
+      "input_dims": [
+        [
+          4096,
+          128,
+          128
+        ],
+        [
+          4096,
+          128,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          128,
+          1,
+          524288
+        ],
+        [
+          65536,
+          512,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x128x32_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.250801,
+      "external_id": 1360,
+      "input_dims": [
+        [
+          4096,
+          128,
+          512
+        ],
+        [
+          4096,
+          512,
+          128
+        ]
+      ],
+      "input_strides": [
+        [
+          65536,
+          512,
+          1
+        ],
+        [
+          65536,
+          1,
+          512
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x32_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.24740199999999998,
+      "external_id": 1107,
+      "input_dims": [
+        [
+          3072,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          3072
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x192x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS1_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.24024199999999998,
+      "external_id": 1435,
+      "input_dims": [
+        [
+          4096,
+          128,
+          128
+        ],
+        [
+          4096,
+          128,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          16384,
+          128,
+          1
+        ],
+        [
+          65536,
+          512,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x128x32_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.22736099999999998,
+      "external_id": 1127,
+      "input_dims": [
+        [
+          3072,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          3072
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x192x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS1_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.18264,
+      "external_id": 1068,
+      "input_dims": [
+        [
+          7168,
+          4096
+        ],
+        [
+          4096,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          7168
+        ],
+        [
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT192x224x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.17204,
+      "external_id": 1097,
+      "input_dims": [
+        [
+          4096,
+          3072
+        ],
+        [
+          3072,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          3072,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.16496,
+      "external_id": 1117,
+      "input_dims": [
+        [
+          4096,
+          3072
+        ],
+        [
+          3072,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          3072,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.13876,
+      "external_id": 1058,
+      "input_dims": [
+        [
+          4096,
+          7168
+        ],
+        [
+          7168,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          7168,
+          1
+        ],
+        [
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT192x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "moe_shared_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.13591999999999999,
+      "external_id": 2125,
+      "input_dims": [
+        [
+          1536,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          1536
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x192x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS1_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.10931999999999999,
+      "external_id": 2114,
+      "input_dims": [
+        [
+          4096,
+          1536
+        ],
+        [
+          1536,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1536,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.073839,
+      "external_id": 1715,
+      "input_dims": [
+        [
+          512,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          512
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x128_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.06984,
+      "external_id": 1738,
+      "input_dims": [
+        [
+          512,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          512
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x128_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.06748,
+      "external_id": 1704,
+      "input_dims": [
+        [
+          4096,
+          512
+        ],
+        [
+          512,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x240x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.06319899999999999,
+      "external_id": 2031,
+      "input_dims": [
+        [
+          512,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          512
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x128_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.061399999999999996,
+      "external_id": 1727,
+      "input_dims": [
+        [
+          4096,
+          512
+        ],
+        [
+          512,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x240x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.06124,
+      "external_id": 1968,
+      "input_dims": [
+        [
+          512,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          512
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x128_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.05848,
+      "external_id": 1944,
+      "input_dims": [
+        [
+          512,
+          4096
+        ],
+        [
+          4096,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          512
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT128x128x128_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.05792,
+      "external_id": 2020,
+      "input_dims": [
+        [
+          4096,
+          512
+        ],
+        [
+          512,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x240x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.057479,
+      "external_id": 1933,
+      "input_dims": [
+        [
+          4096,
+          512
+        ],
+        [
+          512,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x240x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.054598999999999995,
+      "external_id": 1957,
+      "input_dims": [
+        [
+          4096,
+          512
+        ],
+        [
+          512,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          1
+        ],
+        [
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x240x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_kv_and_compressor_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    }
+  ],
+  "artifact": "single_layer_backward_gemm_bucket_split_20260602",
+  "by_cpu_op": {
+    "aten::baddbmm": {
+      "cijk_ms": 4.5363560000000005,
+      "kernel_count": 3
+    },
+    "aten::bmm": {
+      "cijk_ms": 27.033216,
+      "kernel_count": 13
+    },
+    "aten::mm": {
+      "cijk_ms": 4.596457,
+      "kernel_count": 22
+    }
+  },
+  "by_label": {
+    "attention_kv_and_compressor_backward": {
+      "cijk_ms": 0.625476,
+      "kernel_count": 10,
+      "share_of_cijk_bucket": 0.017294572207526566
+    },
+    "attention_out_projection_backward": {
+      "cijk_ms": 2.267855,
+      "kernel_count": 4,
+      "share_of_cijk_bucket": 0.06270677380698886
+    },
+    "attention_q_path_backward": {
+      "cijk_ms": 1.7970110000000001,
+      "kernel_count": 4,
+      "share_of_cijk_bucket": 0.04968781615476777
+    },
+    "attention_sparse_mla_backward": {
+      "cijk_ms": 4.889395,
+      "kernel_count": 8,
+      "share_of_cijk_bucket": 0.13519302879506068
+    },
+    "moe_routed_expert_vjp": {
+      "cijk_ms": 25.453129,
+      "kernel_count": 6,
+      "share_of_cijk_bucket": 0.7037855607537116
+    },
+    "moe_shared_expert_vjp": {
+      "cijk_ms": 1.133163,
+      "kernel_count": 6,
+      "share_of_cijk_bucket": 0.03133224828194435
+    }
+  },
+  "cijk_bucket_ms": 36.16602900000001,
+  "cijk_kernel_count": 38,
+  "created_at": "2026-06-02",
+  "important_caveats": [
+    "This is the exact normal-backward Cijk kernel bucket split for the old single-GPU packed-sim trace, not the segmented autograd attribution timings.",
+    "The current EP8 owner-rank MORI routed-backward VJP probe is a different distributed shape; its 6.43 ms Triton-SwiGLU result should be compared only to the MoE owner-rank slice, not to the whole 36.17 ms bucket.",
+    "Classification is derived from External id -> CPU op -> input shape plus enclosing backward function; record_function labels were not present for backward subblocks in this raw trace."
+  ],
+  "largest_kernels": [
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.536726,
+      "external_id": 1156,
+      "input_dims": [
+        [
+          384,
+          7168,
+          64
+        ],
+        [
+          384,
+          64,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          1,
+          7168
+        ],
+        [
+          196608,
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.096562,
+      "external_id": 1165,
+      "input_dims": [
+        [
+          384,
+          3072,
+          64
+        ],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          1,
+          3072
+        ],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 5.041041,
+      "external_id": 1170,
+      "input_dims": [
+        [
+          384,
+          3072,
+          64
+        ],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          1,
+          3072
+        ],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 3.3378270000000003,
+      "external_id": 1173,
+      "input_dims": [
+        [
+          384,
+          64,
+          3072
+        ],
+        [
+          384,
+          3072,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          196608,
+          3072,
+          1
+        ],
+        [
+          22020096,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::baddbmm",
+      "duration_ms": 3.330508,
+      "external_id": 1175,
+      "input_dims": [
+        [
+          384,
+          64,
+          7168
+        ],
+        [
+          384,
+          64,
+          3072
+        ],
+        [
+          384,
+          3072,
+          7168
+        ],
+        [],
+        [],
+        [
+          384,
+          64,
+          7168
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          7168,
+          1
+        ],
+        [
+          196608,
+          3072,
+          1
+        ],
+        [
+          22020096,
+          7168,
+          1
+        ],
+        [],
+        [],
+        [
+          458752,
+          7168,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 3.110465,
+      "external_id": 1151,
+      "input_dims": [
+        [
+          384,
+          64,
+          7168
+        ],
+        [
+          384,
+          7168,
+          3072
+        ]
+      ],
+      "input_strides": [
+        [
+          458752,
+          7168,
+          1
+        ],
+        [
+          22020096,
+          3072,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_GR",
+      "label": "moe_routed_expert_vjp",
+      "parent_backward": [
+        "_FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimCyclicUniformGroupedExpertBatchesMoEBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 1.0078880000000001,
+      "external_id": 1396,
+      "input_dims": [
+        [
+          128,
+          4096,
+          512
+        ],
+        [
+          128,
+          512,
+          1056
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          65536,
+          1
+        ],
+        [
+          0,
+          1,
+          512
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT224x256x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA4_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.9678479999999999,
+      "external_id": 1474,
+      "input_dims": [
+        [
+          128,
+          1056,
+          4096
+        ],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          4325376,
+          1,
+          1056
+        ],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x224x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.9232469999999999,
+      "external_id": 1415,
+      "input_dims": [
+        [
+          128,
+          1056,
+          4096
+        ],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          4325376,
+          1,
+          1056
+        ],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x224x32_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR0_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.870006,
+      "external_id": 2069,
+      "input_dims": [
+        [
+          65536,
+          4096
+        ],
+        [
+          4096,
+          1536
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          65536
+        ],
+        [
+          1536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::baddbmm",
+      "duration_ms": 0.8381660000000001,
+      "external_id": 1464,
+      "input_dims": [
+        [
+          128,
+          4096,
+          512
+        ],
+        [
+          128,
+          4096,
+          1056
+        ],
+        [
+          128,
+          1056,
+          512
+        ],
+        [],
+        [],
+        [
+          128,
+          4096,
+          512
+        ]
+      ],
+      "input_strides": [
+        [
+          512,
+          65536,
+          1
+        ],
+        [
+          4325376,
+          1056,
+          1
+        ],
+        [
+          0,
+          512,
+          1
+        ],
+        [],
+        [],
+        [
+          512,
+          65536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x32_MI32x32x1_SN_LDSB1_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA0_DTLB0_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA2_G",
+      "label": "attention_sparse_mla_backward",
+      "parent_backward": [
+        "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "autograd::engine::evaluate_function: _SparseGatherSplitCompressedNoKvCatMLAFunctionBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.696645,
+      "external_id": 1290,
+      "input_dims": [
+        [
+          8,
+          4096,
+          1024
+        ],
+        [
+          8,
+          1024,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          1024,
+          8192,
+          1
+        ],
+        [
+          8388608,
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "BmmBackward0",
+        "autograd::engine::evaluate_function: BmmBackward0"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.681765,
+      "external_id": 2058,
+      "input_dims": [
+        [
+          4096,
+          65536
+        ],
+        [
+          65536,
+          1536
+        ]
+      ],
+      "input_strides": [
+        [
+          65536,
+          1
+        ],
+        [
+          1536,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT192x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_q_path_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::bmm",
+      "duration_ms": 0.5304030000000001,
+      "external_id": 1287,
+      "input_dims": [
+        [
+          8,
+          8192,
+          4096
+        ],
+        [
+          8,
+          4096,
+          1024
+        ]
+      ],
+      "input_strides": [
+        [
+          8192,
+          1,
+          65536
+        ],
+        [
+          1024,
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "BmmBackward0",
+        "autograd::engine::evaluate_function: BmmBackward0"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.525764,
+      "external_id": 1248,
+      "input_dims": [
+        [
+          4096,
+          7168
+        ],
+        [
+          7168,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          7168,
+          1
+        ],
+        [
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVWA8_G",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    },
+    {
+      "cpu_op": "aten::mm",
+      "duration_ms": 0.515043,
+      "external_id": 1259,
+      "input_dims": [
+        [
+          7168,
+          4096
+        ],
+        [
+          4096,
+          8192
+        ]
+      ],
+      "input_strides": [
+        [
+          1,
+          7168
+        ],
+        [
+          8192,
+          1
+        ]
+      ],
+      "kernel_name_prefix": "Cijk_Ailk_Bjlk_BBS_BH_Bias_HA_S_SAV_UserArgs_MT256x256x64_MI16x16x1_CMS_SN_LDSB0_AFC0_AFEM1_AFEM1_ASEM1_CLR1_CADS0_DTLA1_DTLB1_DTVA0_DTVB0_EPS0_FDSI0_GRPM1_GRVW",
+      "label": "attention_out_projection_backward",
+      "parent_backward": [
+        "_FP4PackedSimLinearBackward",
+        "autograd::engine::evaluate_function: _FP4PackedSimLinearBackward"
+      ]
+    }
+  ],
+  "phase_backward_cpu_annotation_ms": 46.115512,
+  "read": "The normal backward GEMM bucket is mostly MoE routed-expert VJP Cijk kernels in this single-GPU packed-sim trace, with sparse-MLA backward and dense attention projections making up most of the remaining attention Cijk time. This validates splitting the optimization ladder: MoE grouped training GEMM work is a large slice, but sparse attention/LI backward remains a separate wall outside the MoE-only owner-rank probe.",
+  "scope": "normal loss.backward Cijk/GEMM-family kernels inside phase.backward for one-MI350 S4096 fixed-router packed-sim full-layer trace",
+  "source_summary_artifact": "run_artifacts/single_layer_s4096_fixed_torchtrace_20260601.json",
+  "source_trace": "/tmp/dsv4_single_layer_s4096_fixed_torch_trace_20260601.json copied from do-sonle-kernel raw torch_trace.json",
+  "subsystem_totals": {
+    "attention_cijk_ms": 9.579737000000002,
+    "attention_share_of_cijk_bucket": 0.2648821909643439,
+    "moe_cijk_ms": 26.586292,
+    "moe_share_of_cijk_bucket": 0.7351178090356559,
+    "other_cijk_ms": 7.105427357601002e-15,
+    "other_share_of_cijk_bucket": 1.964668932163108e-16
+  }
+}

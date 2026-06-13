@@ -1,0 +1,84 @@
+{
+  "artifact": "sharedkv_compressed_dkv_bmm_floor_summary_20260602",
+  "created_date": "2026-06-02",
+  "status": "mfma_friendly_accumulation_floor_beats_atomic_path_but_materializes_probs",
+  "scope": "DeepSeek-V4 shared latent-KV sparse MLA backward compressed-prefix dKV accumulation",
+  "source_probe": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py",
+  "remote_workdir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/sharedkv_mechanism_20260602",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "local_count": 0,
+    "csa_count": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "kv_len": 5120
+  },
+  "reference_context": {
+    "query_major_atomic_compressed_only_ms": 11.017240524291992,
+    "query_major_atomic_best_tile_ms": 10.997425079345703,
+    "query_major_profile_split_topk512_full_atomic_ms": 10.894770622253418,
+    "query_major_profile_split_topk512_no_dkv_ms": 1.8989759683609009,
+    "query_major_profile_split_topk512_dkv_reduce_sink_ms": 2.684101104736328,
+    "rocprof_h64n64_atomic_wavefronts": 16777216.0,
+    "rocprof_h64n64_tcc_atomic_dram_32b_requests": 402522112.0
+  },
+  "results": {
+    "s128_fp32_formula_check": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_fp32_20260602.json",
+      "status": "passed",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "float32",
+      "max_abs_diff": 0.0000324249267578125,
+      "median_ms": 0.4206030070781708,
+      "peak_gib": 0.21915102005004883
+    },
+    "s128_mixed_contract_check": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_mixed_20260602.json",
+      "status": "passed",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "max_abs_diff": 0.12979507446289062,
+      "median_ms": 0.36436301469802856,
+      "peak_gib": 0.18887758255004883
+    },
+    "s128_bf16_speed_check": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s128_bf16_20260602.json",
+      "status": "failed_tight_0p2_tolerance_by_0p001",
+      "math_dtype": "bfloat16",
+      "bmm_input_dtype": "bfloat16",
+      "max_abs_diff": 0.2010364532470703,
+      "median_ms": 0.37344199419021606,
+      "peak_gib": 0.16818666458129883
+    },
+    "s4096_mixed_timing_floor": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_mixed_20260602.json",
+      "status": "timing_only",
+      "math_dtype": "float32",
+      "bmm_input_dtype": "bfloat16",
+      "median_ms": 7.065645217895508,
+      "peak_gib": 5.851562976837158,
+      "checksum_norm": 1848.885986328125,
+      "speedup_vs_query_major_atomic_best_tile": 1.5564831853119304
+    },
+    "s4096_bf16_timing_floor": {
+      "artifact": "run_artifacts/sharedkv_compressed_dkv_bmm_floor_s4096_bf16_20260602.json",
+      "status": "timing_only_s128_tight_diff_not_passed",
+      "math_dtype": "bfloat16",
+      "bmm_input_dtype": "bfloat16",
+      "median_ms": 4.756993770599365,
+      "peak_gib": 4.319336414337158,
+      "checksum_norm": 1848.937255859375,
+      "speedup_vs_query_major_atomic_best_tile": 2.3113357442696076
+    }
+  },
+  "commands": {
+    "s128_fp32": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 128 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype fp32 --warmup-iters 1 --timed-iters 3 --json",
+    "s128_mixed": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 128 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --warmup-iters 2 --timed-iters 5 --json",
+    "s4096_mixed": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 4096 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype fp32 --bmm-input-dtype bf16 --warmup-iters 1 --timed-iters 5 --skip-correctness --skip-reference-timing --json",
+    "s4096_bf16": "HIP_VISIBLE_DEVICES=0 CUDA_VISIBLE_DEVICES=0 python3 benchmark_sparse_mla_shared_kv_compressed_dkv_bmm_floor.py --seq-len 4096 --batch 1 --heads 64 --dim 512 --compress-ratio 4 --topk 512 --dtype bf16 --math-dtype bf16 --bmm-input-dtype bf16 --warmup-iters 1 --timed-iters 5 --skip-correctness --skip-reference-timing --json"
+  },
+  "read": "The compressed-prefix dKV accumulation is not inherently an 11 ms operation if it reaches MFMA-friendly GEMM. A materializing batched-GEMM floor drops S4096 from the retained query-major atomic path's roughly 11.0 ms to 7.07 ms with FP32 score/probability math plus BF16 final KxS @ SxD GEMMs, and to 4.76 ms in pure BF16 timing mode. The FP32 formula matches the reference at S128, and the mixed contract passes the existing 0.2 dKV tolerance. Pure BF16 is fast but misses the tight S128 tolerance by 0.001, so it needs either looser tolerance evidence or a better compensated fused path before promotion. This probe is not production because it materializes [B,H,S,K] scores/probs and peaks at 4.3-5.9 GiB at S4096; the implementation direction is a fused/bucketed MFMA compressed-dKV kernel that preserves query-major reuse and avoids per-row global atomics without materializing the full probability tensor."
+}

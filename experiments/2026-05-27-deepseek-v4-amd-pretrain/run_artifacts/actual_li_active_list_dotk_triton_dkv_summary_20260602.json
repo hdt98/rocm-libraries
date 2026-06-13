@@ -1,0 +1,146 @@
+{
+  "artifact": "actual_li_active_list_dotk_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Actual LightningIndexer active-list dot-K compressed-dKV accumulator diagnostic on MI350.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k",
+  "status": "s512_positive_s4096_layer2_rejected_for_dense_active_group_route_dot",
+  "read": "The dot-K variant batches selected keys before routing them into active compressed groups: contrib[K,D] = grad_logits[:,K]^T @ q[:,D] + probs[:,K]^T @ grad_output[:,D], then route[active_group,K] @ contrib. It keeps the same materialized probs/grad_logits diagnostic contract as the scalar active-list probe. This is a strong S128/S512 accumulator-body improvement, but it is not a production S4096 layer-2 solution. At S512 layer2 it improves the accumulator from the scalar active-list 3.134 ms to 0.416 ms and beats the materialized PyTorch reference at 1.58 ms. At S4096 layer2, the active-group count is too high: 515.9 mean and 1024 max active groups per tile. The route dot becomes dense over hundreds of groups, so the best timing-only point is still 47.26-47.49 ms, far above the current query-major atomic slice. The next kernel must avoid dense active-group route matrices at the hard CR4/topk512 layer, likely by using sparse/segmented route accumulation inside the recompute tile or fusing LI/compressor gradients before dKV writes.",
+  "diagnostic_contract": {
+    "uses_materialized_probs": true,
+    "uses_materialized_grad_logits": true,
+    "uses_active_group_lists": true,
+    "fuses_score_prob_recompute": false,
+    "production_candidate": false
+  },
+  "s128_layer2": {
+    "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s128_layer2_sc16_u32d16h64k16_20260602.json",
+    "seq_len": 128,
+    "seq_chunk": 16,
+    "block_u": 32,
+    "block_k": 16,
+    "active_blocks": 1,
+    "status": "ok",
+    "max_abs_diff": 0.08408927917480469,
+    "candidate_ms": 0.13696199655532837,
+    "pytorch_reference_ms": 0.4938470125198364,
+    "scalar_active_list_best_ms": 0.38616499304771423,
+    "speedup_vs_scalar_active_list_x": 2.819830562409693,
+    "speedup_vs_pytorch_reference_x": 3.605887107032024,
+    "atomic_element_reduction_x": 14.0
+  },
+  "s512_layer2": {
+    "best_artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s512_layer2_sc32_u128d16h64k32_20260602.json",
+    "seq_len": 512,
+    "seq_chunk": 32,
+    "block_u": 128,
+    "active_blocks": 1,
+    "status": "ok",
+    "max_abs_diff": 0.08511638641357422,
+    "best_candidate_ms": 0.41608500480651855,
+    "best_block_k": 32,
+    "pytorch_reference_ms": 1.58086097240448,
+    "scalar_active_list_best_ms": 3.1342430114746094,
+    "speedup_vs_scalar_active_list_x": 7.533654167366056,
+    "speedup_vs_pytorch_reference_x": 3.799007502529225,
+    "atomic_element_reduction_x": 30.0,
+    "points": [
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s512_layer2_sc32_u128d16h64k16_20260602.json",
+        "block_k": 16,
+        "candidate_ms": 0.6441670060157776,
+        "pytorch_reference_ms": 1.5766170024871826
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s512_layer2_sc32_u128d16h64k32_20260602.json",
+        "block_k": 32,
+        "candidate_ms": 0.41608500480651855,
+        "pytorch_reference_ms": 1.58086097240448
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s512_layer2_sc32_u128d16h64k64_20260602.json",
+        "block_k": 64,
+        "candidate_ms": 0.4162850081920624,
+        "pytorch_reference_ms": 1.5774600505828857
+      }
+    ]
+  },
+  "s4096_layer2_timing_only": {
+    "best_artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc64_u512d16h64k64_timing_20260602.json",
+    "best_candidate_ms": 47.259422302246094,
+    "best_shape": {
+      "seq_chunk": 64,
+      "block_u": 512,
+      "block_k": 64,
+      "active_blocks": 2
+    },
+    "current_query_major_full_atomic_ms": 11.080920219421387,
+    "current_query_major_estimated_global_dkv_accumulation_ms": 8.285890102386475,
+    "active_groups_mean_nonempty": 519.90625,
+    "active_groups_max": 1024,
+    "materialized_workspace_gib": 1.017578125,
+    "peak_memory_gib": 2.5647025108337402,
+    "points": [
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc32_u128d16h64k64_timing_20260602.json",
+        "seq_chunk": 32,
+        "block_u": 128,
+        "block_k": 64,
+        "active_blocks": 8,
+        "candidate_ms": 98.79582214355469,
+        "atomic_element_reduction_x": 23.813051840857806
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc32_u512d16h64k64_timing_20260602.json",
+        "seq_chunk": 32,
+        "block_u": 512,
+        "block_k": 64,
+        "active_blocks": 2,
+        "candidate_ms": 47.487674713134766,
+        "atomic_element_reduction_x": 23.813051840857806
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc32_u1024d16h64k64_timing_20260602.json",
+        "seq_chunk": 32,
+        "block_u": 1024,
+        "block_k": 64,
+        "active_blocks": 1,
+        "candidate_ms": 125.00615692138672,
+        "atomic_element_reduction_x": 23.813051840857806
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc64_u512d16h64k64_timing_20260602.json",
+        "seq_chunk": 64,
+        "block_u": 512,
+        "block_k": 64,
+        "active_blocks": 2,
+        "candidate_ms": 47.259422302246094,
+        "atomic_element_reduction_x": 47.254673318506946
+      },
+      {
+        "artifact": "run_artifacts/actual_li_active_list_dotk_triton_dkv_s4096_layer2_sc32_u512d16h64k128_timing_20260602.json",
+        "seq_chunk": 32,
+        "block_u": 512,
+        "block_k": 128,
+        "active_blocks": 2,
+        "candidate_ms": 125.27352142333984,
+        "atomic_element_reduction_x": 23.813051840857806
+      }
+    ]
+  },
+  "decision": {
+    "promote_dotk_for_s512_diagnostic": true,
+    "promote_dotk_for_s4096_layer2": false,
+    "why_not": [
+      "The hard layer2 S4096 route has hundreds of active compressed groups per query tile, so route[active_group,K] becomes a dense 512-1024 row matrix.",
+      "Increasing block_u avoids duplicated KxD head-dot work up to U=512, but U=1024 over-pressures the route/accumulator tile.",
+      "Increasing seq_chunk improves modeled global write reduction but does not reduce the dense route-dot cost.",
+      "Increasing block_k to 128 over-pressures the route dot and regresses."
+    ],
+    "next_kernel_direction": [
+      "Keep active-group detection/list packing and dot-K selected-key batching as useful sub-mechanisms.",
+      "Avoid dense active-group route matrices for layer2 S4096.",
+      "Try sparse/segmented route accumulation inside the query-major recompute tile, where only actual selected groups update.",
+      "Fuse target-probability, KL derivative, compressor gradient, and dKV reduction before emitting global dKV writes."
+    ]
+  }
+}

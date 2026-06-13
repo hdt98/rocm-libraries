@@ -1,0 +1,132 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_20260602",
+  "created_date": "2026-06-02",
+  "status": "passed_two_step_8x_target_shape_sharedkv_li_triton_and_triton_swiglu",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_steps2_20260602",
+  "check_config_run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_checkconfig_20260602",
+  "command_shape": "env RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_steps2_20260602 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_SCATTER_MODE=auto CANARY_LI_KL_BACKEND=triton_tl_dot MASTER_PORT=29583 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_steps2_20260602/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_steps2_20260602",
+  "rank0_structured_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_steps2_20260602/structured_logs/training.global_rank_0.20260602-053300-WEX727.jsonl",
+  "shape": {
+    "model_spec": "deepseek_v4 flash_4layer",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "mbs": 1,
+    "gbs": 128,
+    "seq_len": 4096,
+    "steps": 2,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 524288
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "padded",
+    "CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND": "triton",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_SCATTER_MODE": "auto",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "full",
+    "CANARY_CHECKPOINT_ENABLE": "false"
+  },
+  "check_config": {
+    "model_spec": "deepseek_v4 flash_4layer",
+    "shape_line": "shape 1 128 4096 2",
+    "parallelism_line": "parallelism -1 8",
+    "moe_comm_backend": "mori",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G",
+    "sharedkv_scatter_mode": "auto",
+    "sharedkv_scatter_env": "auto",
+    "attention_sparse_backward_mode_by_layer": [
+      "shared_kv",
+      "shared_kv",
+      "shared_kv",
+      "shared_kv"
+    ],
+    "attention_sparse_threshold_by_layer": [
+      4096,
+      4096,
+      4096,
+      4096
+    ],
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "step1": {
+    "loss": 12.22464,
+    "grad_norm": 13.1875,
+    "memory_gib_range": [
+      72.22,
+      79.63
+    ],
+    "tokens_per_gpu_s_range": [
+      1634,
+      1636
+    ],
+    "tflops_per_gpu_range": [
+      30.92,
+      30.96
+    ],
+    "mfu_pct": 1.34
+  },
+  "step2": {
+    "loss": 8.50602,
+    "grad_norm": 24.0,
+    "memory_gib_range": [
+      81.61,
+      94.17
+    ],
+    "tokens_per_gpu_s": 2648,
+    "node_tokens_per_s": 21184,
+    "tflops_per_gpu": 50.11,
+    "mfu_pct": 2.17,
+    "global_valid_tokens": 524288,
+    "structured_step_time_ms_rank0": 24748.188848956488,
+    "implied_step_time_s": 24.75
+  },
+  "loss_movement": [
+    12.22464,
+    8.50602
+  ],
+  "normalized_8x_target": {
+    "tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "step_time_s_range": [
+      27,
+      30
+    ],
+    "step1": "below_target_warmup",
+    "step2": "above_target"
+  },
+  "comparison_to_prior_safeauto": {
+    "prior_artifact": "run_artifacts/torchtitan_mori_sharedkv_li_triton_8x_s4096_gbs128_safeauto_20260602.json",
+    "prior_step2_tokens_per_gpu_s": 2648,
+    "prior_loss_movement": [
+      12.18523,
+      8.48299
+    ],
+    "this_step2_tokens_per_gpu_s": 2648,
+    "this_loss_movement": [
+      12.22464,
+      8.50602
+    ],
+    "read": "Triton SwiGLU owner-rank VJP composes with the shared-KV sparse path at 8x target shape but does not improve end-to-end throughput versus the prior padded-SwiGLU safe-auto run."
+  },
+  "read": "This is the composed 8x target-shape canary with both current gap-closure branches active: shared-KV sparse attention plus LI triton_tl_dot, and MORI+AITER routed padded MoE with Triton SwiGLU owner-rank VJP. It passes two optimizer steps with clean process-group teardown and target-band step-2 throughput, but the unchanged throughput versus the prior safe-auto run says the remaining wall is not solved by SwiGLU vector fusion alone.",
+  "promotion_read": "Retain as integration evidence only. Promotion still needs final fused sparse MLA/LI/compressor backward plus a production grouped MoE training-GEMM backward path."
+}

@@ -1,0 +1,135 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_hotexpert_telemetry_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+  "date": "2026-06-06",
+  "status": "completed_two_steps_diagnostic_not_promoted",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_hotexpert_telemetry_8x_s4096_gbs128_mbs4_heap96_steps2_20260606",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_hotexpert_telemetry_8x_s4096_gbs128_mbs4_heap96_steps2_20260606/docker-run.log",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 8,
+    "ep": 8,
+    "activation_checkpointing": "none",
+    "mori_shmem_heap_size": "96G",
+    "moe_comm_backend": "standard"
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.19977,
+      "grad_norm": 20.375,
+      "tokens_per_gpu_s": 1905,
+      "tflops_per_gpu": 96.45,
+      "max_logged_memory_gib": 153.56
+    },
+    "step_2": {
+      "loss": 9.30386,
+      "grad_norm": 59.5,
+      "tokens_per_gpu_s": 6270,
+      "node_tokens_s": 50160,
+      "tflops_per_gpu": 317.45,
+      "mfu_pct": 13.74,
+      "max_logged_memory_gib": 193.39
+    }
+  },
+  "additive_step2_rankmax_ms": {
+    "forward_backward_model_forward": 825.1569,
+    "forward_backward_loss": 106.2198,
+    "forward_backward_backward": 1507.7598,
+    "train_step_forward_backward_call": 2434.0554
+  },
+  "hot_expert_telemetry": {
+    "sidecar": "mori_aiter_timing.jsonl",
+    "records": 768,
+    "bad_jsonl_lines": 0,
+    "record_kind": "standard_ep_hot_expert_stats",
+    "local_vjp_assignments": {
+      "min": 28071,
+      "p50": 95848,
+      "mean": 98304,
+      "p90": 137070,
+      "max": 227716
+    },
+    "local_vjp_max_count": {
+      "min": 5878,
+      "p50": 20938.5,
+      "mean": 28411.3828125,
+      "p90": 58878,
+      "max": 129680
+    },
+    "local_vjp_mean_count": {
+      "min": 877.21875,
+      "p50": 2995.25,
+      "mean": 3072,
+      "p90": 4283.4375,
+      "max": 7116.125
+    },
+    "local_vjp_max_over_mean_count": {
+      "min": 2.932589826475247,
+      "p50": 7.3996447406268935,
+      "mean": 9.383478801818589,
+      "p90": 16.820220628966652,
+      "max": 30.607752043134727
+    },
+    "local_vjp_hot_expert_topk_rows": {
+      "min": 28002,
+      "p50": 74555.5,
+      "mean": 82339.62109375,
+      "p90": 128498,
+      "max": 224275
+    },
+    "local_vjp_hot_expert_topk_share": {
+      "min": 0.5625258589777774,
+      "p50": 0.861573114712308,
+      "mean": 0.8394181741908114,
+      "p90": 0.9977493926341049,
+      "max": 0.9999797082039731
+    },
+    "balanced_moe_top1_remote_rows": {
+      "min": 5155,
+      "p50": 18289.5,
+      "mean": 24858.486979166668,
+      "p90": 51463,
+      "max": 113495
+    },
+    "balanced_moe_topk_remote_rows": {
+      "min": 24225,
+      "p50": 65064.5,
+      "mean": 72059.73958333333,
+      "p90": 112388,
+      "max": 195994
+    },
+    "balanced_moe_topk_remote_share": {
+      "min": 0.4895598687053502,
+      "p50": 0.7513035912935991,
+      "mean": 0.7347926727215248,
+      "p90": 0.8726528997876681,
+      "max": 0.8884874819998484
+    },
+    "worst_record": {
+      "rank": 7,
+      "local_rank": 7,
+      "call_id": 78,
+      "owner_ep_rank": 7,
+      "expert_start": 224,
+      "expert_end": 256,
+      "local_vjp_assignments": 227619,
+      "local_vjp_max_count": 129428,
+      "local_vjp_mean_count": 7113.09375,
+      "local_vjp_max_over_mean_count": 18.19573937149359,
+      "local_vjp_hot_expert_global_ids": [253, 255, 225, 246, 231, 244, 234, 240],
+      "local_vjp_hot_expert_counts": [129428, 27100, 23377, 16892, 15420, 4548, 4117, 3393],
+      "local_vjp_hot_expert_remote_counts": [113288, 23461, 20575, 14859, 13510, 3711, 3630, 2960],
+      "balanced_moe_top1_remote_rows": 113288,
+      "balanced_moe_topk_remote_rows": 195994,
+      "balanced_moe_topk_remote_share": 0.8610616864145787
+    }
+  },
+  "read": "The retained standard EP path shows exactly the kind of source-rank/hot-expert skew that MindSpeed balanced_moe targets. On average, the top 8 local experts hold 83.94% of routed rows, and an estimated 73.48% of local routed rows are remote-source hot rows that a hot-expert replica path could move away from the true owner. Worst observed record has expert 253 with 129,428 rows, 113,288 of them remote-source. This does not prove a speedup yet, but it makes a concrete AMD A/B: split top-N remote-hot rows, compute them on helper ranks with replicated weights, reduce dW13/dW2 back to the owner, and compare owner-tail plus combine wait."
+}

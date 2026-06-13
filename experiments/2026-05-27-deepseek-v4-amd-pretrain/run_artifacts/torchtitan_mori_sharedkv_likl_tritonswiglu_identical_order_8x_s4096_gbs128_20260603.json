@@ -1,0 +1,107 @@
+{
+  "artifact": "torchtitan_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_20260603",
+  "created_date": "2026-06-03",
+  "status": "passed_two_steps",
+  "purpose": "Clean non-profiled 8x target-shape validation for the MORI identical-dispatch-order shortcut after the profiler trace showed the synchronization tax removal.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "run_id": "torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_steps2_20260603",
+  "command_shape": "RUN_ID=torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_steps2_20260603 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 GPUS_PER_NODE=8 CANARY_EP=8 CANARY_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_MBS=1 CANARY_STEPS=2 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=full CANARY_SPARSE_MLA_MAX_SEQ_LEN=4096 CANARY_SPARSE_MLA_BACKWARD_MODE=shared_kv CANARY_SPARSE_MLA_KERNEL_MODULE=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend CANARY_SHAREDKV_SCATTER_MODE=auto CANARY_LI_KL_BACKEND=triton_tl_dot CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_ASSUME_IDENTICAL_DISPATCH_ORDER=1 CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_REQUIRE_IDLE_GPUS=true MASTER_PORT=29583 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+  "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_steps2_20260603/docker-run.log",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_sharedkv_likl_tritonswiglu_identical_order_8x_s4096_gbs128_steps2_20260603",
+  "shape": {
+    "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+    "distributed": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+    "visible_devices": "0,1,2,3,4,5,6,7",
+    "gpus": 8,
+    "fsdp": 8,
+    "ep": 8,
+    "seq_len": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 524288,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false
+  },
+  "sparse_mla": {
+    "backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "default",
+    "sharedkv_scatter_mode": "auto",
+    "kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "moe": {
+    "comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_aiter_local_vjp_swiglu_backend": "triton",
+    "mori_aiter_assume_identical_dispatch_order": true,
+    "mori_aiter_op_cache_mode": "backward",
+    "mori_shmem_heap_size": "32G"
+  },
+  "results": {
+    "steps": {
+      "1": {
+        "loss": 12.15004,
+        "grad_norm": 10.8125,
+        "memory_gib_range": [
+          72.34,
+          74.52
+        ],
+        "tokens_per_gpu_s_range": [
+          1666,
+          1670
+        ],
+        "tflops_per_gpu_range": [
+          31.52,
+          31.59
+        ],
+        "mfu_pct_range": [
+          1.36,
+          1.37
+        ]
+      },
+      "2": {
+        "loss": 9.69551,
+        "grad_norm": 62.25,
+        "memory_gib_range": [
+          82.36,
+          201.17
+        ],
+        "tokens_per_gpu_s_range": [
+          2720,
+          2720
+        ],
+        "tokens_per_gpu_s": 2720,
+        "tflops_per_gpu_range": [
+          51.47,
+          51.47
+        ],
+        "tflops_per_gpu": 51.47,
+        "mfu_pct_range": [
+          2.23,
+          2.23
+        ],
+        "mfu_pct": 2.23
+      }
+    },
+    "teardown": "process_groups_destroyed_cleanly"
+  },
+  "comparison_to_prior_8x_tritonswiglu": {
+    "prior_artifact": "run_artifacts/torchtitan_mori_sharedkv_likl_tritonswiglu_8x_s4096_gbs128_20260602.json",
+    "prior_step2_tokens_per_gpu_s": 2648,
+    "this_step2_tokens_per_gpu_s": 2720,
+    "absolute_gain_tokens_per_gpu_s": 72,
+    "relative_gain_pct": 2.72,
+    "target_tokens_per_gpu_s_range": [
+      2200,
+      2400
+    ],
+    "target_read": "Step2 is above the normalized throughput target band, but MFU remains low because the model is a 4-layer proxy and the flops accounting is not a final full-model MFU proof."
+  },
+  "related_profile_artifact": "run_artifacts/torchtitan_ep8_deeper_mori_ranges_identical_order_20260603.json",
+  "read": "The shortcut is stable for a clean two-step target-shape 8x canary and improves step2 throughput from the retained 2648 tok/GPU/s line to 2720 tok/GPU/s. The paired profiler artifact attributes the saved time to removal of repeated MORI receive-count/source-position synchronization; remaining MoE backward work is local padded VJP, especially SwiGLU recompute ranges."
+}

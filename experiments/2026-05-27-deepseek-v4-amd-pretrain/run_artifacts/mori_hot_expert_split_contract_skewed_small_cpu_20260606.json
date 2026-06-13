@@ -1,0 +1,151 @@
+{
+  "args": {
+    "atol": 2e-05,
+    "experts": 32,
+    "hidden": 64,
+    "hot_experts": 2,
+    "intermediate": 32,
+    "output": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/hot_expert_split_contract_20260606/mori_hot_expert_split_contract_skewed_small_cpu_20260606.json",
+    "route_pattern": "skewed",
+    "rtol": 2e-05,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 16,
+    "topk": 4,
+    "world_size": 8
+  },
+  "artifact": "mori_hot_expert_split_contract_probe",
+  "device": "cpu",
+  "diffs": {
+    "topk_weight": {
+      "actual_finite": true,
+      "expected_finite": true,
+      "max_abs": 1.1937117960769683e-12,
+      "mean_abs": 1.1513012765362873e-13,
+      "rel_l2": 2.0139350189691337e-07,
+      "shape": [
+        8,
+        16,
+        4
+      ]
+    },
+    "w1": {
+      "actual_finite": true,
+      "expected_finite": true,
+      "max_abs": 4.547473508864641e-12,
+      "mean_abs": 1.0871975520375388e-13,
+      "rel_l2": 1.8843088845900262e-07,
+      "shape": [
+        32,
+        32,
+        64
+      ]
+    },
+    "w2": {
+      "actual_finite": true,
+      "expected_finite": true,
+      "max_abs": 2.7284841053187847e-12,
+      "mean_abs": 1.210586264479424e-13,
+      "rel_l2": 2.000336853406163e-07,
+      "shape": [
+        32,
+        64,
+        32
+      ]
+    },
+    "w3": {
+      "actual_finite": true,
+      "expected_finite": true,
+      "max_abs": 2.7284841053187847e-12,
+      "mean_abs": 1.0389861985083543e-13,
+      "rel_l2": 1.8025291761395472e-07,
+      "shape": [
+        32,
+        32,
+        64
+      ]
+    },
+    "x": {
+      "actual_finite": true,
+      "expected_finite": true,
+      "max_abs": 3.183231456205249e-12,
+      "mean_abs": 4.3354035639264765e-13,
+      "rel_l2": 1.5544073814322504e-07,
+      "shape": [
+        8,
+        16,
+        64
+      ]
+    }
+  },
+  "exec_load_after": {
+    "loads": [
+      48,
+      48,
+      50,
+      50,
+      52,
+      52,
+      50,
+      162
+    ],
+    "max": 162,
+    "max_over_mean": 2.53125,
+    "mean": 64.0
+  },
+  "next_gate": "Use this split contract to implement top-1/top-2 helper VJP around MORI route metadata: helper/source ranks compute remote-hot rows, then dW13/dW2 are reduced to the true owner and dX/dTopK are placed at the original source token/route.",
+  "owner_load_before": {
+    "loads": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      32,
+      32,
+      288
+    ],
+    "max": 288,
+    "max_over_mean": 4.5,
+    "mean": 64.0
+  },
+  "passed": true,
+  "remote_hot_rows": 126,
+  "scope": "Reference PyTorch contract check for Ascend-style balanced_moe remote-hot helper execution. This proves gradient equivalence of the split, not MORI communication performance.",
+  "selected_hot_experts": [
+    {
+      "global_expert_id": 28,
+      "owner_local_rows": 9,
+      "owner_rank": 7,
+      "remote_hot_rows": 63,
+      "rows": 72,
+      "source_rank_counts": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10,
+        9,
+        9
+      ]
+    },
+    {
+      "global_expert_id": 29,
+      "owner_local_rows": 9,
+      "owner_rank": 7,
+      "remote_hot_rows": 63,
+      "rows": 72,
+      "source_rank_counts": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10,
+        9,
+        9
+      ]
+    }
+  ]
+}

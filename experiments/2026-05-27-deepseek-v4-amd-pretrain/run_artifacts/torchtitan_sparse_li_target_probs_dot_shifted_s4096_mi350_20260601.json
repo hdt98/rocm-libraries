@@ -1,0 +1,107 @@
+{
+  "scope": "triton_sparse_li_target_probs_dot_probe",
+  "status": "passed",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "main_heads": 64,
+    "head_dim": 512,
+    "groups": 1024,
+    "topk": 512,
+    "compress_ratio": 4,
+    "index_pattern": "shifted"
+  },
+  "kernel": {
+    "block_h": 16,
+    "block_k": 512,
+    "block_d": 64,
+    "num_warps": 8
+  },
+  "correctness": {
+    "checked": false,
+    "max_abs_diff": {},
+    "atol": 0.02,
+    "valid_fraction": 0.749755859375,
+    "target_probs_norm": 5.6412153244018555
+  },
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "samples_ms": [
+        1.011765956878662,
+        0.9767670035362244,
+        0.9596859812736511,
+        0.9697669744491577,
+        0.9527270197868347,
+        0.9502459764480591,
+        0.943166971206665,
+        0.943526029586792,
+        0.9434059858322144,
+        0.9340469837188721,
+        0.922685980796814,
+        0.9247660040855408,
+        0.9216060042381287,
+        0.9203259944915771,
+        0.9152870178222656,
+        0.9082459807395935,
+        0.9061660170555115,
+        0.9070069789886475,
+        0.9012460112571716,
+        0.90488600730896
+      ],
+      "mean_ms": 0.9358663439750672,
+      "median_ms": 0.9294064939022064,
+      "min_ms": 0.9012460112571716,
+      "max_ms": 1.011765956878662,
+      "stdev_ms": 0.028667732599423165
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        1.0618270607665181,
+        0.9864659514278173,
+        0.9726869175210595,
+        0.9796569356694818,
+        0.9624260710552335,
+        0.9626370156183839,
+        0.9521360043436289,
+        0.9531759424135089,
+        0.952776987105608,
+        0.943036051467061,
+        0.9343069978058338,
+        0.9341760305687785,
+        0.9309459710493684,
+        0.9296070784330368,
+        0.9241669904440641,
+        0.9176869643852115,
+        0.9154160507023335,
+        0.9161269990727305,
+        0.9105460485443473,
+        0.9162070928141475
+      ],
+      "mean_ms": 0.9478005580604076,
+      "median_ms": 0.9386715246364474,
+      "min_ms": 0.9105460485443473,
+      "max_ms": 1.0618270607665181,
+      "stdev_ms": 0.035203597240382856
+    },
+    "logical_flops": 137438953472,
+    "logical_tflops": 147.87819363618686
+  },
+  "workspace": {
+    "triton": {
+      "target_probs_bytes": 8388608,
+      "selected_main_k_bytes": 0,
+      "target_logits_bytes": 0,
+      "per_head_probs_bytes": 0
+    },
+    "reference": null,
+    "peak_memory_bytes": 303038464,
+    "peak_memory_gib": 0.2822265625,
+    "avoids_selected_main_k": true,
+    "avoids_per_head_target_logits": true
+  },
+  "promotion_read": "This isolates target_probs construction for the LI KL producer. It uses shared latent compressed_k with a gathered tl.dot head tile, then sums per-head softmax probabilities directly to [B,S,K]. It does not compute LI index logits or dQ/dK/dW."
+}

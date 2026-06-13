@@ -1,0 +1,175 @@
+{
+  "artifact": "torchtitan_tilelang_source_boundary_materialization_4x_s4096_20260604",
+  "created_date": "2026-06-04",
+  "status": "materialized_step2_uplift_not_retained",
+  "purpose": "Record the first TorchTitan e2e materialization of the TileLang source-boundary sparse-MLA backward branch and the reason it is not retained yet.",
+  "host": "do-sonle5-mi350-gpu",
+  "runtime_image": "sonle5/nexus-titan-rocm722-mori-tilelang:20260604",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "shape": {
+    "model": "DeepSeek-V4-Flash_4layer_sparse_sharedkv_compressed_layers",
+    "distributed": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+    "visible_devices": "0,1,2,3",
+    "gpus": 4,
+    "fsdp": 4,
+    "ep": 4,
+    "seq_len": 4096,
+    "global_batch_size": 64,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "tokens_per_step": 262144,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false
+  },
+  "code_changes_tested": [
+    {
+      "file": "tools/dsv4_runtime_probe/tilelang_sparse_mqa_bwd_diagnostic.py",
+      "change": "Added/used source-boundary TileLang export that consumes q, kv, dO, indices, valid, output-derived delta, lse, and sink directly; changed Nexus-image exponential lowering from TileLang exp/exp2/__exp to call_pure_extern('float32', 'exp2f', x)."
+    },
+    {
+      "file": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+      "change": "Added tilelang_source_hsk_dkv backward mode, which bypasses PyTorch selected_kv/probs/grad_logits materialization and feeds TileLang selected-limit dKV from exported BF16 HSK tensors."
+    },
+    {
+      "file": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+      "change": "No retained semantic change in the final synced state. A temporary LDS atomic and full-HSK source-offset experiment were rejected after verifier/e2e testing."
+    }
+  ],
+  "verifier": {
+    "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_source_hsk_dkv_s128_h64_d512_l16_k128_nexusimage_exp2f_20260604.json",
+    "result": "compiled_and_ran_in_nexus_image",
+    "timing_ms": {
+      "explicit_pytorch_median": 1.2472,
+      "tilelang_source_hsk_dkv_median": 4.5475
+    },
+    "parity": {
+      "dq_max_abs": 0.494140625,
+      "dkv_local_max_abs": 0.015625,
+      "dkv_compressed_vs_tilelang_bf16_ref_max_abs": 1.3828125,
+      "dkv_compressed_vs_tilelang_bf16_ref_mean_abs": 0.1980522275,
+      "tilelang_bf16_ref_vs_explicit_ref_max_abs": 0.03125
+    },
+    "read": "The export path compiles after exp2f lowering, but compressed dKV parity remains non-clean versus the packed BF16 reference. Treat e2e numbers as a performance probe, not a retained correctness baseline."
+  },
+  "e2e_runs": {
+    "sliced_hsk_source_boundary": {
+      "run_id": "torchtitan_dsv4_tilelang_source_hsk_exp2f_4x_s4096_gbs64_steps3_20260604",
+      "status": "completed_not_retained",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_source_hsk_exp2f_4x_s4096_gbs64_steps3_20260604",
+      "rank0_structured_log": "run_artifacts/torchtitan_dsv4_tilelang_source_hsk_exp2f_4x_s4096_gbs64_steps3_rank0_20260604.jsonl",
+      "steps": {
+        "1": {
+          "loss": 12.30779,
+          "grad_norm": 12.8125,
+          "tflops_per_gpu_range": [27.98, 28.05],
+          "tokens_per_gpu_s_range": [1479, 1482],
+          "memory_gib_range": [83.63, 95.78]
+        },
+        "2": {
+          "loss": 8.92717,
+          "grad_norm": 23.375,
+          "tflops_per_gpu": 82.50,
+          "tokens_per_gpu_s": 4360,
+          "memory_gib_range": [116.91, 164.33],
+          "read": "Best clean comparable step; this is 11.8% over the prior safe-auto 4x step-2 baseline of 73.81 TFLOPs/GPU."
+        },
+        "3": {
+          "loss": 18.06740,
+          "grad_norm": 45.0,
+          "tflops_per_gpu": 55.95,
+          "tokens_per_gpu_s": 2957,
+          "memory_gib_range": [163.79, 249.46],
+          "memory_allocation_retries": 1,
+          "read": "Rejected as retained baseline: loss spiked, memory approached card limit on two ranks, and throughput fell below prior safe-auto baseline."
+        }
+      },
+      "rank0_fwd_bwd_microbatch_ms": {
+        "step1": {
+          "count": 16,
+          "sum": 41089.41,
+          "median": 705.32,
+          "max": 30533.37,
+          "note": "Includes first-step JIT/compile tail."
+        },
+        "step2": {
+          "count": 16,
+          "sum": 12418.60,
+          "median": 776.11,
+          "max": 784.85
+        },
+        "step3": {
+          "count": 16,
+          "sum": 19280.02,
+          "median": 1020.33,
+          "max": 2965.00,
+          "read": "Step-3 slowdown is inside fwd_bwd, not dataloader/optimizer."
+        }
+      }
+    },
+    "full_hsk_source_offset": {
+      "run_id": "torchtitan_dsv4_tilelang_source_hsk_fullhsk_4x_s4096_gbs64_steps3_20260604",
+      "status": "rejected_oom_during_step3",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_tilelang_source_hsk_fullhsk_4x_s4096_gbs64_steps3_20260604",
+      "rank0_structured_log": "run_artifacts/torchtitan_dsv4_tilelang_source_hsk_fullhsk_4x_s4096_gbs64_steps3_rank0_20260604.jsonl",
+      "steps": {
+        "1": {
+          "loss": 12.28383,
+          "tflops_per_gpu_range": [26.13, 26.21],
+          "memory_gib_range": [79.35, 105.02]
+        },
+        "2": {
+          "loss": 8.98060,
+          "grad_norm": 22.25,
+          "tflops_per_gpu": 80.05,
+          "tokens_per_gpu_s": 4230,
+          "memory_gib_range": [130.21, 157.20]
+        },
+        "3": {
+          "status": "failed",
+          "symptom": "HSA_STATUS_ERROR_OUT_OF_RESOURCES during activation-checkpoint recompute/MORI forward inside step-3 backward",
+          "available_free_mem_at_abort_mb": 184
+        }
+      },
+      "rank0_fwd_bwd_microbatch_ms": {
+        "step1": {
+          "count": 16,
+          "sum": 44169.32,
+          "median": 713.43,
+          "max": 33470.19
+        },
+        "step2": {
+          "count": 16,
+          "sum": 12847.05,
+          "median": 802.69,
+          "max": 816.26
+        },
+        "step3_before_abort": {
+          "count": 7,
+          "sum": 9138.54,
+          "median": 1033.03,
+          "max": 2655.08
+        }
+      }
+    }
+  },
+  "comparison": {
+    "prior_safe_auto_4x_step2_tflops_per_gpu": 73.81,
+    "source_boundary_best_step2_tflops_per_gpu": 82.50,
+    "step2_uplift_percent": 11.78,
+    "active_4x_target_tflops_per_gpu": 277.0,
+    "best_step2_ratio_to_target": 0.2978,
+    "speedup_needed_from_best_step2_to_target": 3.36
+  },
+  "decision": {
+    "retain_as_baseline": false,
+    "keep_as_speed_branch": true,
+    "reason": "The branch proves TorchTitan can enter a source-boundary TileLang sparse-MLA backward and materialize a step-2 throughput uplift, but it still exports large BF16 HSK slabs, has non-clean compressed-dKV verifier parity, and regresses/OOMs by step 3.",
+    "next_required_kernel_work": [
+      "Fuse export + dKV consumption so q/dO/kv/indices/lse feed one TileLang sparse-MLA backward boundary without global HSK probability/scaled-dP slabs.",
+      "Produce dQ and compressed/local dKV in the same source-boundary schedule or use a compact per-route partial format with a bounded-memory final reducer.",
+      "Add target-shape verifier parity against explicit PyTorch for compressed dKV using the actual LI layer-2 route, not just synthetic S128 random routes.",
+      "Only rerun 4x/8x TFLOPs after the fused/no-HSK branch removes the step-3 memory growth."
+    ]
+  },
+  "dependency_pin_changes": []
+}

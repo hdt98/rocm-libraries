@@ -1,0 +1,138 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "read": "TileLang query-major compact partial producer. This is a concrete reduced-write dKV kernel: it accumulates by precomputed active compressed-group slot inside the CTA, and writes compact partial rows instead of one selected row per token/topk pair. scalar_reduced is the working compact-row/writeback gate; mfma_reduced is the intended TileLang GEMM contribution body and currently tests the MI350 lowering path. It uses diagnostic materialized probs and grad_logits; QK/PV recompute is intentionally outside this gate. This run folds the compact partial rows into final [groups, D] dKV with torch.index_add_ inside the timed callable, so it measures usable final-dKV output for integration comparison. The fold is a PyTorch diagnostic, not a TileLang final reducer.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 128,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 640,
+    "valid_topk": 512,
+    "token_block": 32,
+    "selected_window": 160,
+    "group_panel_size": 256,
+    "block_k": 32,
+    "block_d": 64,
+    "row_block": 8,
+    "threads": 256,
+    "math_mode": "mfma_reduced",
+    "route_pattern": "panel_capacity_random",
+    "cluster_width": 640,
+    "cluster_stride": 4,
+    "output_layout": "[groups, D]",
+    "fold_final_dkv": true
+  },
+  "compact_route": {
+    "raw_selected_rows": 65536,
+    "padded_selected_rows": 81920,
+    "panel_valid_pairs_before_overflow": 65536,
+    "panel_overflow_count": 0,
+    "panel_overflow_fraction": 0.0,
+    "panel_capacity": 160,
+    "panel_count": 4,
+    "active_partial_rows": 4096,
+    "output_partial_rows": 1024,
+    "padded_partial_rows": 4096,
+    "write_reduction_x": 16.0,
+    "padded_write_reduction_x": 16.0,
+    "token_tiles": 4,
+    "selected_tiles": 4,
+    "route_tiles": 16,
+    "max_active_groups": 256,
+    "active_count_mean": 256.0,
+    "active_count_min": 256,
+    "active_count_max": 256,
+    "partials_bytes": 8388608,
+    "partials_mib": 8.0,
+    "output_partials_bytes": 2097152,
+    "output_partials_mib": 2.0,
+    "final_dkv_bytes": 2097152,
+    "final_dkv_mib": 2.0,
+    "raw_selected_write_bytes_fp32": 134217728,
+    "raw_selected_write_mib_fp32": 128.0,
+    "padded_selected_write_bytes_fp32": 167772160,
+    "padded_selected_write_mib_fp32": 160.0
+  },
+  "prepacked_pairs": null,
+  "correctness": {
+    "enabled": true,
+    "max_abs_diff": 1.4901161193847656e-08,
+    "mean_abs_diff": 1.4372898426984193e-09,
+    "candidate_checksum": -61.839385986328125,
+    "reference_checksum": -61.839378356933594
+  },
+  "timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        0.8945279717445374,
+        0.661204993724823,
+        0.6552460193634033
+      ],
+      "mean_ms": 0.7369929949442545,
+      "median_ms": 0.661204993724823,
+      "min_ms": 0.6552460193634033,
+      "max_ms": 0.8945279717445374,
+      "stdev_ms": 0.13646182261152473
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        1.0271070059388876,
+        0.6769968895241618,
+        0.6778779206797481
+      ],
+      "mean_ms": 0.7939939387142658,
+      "median_ms": 0.6778779206797481,
+      "min_ms": 0.6769968895241618,
+      "max_ms": 1.0271070059388876,
+      "stdev_ms": 0.20188231878281848
+    },
+    "median_ms": 0.661204993724823,
+    "min_ms": 0.6552460193634033,
+    "max_ms": 0.8945279717445374,
+    "mean_ms": 0.7369929949442545,
+    "peak_memory_allocated_bytes": 69583360,
+    "peak_memory_allocated_gib": 0.0648045539855957,
+    "checksum": -61.839385986328125
+  },
+  "fold_timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        0.01679999940097332,
+        0.016600999981164932,
+        0.01679999940097332
+      ],
+      "mean_ms": 0.01673366626103719,
+      "median_ms": 0.01679999940097332,
+      "min_ms": 0.016600999981164932,
+      "max_ms": 0.01679999940097332,
+      "stdev_ms": 0.00011489236859495202
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        0.036499928683042526,
+        0.034810975193977356,
+        0.030130031518638134
+      ],
+      "mean_ms": 0.033813645131886005,
+      "median_ms": 0.034810975193977356,
+      "min_ms": 0.030130031518638134,
+      "max_ms": 0.036499928683042526,
+      "stdev_ms": 0.0032999845319084654
+    },
+    "median_ms": 0.01679999940097332,
+    "min_ms": 0.016600999981164932,
+    "max_ms": 0.01679999940097332,
+    "mean_ms": 0.01673366626103719,
+    "peak_memory_allocated_bytes": 69584896,
+    "peak_memory_allocated_gib": 0.06480598449707031,
+    "checksum": -61.839385986328125
+  }
+}

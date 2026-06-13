@@ -1,0 +1,60 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_failure_20260611",
+  "created_utc": "2026-06-11",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "purpose": "Shortest native-MORI 8xMI350 e2e gate for the opt-in source-position triton_flat weighted-scatter path.",
+  "run_id": "torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_steps2_8x_s4096_gbs128_20260611",
+  "log_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_steps2_8x_s4096_gbs128_20260611/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_mori_native_source_scatter_tritonflat_steps2_8x_s4096_gbs128_20260611",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1
+  },
+  "key_env": {
+    "CANARY_STANDARD_EP_COMPACT_COLLECTIVE_BACKEND": "mori_native",
+    "CANARY_STANDARD_EP_SOURCE_SCATTER_BACKEND": "triton_flat",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_ROLE_SPLIT": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_REUSE_FORWARD_HANDLES_FOR_BACKWARD": "true",
+    "CANARY_STANDARD_EP_MORI_NATIVE_COMPACT_KEEP_RELEASED_HANDLES": "true",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "32G",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.kernels.sparse_mla_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "result": {
+    "status": "failed_before_metric_step",
+    "completed_metric_steps": 0,
+    "tokens_per_gpu_s": null,
+    "tflops_per_gpu": null,
+    "failure_phase": "native compact standard-EP dispatch before source-position scatter can materialize",
+    "failure_marker": "/scratch/sonle5/dsv4_pretrain_canary_20260527/sources/references/mori/src/ops/dispatch_combine/intranode.hpp:289: Device-side assertion `count <= config.MaxNumTokensToSendPerRank() && \"standard-EP compact dispatch input split exceeds MORI staging stride\"' failed.",
+    "root_process": {
+      "rank": 6,
+      "local_rank": 6,
+      "exitcode": -6,
+      "signal": "SIGABRT"
+    },
+    "other_ranks": "terminated by torch.distributed.elastic after rank 6 SIGABRT"
+  },
+  "read": [
+    "The source-position triton_flat weighted-scatter path remains only slice-validated by standard_ep_source_position_scatter_flat_triton_probe_20260611.json.",
+    "This e2e gate did not measure source-position scatter or throughput; it failed upstream in native compact dispatch staging-stride/capacity handling.",
+    "Do not promote triton_flat as an e2e performance path from this run.",
+    "Next native-MORI root cause is the compact dispatch staging-capacity/source-JIT tuple, then rerun the same e2e gate after the dispatch assert is closed."
+  ],
+  "post_run_node_state": {
+    "gpu_processes": "none active after failure cleanup",
+    "vram_allocated_pct": 0
+  }
+}

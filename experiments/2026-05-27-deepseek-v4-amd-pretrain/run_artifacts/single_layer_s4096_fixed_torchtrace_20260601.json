@@ -1,0 +1,172 @@
+{
+  "artifact": "single_layer_s4096_fixed_torchtrace_20260601",
+  "date_local": "2026-06-01",
+  "scope": "one_mi350_s4096_fixed_router_retained_path_normal_loss_backward_torch_profiler_cross_check",
+  "status": "profiler_cross_check_completed",
+  "target": {
+    "sequence_length": 4096,
+    "full_layer_fwd_bwd_grads_ms": 24.9
+  },
+  "clean_baseline_for_gap_math": {
+    "source": "retained fixed-router packed-sim BF16-contract S4096 run recorded in metrics.md and single_layer_gap_attribution_ladder_20260601.json",
+    "full_layer_ms": 68.2089,
+    "forward_ms": 22.577,
+    "backward_ms": 45.4889,
+    "target_time_gap_x": 2.7393132530120483,
+    "required_reduction_ms": 43.3089,
+    "read": "Use this clean run for the headline 68.21 ms versus 24.9 ms gap. The profiler run below is a one-iteration tracing cross-check and carries profiling overhead."
+  },
+  "profiler_run": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "remote_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531",
+    "remote_trace_dir": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/s4096_fixed_torchtrace_20260601/torch_summary",
+    "raw_trace_policy": "torch_trace.json and torch_key_averages.txt are retained outside the repo; this artifact keeps compact derived numbers only.",
+    "command_shape": "python3 dsv4_layer_microbench/profile_microbench.py --preset full --impl fp4-packed-sim --moe-impl grouped-expert-batches-cyclic-uniform-dense-wgrad-baddbmm-xgrad --shared-expert-impl linear-pair --attention-impl sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum --batch 1 --seqlen 4096 --dtype bfloat16 --device cuda --warmup 1 --iters 1 --fixed-router --rmsnorm-save-policy saved-accum --boundary-impl separate --trace-dir profiles/s4096_fixed_torchtrace_20260601/torch_summary",
+    "warning": "PyTorch profiler emitted ROCTracer duplicate flow-start warnings but wrote summary.json, torch_key_averages.txt, and torch_trace.json."
+  },
+  "profiler_phase_ms": {
+    "forward": 24.766995920799673,
+    "loss": 0.1510799629613757,
+    "backward": 46.12274200189859,
+    "phase_total": 71.04081788565964,
+    "gap_x_vs_24p9": 2.853044894002395,
+    "required_reduction_ms_vs_24p9": 46.14081788565964,
+    "tokens_per_s": 57656.993850950894,
+    "estimated_tflops": 298.04154368737954,
+    "read": "The profiler pass is about 4.2% slower than the clean 68.21 ms baseline, but preserves the same forward/backward shape: forward is near the whole layer budget and backward is far above it."
+  },
+  "forward_blocks_ms": {
+    "attn.q_proj": 1.9788929494097829,
+    "attn.kv_proj": 0.34530891571193933,
+    "attn.compress_csa": 0.6329669849947095,
+    "attn.compress_hca": 0.5327080143615603,
+    "attn.sparse_mla": 7.608614047057927,
+    "attn.out_proj": 1.2424460146576166,
+    "layer.attn_norm": 0.4243879811838269,
+    "layer.attn_residual": 0.07462897337973118,
+    "layer.moe_norm": 0.2775189932435751,
+    "moe.router_fixed": 0.031229923479259014,
+    "moe.routed_experts": 9.787235991097987,
+    "moe.shared_expert": 1.0636670049279928,
+    "layer.moe_residual": 0.06342993583530188
+  },
+  "forward_subsystems_ms": {
+    "attention": 12.340936926193535,
+    "moe": 10.882132919505239,
+    "boundary": 0.8399658836424351,
+    "attention_share_of_forward": 0.49828154232582733,
+    "moe_share_of_forward": 0.4393804139308744,
+    "boundary_share_of_forward": 0.033914726126999514
+  },
+  "phase_kernel_family_ms": {
+    "method": "Summed torch_trace.json kernel durations whose timestamp falls inside the CPU user_annotation interval for phase.forward or phase.backward. This is a profiler cross-check, not a perfect synchronized subsystem tree.",
+    "forward": {
+      "cpu_annotation_ms": 24.696905,
+      "kernel_sum_ms": 22.158008,
+      "kernel_count": 139,
+      "cijk_gemm": 14.382,
+      "copy_cast": 3.069,
+      "softmax": 2.527,
+      "rmsnorm": 0.737,
+      "elementwise": 0.72,
+      "rope": 0.319,
+      "reduce": 0.255,
+      "swiglu": 0.15
+    },
+    "backward": {
+      "cpu_annotation_ms": 46.115512,
+      "kernel_sum_ms": 45.153223,
+      "kernel_count": 236,
+      "cijk_gemm": 36.166,
+      "copy_cast": 3.546,
+      "elementwise": 1.958,
+      "softmax": 1.683,
+      "rmsnorm": 0.8,
+      "reduce": 0.561,
+      "rope": 0.322,
+      "swiglu": 0.117
+    },
+    "read": "The normal backward cross-check makes the priority clearer: backward is dominated by GEMM/BMM-family kernels, not by scalar bookkeeping. Copy/cast and scatter-like movement are material but second-order after the main math kernels."
+  },
+  "torch_key_averages_highlights": {
+    "self_cuda_total_ms": 67.749,
+    "rows": [
+      {
+        "name": "aten::bmm",
+        "self_cuda_ms": 38.078,
+        "self_cuda_pct": 56.2,
+        "cuda_total_ms": 38.078,
+        "calls": 20
+      },
+      {
+        "name": "aten::mm",
+        "self_cuda_ms": 7.084,
+        "self_cuda_pct": 10.46,
+        "cuda_total_ms": 7.084,
+        "calls": 33
+      },
+      {
+        "name": "aten::copy_",
+        "self_cuda_ms": 6.899,
+        "self_cuda_pct": 10.18,
+        "cuda_total_ms": 6.899,
+        "calls": 95
+      },
+      {
+        "name": "aten::baddbmm",
+        "self_cuda_ms": 5.386,
+        "self_cuda_pct": 7.95,
+        "cuda_total_ms": 5.386,
+        "calls": 4
+      },
+      {
+        "name": "_SparseGatherSplitCompressedNoKvCatMLAFunction",
+        "self_cuda_ms": 2.519,
+        "cuda_total_ms": 7.433,
+        "calls": 1
+      },
+      {
+        "name": "_SparseGatherSplitCompressedNoKvCatMLAFunctionBackward",
+        "self_cuda_ms": 1.674,
+        "cuda_total_ms": 8.799,
+        "calls": 1
+      }
+    ],
+    "read": "The op table agrees with the phase-kernel view: BMM/GEMM families dominate, sparse MLA backward is still a large attention node, and copies/casts are visible but not the first rung."
+  },
+  "gap_attribution_read": {
+    "headline": "The 68.21 ms to 24.9 ms closure is a two-wall problem: attention/LI backward and compact MoE training GEMM/backward.",
+    "attention_wall": {
+      "current_attention_plus_unfused_li_floor_ms": 27.850193977355957,
+      "planning_budget_ms": [
+        8.7,
+        10.0
+      ],
+      "minimum_reduction_implied_ms": [
+        17.850193977355957,
+        19.150193977355956
+      ],
+      "main_measured_subwall": "Compressed top-k route-slice backward: 11.02 ms out of the 14.39 ms local+compressed raw query-major slice."
+    },
+    "moe_wall": {
+      "current_fixed_router_forward_moe_ms": 9.6633,
+      "current_profiler_forward_moe_ms": 10.882132919505239,
+      "dynamic_moe_bridge_isolated_train_total_ms": 46.34222436696291,
+      "target_whole_routed_expert_gemm_family_fwd_bwd_ms": 12.9,
+      "main_measured_subwall": "Padded/ragged grouped training GEMMs: segmented routed dgrad and wgrad are about 26 ms each, and the dynamic isolated bridge shows GEMMs dominate over sub-ms to about 1 ms dispatch/combine glue."
+    },
+    "secondary_cleanup": {
+      "current_forward_other_ms_clean": 5.9267,
+      "profiler_forward_boundary_ms": 0.8399658836424351,
+      "profiler_forward_plus_backward_copy_cast_kernel_ms": 6.615,
+      "read": "Boundary/copy cleanup matters after the math walls move. It is not enough to close the gap on its own."
+    },
+    "ladder": [
+      "Fuse compressed top-k sparse-MLA backward, especially dKV/scatter and selected-group reuse.",
+      "Fuse LI target probabilities, KL derivative, and LI dQ/dK/dW with sparse MLA/compressor backward instead of running diagnostic side pipelines.",
+      "Replace padded/ragged MoE training contractions with compact-native grouped GEMM/backward kernels.",
+      "Then clean residual/RMSNorm/copy/bookkeeping around the now-smaller math kernels."
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "run_id": "torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "result": "completed_two_steps_hot_expert_sidecar",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpointing": "disabled",
+    "checkpointing": "disabled"
+  },
+  "env": {
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 2,
+    "CANARY_MORI_AITER_TIMING_PATH": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606/hot_expert_timing",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": 64,
+    "CANARY_SHAREDKV_BLOCK_N": 64,
+    "CANARY_SHAREDKV_BLOCK_D": 128,
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot"
+  },
+  "step_metrics": {
+    "1": {"tokens_per_gpu_s": 1850.0, "tflops_per_gpu": 93.68, "loss": 12.23757, "grad_norm": 19.25, "peak_logged_memory_gib": 153.39},
+    "2": {"tokens_per_gpu_s": 7566.0, "tflops_per_gpu": 383.05, "loss": 7.59945, "grad_norm": 40.75, "peak_logged_memory_gib": 191.52}
+  },
+  "hot_expert_sidecar": {
+    "files": 8,
+    "rows": 1536,
+    "kind_counts": {
+      "standard_ep_hot_expert_stats": 768,
+      "standard_ep_hot_expert_execute_stats": 768
+    },
+    "call_count": 96,
+    "execute_rank_entries": 768,
+    "execute_reason_counts": {
+      "executed": 760,
+      "skipped_threshold": 8
+    },
+    "executed_remote_rows_total_grouped_by_call": 6653161,
+    "executed_remote_rows_per_call_mean": 69303.7604,
+    "executed_remote_rows_per_call_median": 43920.5,
+    "executed_remote_rows_per_call_max": 187527,
+    "executed_remote_rows_per_call_min": 0,
+    "planned_remote_rows_total_grouped_by_call": 6682117,
+    "planned_remote_rows_per_call_mean": 69605.3854,
+    "planned_remote_rows_per_call_median": 43920.5,
+    "planned_remote_rows_per_call_max": 187527,
+    "planned_remote_rows_per_call_min": 19955,
+    "modeled_max_load_reduction_pct_per_call_mean": 15.9649,
+    "modeled_max_load_reduction_pct_per_call_median": 13.6605,
+    "modeled_max_load_reduction_pct_per_call_max": 49.7925,
+    "modeled_max_load_reduction_pct_per_call_min": -0.3804,
+    "first_five_call_summaries": [
+      {"call_id": 1, "executed_remote_rows": 25420, "planned_remote_rows": 25420, "modeled_max_load_reduction_pct": 12.7779},
+      {"call_id": 2, "executed_remote_rows": 27162, "planned_remote_rows": 27162, "modeled_max_load_reduction_pct": 7.9794},
+      {"call_id": 3, "executed_remote_rows": 38061, "planned_remote_rows": 38061, "modeled_max_load_reduction_pct": 11.9666},
+      {"call_id": 4, "executed_remote_rows": 22591, "planned_remote_rows": 22591, "modeled_max_load_reduction_pct": 14.2082},
+      {"call_id": 5, "executed_remote_rows": 38675, "planned_remote_rows": 38675, "modeled_max_load_reduction_pct": 12.1674}
+    ]
+  },
+  "source_artifacts": {
+    "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606",
+    "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606/docker-run.log",
+    "hot_expert_timing_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_standard_ep_hot_execute_top2_hotstats_8x_s4096_gbs128_mbs4_steps2_20260606/hot_expert_timing"
+  },
+  "read": "The standard-EP helper-execute branch is confirmed to execute remote-hot rows at the active shape, not merely plan them. Grouped by MoE call id, the two-step sidecar moved about 6.65M remote-hot rows across 96 calls, with planned and executed totals nearly matching. This is the concrete MindSpeed-style mechanism to compose with MORI/AITER: source/helper-side remote-hot VJP, source-local dX/dTopK availability, and hot expert dW reduction back to the owner."
+}

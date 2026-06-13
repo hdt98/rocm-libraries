@@ -1,0 +1,114 @@
+{
+  "artifact": "hipkittens_sharedkv_owner_contract_smoke_20260607",
+  "status": "contract_scaffold_not_latency_candidate",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "workspace": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "source_dir": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner",
+  "reference_snapshot": {
+    "path": "sources/references/hipkittens",
+    "commit": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "build": {
+    "command": "make clean && make GPU_TARGET=CDNA4",
+    "target": "gfx950",
+    "kernel": "sharedkv_contract_kernel",
+    "compiler_resource_report": {
+      "sgpr": 78,
+      "vgpr": 36,
+      "agpr": 0,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 8,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0,
+      "lds_bytes_per_block": 0
+    }
+  },
+  "contract": {
+    "inputs": [
+      "q[B,S,H,D]",
+      "dO[B,S,H,D]",
+      "indices[B,S,selected,1]"
+    ],
+    "outputs": [
+      "dQ[B,S,H,D]",
+      "dOriKV[B,S,1,D]",
+      "dCmpKV[B,ceil(S/compress_ratio),1,D]",
+      "dSinks[B,S,H,1]"
+    ],
+    "note": "This scaffold uses HipKittens gl/pyutils binding and a split local-vs-compressed output surface. It does not implement the real QK/P/dP SharedKV backward math yet."
+  },
+  "smokes": [
+    {
+      "name": "c128_shape_s128",
+      "command": "python ../probe_hipkittens_sharedkv_owner_contract.py --batch 1 --seq 128 --heads 64 --dim 512 --local-count 128 --compressed-topk 32 --compress-ratio 128 --warmup 3 --iters 10",
+      "shape": {
+        "batch": 1,
+        "seq": 128,
+        "heads": 64,
+        "dim": 512,
+        "local_count": 128,
+        "compressed_topk": 32,
+        "selected": 160,
+        "compress_ratio": 128,
+        "compressed_groups": 1
+      },
+      "latency_ms": {
+        "median": 0.1790814995765686,
+        "mean": 0.18043380081653596,
+        "min": 0.17072099447250366,
+        "max": 0.19620199501514435
+      },
+      "finite": {
+        "dQ": true,
+        "dOriKV": true,
+        "dCmpKV": true,
+        "dSinks": true
+      },
+      "norms": {
+        "dQ": 1144.0301513671875,
+        "dOriKV": 181.81857299804688,
+        "dCmpKV": 1.9317851066589355,
+        "dSinks": 2055.345947265625
+      }
+    },
+    {
+      "name": "c4_shape_s128",
+      "command": "python ../probe_hipkittens_sharedkv_owner_contract.py --batch 1 --seq 128 --heads 64 --dim 512 --local-count 128 --compressed-topk 512 --compress-ratio 4 --warmup 3 --iters 10",
+      "shape": {
+        "batch": 1,
+        "seq": 128,
+        "heads": 64,
+        "dim": 512,
+        "local_count": 128,
+        "compressed_topk": 512,
+        "selected": 640,
+        "compress_ratio": 4,
+        "compressed_groups": 32
+      },
+      "latency_ms": {
+        "median": 0.18806300312280655,
+        "mean": 0.19823099970817565,
+        "min": 0.1830819994211197,
+        "max": 0.27996399998664856
+      },
+      "finite": {
+        "dQ": true,
+        "dOriKV": true,
+        "dCmpKV": true,
+        "dSinks": true
+      },
+      "norms": {
+        "dQ": 1144.0301513671875,
+        "dOriKV": 181.81857299804688,
+        "dCmpKV": 89.8591537475586,
+        "dSinks": 2055.345947265625
+      }
+    }
+  ],
+  "next_gate": {
+    "description": "Fork the HipKittens dense GQA backward producer at the dKg/dVg store point and replace dense K/V stores with DSv4 local dOriKV plus compressed dCmpKV epilogue.",
+    "must_measure": "full SharedKV backward boundary dQ+dOriKV+dCmpKV+dSinks at B=4,S=4096,H=64,D=512, selected=640 for C4 and selected=160 for C128",
+    "promotion_threshold": "beat current Triton SharedKV C4 e2e per-call profile around 60.6 ms at B=4 selected640, then materialize e2e TFLOPs/token uplift in flash_12layer_ceiling_probe"
+  }
+}

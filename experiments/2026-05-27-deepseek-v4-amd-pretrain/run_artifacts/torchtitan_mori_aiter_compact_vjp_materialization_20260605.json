@@ -1,0 +1,172 @@
+{
+  "artifact": "torchtitan_mori_aiter_compact_vjp_materialization_20260605",
+  "created_at": "2026-06-05",
+  "question": "Can a compact owner-rank VJP built from AITER grouped GEMM ops replace the retained Python per-expert expert_loop owner VJP and improve 4xMI350 end-to-end TFLOPs?",
+  "shape": {
+    "hardware": "4xMI350",
+    "model": "TorchTitan DeepSeek-V4-Flash 4-layer BF16",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation": 8,
+    "optimizer": "AdamW",
+    "activation_checkpointing": "none",
+    "checkpointing": "disabled",
+    "allocator": "expandable_segments:True",
+    "moe_forward": "MORI dispatch -> AITER fused_moe -> MORI combine",
+    "moe_backward": "MORI routed backward",
+    "saved_forward_dispatch": true,
+    "local_vjp_swiglu_backend": "triton",
+    "local_vjp_aiter_wgrad_op": "ptgmm"
+  },
+  "retained_baseline": {
+    "artifact": "run_artifacts/torchtitan_mori_saved_dispatch_reuse_ab_20260605.json",
+    "run_id": "torchtitan_dsv4_mori_saved_dispatch_expert_loop_stability_4x_s4096_gbs128_mbs4_steps6_20260605",
+    "local_vjp_mode": "expert_loop",
+    "steps4_to6_mean": {
+      "tokens_per_gpu_s": 12570.33,
+      "node_tokens_s": 50281.32,
+      "tflops_per_gpu": 237.19
+    },
+    "peak_logged_memory_gib": 115.04,
+    "decision": "retained promoted 4x canary baseline"
+  },
+  "candidates": [
+    {
+      "run_id": "torchtitan_mori_aiter_compact_vjp_4x_s4096_gbs128_mbs4_steps6_20260605",
+      "local_vjp_mode": "aiter_compact",
+      "transpose_cache_size": 0,
+      "status": "completed",
+      "step_metrics": {
+        "2": {
+          "tokens_per_gpu_s": 12490,
+          "tflops_per_gpu": 236.34
+        },
+        "3": {
+          "tokens_per_gpu_s": 12185,
+          "tflops_per_gpu": 230.56
+        },
+        "4": {
+          "tokens_per_gpu_s": 11828,
+          "tflops_per_gpu": 223.81
+        },
+        "5": {
+          "tokens_per_gpu_s": 11296,
+          "tflops_per_gpu": 213.74
+        },
+        "6": {
+          "tokens_per_gpu_s": 11570,
+          "tflops_per_gpu": 218.92
+        }
+      },
+      "steps4_to6_mean": {
+        "tokens_per_gpu_s": 11564.67,
+        "node_tokens_s": 46258.68,
+        "tflops_per_gpu": 218.82
+      },
+      "peak_logged_memory_gib": 125.25,
+      "profile": {
+        "run_id": "torchtitan_mori_aiter_compact_vjp_profile_4x_s4096_gbs128_steps2_20260605",
+        "path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_mori_aiter_compact_vjp_profile_4x_s4096_gbs128_20260605/mori_timing",
+        "stage_medians_ms": {
+          "backward.local_vjp.aiter_compact": 42.90494728088379,
+          "local_aiter_compact_vjp.forward_recompute": 10.605041027069092,
+          "local_aiter_compact_vjp.wgrad": 10.755821704864502,
+          "local_aiter_compact_vjp.prepare_ops": 7.979081630706787,
+          "local_aiter_compact_vjp.xgrad": 7.681298017501831,
+          "local_aiter_compact_vjp.dgrad_swiglu": 3.100503087043762,
+          "local_aiter_compact_vjp.gather_scale": 1.9077345132827759
+        }
+      },
+      "decision": "rejected; executable but slower than retained expert_loop baseline"
+    },
+    {
+      "run_id": "torchtitan_mori_aiter_compact_vjp_transpose_cache_4x_s4096_gbs128_mbs4_steps6_20260605",
+      "local_vjp_mode": "aiter_compact",
+      "transpose_cache_size": 4,
+      "status": "completed",
+      "code_change": "Added a versioned LRU cache for AITER transposed local expert weights, keyed by data pointer, shape, stride, dtype, device, and PyTorch tensor version.",
+      "step_metrics": {
+        "2": {
+          "tokens_per_gpu_s": 12464,
+          "tflops_per_gpu": 235.85
+        },
+        "3": {
+          "tokens_per_gpu_s": 12375,
+          "tflops_per_gpu": 234.15
+        },
+        "4": {
+          "tokens_per_gpu_s": 12279,
+          "tflops_per_gpu": 232.34
+        },
+        "5": {
+          "tokens_per_gpu_s": 12221,
+          "tflops_per_gpu": 231.25
+        },
+        "6": {
+          "tokens_per_gpu_s": 12238,
+          "tflops_per_gpu": 231.56
+        }
+      },
+      "steps4_to6_mean": {
+        "tokens_per_gpu_s": 12246.0,
+        "node_tokens_s": 48984.0,
+        "tflops_per_gpu": 231.93
+      },
+      "peak_logged_memory_gib": 134.1,
+      "uplift_vs_uncached_steps4_to6": {
+        "tokens_per_gpu_s_percent": 5.89,
+        "tflops_per_gpu_percent": 5.99
+      },
+      "gap_vs_retained_baseline_steps4_to6": {
+        "tokens_per_gpu_s_percent": -2.58,
+        "tflops_per_gpu_percent": -2.61,
+        "peak_memory_delta_gib": 19.06
+      },
+      "profile": {
+        "run_id": "torchtitan_mori_aiter_compact_vjp_transpose_cache_profile_4x_s4096_gbs128_steps2_20260605",
+        "path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/profiles/torchtitan_mori_aiter_compact_vjp_transpose_cache_profile_4x_s4096_gbs128_20260605/mori_timing",
+        "read": "The cache does not materially reduce prepare_ops under the current tensor key, likely because the FSDP/local expert tensors change data pointer or version across owner-VJP calls.",
+        "stage_medians_ms": {
+          "backward.local_vjp.aiter_compact": 43.60936164855957,
+          "local_aiter_compact_vjp.forward_recompute": 10.836820602416992,
+          "local_aiter_compact_vjp.wgrad": 11.385744571685791,
+          "local_aiter_compact_vjp.prepare_ops": 7.94327449798584,
+          "local_aiter_compact_vjp.xgrad": 7.8415374755859375,
+          "local_aiter_compact_vjp.dgrad_swiglu": 3.1657835245132446,
+          "local_aiter_compact_vjp.gather_scale": 1.9642744660377502
+        }
+      },
+      "decision": "not promoted; improves the AITER compact branch, but remains below retained expert_loop throughput and uses substantially more memory"
+    }
+  ],
+  "root_cause_read": [
+    "The AITER compact owner VJP is executable at the target shape, but the current adapter does not materialize a throughput win.",
+    "The main measured local-VJP costs are forward recompute, grouped wgrad, xgrad, and prepare_ops. The prepare_ops tax remains about 8 ms median per owner-VJP call even after the transposed-weight LRU cache, suggesting the current cache key does not hit under FSDP/local tensor lifetimes.",
+    "This branch still recomputes gate/up/hidden/out_compact in backward instead of consuming compact intermediates exposed by the AITER fused forward.",
+    "A hidden AITER grouped-GEMM-only adapter is not enough; the production path needs AITER-forward-compatible saved compact intermediates or a real fused grouped owner-rank training backward."
+  ],
+  "decision": "Keep the retained saved-dispatch expert_loop canary as the promoted 4x baseline. Keep aiter_compact as an executable diagnostic branch, but do not promote it.",
+  "next_actions": [
+    "Preserve AITER fused forward and expose compact training intermediates needed by backward: routed compact input, gate/up and possibly hidden/out_compact.",
+    "Avoid per-owner-VJP weight layout copies; if continuing the cache branch, instrument cache keys/hits and find a stable parameter identity under FSDP.",
+    "Move from Python adapter plus grouped GEMM calls toward a fused compact grouped owner-rank backward that computes dW2, dW1/dW3, dX, and dTopkWeight with fewer launches and less recompute.",
+    "Only rerun end-to-end promotion after the local owner-VJP stage profile drops below the retained expert_loop path and peak memory stays within the current headroom."
+  ],
+  "validation": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+    "bash -n experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh",
+    "S128 4xMI350 smoke: torchtitan_mori_aiter_compact_vjp_smoke_4x_s128_gbs4_20260605",
+    "S4096 4xMI350 six-step materialization: torchtitan_mori_aiter_compact_vjp_4x_s4096_gbs128_mbs4_steps6_20260605",
+    "S4096 4xMI350 timing profile: torchtitan_mori_aiter_compact_vjp_profile_4x_s4096_gbs128_steps2_20260605",
+    "S128 4xMI350 cached-transpose smoke: torchtitan_mori_aiter_compact_vjp_transpose_cache_smoke_4x_s128_gbs4_20260605",
+    "S4096 4xMI350 cached-transpose six-step materialization: torchtitan_mori_aiter_compact_vjp_transpose_cache_4x_s4096_gbs128_mbs4_steps6_20260605",
+    "S4096 4xMI350 cached-transpose timing profile: torchtitan_mori_aiter_compact_vjp_transpose_cache_profile_4x_s4096_gbs128_steps2_20260605"
+  ],
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+}

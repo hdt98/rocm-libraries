@@ -1,0 +1,78 @@
+{
+  "artifact": "actual_li_rocwmma_route_grid_pairslot_partial_shape_sweep",
+  "created_at": "2026-06-03",
+  "status": "rejected_shape_tuning_branch",
+  "scope": "Actual-LI layer-2 S4096 compact pair-slot partial route-grid selected-block sweep",
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "token_block": 32,
+    "d_block": 16
+  },
+  "baseline": {
+    "retained_dot_k_atomic_triton_gate_ms": 8.189546585083008,
+    "same_probe_raw_atomic_ms_range": [9.419596672058105, 10.02436637878418],
+    "read": "The same HIP/rocWMMA route-grid raw atomic path is slower than the retained Triton dot_k_atomic gate, so pair-slot branches need a clear win over same-probe raw before they are worth porting."
+  },
+  "measurements": [
+    {
+      "selected_block": 64,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s4096_layer2_t32k64_20260603.json",
+      "modeled_write_reduction_x": 3.428225069715621,
+      "coalesced_scalar_writes": 234828288,
+      "compact_rows": 458649,
+      "max_active_groups": 908,
+      "raw_atomic_ms": 9.508916854858398,
+      "contrib_sink_ms": 8.50798511505127,
+      "grouped_atomic_ms": 21.42022705078125,
+      "compact_pairslot_atomic_ms": 21.607389450073242,
+      "compact_pairslot_partial_emit_ms": 18.690431594848633,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 19.472360610961914,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.0001220703125
+    },
+    {
+      "selected_block": 128,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s4096_layer2_t32k128_20260603.json",
+      "modeled_write_reduction_x": 6.368246896579656,
+      "coalesced_scalar_writes": 126415360,
+      "compact_rows": 246905,
+      "max_active_groups": 1015,
+      "raw_atomic_ms": 9.419596672058105,
+      "contrib_sink_ms": 8.769667625427246,
+      "grouped_atomic_ms": 20.26540756225586,
+      "compact_pairslot_atomic_ms": 19.64904022216797,
+      "compact_pairslot_partial_emit_ms": 18.25014305114746,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 18.59010887145996,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.00012969970703125
+    },
+    {
+      "selected_block": 512,
+      "artifact": "run_artifacts/actual_li_rocwmma_route_grid_pairslot_partial_s4096_layer2_t32k512_20260603.json",
+      "modeled_write_reduction_x": 23.813051840857806,
+      "coalesced_scalar_writes": 33806848,
+      "compact_rows": 66029,
+      "max_active_groups": 1024,
+      "raw_atomic_ms": 10.02436637878418,
+      "contrib_sink_ms": 8.997513771057129,
+      "grouped_atomic_ms": 19.696327209472656,
+      "compact_pairslot_atomic_ms": 18.38819122314453,
+      "compact_pairslot_partial_emit_ms": 18.223827362060547,
+      "compact_pairslot_partial_emit_plus_index_add_ms": 18.314308166503906,
+      "raw_vs_compact_pairslot_partial_reduce_max_abs_diff": 0.0001220703125
+    }
+  ],
+  "decision": {
+    "promote": false,
+    "reason": "Smaller selected tiles reduce the modeled write reduction and do not reduce the producer wall. K64/K128/K512 all stay around 18-19.5 ms for compact pair-slot partial emit+reduce, versus 9.4-10.0 ms same-probe raw and 8.19 ms retained Triton raw-atomic gate.",
+    "next_action": "Stop tuning selected_block for the pair-slot LDS-table producer. The next kernel must change the local accumulation primitive itself: warp/lane segmented accumulation, register-owned segments, or a split producer that writes compact rows without per-contribution LDS table updates."
+  },
+  "commands": [
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --seq-len 4096 --layer-id 2 --token-block 32 --selected-block 64 --include-compact-pairslot-atomic --include-compact-pairslot-partial --skip-reference ...",
+    "docker run ... benchmark_sparse_mla_shared_kv_actual_li_dkv_rocwmma_route_grid.py --seq-len 4096 --layer-id 2 --token-block 32 --selected-block 128 --include-compact-pairslot-atomic --include-compact-pairslot-partial --skip-reference ..."
+  ]
+}

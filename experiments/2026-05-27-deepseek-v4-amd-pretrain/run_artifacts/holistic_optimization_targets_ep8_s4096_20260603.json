@@ -1,0 +1,93 @@
+{
+  "artifact": "holistic_optimization_targets_ep8_s4096_20260603",
+  "date_utc": "2026-06-03",
+  "shape": {
+    "gpus": 8,
+    "gpu": "MI350",
+    "sequence_length": 4096,
+    "micro_batch_size": 1,
+    "global_batch_size": 128,
+    "parallelism": "TP1_PP1_CP1_FSDP8_EP8",
+    "activation_checkpointing": "full"
+  },
+  "retained_canary_context": {
+    "mori_tuple": [64, 32, 8],
+    "mori_backward_combine_input": "registered",
+    "mori_local_vjp": "padded",
+    "mori_local_vjp_swiglu_backend": "triton",
+    "chunked_ce_num_chunks_default_for_retained_8x_shape": 2,
+    "step2_throughput_old_ce8_tok_per_gpu_s": 3026,
+    "step2_implied_time_old_ce8_s": 21.65,
+    "step2_throughput_ce2_default_validation_tok_per_gpu_s": 3103,
+    "step2_implied_time_ce2_default_validation_s": 21.12
+  },
+  "ranked_targets": [
+    {
+      "rank": 1,
+      "target": "MoE backward return skew plus overlap",
+      "evidence": {
+        "ep8_sidecar_combine_dx_rank_median_total_s_per_profiled_step": 2.718,
+        "barrier_diag_pre_barrier_rank_median_ms_per_call": 32.61,
+        "barrier_diag_combine_call_rank_median_ms_per_call": 0.62
+      },
+      "read": "The raw dX combine kernel is sub-ms; the wall is peer-arrival skew hidden inside combine. Highest structural return is start dX return earlier or in chunks, and reduce owner-rank VJP skew."
+    },
+    {
+      "rank": 2,
+      "target": "MoE owner-rank VJP math",
+      "evidence": {
+        "ep8_recompute_forward_s": 0.707,
+        "ep8_wgrad_s": 0.587,
+        "ep8_xgrad_reduce_s": 0.478,
+        "ep8_w2_dgrad_swiglu_s": 0.287,
+        "ep8_pack_scatter_s": 0.199
+      },
+      "read": "This is the VJP imbalance that feeds combine wait. The next kernel return is fused/grouped owner-rank training GEMM and better scheduling, not dispatch-only changes."
+    },
+    {
+      "rank": 3,
+      "target": "Loss/lm-head chunked CE",
+      "evidence": {
+        "ep8_sidecar_chunked_ce_lm_head_backward_region_s_per_step": 2.35,
+        "ep8_sidecar_loss_chunk_backward_s_per_step": 2.17,
+        "ce1_step2_tok_per_gpu_s": 3002,
+        "ce4_step2_tok_per_gpu_s": 2989,
+        "ce2_manual_ab_step2_tok_per_gpu_s": 3136,
+        "ce2_default_validation_step2_tok_per_gpu_s": 3103,
+        "ce2_default_validation_vs_old_ce8_step2_uplift_percent": 2.5
+      },
+      "read": "The full-vocab loss path is a real multi-second bucket. The easy chunk-count A/B found CE2 faster than the old CE8 registered-combine baseline, while CE4 and CE1 regressed; the follow-up launcher-default validation passed at 3103 tok/GPU/s."
+    },
+    {
+      "rank": 4,
+      "target": "Attention forward/backward and final sparse MLA/LI",
+      "evidence": {
+        "rank_median_attention_kernel_family_s": 2.10
+      },
+      "read": "Attention is not the largest current guarded-path bucket, but final sparse MLA/LI is still mandatory because the retained systems canary uses guarded fallback/prototype sparse backward rather than the final fused path."
+    },
+    {
+      "rank": 5,
+      "target": "Copy/gather/fill/bookkeeping movement",
+      "evidence": {
+        "rank_median_copy_cat_fill_gather_kernel_family_s": 1.44
+      },
+      "read": "Meaningful but below MoE and loss for expected near-term return."
+    },
+    {
+      "rank": 6,
+      "target": "RCCL/NCCL collectives",
+      "evidence": {
+        "rank_median_rccl_nccl_kernel_family_s": 1.03
+      },
+      "read": "Not the largest EP8 bucket in the current single-node profile; revisit after MoE/loss changes alter overlap."
+    }
+  ],
+  "non_additivity_caveat": "Profiler and sidecar buckets use different synchronization and annotation scopes; use the ranking and A/B throughput direction rather than summing all rows as wall time.",
+  "next_actions": [
+    "Keep CE2 as the retained loss-chunk setting for the exact 8x target shape; CE1 was validated on a clean idle 8-GPU node and regressed to 3002 tok/GPU/s.",
+    "Implement the staged AsyncLL dX overlap contract in run_artifacts/mori_asyncll_dx_overlap_contract_20260603.json rather than more manual MORI launch tuple sweeps.",
+    "Continue fused/grouped owner-rank VJP work because VJP skew feeds combine wait.",
+    "Keep final sparse MLA/LI as mandatory correctness/perf work even though current guarded-path attention is not the top bucket."
+  ]
+}

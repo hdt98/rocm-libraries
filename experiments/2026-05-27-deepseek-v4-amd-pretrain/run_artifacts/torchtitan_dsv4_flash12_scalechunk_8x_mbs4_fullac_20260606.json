@@ -1,0 +1,122 @@
+{
+  "schema": "dsv4_flash12_8x_mbs4_scalechunk.v1",
+  "date": "2026-06-06",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "model": "deepseek_v4_flash_12layer_ceiling_probe_bf16_canary",
+  "run_id": "torchtitan_dsv4_flash12_scalechunk_kernel_8x_s4096_gbs128_mbs4_heap144_fullac_steps4_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_scalechunk_kernel_8x_s4096_gbs128_mbs4_heap144_fullac_steps4_20260606/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_scalechunk_kernel_8x_s4096_gbs128_mbs4_heap144_fullac_steps4_20260606",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8
+  },
+  "env": {
+    "CANARY_CHECKPOINT_ENABLE": "false",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "full",
+    "CANARY_MORI_SHMEM_HEAP_SIZE": "144G",
+    "CANARY_PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_DSV4_PROFILE_SHAREDKV_BACKWARD": "false",
+    "CANARY_MOE_COMM_BACKEND": "mori",
+    "CANARY_EXPERIMENTAL_MORI_AITER_MOE": "1",
+    "CANARY_MORI_AITER_FORWARD_MODE": "aiter",
+    "CANARY_MORI_AITER_BACKWARD_MODE": "routed",
+    "CANARY_MORI_AITER_LOCAL_VJP_MODE": "aiter_compact",
+    "CANARY_MORI_AITER_LOCAL_VJP_AITER_WGRAD_OP": "ptgmm",
+    "CANARY_MORI_AITER_COMPACT_RECOMPUTE_MODE": "expert_loop",
+    "CANARY_MORI_AITER_XGRAD_MODE": "full",
+    "CANARY_MORI_AITER_SCALE_CHUNK_ROWS": "4096",
+    "CANARY_CHUNKED_CE_NUM_CHUNKS": "8"
+  },
+  "result": "completed_four_steps_rejected_for_throughput",
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.20288,
+      "grad_norm": 19.5,
+      "tokens_per_gpu_s": 1318.0,
+      "tflops_per_gpu": 66.74,
+      "max_logged_memory_gib": 84.64
+    },
+    {
+      "step": 2,
+      "loss": 8.49143,
+      "grad_norm": 62.0,
+      "tokens_per_gpu_s": 2651.0,
+      "tflops_per_gpu": 134.23,
+      "max_logged_memory_gib": 124.5
+    },
+    {
+      "step": 3,
+      "loss": 17.63431,
+      "grad_norm": 102.0,
+      "tokens_per_gpu_s": 2750.0,
+      "tflops_per_gpu": 139.22,
+      "max_logged_memory_gib": 124.5
+    },
+    {
+      "step": 4,
+      "loss": 17.97263,
+      "grad_norm": 34.25,
+      "tokens_per_gpu_s": 2625.0,
+      "tflops_per_gpu": 132.89,
+      "max_logged_memory_gib": 127.75
+    }
+  ],
+  "aggregates": {
+    "steps_2_to_4_tokens_per_gpu_s_mean": 2675.33,
+    "steps_2_to_4_node_tokens_s_mean": 21402.67,
+    "steps_2_to_4_tflops_per_gpu_mean": 135.45,
+    "peak_logged_memory_gib": 127.75
+  },
+  "comparison": {
+    "old_heap144_fullac_mbs4": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_8x_mbs4_heap_ladder_20260606.json",
+      "result": "completed_step2_then_failed_step3_backward_scale_temp_oom",
+      "step2_tokens_per_gpu_s": 2819.0,
+      "step2_tflops_per_gpu": 142.74,
+      "failure": "OOM in compact MORI routed VJP while forming dy_compact.float() * weight_compact.unsqueeze(-1)"
+    },
+    "stable_8x_mbs2_anchor": {
+      "artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_8x_s4096_gbs128_mbs2_heap96_20260606.json",
+      "steps_2_to_6_tokens_per_gpu_s_mean": 2857.8,
+      "steps_2_to_6_tflops_per_gpu_mean": 144.686,
+      "peak_logged_memory_gib": 130.61
+    },
+    "delta_vs_8x_mbs2_anchor": {
+      "tokens_per_gpu_s_pct": -6.39,
+      "tflops_per_gpu_pct": -6.36,
+      "peak_memory_gib": -2.86
+    }
+  },
+  "rejected_config_attempt": {
+    "run_id": "torchtitan_dsv4_flash12_scalechunk_8x_s4096_gbs128_mbs4_heap144_fullac_steps4_20260606",
+    "result": "failed_before_step1_missing_sparse_mla_kernel_module",
+    "reason": "TORCHTITAN_DSV4_PYTORCH_SPARSE_MLA_BACKWARD_MODE=shared_kv requires TORCHTITAN_DSV4_SPARSE_MLA_KERNEL_MODULE."
+  },
+  "validation": [
+    "Run header confirmed mori_aiter_scale_chunk_rows=4096 and sparse_mla_kernel_module=torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend.",
+    "Training completed four steps and destroyed all process groups.",
+    "Post-run pgrep found no matching torchtitan_dsv4_flash12_scalechunk/torchrun/train.py processes.",
+    "Post-run rocm-smi --showpidgpus showed no GPU-owning process."
+  ],
+  "read": "The bounded scale helper fixes the old MBS4 heap144 step-3 compact owner-VJP scale OOM. It does not promote MBS4: steps 2-4 average 2675.33 tok/GPU/s and 135.45 TFLOPs/GPU, below the stable 8x MBS2 anchor at 2857.8 tok/GPU/s and 144.686 TFLOPs/GPU. Keep MBS2 as the retained 8x baseline; next 8x work should reduce MORI workspace/op pressure and owner-VJP compute/skew rather than increasing MBS."
+}

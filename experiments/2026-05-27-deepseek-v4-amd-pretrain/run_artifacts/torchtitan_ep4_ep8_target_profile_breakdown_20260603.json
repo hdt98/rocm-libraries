@@ -1,0 +1,224 @@
+{
+  "artifact": "torchtitan_ep4_ep8_target_profile_breakdown_20260603",
+  "created_date": "2026-06-03",
+  "status": "complete",
+  "scope": "Target-shape EP4/EP8 TorchTitan DeepSeek-V4 Flash S4096 profiling split for current MORI+AITER routed padded VJP plus Triton-SwiGLU path.",
+  "how_to_read": [
+    "Both runs profile step 2 after one warmup step: MBS=1, S=4096, full activation checkpointing, checkpoint disabled.",
+    "MORI backward leaf timings use TORCHTITAN_MORI_AITER_TIMING_PATH CUDA events over call IDs 65-128, i.e. the profiled step's 64 routed backward calls per rank.",
+    "Dense linear and kernel-family attribution uses Chrome trace gpu_user_annotation/kernel events from profiling/traces/iteration_2.",
+    "Trace and event timings are diagnostic and not exclusive wall time. Use the no-timing canary artifacts for headline throughput."
+  ],
+  "common_knobs": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "node": "do-sonle5-mi350-gpu",
+    "module": "deepseek_v4",
+    "config": "deepseek_v4_flash_4layer_bf16_canary",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "mbs": 1,
+    "sequence_length": 4096,
+    "steps": 2,
+    "activation_checkpointing": "full",
+    "checkpoint_enabled": false,
+    "profile_dense_linear_backward": true,
+    "profiler_schedule": {
+      "profile_freq": 2,
+      "warmup": 1,
+      "active": 1
+    },
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": 1,
+    "mori_aiter_backward_mode": "routed",
+    "local_vjp_mode": "padded",
+    "local_vjp_swiglu_backend": "triton",
+    "mori_op_cache_mode": "backward",
+    "assume_identical_dispatch_order": 1,
+    "mori_backward_combine_input_mode": "external",
+    "mori_shmem_heap_size": "32G",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_scatter_mode": "auto",
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "runs": {
+    "ep4_fsdp4_gbs64": {
+      "run_id": "torchtitan_dsv4_ep4_profile_mori_dense_s4096_gbs64_20260603",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_ep4_profile_mori_dense_s4096_gbs64_20260603",
+      "shape": {
+        "gpus": 4,
+        "fsdp": 4,
+        "ep": 4,
+        "gbs": 64,
+        "gradient_accumulation_steps": 16,
+        "mori_backward_calls_per_rank": 64
+      },
+      "result": {
+        "passed": true,
+        "loss_step1": 12.33551,
+        "loss_step2": 7.70565,
+        "grad_norm_step2": 39.0,
+        "tokens_per_gpu_s_step2": 4063,
+        "tflops_per_gpu_step2": 76.88,
+        "mfu_step2_pct_mi350": 3.33
+      },
+      "mori_cuda_event_step2_ms_per_rank": {
+        "local_vjp_total_sum_mean": 2451.205,
+        "local_vjp_total_per_call_median_rank_median": 39.244,
+        "local_vjp_gemm_family_sum_mean": 2085.535,
+        "local_vjp_gemm_components_sum_mean": {
+          "w13_forward_gemm": 462.491,
+          "w2_forward_gemm": 240.323,
+          "w2_dgrad_gemm": 240.494,
+          "w2_wgrad_gemm": 218.971,
+          "w13_wgrad_gemm": 419.594,
+          "w13_xgrad_gemm_reduce": 503.661
+        },
+        "local_vjp_swiglu_sum_mean": 115.403,
+        "local_vjp_route_misc_sum_mean": 242.485,
+        "dispatch_x_sum_mean": 93.045,
+        "dispatch_grad_output_sum_mean": 44.139,
+        "combine_dx_sum_mean": 924.264,
+        "combine_dx_per_call_median_rank_median": 10.692,
+        "combine_dx_rank_values_sum_ms": {
+          "0": 960.031,
+          "1": 822.904,
+          "2": 428.085,
+          "3": 1486.037
+        },
+        "dispatch_topk_dummy_sum_mean": 19.209,
+        "combine_dtopk_sum_mean": 4.657
+      },
+      "trace_gpu_user_step2_ms_per_rank": {
+        "dense_linear_attention_sum_mean": 208.761,
+        "dense_linear_shared_experts_sum_mean": 1973.245,
+        "dense_linear_router_sum_mean": 10.365,
+        "mori_forward": {
+          "pack_weights_sum_mean": 494.033,
+          "dispatch_sum_mean": 138.855,
+          "fused_moe_sum_mean": 294.663,
+          "combine_sum_mean": 226.985
+        },
+        "attention_forward_ranges": {
+          "dense_inner_attention_sum_mean": 714.92,
+          "q_projection_sum_mean": 144.687,
+          "kv_b_dense_sum_mean": 132.393,
+          "wo_sum_mean": 108.471
+        },
+        "top_kernel_families_sum_mean": {
+          "rocBLAS_Tensile_GEMM_Cijk": 2961.71,
+          "copy_elementwise": 2639.761,
+          "NCCL": 1492.363,
+          "MORI_EpCombine": 1155.22,
+          "attention_bwd_dk_dv": 919.622,
+          "attention_forward": 714.163,
+          "attention_bwd_dq": 432.926,
+          "MORI_EpDispatch": 292.227,
+          "AITER_CK_MoE_forward": 286.492,
+          "Triton_SwiGLU": 105.591
+        }
+      }
+    },
+    "ep8_fsdp8_gbs128": {
+      "run_id": "torchtitan_dsv4_ep8_profile_mori_dense_s4096_gbs128_20260603",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_ep8_profile_mori_dense_s4096_gbs128_20260603",
+      "shape": {
+        "gpus": 8,
+        "fsdp": 8,
+        "ep": 8,
+        "gbs": 128,
+        "gradient_accumulation_steps": 16,
+        "mori_backward_calls_per_rank": 64
+      },
+      "result": {
+        "passed": true,
+        "loss_step1": 12.27811,
+        "loss_step2": 8.48009,
+        "grad_norm_step2": 49.25,
+        "tokens_per_gpu_s_step2": 2809,
+        "tflops_per_gpu_step2": 53.14,
+        "mfu_step2_pct_mi350": 2.3
+      },
+      "mori_cuda_event_step2_ms_per_rank": {
+        "local_vjp_total_sum_mean": 2271.055,
+        "local_vjp_total_per_call_median_rank_median": 31.895,
+        "local_vjp_gemm_family_sum_mean": 1900.596,
+        "local_vjp_gemm_components_sum_mean": {
+          "w13_forward_gemm": 429.608,
+          "w2_forward_gemm": 219.935,
+          "w2_dgrad_gemm": 221.883,
+          "w2_wgrad_gemm": 192.851,
+          "w13_wgrad_gemm": 372.812,
+          "w13_xgrad_gemm_reduce": 463.507
+        },
+        "local_vjp_swiglu_sum_mean": 103.818,
+        "local_vjp_route_misc_sum_mean": 258.289,
+        "dispatch_x_sum_mean": 183.823,
+        "dispatch_grad_output_sum_mean": 41.965,
+        "combine_dx_sum_mean": 2874.027,
+        "combine_dx_per_call_median_rank_median": 41.582,
+        "combine_dx_rank_values_sum_ms": {
+          "0": 1065.811,
+          "1": 3439.067,
+          "2": 3008.551,
+          "3": 3095.28,
+          "4": 3729.648,
+          "5": 2365.08,
+          "6": 2887.302,
+          "7": 3401.479
+        },
+        "dispatch_topk_dummy_sum_mean": 26.149,
+        "combine_dtopk_sum_mean": 6.966
+      },
+      "trace_gpu_user_step2_ms_per_rank": {
+        "dense_linear_attention_sum_mean": 215.969,
+        "dense_linear_shared_experts_sum_mean": 1934.229,
+        "dense_linear_router_sum_mean": 10.484,
+        "mori_forward": {
+          "pack_weights_sum_mean": 223.734,
+          "dispatch_sum_mean": 120.787,
+          "fused_moe_sum_mean": 261.027,
+          "combine_sum_mean": 345.511
+        },
+        "attention_forward_ranges": {
+          "dense_inner_attention_sum_mean": 707.938,
+          "q_projection_sum_mean": 99.394,
+          "kv_b_dense_sum_mean": 130.034,
+          "wo_sum_mean": 122.588
+        },
+        "top_kernel_families_sum_mean": {
+          "MORI_EpCombine": 3225.774,
+          "rocBLAS_Tensile_GEMM_Cijk": 2756.934,
+          "copy_elementwise": 1810.026,
+          "NCCL": 985.532,
+          "attention_bwd_dk_dv": 930.4,
+          "attention_forward": 707.352,
+          "attention_bwd_dq": 433.173,
+          "MORI_EpDispatch": 369.646,
+          "AITER_CK_MoE_forward": 251.303,
+          "Triton_SwiGLU": 97.222
+        }
+      }
+    }
+  },
+  "comparison": {
+    "ep8_vs_ep4": {
+      "local_vjp_total_sum_mean_delta_ms": -180.15,
+      "local_vjp_gemm_family_sum_mean_delta_ms": -184.939,
+      "combine_dx_sum_mean_delta_ms": 1949.763,
+      "dense_shared_experts_sum_mean_delta_ms": -39.016,
+      "attention_kernel_family_total_delta_ms": 4.837
+    },
+    "attention_kernel_family_total_ms_per_rank": {
+      "ep4": 2066.711,
+      "ep8": 2070.925
+    }
+  },
+  "read": [
+    "EP8 smooths local routed expert VJP GEMM slightly versus EP4, but the backward dX combine grows sharply and becomes the largest MoE-specific wall.",
+    "The big anonymous GEMM bucket is not only routed MoE. Shared expert dense backward is about 1.93-1.97 s/rank/step and remains essentially unchanged between EP4 and EP8.",
+    "Attention kernels are stable at about 2.07 s/rank/step across EP4 and EP8 in this guarded/shared-KV prototype path: forward attention plus dK/dV plus dQ.",
+    "Pure Triton SwiGLU is now second-order at about 0.10-0.12 s/rank/step after the runtime-n_elements patch.",
+    "Next ladder: reduce MORI backward combine_dx, then replace padded owner-rank VJP GEMM family with fused or grouped training GEMM, while keeping shared expert dense backward and attention kernels as separate buckets."
+  ]
+}

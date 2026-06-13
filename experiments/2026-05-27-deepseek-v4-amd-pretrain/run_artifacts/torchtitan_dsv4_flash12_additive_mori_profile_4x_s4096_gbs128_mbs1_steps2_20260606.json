@@ -1,0 +1,150 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_ceiling_probe_profile",
+  "created_at": "2026-06-06",
+  "run_id": "torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606",
+  "status": "completed_two_steps_not_promoted_profile_only",
+  "host": "do-vunguyen-mi350-gpu",
+  "hostname": "vu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606/docker-run.log",
+  "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606",
+  "timing_dirs": {
+    "additive": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606/additive",
+    "mori_aiter": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606/mori"
+  },
+  "shape": {
+    "model": "deepseek_v4",
+    "model_spec": "flash_12layer_ceiling_probe",
+    "layers": 12,
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 4,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "optimizer": "AdamW",
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enabled": false,
+    "moe_comm_backend": "mori",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "expert_loop",
+    "mori_aiter_save_forward_dispatch": true,
+    "mori_aiter_xgrad_mode": "compact",
+    "pytorch_alloc_conf": "expandable_segments:True"
+  },
+  "step_metrics": {
+    "step_1": {
+      "loss": 12.25016,
+      "grad_norm": 13.3125,
+      "tokens_per_gpu_s_mean": 1874.0,
+      "node_tokens_s_mean": 7496.0,
+      "tflops_per_gpu_mean": 94.88,
+      "mfu_percent": 4.11,
+      "peak_logged_memory_gib": 172.39
+    },
+    "step_2": {
+      "loss": 9.41233,
+      "grad_norm": 29.375,
+      "tokens_per_gpu_s_mean": 2473.0,
+      "node_tokens_s_mean": 9892.0,
+      "tflops_per_gpu_mean": 125.23,
+      "mfu_percent": 5.42,
+      "peak_logged_memory_gib": 202.17,
+      "implied_flops_per_token_gflop": 50.64,
+      "target_tokens_per_gpu_s": 12200,
+      "target_ratio_tokens_per_gpu": 0.2027,
+      "gap_to_target_x": 4.93
+    }
+  },
+  "additive_timing_step2": {
+    "rank_step_wall_ms_max": 52971.179,
+    "rank_step_wall_ms_mean": 52970.192,
+    "rank_step_wall_ms_min": 52967.878,
+    "phases_rank_wall_ms_max": {
+      "step.train_step": 52970.515,
+      "train_step.microbatch_forward_backward": 52383.509,
+      "forward_backward.model_forward": 12262.746,
+      "forward_backward.loss": 1437.136,
+      "forward_backward.backward": 27619.882,
+      "train_step.grad_clip": 55.527,
+      "train_step.optimizer_step": 87.426,
+      "train_step.accumulated_loss_reduce": 365.713,
+      "train_step.fetch_microbatches": 64.143,
+      "train_step.valid_tokens_all_reduce": 7.107,
+      "train_step.collect_dist_metrics": 8.183
+    },
+    "derived_microbatch_residual_ms": 11037.06,
+    "derived_small_forward_backward_child_sum_ms": 26.686,
+    "per_microbatch_mean_rank_max_ms": {
+      "forward": 383.211,
+      "loss": 44.91,
+      "backward": 863.121,
+      "microbatch_residual": 348.151
+    },
+    "read": "The additive timer is nested and intrusive. Use step.train_step as the real step wall. Child phase totals are useful for attribution, but the full phase sum double-counts nested phases."
+  },
+  "mori_aiter_timing_step2": {
+    "split_rule": "call_id > 768, because each step has 12 layers x 32 microbatches x forward/backward = 768 MORI records per rank",
+    "records_per_rank": 768,
+    "backward_stage_calls_per_rank": 384,
+    "recv_count_summary": {
+      "rank0": {"mean": 13973.33, "min": 9740, "max": 15619},
+      "rank1": {"mean": 12872.92, "min": 8068, "max": 15803},
+      "rank2": {"mean": 14259.08, "min": 11521, "max": 15996},
+      "rank3": {"mean": 13120.52, "min": 9337, "max": 16136}
+    },
+    "stage_gpu_total_rank_max_ms": {
+      "backward.local_vjp.expert_loop": 6486.773,
+      "local_expert_loop_vjp.expert_loop": 5954.193,
+      "local_expert_loop_vjp.sort_counts": 192.165,
+      "local_expert_loop_vjp.route_pack": 60.964,
+      "local_expert_loop_vjp.gather": 62.935,
+      "backward.combine_dx.call": 1355.017,
+      "backward.dispatch_grad_output.call": 946.544,
+      "backward.align_grad_output": 185.6,
+      "backward.dispatch_topk_dummy.call_plus_backward.combine_dtopk.call": 177.489,
+      "forward.aiter.save_dispatch_for_backward": 59.723,
+      "backward.reuse_forward_dispatch": 2.534
+    },
+    "rough_non_mori_or_unattributed_backward_ms": 18464.1,
+    "read": "MORI timings are GPU-event totals for named MoE/EP stages and should not be added directly to the additive wall. Step 2 still shows MORI owner VJP plus dX return as a major backward target, but it is not the entire 12-layer backward wall."
+  },
+  "bottleneck_read": [
+    "Step 2 is the cleaner profile point: 2,473 tok/GPU/s, 125.23 TFLOPs/GPU, and 202.17 GiB peak logged memory, still only 20.3% of the 12.2k tok/GPU/s target.",
+    "Additive step-2 wall is about 52.97 s. The largest child buckets are backward 27.62 s, forward 12.26 s, microbatch wrapper/residual 11.04 s, and loss 1.44 s.",
+    "MORI/EP remains a real target: owner-rank expert_loop local VJP is 6.49 s rank-max GPU time for step 2, combine_dx is 1.36 s, and grad-output dispatch is 0.95 s.",
+    "The remaining backward after subtracting the main MORI GPU-event buckets is still roughly 18.46 s, so the 12-layer gap also needs decomposition of dense-fallback attention/projections/FSDP/backward wrapper work.",
+    "This run still uses the S4096 guarded dense fallback for compressed layers, so it is not evidence for final sparse MLA/LI performance."
+  ],
+  "promotion": {
+    "promoted": false,
+    "reasons": [
+      "Only two optimizer steps.",
+      "Additive timing instrumentation is intrusive.",
+      "Below the 12.2k tok/GPU/s active target.",
+      "Compressed layers still use guarded dense fallback at S4096."
+    ]
+  },
+  "commands": {
+    "run": "RUN_ID=torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606 TARGET_HOST=do-vunguyen-mi350-gpu REMOTE_ROOT=/scratch/sonle5/dsv4_pretrain_canary_20260527 IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly-mori GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_STEPS=2 CANARY_TORCHTITAN_CONFIG=deepseek_v4_flash_12layer_ceiling_probe_bf16_canary CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=1 CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_SAVE_FORWARD_DISPATCH=true CANARY_MORI_AITER_LOCAL_VJP_MODE=expert_loop CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_AITER_OP_CACHE_MODE=backward CANARY_MORI_AITER_DX_RETURN_MODE=sync CANARY_MORI_AITER_XGRAD_MODE=compact CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PERSIST_JIT_CACHE=auto CANARY_ENABLE_PROFILING=false CANARY_DSV4_ADDITIVE_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606/additive CANARY_MORI_AITER_TIMING_PATH=/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_additive_mori_profile_4x_s4096_gbs128_mbs1_steps2_20260606/mori experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  },
+  "validation": [
+    "Remote node readiness checked with df and rocm-smi before running.",
+    "Run completed two optimizer steps with finite loss and grad norm.",
+    "Additive timing JSONL and MORI/AITER timing JSONL were copied locally and parsed.",
+    "Raw outputs remain outside the repo under /scratch; this file is the compact persisted summary."
+  ],
+  "next_actions": [
+    "Profile the step-2 non-MORI backward residual enough to split dense-fallback attention/projections/FSDP communication from Python/autograd wrapper overhead.",
+    "Continue MORI/MoE path toward fused grouped owner-rank training backward, because owner VJP plus dX return is still about 8-9 s of step-2 GPU-event time.",
+    "Keep sparse MLA/LI work separate until the 12-layer target stops hitting the S4096 guarded dense fallback."
+  ]
+}

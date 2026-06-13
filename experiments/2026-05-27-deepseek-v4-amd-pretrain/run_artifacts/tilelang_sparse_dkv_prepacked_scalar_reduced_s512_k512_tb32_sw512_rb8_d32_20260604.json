@@ -1,0 +1,96 @@
+{
+  "status": "ok",
+  "scope": "tilelang_sparse_dkv_compact_partial_producer",
+  "read": "TileLang query-major compact partial producer. This is a concrete reduced-write dKV kernel: it accumulates by precomputed active compressed-group slot inside the CTA, and writes compact partial rows instead of one selected row per token/topk pair. scalar_reduced is the working compact-row/writeback gate; mfma_reduced is the intended TileLang GEMM contribution body and currently tests the MI350 lowering path. It uses diagnostic materialized probs and grad_logits; QK/PV recompute is intentionally outside this gate.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 512,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "token_block": 32,
+    "selected_window": 512,
+    "block_k": 32,
+    "block_d": 32,
+    "row_block": 8,
+    "threads": 256,
+    "math_mode": "prepacked_scalar_reduced",
+    "route_pattern": "clustered_unique",
+    "cluster_width": 640,
+    "cluster_stride": 4,
+    "output_layout": "[rows, D]"
+  },
+  "compact_route": {
+    "raw_selected_rows": 262144,
+    "active_partial_rows": 12190,
+    "output_partial_rows": 12190,
+    "padded_partial_rows": 12224,
+    "write_reduction_x": 21.50484003281378,
+    "padded_write_reduction_x": 21.445026178010473,
+    "token_tiles": 16,
+    "selected_tiles": 1,
+    "route_tiles": 16,
+    "max_active_groups": 764,
+    "active_count_mean": 761.875,
+    "active_count_min": 760,
+    "active_count_max": 764,
+    "partials_bytes": 24965120,
+    "partials_mib": 23.80859375,
+    "output_partials_bytes": 24965120,
+    "output_partials_mib": 23.80859375,
+    "raw_selected_write_bytes_fp32": 536870912,
+    "raw_selected_write_mib_fp32": 512.0
+  },
+  "prepacked_pairs": {
+    "max_pairs_per_row": 32,
+    "pair_count_mean": 21.50484003281378,
+    "pair_count_min": 1,
+    "pair_count_max": 32,
+    "pair_count_nonzero": 12190,
+    "packed_slot_count": 390080,
+    "packed_fill": 0.6720262510254307,
+    "packed_int32_mib": 3.0225753784179688,
+    "prepack_wall_ms": 873.3605389716104
+  },
+  "correctness": {
+    "enabled": false
+  },
+  "timing": {
+    "event": {
+      "enabled": true,
+      "samples_ms": [
+        67.50546264648438,
+        68.40919494628906,
+        67.42536926269531
+      ],
+      "mean_ms": 67.78000895182292,
+      "median_ms": 67.50546264648438,
+      "min_ms": 67.42536926269531,
+      "max_ms": 68.40919494628906,
+      "stdev_ms": 0.5463606860453634
+    },
+    "wall": {
+      "enabled": true,
+      "samples_ms": [
+        67.58730497676879,
+        68.49068298470229,
+        67.47933605220169
+      ],
+      "mean_ms": 67.85244133789092,
+      "median_ms": 67.58730497676879,
+      "min_ms": 67.47933605220169,
+      "max_ms": 68.49068298470229,
+      "stdev_ms": 0.5553635043477448
+    },
+    "median_ms": 67.50546264648438,
+    "min_ms": 67.42536926269531,
+    "max_ms": 68.40919494628906,
+    "mean_ms": 67.78000895182292,
+    "peak_memory_allocated_bytes": 230713856,
+    "peak_memory_allocated_gib": 0.21486902236938477,
+    "checksum": 40.56056213378906
+  }
+}

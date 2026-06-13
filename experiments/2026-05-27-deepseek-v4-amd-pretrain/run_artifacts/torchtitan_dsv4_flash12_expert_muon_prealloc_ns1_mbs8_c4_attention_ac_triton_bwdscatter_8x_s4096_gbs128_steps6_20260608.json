@@ -1,0 +1,146 @@
+{
+  "run_id": "torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_mbs8_c4_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps6_20260608",
+  "date": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "log_path": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_mbs8_c4_attention_ac_triton_bwdscatter_8x_s4096_gbs128_steps6_20260608/docker-run.log",
+  "result": "completed_six_steps_not_promoted",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 2,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "layers": 12,
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+  },
+  "optimizer": {
+    "dense_and_nonexpert": "adamw",
+    "experts": "muon",
+    "muon_impl": "batched",
+    "muon_ns_steps": 1,
+    "muon_state_dtype": "bfloat16",
+    "muon_ns_compute_dtype": "bfloat16",
+    "muon_workspace_mode": "prealloc",
+    "muon_chunk_matrices": 4,
+    "muon_elementwise_backend": "torch"
+  },
+  "activation_checkpoint": {
+    "mode": "selective",
+    "scope": "c4_attention_only",
+    "read": "This checkpoints only C4 sparse-attention layers. It is faster than the lower-memory Muon attention-only six-step reference, but uses much more memory and therefore does not help the larger-MBS/no-AC fit goal."
+  },
+  "sparse_attention": {
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot"
+  },
+  "moe_ep": {
+    "moe_comm_backend": "standard",
+    "balanced_moe_mode": "execute",
+    "balanced_moe_hot_experts": 8,
+    "hot_weight_forward_backend": "mori_sdma",
+    "hot_weight_reduce_backend": "mori_sdma",
+    "hot_split_materialize_rows": "owner_compact",
+    "hot_split_presort_mode": "owner_compact",
+    "hot_split_weight_layout": "selected",
+    "hot_split_weighted_scatter_backend": "triton_bwd"
+  },
+  "step_metrics": [
+    {
+      "step": 1,
+      "loss": 12.23095,
+      "grad_norm": 19.5,
+      "tokens_per_gpu_s": 1639,
+      "tflops_per_gpu": 82.98,
+      "rankmax_memory_gib": 252.38
+    },
+    {
+      "step": 2,
+      "loss": 9.39015,
+      "grad_norm": 119.5,
+      "tokens_per_gpu_s": 8082,
+      "tflops_per_gpu": 409.20,
+      "rankmax_memory_gib": 269.66
+    },
+    {
+      "step": 3,
+      "loss": 7.01929,
+      "grad_norm": 56.5,
+      "tokens_per_gpu_s": 8264,
+      "tflops_per_gpu": 418.41,
+      "rankmax_memory_gib": 269.67
+    },
+    {
+      "step": 4,
+      "loss": 30.09104,
+      "grad_norm": 67.0,
+      "tokens_per_gpu_s": 8452,
+      "tflops_per_gpu": 427.92,
+      "rankmax_memory_gib": 269.67
+    },
+    {
+      "step": 5,
+      "loss": 7.01107,
+      "grad_norm": 17.5,
+      "tokens_per_gpu_s": 8523,
+      "tflops_per_gpu": 431.53,
+      "rankmax_memory_gib": 269.67
+    },
+    {
+      "step": 6,
+      "loss": 6.68233,
+      "grad_norm": 29.0,
+      "tokens_per_gpu_s": 8543,
+      "tflops_per_gpu": 432.55,
+      "rankmax_memory_gib": 269.67
+    }
+  ],
+  "windows": {
+    "steps_2_to_6": {
+      "tokens_per_gpu_s_mean": 8372.8,
+      "node_tokens_s_mean": 66982.4,
+      "tflops_per_gpu_mean": 423.922,
+      "peak_logged_memory_gib": 269.67
+    },
+    "steps_4_to_6": {
+      "tokens_per_gpu_s_mean": 8506.0,
+      "node_tokens_s_mean": 68048.0,
+      "tflops_per_gpu_mean": 430.0,
+      "peak_logged_memory_gib": 269.67
+    }
+  },
+  "comparisons": {
+    "vs_muon_attention_only_triton_bwd_steps_2_to_6": {
+      "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_expert_muon_prealloc_ns1_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "baseline_tokens_per_gpu_s_mean": 8202.525,
+      "baseline_tflops_per_gpu_mean": 415.3055,
+      "baseline_peak_logged_memory_gib": 234.38,
+      "delta_tokens_per_gpu_s_pct": 2.075,
+      "delta_tflops_per_gpu_pct": 2.075,
+      "delta_peak_memory_gib": 35.29
+    },
+    "vs_adamw_attention_only_triton_bwd_current_best": {
+      "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+      "baseline_steps_2_to_20_tokens_per_gpu_s_mean": 8518.8421,
+      "baseline_steps_2_to_20_tflops_per_gpu_mean": 431.3139,
+      "baseline_peak_logged_memory_gib": 251.97,
+      "read": "Not a matched window comparison. The C4-only Muon six-step run is near the retained AdamW throughput in a short window, but uses 17.70 GiB more peak memory than the AdamW attention-only retained run and 35.29 GiB more than the Muon attention-only six-step reference."
+    }
+  },
+  "decision": {
+    "promote": false,
+    "read": "Attention-only selective recompute remains the retained fit/perf scope. C4-only recompute is a useful speed/memory trade but it gives back the memory headroom that made Muon interesting, so it does not unlock MBS16 or no-AC. Whole-block/block-style recompute remains rejected because it re-enters collective-bearing MoE/hot-helper paths."
+  }
+}

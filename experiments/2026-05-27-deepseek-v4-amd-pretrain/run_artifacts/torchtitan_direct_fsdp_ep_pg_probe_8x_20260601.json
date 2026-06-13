@@ -1,0 +1,1767 @@
+{
+  "artifact": "torchtitan_fsdp_ep_process_group_probe",
+  "created_at": "2026-05-31T18:03:20.469163+00:00",
+  "per_rank": [
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 0,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133301776693040,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x793cbd0c3730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133295410217200,
+          "group_ranks": [
+            0
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x793b419380f0>",
+          "mesh": [
+            0
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133295410218352,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x793b41938570>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133301776693040,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x793cbd0c3730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133301776693040,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x793cbd0c3730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 0,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 1,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            1
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133729460385264,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x79a050fb75f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133723143472880,
+          "group_ranks": [
+            1
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x799ed87706f0>",
+          "mesh": [
+            1
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            1
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133723143473392,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x799ed87708f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            1
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133729460385264,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x79a050fb75f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            1
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 133729460385264,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x79a050fb75f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 1,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 2,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            2
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 129370619549872,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x75a971d298b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 129370536707184,
+          "group_ranks": [
+            2
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x75a96ce28470>",
+          "mesh": [
+            2
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            2
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 129370536708656,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x75a96ce28a30>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            2
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 129370619549872,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x75a971d298b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            2
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 129370619549872,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x75a971d298b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 2,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 3,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            3
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125059540956976,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x71bdb183b730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125053176793328,
+          "group_ranks": [
+            3
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x71bc362e48f0>",
+          "mesh": [
+            3
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            3
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125053176793840,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x71bc362e4af0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            3
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125059540956976,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x71bdb183b730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            3
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125059540956976,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x71bdb183b730>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 3,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 4,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            4
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125549311636784,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x722fba1f3530>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125542972899376,
+          "group_ranks": [
+            4
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x722e404dc030>",
+          "mesh": [
+            4
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            4
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125542972900720,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x722e404dc570>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            4
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125549311636784,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x722fba1f3530>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            4
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 125549311636784,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x722fba1f3530>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 4,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 5,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            5
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135219348190704,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7afb353735f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135213031360240,
+          "group_ranks": [
+            5
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7af9bcb406f0>",
+          "mesh": [
+            5
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            5
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135213031361008,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7af9bcb409f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            5
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135219348190704,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7afb353735f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            5
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135219348190704,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7afb353735f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 5,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 6,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            6
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135969127511792,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7ba9c78bb6f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135962762787888,
+          "group_ranks": [
+            6
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7ba84c2dbc30>",
+          "mesh": [
+            6
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            6
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135962762854832,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7ba84c2ec1b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            6
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135969127511792,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7ba9c78bb6f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            6
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 135969127511792,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7ba9c78bb6f0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 6,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    },
+    {
+      "backend": "nccl",
+      "collective_smoke": {
+        "ep_all_to_all_recv": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "fsdp_all_reduce_sum": 28.0
+      },
+      "cuda_available": true,
+      "device_name": "AMD Instinct MI350X VF",
+      "local_identity": {
+        "fsdp_group_is_ep_group": false,
+        "fsdp_group_ranks_equal_ep_group_ranks": true
+      },
+      "local_rank": 7,
+      "meshes": {
+        "batch": {
+          "available": true,
+          "coordinate": [
+            7
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 139190982260144,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7e97ed0db5b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "batch"
+          ],
+          "name": "batch",
+          "ndim": 1,
+          "size": 8
+        },
+        "cp": {
+          "available": false,
+          "name": "cp",
+          "reason": "optional mesh is None"
+        },
+        "dp_replicate": {
+          "available": false,
+          "name": "dp_replicate",
+          "reason": "optional mesh is None"
+        },
+        "efsdp": {
+          "available": true,
+          "coordinate": [
+            0
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 139184615639216,
+          "group_ranks": [
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7e967192c8b0>",
+          "mesh": [
+            7
+          ],
+          "mesh_dim_names": [
+            "efsdp"
+          ],
+          "name": "efsdp",
+          "ndim": 1,
+          "size": 1
+        },
+        "ep": {
+          "available": true,
+          "coordinate": [
+            7
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 139184615639728,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7e967192cab0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "ep"
+          ],
+          "name": "ep",
+          "ndim": 1,
+          "size": 8
+        },
+        "fsdp": {
+          "available": true,
+          "coordinate": [
+            7
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 139190982260144,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7e97ed0db5b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "fsdp"
+          ],
+          "name": "fsdp",
+          "ndim": 1,
+          "size": 8
+        },
+        "loss": {
+          "available": true,
+          "coordinate": [
+            7
+          ],
+          "group_backend": "nccl",
+          "group_object_id": 139190982260144,
+          "group_ranks": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "group_repr": "<torch.distributed.distributed_c10d.ProcessGroup object at 0x7e97ed0db5b0>",
+          "mesh": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mesh_dim_names": [
+            "loss_mesh"
+          ],
+          "name": "loss",
+          "ndim": 1,
+          "size": 8
+        },
+        "pp": {
+          "available": false,
+          "name": "pp",
+          "reason": "optional mesh is None"
+        },
+        "tp": {
+          "available": false,
+          "name": "tp",
+          "reason": "optional mesh is None"
+        }
+      },
+      "parallel_dims": {
+        "cp": 1,
+        "dp_replicate": 1,
+        "dp_shard": 8,
+        "ep": 8,
+        "etp": null,
+        "full_dtensor": false,
+        "pp": 1,
+        "tp": 1
+      },
+      "rank": 7,
+      "torch_hip": "7.2.53211",
+      "torch_version": "2.13.0a0+gitccf72d7",
+      "world_size": 8
+    }
+  ],
+  "purpose": "Runtime evidence for the Ascend-mapped FSDP/EP process-group separation gate."
+}

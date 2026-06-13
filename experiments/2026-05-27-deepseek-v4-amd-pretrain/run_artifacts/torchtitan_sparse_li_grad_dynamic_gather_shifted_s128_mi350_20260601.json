@@ -1,0 +1,68 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "grad_norms": {
+    "index_k": 0.00073531229281798,
+    "index_q": 0.0007696835091337562,
+    "weights": 0.0005981918657198548
+  },
+  "kernel": {
+    "read": "LI-index-only dynamic top-k floor. It materializes selected key-index rows and uses torch einsum/autograd for d_query_index, d_key_index, and d_weights against a uniform target distribution. It excludes main-attention target-prob construction.",
+    "workspace": {
+      "head_logits_logical_bytes": 524288,
+      "index_logits_bytes": 16384,
+      "row_count": 125.0,
+      "selected_index_k_bytes": 1048576,
+      "target_probs_bytes": 16384
+    }
+  },
+  "loss": 0.016749758273363113,
+  "matmul_dtype": "input",
+  "scope": "dynamic_topk_li_index_gradient_gather_einsum_floor",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 32,
+    "head_dim": 128,
+    "index_pattern": "shifted",
+    "n_heads": 64,
+    "seq_len": 128,
+    "shift_stride": 13,
+    "topk": 32,
+    "valid_entries": 2016
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 2.0862200260162354,
+      "mean_ms": 1.406800349553426,
+      "median_ms": 1.1157710552215576,
+      "min_ms": 1.0184099674224854,
+      "samples_ms": [
+        2.0862200260162354,
+        1.1157710552215576,
+        1.0184099674224854
+      ],
+      "stdev_ms": 0.5904050456491509
+    },
+    "peak_memory_allocated_bytes": 176962048,
+    "peak_memory_allocated_gib": 0.1648087501525879,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 2.1493929671123624,
+      "mean_ms": 1.4510253289093573,
+      "median_ms": 1.1515970109030604,
+      "min_ms": 1.0520860087126493,
+      "samples_ms": [
+        2.1493929671123624,
+        1.1515970109030604,
+        1.0520860087126493
+      ],
+      "stdev_ms": 0.6068472859428206
+    },
+    "warmup_iters": 1
+  }
+}

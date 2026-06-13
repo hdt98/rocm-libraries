@@ -1,0 +1,176 @@
+{
+  "artifact": "mori_remote_hot_mask_lookup_rejection_20260607",
+  "code_decision": "production mori_aiter_moe.py reverted to existing per-hot scan; probe retained",
+  "date": "2026-06-07",
+  "e2e_timing_run": {
+    "baseline_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_aiter_routemask_top8_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607.json",
+    "baseline_step2_tflops_per_gpu": 218.02,
+    "baseline_step2_tokens_per_gpu_s": 4306,
+    "host": "do-vunguyen-mi350-gpu",
+    "read": "No throughput promotion; step 2 is slightly lower than the prior top-8 SDMA timing sidecar.",
+    "run_id": "torchtitan_dsv4_flash12_mori_aiter_routemask_top8_lookupmask2_sdma_timing_8x_s4096_gbs128_mbs2_steps2_20260607",
+    "step_metrics": {
+      "1": {
+        "grad_norm": 17.25,
+        "loss": 12.40782,
+        "peak_logged_memory_gib": 115.41,
+        "tflops_per_gpu": 71.69,
+        "tokens_per_gpu_s_max": 1416,
+        "tokens_per_gpu_s_min": 1413
+      },
+      "2": {
+        "grad_norm": 93.0,
+        "loss": 9.00284,
+        "peak_logged_memory_gib": 159.46,
+        "tflops_per_gpu": 216.73,
+        "tokens_per_gpu_s_max": 4281,
+        "tokens_per_gpu_s_min": 4280
+      }
+    }
+  },
+  "last_half_timing_compare": {
+    "broad_mori_rankmax_ms": {
+      "backward.combine_dx.call": {
+        "baseline_ms": 736.8383347988129,
+        "delta_ms": 20.392494678497314,
+        "lookup_ms": 757.2308294773102
+      },
+      "backward.dispatch_grad_output.call": {
+        "baseline_ms": 233.74622613191605,
+        "delta_ms": 32.40236037969589,
+        "lookup_ms": 266.14858651161194
+      },
+      "backward.local_vjp.aiter_stage1_recompute": {
+        "baseline_ms": 2128.4141902923584,
+        "delta_ms": 54.496185302734375,
+        "lookup_ms": 2182.910375595093
+      },
+      "local_aiter_stage1_saved_vjp.wgrad": {
+        "baseline_ms": 373.72713112831116,
+        "delta_ms": 31.080445528030396,
+        "lookup_ms": 404.80757665634155
+      }
+    },
+    "helper_stage_rankmax_ms": {
+      "forward.balanced_moe.execute.hot_split.broadcast_w13": {
+        "baseline_ms": 135.63311064243317,
+        "delta_ms": 0.15907657146453857,
+        "lookup_ms": 135.7921872138977
+      },
+      "forward.balanced_moe.execute.hot_split.broadcast_w2": {
+        "baseline_ms": 92.46544075012207,
+        "delta_ms": 2.0127922892570496,
+        "lookup_ms": 94.47823303937912
+      },
+      "forward.balanced_moe.execute.hot_split.gather_remote": {
+        "baseline_ms": 7.5817859917879105,
+        "delta_ms": -0.980594988912344,
+        "lookup_ms": 6.6011910028755665
+      },
+      "forward.balanced_moe.execute.hot_split.grouped_rows": {
+        "baseline_ms": 243.28287959098816,
+        "delta_ms": -33.89517438411713,
+        "lookup_ms": 209.38770520687103
+      },
+      "forward.balanced_moe.execute.hot_split.scatter_tokens": {
+        "baseline_ms": 49.571050852537155,
+        "delta_ms": -7.738552093505859,
+        "lookup_ms": 41.832498759031296
+      },
+      "forward.balanced_moe.execute.hot_split.sort_counts": {
+        "baseline_ms": 28.151932939887047,
+        "delta_ms": -1.5199529081583023,
+        "lookup_ms": 26.631980031728745
+      },
+      "forward.balanced_moe.execute.plan": {
+        "baseline_ms": 117.16977488994598,
+        "delta_ms": 11.48492032289505,
+        "lookup_ms": 128.65469521284103
+      },
+      "forward.balanced_moe.execute.remote_mask": {
+        "baseline_ms": 61.78812512755394,
+        "delta_ms": 1.9604224860668182,
+        "lookup_ms": 63.74854761362076
+      }
+    },
+    "helper_total_rankmax_ms": {
+      "baseline": 735.6441007852554,
+      "delta": -28.517062705010176,
+      "lookup": 707.1270380802453
+    },
+    "remote_rows_local": {
+      "baseline": {
+        "max": 38757,
+        "mean": 22676.52734375,
+        "median": 22075.5
+      },
+      "lookup": {
+        "max": 30370,
+        "mean": 20282.169270833332,
+        "median": 20126.0
+      },
+      "note": "Routing/loss differed between two training runs, so stage totals are useful but not a same-tensor proof."
+    }
+  },
+  "next_action": "Do not pursue lookup-table mask classification. Focus on first-class dispatcher layout and batched/overlapped helper execution instead.",
+  "result": "rejected_lookup_table_remote_hot_mask",
+  "same_tensor_probe": {
+    "read": "On the same generated routed-slot tensor, lookup-table classify is slower than the existing top-8 scan on MI350.",
+    "with_min_helper_rows_0": {
+      "lookup_median_ms_mean_across_ranks": 0.22393868677318096,
+      "lookup_over_old_max": 1.18331486789967,
+      "lookup_over_old_median": 1.1692581297081364,
+      "lookup_over_old_min": 1.1622489156361848,
+      "old_median_ms_mean_across_ranks": 0.191168500110507,
+      "remote_rows_max": 1331,
+      "remote_rows_median": 1305.5,
+      "shape": {
+        "hot_experts": 8,
+        "min_helper_rows": 0,
+        "num_global_experts": 256,
+        "num_local_experts": 32,
+        "selected_hot_experts": [
+          47,
+          157,
+          64,
+          112,
+          228,
+          214,
+          188,
+          5
+        ],
+        "tokens": 8192,
+        "top_k": 6,
+        "world_size": 8
+      }
+    },
+    "with_min_helper_rows_512": {
+      "lookup_median_ms_mean_across_ranks": 0.3752563130110502,
+      "lookup_over_old_max": 1.08944908646938,
+      "lookup_over_old_median": 1.0694453165134585,
+      "lookup_over_old_min": 1.0494292110843317,
+      "old_median_ms_mean_across_ranks": 0.3509435597807169,
+      "remote_rows_max": 0,
+      "remote_rows_median": 0.0,
+      "shape": {
+        "hot_experts": 8,
+        "min_helper_rows": 512,
+        "num_global_experts": 256,
+        "num_local_experts": 32,
+        "selected_hot_experts": [
+          47,
+          157,
+          64,
+          112,
+          228,
+          214,
+          188,
+          5
+        ],
+        "tokens": 8192,
+        "top_k": 6,
+        "world_size": 8
+      }
+    }
+  }
+}

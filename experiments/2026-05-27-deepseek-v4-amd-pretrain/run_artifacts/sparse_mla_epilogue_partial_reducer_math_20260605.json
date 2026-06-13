@@ -1,0 +1,81 @@
+{
+  "artifact": "sparse_mla_epilogue_partial_reducer_math",
+  "date": "2026-06-05",
+  "scope": "Current math and implementation state for the sparse-MLA shared-KV backward dKV epilogue partial reducer",
+  "shape": {
+    "device": "1xMI350",
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "valid_pairs": 1572352
+  },
+  "layout_contract": {
+    "grad_kv_layout": "grad_kv[B, S + compressed_groups, D]",
+    "compressed_group_destination": "compressed group g writes to grad_kv[:, S + g, d]",
+    "head_dimension": "H is a reduction dimension, not an output dimension, so final compressed dKV has no H axis.",
+    "dimension_d": "D is an output axis. Each d lane is reduced independently; D itself is not a reduction axis."
+  },
+  "math": {
+    "per_token_slot_d_contribution": "c[t,k,d] = sum_h(scaled_dP[t,h,k] * q[t,h,d] + prob[t,h,k] * grad_output[t,h,d])",
+    "current_epilogue_write": "atomicAdd(grad_kv[S + group[t,k], d], c[t,k,d])",
+    "desired_local_group_reduction": "A[g,d] = sum_{t,k: group[t,k] = g} c[t,k,d], then atomicAdd(grad_kv[S + g, d], A[g,d])",
+    "what_is_already_reduced_locally": "The H dimension is already reduced inside the contribution tile by tl.dot or CK/rocWMMA MFMA-style math.",
+    "what_is_not_yet_reduced_in_the_fast_kernel": "Multiple (token, selected_slot) pairs that share the same compressed group are not meaningfully reduced before global memory in the retained query-major Triton kernel."
+  },
+  "current_fast_triton_kernel": {
+    "source": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "function": "_sparse_mla_shared_kv_backward_dq_dkv_query_recompute_kernel",
+    "owner": "one query token x head block x selected window",
+    "retained_block_shape": {
+      "block_h": 64,
+      "block_n": 64,
+      "block_d": 128
+    },
+    "measured_artifact": "run_artifacts/sparse_attention_kernel_actual_li_query_recompute_profile_decision_20260605.json",
+    "measured_ms": {
+      "no_dkv": 1.9622999429702759,
+      "dkv_reduce_sink": 2.853471040725708,
+      "full": 11.134678840637207,
+      "dkv_dot_math_approx": 0.8911710977554321,
+      "global_dkv_accumulation_approx": 8.281207799911499
+    },
+    "read": "This is the actual source-boundary sparse-attention backward kernel gate: q, dO, output, lse, kv_bank, and LI indices enter; dQ and dKV leave. It is fast before dKV writes and slow when it emits the raw many-to-one dKV atomic stream."
+  },
+  "why_one_token_owner_has_no_local_group_reduction": {
+    "within_one_token": "For the actual LI route, selected compressed groups are effectively unique within a token/selected window, so reducing by group inside a one-token CTA has modeled reduction 1.0x.",
+    "across_tokens": "The useful repeats appear across a token tile, not inside one token. For token_block=32 and selected_block=512, modeled write reduction is 23.813x, but the retained fast Triton owner does not see those 32 tokens at once.",
+    "not_a_triton_language_limit": "Triton can express multi-token work, but serializing many tokens inside one program loses the query-major producer speed that gives the 1.96 ms no-dKV baseline."
+  },
+  "tested_cross_token_local_reducer": {
+    "source": "tools/dsv4_runtime_probe/source_boundary_query_major_scorepage_dparallel.hip",
+    "modes": {
+      "mode13": "token_block=32, group_panel=32, sorted sidecar, accumulates group_acc[local_group, d] in LDS, then writes valid dKV",
+      "mode14": "same as mode13 but final global dKV writes replaced by checksum sink"
+    },
+    "math": "group_acc[p,d] += sum_{token in tile} sum_{k in panel: group[token,k] = p} sum_h(scaled_dP[token,h,k] * q[token,h,d] + prob[token,h,k] * grad_output[token,h,d])",
+    "measured_artifacts": {
+      "mode13_valid_dkv": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_t32_gp32_k512_mode13_bounded_group_sidecar_reduced_dkv_20260605.json",
+      "mode14_sink": "run_artifacts/sparse_mla_source_boundary_query_major_scorepage_dparallel_s4096_layer2_t32_gp32_k512_mode14_bounded_group_sidecar_sink_20260605.json"
+    },
+    "measured_ms": {
+      "mode13_valid_dkv": 154.99237060546875,
+      "mode14_sink": 152.29849243164062,
+      "final_global_write_delta": 2.693878173828125
+    },
+    "rejection_reason": "This implements the desired cross-token group reduction mathematically, but it serializes token-tile score/prob/scaled-dP production inside one CTA and spends heavy LDS/reducer work. The final global atomics are not the wall in this rejected owner."
+  },
+  "current_decision": {
+    "status": "math_understood_current_local_reducer_not_promoted",
+    "do_not_do_next": [
+      "Do not make compressed group the outer contribution loop.",
+      "Do not add another late dKV-only reducer after materialized P/scaled-dP.",
+      "Do not use the token-tile group_acc owner as the promoted sparse-attention kernel."
+    ],
+    "next_kernel_requirement": "Preserve the H64 query-major source-boundary producer that gives ~2 ms no-dKV latency, but add a group-aware segmented dKV epilogue before global memory. The implementation must reduce across (token, selected_slot) sharing compressed group without serializing the token tile's score/prob/scaled-dP producer.",
+    "promotion_gate": "A candidate must beat the retained 11.134678840637207 ms S4096 full sparse-attention backward boundary before any 4x/8x TorchTitan e2e TFLOPs run."
+  },
+  "dependency_pins_changed": false
+}

@@ -1,0 +1,160 @@
+{
+  "best_triton": {
+    "block_k": 64,
+    "block_m": 32,
+    "block_n": 64,
+    "compact_tflops_median": 0.8914537760578986,
+    "median_ms": 0.15056050196290016,
+    "min_ms": 0.07079999893903732,
+    "num_warps": 4,
+    "speedup_vs_torch_padded_gather_median": 0.13456384248161307,
+    "timing_ms": {
+      "triton_compact_bm32_bn64_bk64_w4_ms_max": 0.230321004986763,
+      "triton_compact_bm32_bn64_bk64_w4_ms_mean": 0.15056050196290016,
+      "triton_compact_bm32_bn64_bk64_w4_ms_median": 0.15056050196290016,
+      "triton_compact_bm32_bn64_bk64_w4_ms_min": 0.07079999893903732
+    }
+  },
+  "check": {
+    "atol": 0.5,
+    "config": {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 64,
+      "num_warps": 4
+    },
+    "max_abs": 0.0,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.0,
+    "rtol": 0.025
+  },
+  "failed_triton_configs": [],
+  "flops": {
+    "compact": 134217728.0,
+    "compact_vs_padded_flop_ratio": 0.6153846153846154,
+    "padded_global_max": 218103808.0
+  },
+  "op": "w2_dgrad",
+  "op_read": "dY [assignments, hidden] x w2 [experts, hidden, intermediate]",
+  "probe": "triton_compact_grouped_gemm",
+  "read": "Promote only if the best Triton compact tile beats padded torch.bmm plus gather with correct BF16 output. A win here is necessary but not sufficient for full-layer promotion because wgrad and compact-to-token reductions still need kernels.",
+  "route_stats": {
+    "assignments": 512,
+    "experts": 32,
+    "max_per_expert": 26,
+    "mean_per_expert": 16.0,
+    "min_per_expert": 9,
+    "padded_rows_global_max": 832,
+    "padding_multiplier_global_max": 1.625
+  },
+  "shape": {
+    "K": 512,
+    "N": 256,
+    "assignments": 512,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 32,
+    "tokens": 128,
+    "topk": 4
+  },
+  "torch_padded_bmm_gather": {
+    "compact_equivalent_tflops_median": 0.7224493671802765,
+    "median_ms": 0.18578150123357773,
+    "padded_tflops_median": 1.1739802216679494,
+    "timing_ms": {
+      "torch_padded_bmm_gather_ms_max": 0.29916200041770935,
+      "torch_padded_bmm_gather_ms_mean": 0.18578150123357773,
+      "torch_padded_bmm_gather_ms_median": 0.18578150123357773,
+      "torch_padded_bmm_gather_ms_min": 0.0724010020494461
+    }
+  },
+  "torch_padded_bmm_only": {
+    "compact_equivalent_tflops_median": 6.2425398714118545,
+    "median_ms": 0.021500499919056892,
+    "padded_tflops_median": 10.144127291044263,
+    "timing_ms": {
+      "torch_padded_bmm_only_ms_max": 0.022640999406576157,
+      "torch_padded_bmm_only_ms_mean": 0.021500499919056892,
+      "torch_padded_bmm_only_ms_median": 0.021500499919056892,
+      "torch_padded_bmm_only_ms_min": 0.020360000431537628
+    }
+  },
+  "torch_padded_bmm_out": {
+    "compact_equivalent_tflops_median": 6.624764569871046,
+    "median_ms": 0.02025999967008829,
+    "padded_tflops_median": 10.76524242604045,
+    "timing_ms": {
+      "torch_padded_bmm_out_ms_max": 0.020759999752044678,
+      "torch_padded_bmm_out_ms_mean": 0.02025999967008829,
+      "torch_padded_bmm_out_ms_median": 0.02025999967008829,
+      "torch_padded_bmm_out_ms_min": 0.019759999588131905
+    }
+  },
+  "triton_results": [
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 64,
+      "compact_tflops_median": 0.8914537760578986,
+      "median_ms": 0.15056050196290016,
+      "min_ms": 0.07079999893903732,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.13456384248161307,
+      "timing_ms": {
+        "triton_compact_bm32_bn64_bk64_w4_ms_max": 0.230321004986763,
+        "triton_compact_bm32_bn64_bk64_w4_ms_mean": 0.15056050196290016,
+        "triton_compact_bm32_bn64_bk64_w4_ms_median": 0.15056050196290016,
+        "triton_compact_bm32_bn64_bk64_w4_ms_min": 0.07079999893903732
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 32,
+      "compact_tflops_median": 0.8520651520503202,
+      "median_ms": 0.15752049908041954,
+      "min_ms": 0.06988000124692917,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.1286181785124035,
+      "timing_ms": {
+        "triton_compact_bm32_bn32_bk64_w4_ms_max": 0.2451609969139099,
+        "triton_compact_bm32_bn32_bk64_w4_ms_mean": 0.15752049908041954,
+        "triton_compact_bm32_bn32_bk64_w4_ms_median": 0.15752049908041954,
+        "triton_compact_bm32_bn32_bk64_w4_ms_min": 0.06988000124692917
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 64,
+      "compact_tflops_median": 0.7958760144795505,
+      "median_ms": 0.16864150390028954,
+      "min_ms": 0.0726810023188591,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.120136497846148,
+      "timing_ms": {
+        "triton_compact_bm16_bn64_bk64_w4_ms_max": 0.26460200548171997,
+        "triton_compact_bm16_bn64_bk64_w4_ms_mean": 0.16864150390028954,
+        "triton_compact_bm16_bn64_bk64_w4_ms_median": 0.16864150390028954,
+        "triton_compact_bm16_bn64_bk64_w4_ms_min": 0.0726810023188591
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 32,
+      "compact_tflops_median": 0.7488951249490814,
+      "median_ms": 0.1792209930717945,
+      "min_ms": 0.06616000086069107,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.11304479080735981,
+      "timing_ms": {
+        "triton_compact_bm16_bn32_bk64_w4_ms_max": 0.29228198528289795,
+        "triton_compact_bm16_bn32_bk64_w4_ms_mean": 0.1792209930717945,
+        "triton_compact_bm16_bn32_bk64_w4_ms_median": 0.1792209930717945,
+        "triton_compact_bm16_bn32_bk64_w4_ms_min": 0.06616000086069107
+      }
+    }
+  ]
+}

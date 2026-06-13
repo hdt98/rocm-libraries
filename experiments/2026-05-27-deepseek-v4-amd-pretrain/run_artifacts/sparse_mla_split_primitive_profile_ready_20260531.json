@@ -1,0 +1,71 @@
+{
+  "artifact": "sparse_mla_split_primitive_profile_ready_20260531",
+  "superseded_by": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/sparse_mla_split_primitive_profile_decision_20260531.json",
+  "created_at": "2026-05-31T16:23:27Z",
+  "scope": "Prepare and validate a primitive-profile path for split-compressed sparse MLA backward, then attempt the Flash S=4096 one-MI350 timing probe.",
+  "code_changes": {
+    "probe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/probe_sparse_mla_backward_ops.py",
+    "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh",
+    "read": "The probe now profiles split-compressed branches instead of returning a skipped primitive profile, and the launcher exposes probe-sparse-mla-backward-4096 with SPARSE_MLA_BWD_* controls."
+  },
+  "small_cpu_validation": {
+    "host": "do-sonle-kernel",
+    "container": "b9d33e6e8227",
+    "device": "cpu",
+    "command_shape": "python3 dsv4_layer_microbench/probe_sparse_mla_backward_ops.py --device cpu --dtype float32 --batch 1 --seqlen 16 --heads 2 --kv-dim 8 --window-size 4 --csa-ratio 4 --hca-ratio 8 --warmup 0 --iters 1 --variant split-compressed-triton-softmax --primitive-profile --check-variants retained --json",
+    "result": "passed",
+    "correctness_vs_retained": {
+      "ok": true,
+      "checked_tensors": [
+        "out",
+        "q",
+        "kv",
+        "csa",
+        "hca",
+        "attn_sink"
+      ],
+      "max_abs_all": 0.0,
+      "rel_l2_all": 0.0
+    },
+    "primitive_profile_path": "exercised_split_compressed_branch",
+    "note": "CPU timing is not performance evidence; this only validates the split primitive-profile logic and correctness plumbing."
+  },
+  "flash_s4096_gpu_probe_attempt": {
+    "command": "RUN_TAG=sparse_mla_split_primitive_flash_s4096_20260531 SPARSE_MLA_BWD_VARIANT=split-compressed-triton-softmax SPARSE_MLA_BWD_ITERS=5 SPARSE_MLA_BWD_PRIMITIVE_PROFILE=true SPARSE_MLA_BWD_CHECK_VARIANTS=retained WAIT_IDLE_SECONDS=120 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-sparse-mla-backward-4096",
+    "status": "not_started",
+    "reason": "Idle guard timed out on do-sonle-kernel before staging/running the GPU timing probe.",
+    "blocking_processes_observed": [
+      {
+        "timestamp_utc": "2026-05-31T16:19:49Z",
+        "pid": 3669515,
+        "owner": "root",
+        "process": "python",
+        "gpu": 1,
+        "vram_used_bytes": 1239117824,
+        "cmd": "python /exp/tools/dsv4_coda_attention_layer_gate.py --m-values 64 --groups 1 --cache-seqlen 512 --cache-stride 0 --page-size 256 --block-n 128 --num-split 1 --q-absorb-backend gemm --q-partials-handoff partials --q-absorb-direct-backend sumsq-gemm --mla-kv-format qfp8-block-prepacked --mla-value-group-tiles 8 --post-tail-mode none --skip-bench --aiter-root /exp/sources/wip/aiter --aiter-aot-import --json-output /exp/artifacts/dsv4_coda_qfp8_gate_20260531/smoke/gate_qfp8_prepacked_M64_S512.json"
+      },
+      {
+        "timestamp_utc": "2026-05-31T16:20:00Z",
+        "pid": 3674203,
+        "owner": "root",
+        "process": "python",
+        "gpu": 0,
+        "vram_used_bytes": 0,
+        "cmd": "python /exp/tools/dsv4_coda_attention_layer_gate.py --m-values 512 --groups 1 --cache-seqlen 8192 --cache-stride 0 --page-size 256 --block-n 128 --num-split 1 --q-absorb-backend gemm --q-partials-handoff partials --q-absorb-direct-backend sumsq-gemm --mla-kv-format qfp8-block-prepacked --mla-value-group-tiles 8 --post-tail-mode none --skip-bench --profile-stage coda-mla-consume --profile-warmup 3 --profile-iters 20 --aiter-root /exp/sources/wip/aiter --aiter-aot-import --json-output /exp/artifacts/dsv4_coda_qfp8_gate_20260531/smoke/gate_qfp8_prepacked_M512_S8192_profile.json"
+      }
+    ],
+    "decision": "Do not co-schedule this timing-sensitive sparse MLA backward probe over root-owned Coda attention gates. Retry the same command when do-sonle-kernel is idle."
+  },
+  "validation": {
+    "local_py_compile": "passed",
+    "launcher_bash_n": "passed",
+    "json_artifact_validation": "passed",
+    "recipe_yaml_validation": "passed_with_ruby_yaml",
+    "local_cpu_smoke": "not_available_desktop_python_missing_torch"
+  },
+  "next_actions": [
+    "Retry probe-sparse-mla-backward-4096 when do-sonle-kernel has no non-gpuagent KFD processes.",
+    "Use the resulting primitive profile to decide whether the next sparse MLA work is softmax split fusion, compressed branch gradient accumulation, q/dKV accumulation, or sink-gradient reduction."
+  ],
+  "dependency_pin_changes": []
+}

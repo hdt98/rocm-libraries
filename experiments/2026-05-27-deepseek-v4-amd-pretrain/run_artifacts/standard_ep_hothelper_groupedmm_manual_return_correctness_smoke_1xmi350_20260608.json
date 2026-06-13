@@ -1,0 +1,199 @@
+{
+  "checks": {
+    "grouped_mm_manual_return_dtopk": {
+      "atol": 1.0,
+      "dtype": "torch.float32",
+      "max_abs": 2.4024397134780884e-05,
+      "mean_abs": 4.755202098749578e-08,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 4.329569434688843e-05,
+      "rtol": 0.05,
+      "shape": [
+        512,
+        1
+      ]
+    },
+    "grouped_mm_manual_return_dw1": {
+      "atol": 1.0,
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.00048828125,
+      "mean_abs": 2.19308931264095e-05,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 0.003552862471475087,
+      "rtol": 0.05,
+      "shape": [
+        8,
+        128,
+        256
+      ]
+    },
+    "grouped_mm_manual_return_dw2": {
+      "atol": 1.0,
+      "dtype": "torch.bfloat16",
+      "max_abs": 6.103515625e-05,
+      "mean_abs": 1.3556018529925495e-09,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 1.8526457022493423e-05,
+      "rtol": 0.05,
+      "shape": [
+        8,
+        256,
+        128
+      ]
+    },
+    "grouped_mm_manual_return_dw3": {
+      "atol": 1.0,
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.00048828125,
+      "mean_abs": 2.1615438527078368e-05,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 0.0035388998671992103,
+      "rtol": 0.05,
+      "shape": [
+        8,
+        128,
+        256
+      ]
+    },
+    "grouped_mm_manual_return_dx": {
+      "atol": 1.0,
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0009765625,
+      "mean_abs": 5.480220715980977e-05,
+      "ok": true,
+      "pct_close": 100.0,
+      "rel_l2": 0.004137683168639253,
+      "rtol": 0.05,
+      "shape": [
+        512,
+        256
+      ]
+    }
+  },
+  "detail_enabled": false,
+  "estimated_flops": {
+    "detail_gemm_each": 33554432.0,
+    "forward_recompute_gemm": 100663296.0,
+    "full_vjp_gemm_family": 301989888.0,
+    "fused_w13_detail_forward_gate_up_gemm": 67108864.0,
+    "saved_hidden_output_vjp_gemm_family": 201326592.0,
+    "saved_hidden_vjp_gemm_family": 234881024.0,
+    "stage1_hidden_output_vjp_gemm_family": 234881024.0,
+    "stage1_hidden_vjp_gemm_family": 268435456.0,
+    "w2_dgrad_gemm": 33554432.0,
+    "wgrad_gemms": 100663296.0,
+    "xgrad_gemms": 67108864.0
+  },
+  "estimated_tflops": {
+    "grouped_mm_manual_return_backward_saved_graph": 0.0012642873580853407,
+    "grouped_mm_manual_return_forward_graph": 0.21346688273912293,
+    "grouped_mm_manual_return_full_forward_backward": 0.13580746608054584,
+    "torch_padded_dgrad_swiglu": 0.11065195488995137,
+    "torch_padded_forward_recompute": 0.009660521298234689,
+    "torch_padded_full_vjp": 0.3745062930184112,
+    "torch_padded_wgrad": 6.185791345962203e-05,
+    "torch_padded_xgrad_reduce": 0.14570986481265966
+  },
+  "fused_w13_enabled": false,
+  "grouped_mm_autograd_enabled": false,
+  "grouped_mm_manual_return_enabled": true,
+  "grouped_mm_scatter_autograd_enabled": false,
+  "grouped_mm_scatter_backend": "torch",
+  "layout_detail_enabled": false,
+  "layout_only": false,
+  "layout_probe": {
+    "enabled": false
+  },
+  "ok": true,
+  "prealloc_state": {},
+  "prealloc_triton_swiglu_enabled": false,
+  "primus_turbo_auto_tune": false,
+  "primus_turbo_backend": "default",
+  "primus_turbo_enabled": false,
+  "probe": "owned_expert_vjp_ep_shape",
+  "read": "Models the local owner-rank VJP behind MORI routed backward. It compares retained padded torch.bmm-style grouped expert math against AITER compact grouped GMM/TGMM at the EP-local shape.",
+  "route_stats": {
+    "assignments_to_owner_rank": 512,
+    "expected_assignments_uniform": 512.0,
+    "expert_start": 0,
+    "expert_stop": 8,
+    "local_experts": 8,
+    "max_per_local_expert": 79,
+    "mean_per_local_expert": 64.0,
+    "min_per_local_expert": 48,
+    "owner_rank": 0,
+    "padded_rows_local_max": 632,
+    "padding_multiplier_local_max": 1.234375,
+    "source_tokens_all_ranks": 512,
+    "tokens_per_rank": 512,
+    "tokens_with_owner_expert": 512,
+    "topk": 1,
+    "total_experts": 8,
+    "world_size": 1
+  },
+  "saved_activation_enabled": false,
+  "saved_activation_state": {},
+  "shape": {
+    "backend": "torch",
+    "dtype": "bfloat16",
+    "experts": 8,
+    "hidden": 256,
+    "intermediate": 128,
+    "local_experts": 8,
+    "source_tokens_all_ranks": 512,
+    "tokens_per_rank": 512,
+    "topk": 1,
+    "wgrad_op": "ptgmm",
+    "world_size": 1
+  },
+  "timing_ms": {
+    "grouped_mm_manual_return_backward_saved_graph_ms_max": 159.2411651611328,
+    "grouped_mm_manual_return_backward_saved_graph_ms_mean": 159.2411651611328,
+    "grouped_mm_manual_return_backward_saved_graph_ms_median": 159.2411651611328,
+    "grouped_mm_manual_return_backward_saved_graph_ms_min": 159.2411651611328,
+    "grouped_mm_manual_return_compact_grad_ms_max": 0.36440399289131165,
+    "grouped_mm_manual_return_compact_grad_ms_mean": 0.36440399289131165,
+    "grouped_mm_manual_return_compact_grad_ms_median": 0.36440399289131165,
+    "grouped_mm_manual_return_compact_grad_ms_min": 0.36440399289131165,
+    "grouped_mm_manual_return_forward_graph_ms_max": 0.47156399488449097,
+    "grouped_mm_manual_return_forward_graph_ms_mean": 0.47156399488449097,
+    "grouped_mm_manual_return_forward_graph_ms_median": 0.47156399488449097,
+    "grouped_mm_manual_return_forward_graph_ms_min": 0.47156399488449097,
+    "grouped_mm_manual_return_full_forward_backward_ms_max": 2.2236618995666504,
+    "grouped_mm_manual_return_full_forward_backward_ms_mean": 2.2236618995666504,
+    "grouped_mm_manual_return_full_forward_backward_ms_median": 2.2236618995666504,
+    "grouped_mm_manual_return_full_forward_backward_ms_min": 2.2236618995666504,
+    "grouped_mm_manual_return_full_forward_backward_single_wall_ms": 1.6107840929180384,
+    "torch_padded_dgrad_swiglu_ms_max": 0.3032430112361908,
+    "torch_padded_dgrad_swiglu_ms_mean": 0.3032430112361908,
+    "torch_padded_dgrad_swiglu_ms_median": 0.3032430112361908,
+    "torch_padded_dgrad_swiglu_ms_min": 0.3032430112361908,
+    "torch_padded_forward_recompute_ms_max": 10.420068740844727,
+    "torch_padded_forward_recompute_ms_mean": 10.420068740844727,
+    "torch_padded_forward_recompute_ms_median": 10.420068740844727,
+    "torch_padded_forward_recompute_ms_min": 10.420068740844727,
+    "torch_padded_full_vjp_ms_max": 0.8063679933547974,
+    "torch_padded_full_vjp_ms_mean": 0.8063679933547974,
+    "torch_padded_full_vjp_ms_median": 0.8063679933547974,
+    "torch_padded_full_vjp_ms_min": 0.8063679933547974,
+    "torch_padded_full_vjp_single_wall_ms": 0.5410949233919382,
+    "torch_padded_wgrad_ms_max": 1627.3309326171875,
+    "torch_padded_wgrad_ms_mean": 1627.3309326171875,
+    "torch_padded_wgrad_ms_median": 1627.3309326171875,
+    "torch_padded_wgrad_ms_min": 1627.3309326171875,
+    "torch_padded_xgrad_reduce_ms_max": 0.4605650007724762,
+    "torch_padded_xgrad_reduce_ms_mean": 0.4605650007724762,
+    "torch_padded_xgrad_reduce_ms_median": 0.4605650007724762,
+    "torch_padded_xgrad_reduce_ms_min": 0.4605650007724762
+  },
+  "triton_swiglu_enabled": false,
+  "versions": {
+    "device": "AMD Instinct MI350X VF",
+    "torch": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211"
+  }
+}

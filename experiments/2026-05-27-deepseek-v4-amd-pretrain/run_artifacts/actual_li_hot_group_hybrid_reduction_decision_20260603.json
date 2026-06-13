@@ -1,0 +1,59 @@
+{
+  "artifact": "actual_li_hot_group_hybrid_reduction_decision_20260603",
+  "date_utc": "2026-06-03",
+  "scope": "Metadata decision for a bounded hot-group local accumulator inside the fast query-major compressed-dKV producer.",
+  "source_artifacts": {
+    "small_hot_limits": "run_artifacts/actual_li_hot_group_hybrid_reduction_s4096_layer2_20260603.json",
+    "wide_hot_limits": "run_artifacts/actual_li_hot_group_hybrid_reduction_wide_s4096_layer2_20260603.json",
+    "baseline_atomic_gate": "run_artifacts/actual_li_active_list_dotk_atomic_triton_dkv_s4096_layer2_sc32_d16h64k64_timing10_20260603.json",
+    "compact_partial_store": "run_artifacts/actual_li_active_list_dotk_compact_partial_store_seqchunk_sweep_20260603.json"
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "compressed_groups": 1024,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "raw_h64_dkv_write_elements": 805044224
+  },
+  "retained_tile_candidates": [
+    {
+      "token_block": 32,
+      "selected_block": 512,
+      "full_tile_segmented_reduction_x": 23.813051840857806,
+      "full_tile_unique_rows": 66029,
+      "hot_limit_256_reduction_x": 1.962,
+      "hot_limit_512_reduction_x": 4.805,
+      "hot_limit_768_reduction_x": 13.468,
+      "hot_limit_1024_reduction_x": 23.813
+    },
+    {
+      "token_block": 64,
+      "selected_block": 512,
+      "full_tile_segmented_reduction_x": 47.254673318506946,
+      "full_tile_unique_rows": 33274,
+      "hot_limit_256_reduction_x": 1.967,
+      "hot_limit_512_reduction_x": 4.985,
+      "hot_limit_768_reduction_x": 17.262,
+      "hot_limit_1024_reduction_x": 47.255
+    }
+  ],
+  "decision": {
+    "status": "reject_small_bounded_hot_group_table_as_primary_kernel",
+    "read": "A small hot-group accumulator does not capture enough of the modeled tile-local dKV reduction. For the primary 32x512 candidate, hot-256 saves only about 49% of route pairs and gives 1.96x hybrid write reduction; hot-512 gives 4.81x. The useful 13.5x-23.8x range appears only when the table covers 768-1024 groups, which is effectively the wide active-list/local-table problem that previous runtime probes already rejected.",
+    "implication": "Do not build a top-N-only query-major Triton/HIP kernel as the next production attempt. It would add routing/table overhead while leaving too many tail atomics.",
+    "next_kernel_target": "Keep query-major MFMA contribution production, but implement true full-tile segmented/grouped accumulation across the tile. The reducer must avoid the dense active-group route matrix and avoid a single CTA-wide dense local table; split segmented reduction across waves/CTAs or use a sparse sorted/rocPRIM-like local reducer before global writes.",
+    "bringup_rung": "Use token_block=32, selected_block=512 for the main target and token_block=32, selected_block=256 only as lower-pressure correctness bring-up."
+  },
+  "commands": [
+    "python3 -m py_compile experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py",
+    "rsync -a experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py do-sonle5-mi350-gpu:/scratch/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py --seq-len 4096 --layer-id 2 --token-blocks 16,32,64 --selected-blocks 128,256,512 --hot-limits 8,16,32,64,128,256 --summary-path /workspace/run_artifacts/actual_li_hot_group_hybrid_reduction_s4096_layer2_20260603.json",
+    "docker run --rm --entrypoint python --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONPATH=/workspace/tools/dsv4_runtime_probe:/workspace/sources/wip/torchtitan -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace onenexus/nexus-titan:rocm722-pytorch-nightly-mori tools/dsv4_runtime_probe/analyze_sparse_mla_shared_kv_actual_li_tile_coalescing.py --seq-len 4096 --layer-id 2 --token-blocks 32,64 --selected-blocks 512 --hot-limits 256,384,512,768,1024 --summary-path /workspace/run_artifacts/actual_li_hot_group_hybrid_reduction_wide_s4096_layer2_20260603.json"
+  ],
+  "dependency_pin_changes": []
+}

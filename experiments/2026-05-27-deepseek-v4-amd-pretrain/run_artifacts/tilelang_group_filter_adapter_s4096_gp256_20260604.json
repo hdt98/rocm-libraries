@@ -1,0 +1,279 @@
+{
+  "status": "ok",
+  "scope": "tilelang_selected_limit_dkv_adapter",
+  "read": "Reusable adapter around the promoted TileLang selected-limit compressed-dKV producer. Kernel-only timing should match the CLI mfma_panel_atomic_final_limited result; pack+kernel timing shows the cost of feeding materialized per-head probs and scaled grad logits through a Python/Torch packing bridge. This is a semantic integration gate, not final fused sparse-MLA backward.",
+  "device": "cuda",
+  "torch_version": "2.9.1+rocm7.2.0.git7e1940d4",
+  "torch_hip_version": "7.2.26015-fc0010cf6a",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "actual_li_compress_ratio": 4,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "packed_topk": 1024,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "input_layout": "bshd",
+    "plan_on_device": false
+  },
+  "input_contract": {
+    "q_checksum": -2097.9130859375,
+    "grad_output_checksum": 6701.39306640625,
+    "probs_checksum": 260255.625,
+    "grad_logits_scaled_checksum": -1.7676950693130493,
+    "materialized_workspace": {
+      "q_bytes": 268435456,
+      "grad_output_bytes": 268435456,
+      "output_bytes": 268435456,
+      "lse_bytes": 1048576,
+      "compressed_kv_bytes": 1048576,
+      "probs_bytes": 536870912,
+      "grad_logits_bytes": 536870912,
+      "valid_bytes": 2097152,
+      "safe_groups_bytes": 16777216,
+      "materialized_probs_grad_logits": true,
+      "read": "boundary input source captures real q/dO/output/lse/compressed KV tensors. Materialized per-head probs and grad_logits are created only for materialized-input producer modes or when correctness checking needs the reference."
+    }
+  },
+  "plan": {
+    "seq_len": 4096,
+    "original_topk": 512,
+    "packed_topk": 1024,
+    "group_count": 1024,
+    "group_panel_size": 256,
+    "panel_capacity": 256,
+    "panel_count": 4,
+    "token_block": 16,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "input_layout": "bshd",
+    "active_rows": 131543,
+    "max_active_groups": 256,
+    "valid_pairs": 1572352,
+    "overflow_pairs": 0,
+    "overflow_fraction": 0.0,
+    "write_reduction_x": 11.953140798066032,
+    "route_limit_modeled_chunk_fraction": 0.4599609375,
+    "selected_limit_contract": "packed actual-LI groups -> route selected limits -> TileLang in-CTA active-group reduction -> final [groups,D] dKV",
+    "static_plan_wall_ms": 74.33216390199959,
+    "final_dkv_mib": 2.0,
+    "packed_probs_mib": 512.0,
+    "packed_grad_logits_mib": 512.0
+  },
+  "correctness": {
+    "enabled": false
+  },
+  "timing": {
+    "pack_only": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          2.118738889694214,
+          2.0230979919433594,
+          2.0080180168151855,
+          2.008816957473755,
+          2.0056569576263428
+        ],
+        "mean_ms": 2.0328657627105713,
+        "median_ms": 2.008816957473755,
+        "min_ms": 2.0056569576263428,
+        "max_ms": 2.118738889694214,
+        "stdev_ms": 0.048491437046196954
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          2.169532934203744,
+          2.0480419043451548,
+          2.0320219919085503,
+          2.0316720474511385,
+          2.028572140261531
+        ],
+        "mean_ms": 2.0619682036340237,
+        "median_ms": 2.0320219919085503,
+        "min_ms": 2.028572140261531,
+        "max_ms": 2.169532934203744,
+        "stdev_ms": 0.06060949347949517
+      },
+      "median_ms": 2.008816957473755,
+      "min_ms": 2.0056569576263428,
+      "max_ms": 2.118738889694214,
+      "mean_ms": 2.0328657627105713,
+      "peak_memory_allocated_bytes": 4149228032,
+      "peak_memory_allocated_gib": 3.864269733428955,
+      "checksum": 260255.625
+    },
+    "kernel_only": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          6.766578197479248,
+          6.748978137969971,
+          6.7457780838012695,
+          6.752898216247559,
+          6.750658988952637
+        ],
+        "mean_ms": 6.752978324890137,
+        "median_ms": 6.750658988952637,
+        "min_ms": 6.7457780838012695,
+        "max_ms": 6.766578197479248,
+        "stdev_ms": 0.008034102908224025
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          6.849986035376787,
+          6.763866171240807,
+          6.7598349414765835,
+          6.766756065189838,
+          6.764325080439448
+        ],
+        "mean_ms": 6.780953658744693,
+        "median_ms": 6.764325080439448,
+        "min_ms": 6.7598349414765835,
+        "max_ms": 6.849986035376787,
+        "stdev_ms": 0.03867018473877396
+      },
+      "median_ms": 6.750658988952637,
+      "min_ms": 6.7457780838012695,
+      "max_ms": 6.766578197479248,
+      "mean_ms": 6.752978324890137,
+      "peak_memory_allocated_bytes": 2538614784,
+      "peak_memory_allocated_gib": 2.364269256591797,
+      "checksum": 6397.07373046875
+    },
+    "pack_plus_kernel": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          9.313440322875977,
+          8.735355377197266,
+          8.743515968322754,
+          8.734955787658691,
+          8.736716270446777
+        ],
+        "mean_ms": 8.852796745300292,
+        "median_ms": 8.736716270446777,
+        "min_ms": 8.734955787658691,
+        "max_ms": 9.313440322875977,
+        "stdev_ms": 0.2575307926542754
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          9.342046920210123,
+          8.798368042334914,
+          8.767660008743405,
+          8.755777962505817,
+          8.757117902860045
+        ],
+        "mean_ms": 8.884194167330861,
+        "median_ms": 8.767660008743405,
+        "min_ms": 8.755777962505817,
+        "max_ms": 9.342046920210123,
+        "stdev_ms": 0.2565222094781215
+      },
+      "median_ms": 8.736716270446777,
+      "min_ms": 8.734955787658691,
+      "max_ms": 9.313440322875977,
+      "mean_ms": 8.852796745300292,
+      "peak_memory_allocated_bytes": 3855546880,
+      "peak_memory_allocated_gib": 3.5907578468322754,
+      "checksum": 6397.07373046875
+    },
+    "source_indexed_kernel": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          7.686945915222168,
+          7.661305904388428,
+          7.664706230163574,
+          7.670546054840088,
+          7.671145915985107
+        ],
+        "mean_ms": 7.670930004119873,
+        "median_ms": 7.670546054840088,
+        "min_ms": 7.661305904388428,
+        "max_ms": 7.686945915222168,
+        "stdev_ms": 0.009849645949468432
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          7.769952993839979,
+          7.6763019897043705,
+          7.689201971516013,
+          7.692273007705808,
+          7.687063189223409
+        ],
+        "mean_ms": 7.702958630397916,
+        "median_ms": 7.689201971516013,
+        "min_ms": 7.6763019897043705,
+        "max_ms": 7.769952993839979,
+        "stdev_ms": 0.037930576294446794
+      },
+      "median_ms": 7.670546054840088,
+      "min_ms": 7.661305904388428,
+      "max_ms": 7.686945915222168,
+      "mean_ms": 7.670930004119873,
+      "peak_memory_allocated_bytes": 2538614784,
+      "peak_memory_allocated_gib": 2.364269256591797,
+      "checksum": 6397.07373046875
+    },
+    "group_filter_kernel": {
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          12.124062538146973,
+          12.140104293823242,
+          12.119223594665527,
+          12.130583763122559,
+          12.107422828674316
+        ],
+        "mean_ms": 12.124279403686524,
+        "median_ms": 12.124062538146973,
+        "min_ms": 12.107422828674316,
+        "max_ms": 12.140104293823242,
+        "stdev_ms": 0.012246677635170452
+      },
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          12.19589589163661,
+          12.156107928603888,
+          12.133966898545623,
+          12.14484591037035,
+          12.121796142309904
+        ],
+        "mean_ms": 12.150522554293275,
+        "median_ms": 12.14484591037035,
+        "min_ms": 12.121796142309904,
+        "max_ms": 12.19589589163661,
+        "stdev_ms": 0.028378939888421387
+      },
+      "median_ms": 12.124062538146973,
+      "min_ms": 12.107422828674316,
+      "max_ms": 12.140104293823242,
+      "mean_ms": 12.124279403686524,
+      "peak_memory_allocated_bytes": 2547001856,
+      "peak_memory_allocated_gib": 2.3720803260803223,
+      "checksum": 6397.07373046875
+    }
+  },
+  "decision_hint": {
+    "promote_adapter": true,
+    "source_indexed_beats_pack_plus_kernel": true,
+    "group_filter_avoids_route_plan": true,
+    "group_filter_beats_cpu_plan_plus_source_kernel": true,
+    "pack_is_production_ready": false,
+    "next": "Use the source-indexed TileLang producer in the TorchTitan bridge, then fuse probability and LI-derivative production so the remaining materialized selected-state tensors disappear."
+  }
+}

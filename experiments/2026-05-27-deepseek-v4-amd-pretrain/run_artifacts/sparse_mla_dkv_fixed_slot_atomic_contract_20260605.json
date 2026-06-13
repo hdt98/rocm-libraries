@@ -1,0 +1,78 @@
+{
+  "scope": "sparse_mla_dkv_fixed_slot_atomic_contract",
+  "date": "2026-06-05",
+  "status": "contract_pinned_for_next_cooperative_kernel",
+  "user_question": "In the global atomics, are the slots for dKV pre-buffered as fixed (g,h,d) destinations, one hxd matrix per compressed group g?",
+  "answer": {
+    "fixed_destination_slots": true,
+    "layout_correction": "For the current shared latent-KV sparse MLA backward, the fixed destination is effectively dKV[seq_len + group, d], not dKV[group, head, d]. The head dimension is a reduction dimension.",
+    "reason": "Each selected compressed group g maps to one shared latent KV row. Contributions from all query tokens, selected slots, and heads accumulate into that row and D element."
+  },
+  "math_contract": {
+    "destination": "dKV[g, d]",
+    "formula": "dKV[g,d] += sum_{token,k,h: safe_groups[token,k] == g} probs[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]",
+    "forward_sidecar": "safe_groups/group_ids[B,S,K] is already the forward-known compressed group sidecar consumed by the current Triton dot_k_atomic path.",
+    "output_allocation": "The global gradient buffer is preallocated before accumulation; global atomics add into known rows rather than allocating or discovering output slots."
+  },
+  "current_amd_evidence": {
+    "best_triton_exact_group_id_dkv_slice_ms": 8.144311904907227,
+    "full_sparse_attention_backward_gate_ms": 11.13,
+    "mode": "dot_k_atomic",
+    "atomic_shape": {
+      "scalar_atomic_add_elements_s4096_layer2": 805044224,
+      "read": "One indirect global atomic is issued per selected contribution and D element after the K64 dot contribution is produced."
+    },
+    "exact_sidecar_not_missing": true,
+    "failed_shortcuts": [
+      {
+        "branch": "Triton active-group reducer",
+        "median_ms": 57.238929748535156,
+        "reason": "Group-owned matching repeats/replays contribution production and loses the fast query-major tl.dot schedule."
+      },
+      {
+        "branch": "Triton compact-micro partial store",
+        "median_ms": 8.824965953826904,
+        "reason": "Keeps the fast producer but inserts a global partial-row load/store per valid selected contribution before final reduction."
+      },
+      {
+        "branch": "HIP exact-sidecar D-parallel source-boundary",
+        "median_ms": 24.86708641052246,
+        "reason": "Carries exact group ids but still uses token_block=1, so it provides no local write-count reduction and adds producer/replay cost."
+      },
+      {
+        "branch": "HIP/CK H64N64 owner replacement",
+        "median_ms": 46.52796936035156,
+        "reason": "Moves too much of the fast Triton producer into a slower 16-wave CTA owner; final atomics are not the measured wall in that implementation."
+      }
+    ]
+  },
+  "ascend_reference_read": {
+    "source_files": [
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/sasg_basic.h",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/vec_op.h",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube4.h",
+      "sources/references/ascend-cann-dsv4-image-cann900-v30/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/sparse_attn_sharedkv_grad/arch22/basic_modules/cube_modules/cube5.h"
+    ],
+    "stage_mapping": {
+      "cube4": "dk = ds^T * q writes mm4ResWorkspaceGm",
+      "cube5": "dv = p^T * dy writes mm5ResWorkspaceGm",
+      "scatter_add": "VecOp::ScatterAdd reads mm4/mm5 workspace rows, scales dk, adds dv, then uses SetAtomicAdd<float>() and DataCopy into d_ori_kv/d_cmp_kv rows."
+    },
+    "amd_lesson": "Ascend does not avoid final atomic scatter. Its win is that Cube345 creates row-like partials and ScatterAdd consumes staged rows with vector ping-pong, rather than issuing a raw per-contribution indirect atomic stream from the producer."
+  },
+  "next_kernel_contract": {
+    "goal": "Keep the Triton-like query-major K64 dot producer, but add on-chip segmented local reduction by exact group id before global atomics.",
+    "required_shape": [
+      "wider token tile than 1 so the epilogue has duplicate group destinations to reduce",
+      "q/dO/probs/scaled_dP must remain resident or be consumed immediately",
+      "exact safe_groups sidecar is carried into the epilogue",
+      "emit one reduced atomic per locally accumulated (group,d) row instead of per (token,selected_slot,d) contribution where possible"
+    ],
+    "rejected_as_not_enough": [
+      "adding group ids as metadata without widening the local reduction tile",
+      "detaching ScatterAdd into a separate raw HBM partial slab",
+      "making compressed group the outer contribution loop when it reloads q/dO too often"
+    ],
+    "promotion_gate": "A S4096 source-boundary sparse attention backward candidate must beat the 11.13 ms full Triton gate, then materialize into 4x/8x TorchTitan TFLOPs and memory before promotion."
+  }
+}

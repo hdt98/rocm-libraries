@@ -1,0 +1,213 @@
+{
+  "artifact": "muon_shard_contract",
+  "date_local": "2026-05-31",
+  "run_id": "torchtitan_muon_shard_contract_rank3_20260531",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "command": "RUN_ID=torchtitan_muon_shard_contract_rank3_20260531 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh muon-shard-contract",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_muon_shard_contract_rank3_20260531",
+  "remote_log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_muon_shard_contract_rank3_20260531/muon-shard-contract.log",
+  "result": {
+    "status": "passed",
+    "failures": [],
+    "torch_version": "2.10.0a0+git449b176",
+    "seed": 20260531,
+    "muon": {
+      "eps": 1e-07,
+      "momentum": 0.95,
+      "nesterov": true,
+      "ns_steps": 5
+    },
+    "matrix_case": {
+      "shape": [
+        128,
+        256
+      ],
+      "failures": [],
+      "full_matrix_update": {
+        "norm": 9.897391319274902,
+        "shape": [
+          128,
+          256
+        ]
+      },
+      "row_sharded_local_update": {
+        "shards": 4,
+        "local_shapes": [
+          [
+            32,
+            256
+          ],
+          [
+            32,
+            256
+          ],
+          [
+            32,
+            256
+          ],
+          [
+            32,
+            256
+          ]
+        ],
+        "vs_full": {
+          "max_abs": 0.118649423122406,
+          "mean_abs": 0.02025185525417328,
+          "rel_l2": 0.46550610661506653
+        }
+      },
+      "column_sharded_local_update": {
+        "shards": 4,
+        "local_shapes": [
+          [
+            128,
+            64
+          ],
+          [
+            128,
+            64
+          ],
+          [
+            128,
+            64
+          ],
+          [
+            128,
+            64
+          ]
+        ],
+        "vs_full": {
+          "max_abs": 0.1679869294166565,
+          "mean_abs": 0.03239699453115463,
+          "rel_l2": 0.7442668676376343
+        }
+      },
+      "controls": {
+        "row_single_shard": {
+          "local_shapes": [
+            [
+              128,
+              256
+            ]
+          ],
+          "vs_full": {
+            "max_abs": 0.0,
+            "mean_abs": 0.0,
+            "rel_l2": 0.0
+          }
+        },
+        "column_single_shard": {
+          "local_shapes": [
+            [
+              128,
+              256
+            ]
+          ],
+          "vs_full": {
+            "max_abs": 0.0,
+            "mean_abs": 0.0,
+            "rel_l2": 0.0
+          }
+        }
+      }
+    },
+    "batched_expert_case": {
+      "shape": [
+        4,
+        128,
+        256
+      ],
+      "failures": [],
+      "full_batched_update": {
+        "norm": 19.835538864135742,
+        "shape": [
+          4,
+          128,
+          256
+        ]
+      },
+      "expert_axis_sharded_local_update": {
+        "shards": 2,
+        "local_shapes": [
+          [
+            2,
+            128,
+            256
+          ],
+          [
+            2,
+            128,
+            256
+          ]
+        ],
+        "vs_full": {
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "rel_l2": 0.0
+        }
+      },
+      "row_axis_sharded_local_update": {
+        "shards": 4,
+        "local_shapes": [
+          [
+            4,
+            32,
+            256
+          ],
+          [
+            4,
+            32,
+            256
+          ],
+          [
+            4,
+            32,
+            256
+          ],
+          [
+            4,
+            32,
+            256
+          ]
+        ],
+        "vs_full": {
+          "max_abs": 0.11635418236255646,
+          "mean_abs": 0.02049262821674347,
+          "rel_l2": 0.46919289231300354
+        }
+      },
+      "column_axis_sharded_local_update": {
+        "shards": 4,
+        "local_shapes": [
+          [
+            4,
+            128,
+            64
+          ],
+          [
+            4,
+            128,
+            64
+          ],
+          [
+            4,
+            128,
+            64
+          ],
+          [
+            4,
+            128,
+            64
+          ]
+        ],
+        "vs_full": {
+          "max_abs": 0.19108915328979492,
+          "mean_abs": 0.03223298862576485,
+          "rel_l2": 0.7377979159355164
+        }
+      }
+    },
+    "conclusion": "Current reference Muon is checkpointable for bring-up, but FSDP local-shard orthogonalization is not equivalent when the shard cuts a Muon matrix axis. Sharding only the independent expert/batch axis of a rank-3 expert tensor is equivalent in this reference because Muon orthogonalizes each matrix in the batch independently. A faithful distributed path needs coordinated matrix-level update semantics whenever FSDP cuts through the last two matrix dimensions, plus optimizer-state checkpointing."
+  }
+}

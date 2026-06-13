@@ -1,0 +1,79 @@
+{
+  "status": "selected_limit_source_bridge_is_real_candidate_not_yet_production_default",
+  "scope": "TorchTitan shared-KV sparse-MLA compressed-dKV TileLang bridge",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code_changes": {
+    "backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "verifier": "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py",
+    "adapter_benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "new_env": "TORCHTITAN_DSV4_SPARSE_MLA_SHAREDKV_TILELANG_DKV_BACKEND",
+    "choices": [
+      "group_filter",
+      "selected_limit_source",
+      "selected_limit_packed"
+    ],
+    "read": "The bridge can now time the fast selected-limit TileLang dKV producer directly instead of hiding it behind tilelang_materialized_dkv or falling back to plan-free group-filter."
+  },
+  "s512_correctness": {
+    "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_selected_limit_source_s512_20260604.json",
+    "shape": {
+      "seq_len": 512,
+      "heads": 64,
+      "dim": 512,
+      "local_count": 128,
+      "compressed_count": 128,
+      "group_count": 128
+    },
+    "selected_limit_source_bridge_ms": 3.137676954269409,
+    "explicit_pytorch_bridge_ms": 2.0691070556640625,
+    "compressed_dkv_vs_tilelang_bf16_ref_max_abs": 0.015625,
+    "compressed_dkv_vs_explicit_ref_max_abs": 0.03125,
+    "read": "Small-shape parity is clean in the expected BF16 compressed-dKV band. The TileLang bridge is slower than PyTorch at S512, so this is not a small-shape optimization."
+  },
+  "s4096_bridge_timing": {
+    "artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_selected_limit_source_s4096_gp512_20260604.json",
+    "shape": {
+      "seq_len": 4096,
+      "heads": 64,
+      "dim": 512,
+      "local_count": 128,
+      "compressed_count": 512,
+      "group_count": 1024,
+      "group_panel_size": 512,
+      "panel_capacity": 512,
+      "token_block": 16,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "selected_limit_source_bridge_event_ms": 29.787200927734375,
+    "selected_limit_source_bridge_wall_ms": 29.856706969439983,
+    "previous_group_filter_bridge_event_ms": 31.938735961914062,
+    "previous_explicit_pytorch_bridge_event_ms": 30.99850845336914,
+    "speedup_vs_group_filter_bridge_x": 1.0722256792037769,
+    "speedup_vs_explicit_pytorch_bridge_x": 1.0406643292642105,
+    "read": "At S4096 the selected-limit source bridge is now a real improvement over both the prior plan-free group-filter bridge and the same-shape explicit PyTorch bridge, but it still includes explicit selected-state materialization outside the dKV producer."
+  },
+  "s4096_adapter_breakout": {
+    "artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_gp512_planondevice_20260604.json",
+    "static_plan_wall_ms": 193.22709483094513,
+    "kernel_only_packed_ms": 6.194987773895264,
+    "source_indexed_kernel_ms": 7.323480129241943,
+    "pack_only_ms": 2.063102960586548,
+    "pack_plus_kernel_ms": 8.165449142456055,
+    "write_reduction_x": 11.953140798066032,
+    "read": "The real TileLang dKV body is already below the old 8.0-8.8 ms sparse-atomic wall. Source-indexing avoids the 512 MiB packed P and 512 MiB packed dP slabs, but adds about 1.13 ms versus packed kernel-only. Route-plan generation is still not production-ready when built as standalone Torch metadata."
+  },
+  "decision": {
+    "promote_kernel_body": true,
+    "promote_bridge_default": false,
+    "keep_explicit_pytorch_stable_default": true,
+    "tilelang_next": [
+      "Reuse or GPU-produce LI selected-limit metadata instead of building it as a standalone Python/Torch plan.",
+      "Fuse or adjacent-produce P and scaled dP into the selected-limit dKV producer so selected-KV/probs/grad_logits are no longer materialized.",
+      "Keep group_filter only as the plan-free fallback/control; selected_limit_source is the higher-return S4096 bridge branch."
+    ]
+  }
+}

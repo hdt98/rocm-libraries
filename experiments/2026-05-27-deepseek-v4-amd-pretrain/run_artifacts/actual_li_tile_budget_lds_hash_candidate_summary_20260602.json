@@ -1,0 +1,106 @@
+{
+  "artifact": "actual_li_tile_budget_lds_hash_candidate_summary_20260602",
+  "created_date": "2026-06-02",
+  "status": "lds_hash_scatter_candidate_shape_selected",
+  "scope": "Actual-LI S4096 layer2 compressed-dKV tile-local write-reduction budget for the next LDS/hash or CK-Tile segmented reducer.",
+  "source_artifacts": {
+    "coalescing": "run_artifacts/actual_li_tile_coalescing_s4096_layer2_tb1-64_sb32-512_20260602.json",
+    "budget": "run_artifacts/actual_li_tile_budget_s4096_layer2_tb1-64_sb32-512_20260602.json"
+  },
+  "shape": {
+    "device": "1xMI350",
+    "layer_id": 2,
+    "sequence_length": 4096,
+    "heads": 64,
+    "head_dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "hard_case": "CR4 topk512 actual LightningIndexer route over all 1024 compressed groups"
+  },
+  "route_only_read": {
+    "best_route_only": {
+      "token_block": 64,
+      "selected_block": 512,
+      "route_atomic_reduction_x": 47.254673318506946,
+      "saved_pair_fraction": 0.9788380718821231,
+      "unique_groups_p99": 1013.29,
+      "unique_groups_max": 1024,
+      "read": "This is an upper-bound route shape, not the first kernel target. It maximizes coalescing but doubles token span and pushes loop pressure."
+    },
+    "small_query_major_like": {
+      "token_block": 4,
+      "selected_block": 128,
+      "route_atomic_reduction_x": 1.4254184416194278,
+      "nontrivial_p99_fit": false,
+      "read": "Tiny query-major tiles do not create enough repeated compressed-group fan-in. A useful reducer must persist across a wider token/selected tile."
+    }
+  },
+  "retained_kernel_targets": {
+    "primary_target": {
+      "token_block": 32,
+      "selected_block": 512,
+      "d_block": 16,
+      "micro_token_block": 1,
+      "micro_selected_block": 64,
+      "route_atomic_reduction_x": 23.813051840857806,
+      "saved_pair_fraction": 0.958006222525236,
+      "coalesced_atomic_add_elements": 33806848,
+      "p99_persistent_kib": 83.25890625,
+      "p99_combined_kib": 115.25890625,
+      "dblock_tile_microsteps": 256,
+      "full_dim_tile_microsteps": 8192,
+      "layer_dblock_tiles": 4096,
+      "layer_microsteps": 1048576,
+      "microstep_pressure": "high_but_plausible_first_kernel",
+      "classification": "wide_tile_candidate_needs_streaming_mfma_kernel",
+      "read": "This keeps the original 23.813x coalesced-write target and fits the 128 KiB p99 scratch budget if the route matrix is replaced by sparse LDS/hash accumulation. It is not suitable for dense route-dot, which the dot_k_micro probe already rejected."
+    },
+    "compile_smoke_rung": {
+      "token_block": 32,
+      "selected_block": 256,
+      "d_block": 16,
+      "micro_token_block": 1,
+      "micro_selected_block": 64,
+      "route_atomic_reduction_x": 12.338365924856399,
+      "saved_pair_fraction": 0.9189519903940084,
+      "coalesced_atomic_add_elements": 65247232,
+      "p99_persistent_kib": 83.3870703125,
+      "p99_combined_kib": 115.3870703125,
+      "dblock_tile_microsteps": 128,
+      "full_dim_tile_microsteps": 4096,
+      "layer_dblock_tiles": 7168,
+      "layer_microsteps": 917504,
+      "microstep_pressure": "moderate",
+      "classification": "wide_tile_candidate_needs_streaming_mfma_kernel",
+      "read": "This is the lower-pressure bring-up rung. It preserves a nontrivial 12.34x write-reduction target and should be used to smoke the LDS/hash scatter body before widening to selected_block=512."
+    },
+    "secondary_moderate_target": {
+      "token_block": 16,
+      "selected_block": 512,
+      "d_block": 16,
+      "micro_token_block": 1,
+      "micro_selected_block": 64,
+      "route_atomic_reduction_x": 11.952959063438367,
+      "coalesced_atomic_add_elements": 67351040,
+      "p99_combined_kib": 107.25625,
+      "dblock_tile_microsteps": 128,
+      "layer_microsteps": 1048576,
+      "microstep_pressure": "moderate",
+      "read": "Alternative if token_block=32 has scheduling pressure. It keeps full selected span but halves the token persistence and therefore loses about half of the write reduction."
+    }
+  },
+  "mechanism_read": {
+    "what_this_changes": "It narrows the next implementation contract from generic coalesced dKV to a D16 persistent tile with sparse LDS/hash scatter over selected-key microtiles.",
+    "what_it_rejects": "Small query-major-like tiles are not enough, and dense route-dot is already rejected. The next body must sparse-scatter selected KxD contributions into local compressed-group rows without forming route[unique_group,K].",
+    "why_likely_next": "The metadata path is already measured at about 0.848 ms for S4096 layer2, the current global dKV accumulation slice is about 8.29 ms, and the retained primary tile fits the p99 scratch budget while reducing modeled global writes by 23.813x.",
+    "risk": "The tile budget does not prove runtime. It assumes a streaming selected-key dot/MFMA loop and cheap local accumulation; the next proof must be a real HIP/CK-Tile or equivalent kernel with S128/S512 parity and S4096 timing."
+  },
+  "next_validation": [
+    "Implement a materialized-probs diagnostic kernel for token_block=32, selected_block=256, d_block=16, micro_selected_block=64 using sparse LDS/hash or equivalent tile-local accumulation.",
+    "Pass S128 and S512 parity against reference dKV with max_abs_diff at the current BF16 tolerance.",
+    "Reject if S512 is slower than the dot_k_atomic plus expected write-reduction path, or if LDS/hash contention dominates before target shape.",
+    "If S512 passes, run S4096 timing-only for selected_block=256, then widen to selected_block=512 to recover the full 23.813x write-reduction target.",
+    "Only after compressed dKV timing is close, fuse target_probs, KL derivative, LI dQ/dK/dW, and compressor gradients into the same recompute path."
+  ]
+}

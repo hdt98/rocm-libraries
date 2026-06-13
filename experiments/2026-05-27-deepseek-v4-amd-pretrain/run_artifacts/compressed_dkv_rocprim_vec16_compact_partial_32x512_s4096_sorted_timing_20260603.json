@@ -1,0 +1,66 @@
+{
+  "artifact": "compressed_dkv_rocprim_reduce_by_key_floor",
+  "scope": "compressed_shared_kv_dkv_vec16_reduce_by_group",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "mode": "sorted_balanced",
+  "value_kind": "vec16",
+  "seed": 1234,
+  "num_pairs": 2112928,
+  "d_tile": 16,
+  "num_items": 2112928,
+  "groups": 32768,
+  "key_space": 32768,
+  "full_d512_multiplier": 32.0,
+  "build_seconds": 44.479493418941274,
+  "extension_dir": "/workspace/torch_extensions/rocprim_reduce_by_key_compact_v1",
+  "effective_torch_extensions_dir": "/workspace/torch_extensions/rocprim_reduce_by_key_compact_v1",
+  "workspace": {
+    "temp_bytes": 1339524,
+    "resident_tensor_bytes": 288697736,
+    "resident_tensor_gib": 0.2688707187771797
+  },
+  "parity": null,
+  "timings": {
+    "reduce_only_sorted_keys": {
+      "samples_ms": [
+        0.4862070083618164,
+        0.4501659870147705,
+        0.44524601101875305,
+        0.45196598768234253,
+        0.4231260120868683,
+        0.4380069971084595,
+        0.4254859983921051,
+        0.422325998544693,
+        0.438167005777359,
+        0.441087007522583,
+        0.4424059987068176,
+        0.41584599018096924,
+        0.43728700280189514,
+        0.4280860126018524,
+        0.42688700556755066,
+        0.44820699095726013,
+        0.4352869987487793,
+        0.4372060000896454,
+        0.4283660054206848,
+        0.44996699690818787
+      ],
+      "median_ms": 0.4376469999551773,
+      "min_ms": 0.41584599018096924,
+      "max_ms": 0.4862070083618164,
+      "p90_ms": 0.45034598708152773,
+      "timed_iters": 20,
+      "warmup_iters": 5
+    },
+    "torch_sort_only": null,
+    "torch_sort_reorder_values": null,
+    "torch_sort_reorder_values_plus_reduce": null
+  },
+  "extrapolated": {
+    "full_d512_reduce_only_ms": 14.004703998565674,
+    "full_d512_sort_reorder_reduce_ms": null
+  },
+  "read": "This is a primitive-floor diagnostic for reducing compressed dKV contributions. scalar mode keys every compressed-group/D scalar; vec16 mode keys route pairs and reduces a D16 float vector payload. It excludes sparse-MLA contribution math. sorted_balanced is an optimistic lower bound where route keys are already grouped; random_sort_reduce includes PyTorch/ROCm sort and value reorder overhead before rocPRIM reduce_by_key."
+}

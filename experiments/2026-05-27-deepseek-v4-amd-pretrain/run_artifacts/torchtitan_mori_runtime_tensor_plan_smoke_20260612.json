@@ -1,0 +1,130 @@
+{
+  "artifact": "torchtitan_mori_runtime_tensor_plan_smoke_20260612",
+  "created_at": "2026-06-12",
+  "purpose": "Validate the native MORI balanced-MoE needed-row exchange runtime-plan cleanup before the next clean-node sustained throughput A/B.",
+  "change_summary": [
+    "MORI BalancedMoeOwnerCompactExchangePlan.as_tensors now carries host split tuples and needed_row_count alongside device metadata tensors.",
+        "MORI exchange_owner_compact_needed_rows can consume precomputed send_local_indices and grad_recv_local_indices.",
+        "MORI now exports prepare_owner_compact_needed_rows_runtime_plan from mori.ops so framework callers can prepare reusable runtime metadata through the native balanced_moe API.",
+        "MORI now exports build_owner_compact_exchange_runtime_plan from mori.ops so framework callers can build the serial debug plan and reusable runtime tensor plan in one native API call.",
+        "MORI now exports build_owner_compact_exchange_runtime_plan_from_plan from mori.ops so callers with an existing BalancedMoePlan can keep runtime local-index translation inside MORI.",
+        "MORI now exports build_balanced_moe_runtime_layout from mori.ops so callers can build the source hot/cold partition and owner-compact exchange runtime plan as one native layout ABI.",
+        "MORI exchange_owner_compact_needed_rows can consume a fully prepared runtime plan without requiring compact_local_indices from the framework caller.",
+        "TorchTitan standard-EP hot-helper needed-layout path precomputes those local-index tensors once per helper forward and reuses them across hot-weight banks."
+  ],
+  "scope": {
+    "math_changed": false,
+    "layout_contract": "saved owner-compact hot/cold/helper partition",
+    "active_flags_for_next_gate": {
+      "CANARY_MOE_COMM_BACKEND": "standard",
+      "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+      "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": 8,
+      "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "needed",
+      "CANARY_STANDARD_EP_NEEDED_WEIGHT_EXCHANGE_IMPL": "mori",
+      "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+      "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact"
+    }
+  },
+  "validation": {
+    "local_py_compile": [
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/references/mori/python/mori/ops/balanced_moe.py",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+      "experiments/2026-05-27-deepseek-v4-amd-pretrain/sources/wip/torchtitan/torchtitan/models/common/moe.py"
+    ],
+    "image_py_compile": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "result": "pass"
+    },
+    "runtime_plan_smoke": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "device": "CPU tensors inside ROCm image",
+      "result": "owner_compact_needed_rows runtime-plan smoke ok",
+      "coverage": [
+        "precomputed send_local_indices",
+        "precomputed grad_recv_local_indices",
+        "host split tuple path",
+        "autograd backward scatter to local owner rows"
+      ]
+    },
+    "fallback_plan_smoke": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "device": "CPU tensors inside ROCm image",
+      "result": "owner_compact_needed_rows fallback-plan smoke ok",
+      "coverage": [
+        "legacy plan without precomputed local indices",
+        "inside-wrapper send/grad local-index derivation",
+        "host split tuple path",
+        "autograd backward scatter to local owner rows"
+      ]
+    },
+    "public_helper_smoke": {
+      "host": "do-vunguyen-mi350-gpu",
+      "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+      "device": "CPU tensors inside ROCm image",
+      "result": "mori runtime-plan helper smoke ok",
+      "coverage": [
+        "from mori.ops import prepare_owner_compact_needed_rows_runtime_plan",
+        "helper-built send_local_indices",
+        "helper-built grad_recv_local_indices",
+        "exchange_owner_compact_needed_rows consuming helper-built runtime plan",
+        "autograd backward scatter to local owner rows"
+      ]
+    },
+        "object_plan_helper_smoke": {
+            "host": "do-vunguyen-mi350-gpu",
+            "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+            "device": "CPU tensors inside ROCm image",
+            "result": "mori object-plan helper smoke ok",
+      "coverage": [
+        "build_owner_compact_exchange_plan object",
+        "prepare_owner_compact_needed_rows_runtime_plan consuming the plan object",
+        "exchange_owner_compact_needed_rows consuming helper-built runtime plan",
+                "autograd backward scatter to local owner rows"
+            ]
+        },
+        "pytest_balanced_moe": {
+            "host": "do-vunguyen-mi350-gpu",
+            "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+            "command": "PYTHONPATH=/work/sources/references/mori/python pytest -q tests/python/ops/test_balanced_moe.py",
+            "result": "18 passed in 1.17s",
+            "added_coverage": [
+                "prepare_owner_compact_needed_rows_runtime_plan with a BalancedMoeOwnerCompactExchangePlan object",
+                "from mori.ops import build_balanced_moe_runtime_layout",
+                "from mori.ops import build_owner_compact_exchange_runtime_plan",
+                "from mori.ops import build_owner_compact_exchange_runtime_plan_from_plan",
+                "build_balanced_moe_runtime_layout groups owner-compact presorted source partition metadata with reusable exchange runtime metadata",
+                "build_owner_compact_exchange_runtime_plan builds serial and runtime plans in MORI",
+                "build_owner_compact_exchange_runtime_plan_from_plan builds serial and runtime plans from an existing BalancedMoePlan",
+                "runtime-plan send_local_indices and grad_recv_local_indices are precomputed from compact local expert indices",
+                "runtime-plan exchange matches fallback exchange on the same compact offset ABI without passing compact_local_indices to the exchange call",
+                "autograd backward returns helper partial gradients to local owner rows through the cached runtime-plan path",
+                "exchange_owner_compact_needed_rows rejects calls without compact_local_indices when the plan lacks precomputed local indices"
+            ]
+        },
+        "git_diff_check": "pass"
+    },
+    "node_state_after_smoke": {
+        "do-vunguyen-mi350-gpu": "not clean for 8x gate; unrelated 4-rank Primus/TorchTitan Qwen3 job holds GPUs 0-3",
+        "do-sonle5-mi350-gpu": "briefly idle, then an unrelated Primus/Qwen3 rejoin job acquired GPUs 0-3 before the 8x needed-layout gate could start",
+        "attempted_run_id": "torchtitan_dsv4_flash12_needed_local_8x_mbs8_ce8_attention_ac_steps20_20260612",
+        "action": "launcher refused before metrics; no contaminated throughput result kept"
+    },
+  "next_gate": {
+    "shape": "8xMI350, flash_12layer_ceiling_probe, S4096, GBS128, FSDP8/EP8, attention-only activation checkpointing, CE8",
+    "compare": [
+      "needed layout + mori runtime tensor plan",
+      "needed layout + local exchange",
+      "retained selected owner-compact hot-helper baseline"
+    ],
+    "promotion_requires": [
+      "20-step or at least 6-step sustained tok/GPU/s",
+      "TFLOPs/GPU",
+      "peak logged memory",
+      "low-intrusion timing profile if throughput moves"
+    ]
+  },
+  "dependency_pin_changes": "none"
+}

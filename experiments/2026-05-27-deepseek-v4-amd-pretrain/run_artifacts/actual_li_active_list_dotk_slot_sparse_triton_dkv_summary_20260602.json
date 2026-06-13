@@ -1,0 +1,71 @@
+{
+  "artifact": "actual_li_active_list_dotk_slot_sparse_triton_dkv_summary_20260602",
+  "created_date": "2026-06-02",
+  "scope": "Actual LightningIndexer compressed-dKV diagnostic that precomputes each selected route entry's compact active-list slot, then reruns the sparse-local dot-K accumulator.",
+  "tool": "tools/dsv4_runtime_probe/benchmark_sparse_mla_shared_kv_actual_li_dkv_active_list_triton.py --kernel dot_k_slot_sparse",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "status": "rejected_at_s512_active_row_lookup_not_the_wall",
+  "diagnostic_contract": {
+    "uses_materialized_probs": true,
+    "uses_materialized_grad_logits": true,
+    "uses_active_group_lists": true,
+    "precomputes_active_route_slots": true,
+    "uses_selected_key_batched_tl_dot": true,
+    "coalesces_global_dkv_writes": true,
+    "fuses_score_prob_recompute": false,
+    "production_candidate": false
+  },
+  "read": "dot_k_slot_sparse isolates whether the failed dot_k_sparse body was mainly paying to find the active row with groups == selected_group. It precomputes route_slots[token,k] as the active-list row index, then uses offs_u == slot inside the Triton sparse-local accumulator. The result improves S128 and S512 only slightly, so active-row lookup is not the dominant mechanism. The scalar per-selected local accumulation loop remains the wall; the next branch needs segmented/MFMA-friendly reduction or LI/compressor fusion, not more Triton local sparse-loop cleanup.",
+  "results": [
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_slot_sparse_triton_dkv_s128_layer2_sc16_u32d16h64k32_20260602.json",
+      "seq_len": 128,
+      "layer_id": 2,
+      "seq_chunk": 16,
+      "block_u": 32,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 32,
+      "correctness": "passed",
+      "max_abs_diff": 0.06965017318725586,
+      "accumulator_median_ms": 0.3926840126514435,
+      "dot_k_sparse_ms": 0.43120500445365906,
+      "dot_k_atomic_ms": 0.14688199758529663,
+      "dot_k_dense_route_ms": 0.13696199655532837,
+      "pytorch_reference_median_ms": 0.47532498836517334,
+      "actual_atomic_element_reduction_x": 14.0,
+      "actual_atomic_elements": 73728,
+      "query_major_raw_atomic_elements": 1032192,
+      "route_slots_bytes": 32768
+    },
+    {
+      "artifact": "run_artifacts/actual_li_active_list_dotk_slot_sparse_triton_dkv_s512_layer2_sc32_u128d16h64k64_20260602.json",
+      "seq_len": 512,
+      "layer_id": 2,
+      "seq_chunk": 32,
+      "block_u": 128,
+      "block_d": 16,
+      "block_h": 64,
+      "block_k": 64,
+      "correctness": "passed",
+      "max_abs_diff": 0.0716860294342041,
+      "accumulator_median_ms": 8.062413215637207,
+      "dot_k_sparse_ms": 8.226095199584961,
+      "dot_k_atomic_ms": 0.27184200286865234,
+      "dot_k_dense_route_ms": 0.41608500480651855,
+      "scalar_active_list_best_ms": 3.1342430114746094,
+      "pytorch_reference_median_ms": 1.5772180557250977,
+      "actual_atomic_element_reduction_x": 30.0,
+      "actual_atomic_elements": 557056,
+      "query_major_raw_atomic_elements": 16711680,
+      "route_slots_bytes": 524288
+    }
+  ],
+  "decision": {
+    "status": "rejected",
+    "why": "Precomputing active-list row slots changes S512 from 8.226 ms to only 8.062 ms. That is not enough to challenge dot_k_atomic at 0.272 ms or dense-route dot_k at 0.416 ms for the same S512 shape.",
+    "s4096_run": "skipped because S512 remains decisively negative.",
+    "mechanism_read": "The bottleneck is the scalar per-selected sparse accumulation body, not active-row lookup. Coalesced writes still need a segmented/MFMA-friendly reduction schedule or deeper LI/compressor fusion."
+  }
+}

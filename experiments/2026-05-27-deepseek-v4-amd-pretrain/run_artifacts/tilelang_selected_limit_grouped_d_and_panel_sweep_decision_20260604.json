@@ -1,0 +1,85 @@
+{
+  "status": "closed_no_promotion",
+  "scope": "tilelang_selected_limit_grouped_d_and_panel_sweep",
+  "date": "2026-06-04",
+  "question": "Can we push the TileLang selected-limit compressed-dKV producer by grouping D blocks or changing group panel size?",
+  "implementation": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "benchmark": "tools/dsv4_runtime_probe/benchmark_tilelang_selected_limit_adapter.py",
+    "new_config": "TileLangSelectedLimitConfig.d_blocks_per_kernel",
+    "new_cli": "benchmark_tilelang_selected_limit_adapter.py --d-blocks-per-kernel",
+    "new_kernel_builders": [
+      "make_mfma_panel_atomic_final_limited_bshd_grouped_d_kernel_builder",
+      "make_mfma_panel_atomic_final_limited_bshd_source_indexed_grouped_d_kernel_builder"
+    ],
+    "contract": "real final [group,D] fp32 dKV output; same SourceSelected/PairSlots/TileOffsets/ActiveGroups selected-limit route metadata as the retained kernel"
+  },
+  "retained_baseline": {
+    "artifact": "run_artifacts/tilelang_selected_limit_legacy_plan_actual_li_s4096_layer2_gp512_20260604.json",
+    "shape": "S4096,H64,D512,actual-LI layer2,groups1024,topk512,gp512,cap512,K64,D64,dblocks1",
+    "packed_kernel_only_ms": 6.180221080780029,
+    "source_indexed_kernel_ms": 7.282271862030029,
+    "pack_plus_kernel_ms": 8.192240715026855,
+    "max_active_groups": 512,
+    "write_reduction_x": 11.953140798066032
+  },
+  "tested_candidates": [
+    {
+      "name": "grouped_d_small_correctness",
+      "artifact": "run_artifacts/tilelang_selected_limit_grouped_d_s128_layer2_gp32_dblocks2_20260604.json",
+      "shape": "S128,H64,D512,gp32,cap32,K32,D64,dblocks2",
+      "correctness": {
+        "max_abs_diff_vs_torch_reference": 0.00000667572021484375,
+        "source_vs_packed_max_abs_diff": 0.0
+      },
+      "source_indexed_kernel_ms": 0.11312100291252136,
+      "read": "The grouped-D kernel is functionally correct on the small gate."
+    },
+    {
+      "name": "grouped_d_target_d64x2",
+      "artifact": null,
+      "shape": "S4096,H64,D512,gp512,cap512,K64,D64,dblocks2",
+      "result": "compile_rejected",
+      "failure": "requested dynamic shared memory 294912 bytes exceeds MI350 per-block limit 163840 bytes",
+      "read": "The useful D64x2 reuse shape is not legal with the full max_active_groups accumulator."
+    },
+    {
+      "name": "grouped_d_target_d32x2",
+      "artifact": "run_artifacts/tilelang_selected_limit_grouped_d_s4096_layer2_gp512_bd32_dblocks2_20260604.json",
+      "shape": "S4096,H64,D512,gp512,cap512,K64,D32,dblocks2",
+      "packed_kernel_only_ms": 7.250359058380127,
+      "source_indexed_kernel_ms": 8.131403923034668,
+      "pack_plus_kernel_ms": 9.212491035461426,
+      "read": "This legal grouped-D shape regresses because smaller D32 MFMA tiles lose more than P/dP reuse gains."
+    },
+    {
+      "name": "smaller_group_panel_gp256",
+      "artifact": "run_artifacts/tilelang_selected_limit_source_s4096_layer2_gp256_bd64_20260604.json",
+      "shape": "S4096,H64,D512,gp256,cap256,K64,D64,dblocks1",
+      "packed_kernel_only_ms": 6.7607598304748535,
+      "source_indexed_kernel_ms": 7.637685775756836,
+      "pack_plus_kernel_ms": 8.725652694702148,
+      "max_active_groups": 256,
+      "read": "Halving the accumulator footprint works but adds panel work and regresses versus GP512."
+    },
+    {
+      "name": "single_group_panel_gp1024_pc512",
+      "artifact": null,
+      "shape": "S4096,H64,D512,gp1024,cap512,K64,D64,dblocks1",
+      "result": "compile_rejected",
+      "failure": "TileLang layout inference failed with no available layout found",
+      "read": "The one-panel route is not currently expressible by this TileLang layout."
+    }
+  ],
+  "decision": {
+    "promote_grouped_d": false,
+    "promote_gp256": false,
+    "retain_best_kernel": "gp512,cap512,K64,D64,dblocks1 selected-limit source/packed body",
+    "why": "The best legal grouped-D and smaller-panel TileLang variants are slower than the retained 6.18 ms packed / 7.28 ms source-indexed kernel. The useful D64x2 reuse shape exceeds LDS, while the legal D32x2 shape loses MFMA efficiency.",
+    "next": [
+      "Keep the retained selected-limit TileLang dKV body for TorchTitan bridge experiments.",
+      "Do not spend more time on full max_active_groups x D grouped-D accumulators in TileLang.",
+      "The next real speed branch needs a smaller keyed or segmented in-producer reducer, or a lower-level HIP/CK/rocWMMA implementation that can reduce by compressed group without allocating the full active-group-by-D table."
+    ]
+  }
+}

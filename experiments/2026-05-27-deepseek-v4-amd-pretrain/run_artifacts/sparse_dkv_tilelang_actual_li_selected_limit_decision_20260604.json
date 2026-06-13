@@ -1,0 +1,113 @@
+{
+  "status": "actual_li_tilelang_selected_limit_kernel_promoted",
+  "scope": "sparse_mla_backward_compressed_dkv_actual_li_tilelang_selected_limit",
+  "date": "2026-06-04",
+  "hardware": "MI350",
+  "image": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+  "code": {
+    "probe": "tools/dsv4_runtime_probe/benchmark_tilelang_sparse_dkv_compact_partial.py",
+    "new_math_mode": "mfma_panel_atomic_final_limited",
+    "new_metadata": "per-route selected-limit table for actual_li_panel routes",
+    "kernel_change": "Keep the query-major panel MFMA contribution body and final [groups, D] atomic-add contract, but skip block_k selected chunks that are padded-empty across the whole token/panel route tile."
+  },
+  "correctness_gate": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s512_tb128_cap128_20260604.json",
+    "shape": {
+      "seq_len": 512,
+      "compressed_groups": 128,
+      "heads": 64,
+      "dim": 512,
+      "actual_li_topk": 128,
+      "token_block": 128,
+      "selected_window": 128,
+      "group_panel_size": 128,
+      "block_k": 64,
+      "block_d": 64,
+      "threads": 512
+    },
+    "max_abs_diff": 3.725290298461914e-8,
+    "mean_abs_diff": 3.977844720282064e-9,
+    "median_ms": 2.007214069366455,
+    "route_limit_modeled_chunk_fraction": 0.75
+  },
+  "s4096_sweep": [
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb8_cap512_k64d64_thr512_20260604.json",
+      "token_block": 8,
+      "median_ms": 7.057096004486084,
+      "route_limit_modeled_chunk_fraction": 0.4295654296875,
+      "route_limit_zero_count": 256,
+      "active_partial_rows": 262389,
+      "would_have_partial_workspace_mib": 512.478515625
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+      "token_block": 16,
+      "median_ms": 6.912532806396484,
+      "route_limit_modeled_chunk_fraction": 0.431396484375,
+      "route_limit_zero_count": 128,
+      "active_partial_rows": 131543,
+      "would_have_partial_workspace_mib": 256.919921875
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb32_cap512_k64d64_thr512_20260604.json",
+      "token_block": 32,
+      "median_ms": 7.062292098999023,
+      "route_limit_modeled_chunk_fraction": 0.43310546875,
+      "route_limit_zero_count": 64,
+      "active_partial_rows": 66027,
+      "would_have_partial_workspace_mib": 128.958984375
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb64_cap512_k64d64_thr512_20260604.json",
+      "token_block": 64,
+      "median_ms": 7.712859153747559,
+      "route_limit_modeled_chunk_fraction": 0.4345703125,
+      "route_limit_zero_count": 32,
+      "active_partial_rows": 33268,
+      "would_have_partial_workspace_mib": 64.9765625
+    },
+    {
+      "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb128_cap512_k64d64_thr512_20260604.json",
+      "token_block": 128,
+      "median_ms": 9.559432983398438,
+      "route_limit_modeled_chunk_fraction": 0.4375,
+      "route_limit_zero_count": 16,
+      "active_partial_rows": 16887,
+      "would_have_partial_workspace_mib": 32.982421875
+    }
+  ],
+  "retained_best_actual_route": {
+    "artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_limited_s4096_tb16_cap512_k64d64_thr512_20260604.json",
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "actual_li_topk": 512,
+    "token_block": 16,
+    "selected_window": 512,
+    "group_panel_size": 512,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "median_ms": 6.912532806396484,
+    "route_limit_modeled_chunk_fraction": 0.431396484375,
+    "route_limit_zero_count": 128,
+    "final_dkv_mib": 2.0,
+    "would_have_partial_workspace_mib": 256.919921875
+  },
+  "comparison": {
+    "prior_actual_route_artifact": "run_artifacts/tilelang_sparse_dkv_actual_li_panel_atomic_final_s4096_tb32_cap512_k64d64_thr512_timing10_20260604.json",
+    "prior_actual_route_median_ms": 12.735137939453125,
+    "speedup_vs_prior_actual_route": 1.842325858861562,
+    "current_triton_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "read": "This is the first actual-LI TileLang dKV branch to beat the retained sparse-atomic wall instead of only reducing memory footprint. The win comes from using route selected-limit metadata to skip padded selected chunks; the final output remains the correct [groups, D] dKV tensor."
+  },
+  "decision": {
+    "promote_selected_limit_kernel": true,
+    "promote_residual_spill_kernel": false,
+    "retained_tilelang_candidate": "actual_li_panel cap512 token_block=16 mfma_panel_atomic_final_limited",
+    "not_yet_complete_sparse_mla_backward": true,
+    "read": "Promote mfma_panel_atomic_final_limited as the current actual-route TileLang compressed-dKV candidate. It is still a diagnostic dKV producer reading materialized probs and grad_logits, not the complete fused sparse MLA/LightningIndexer backward. The next work is semantic integration: fuse or feed LI target-prob/derivative production, connect the compressor/LI dKV consumer, and keep the no-selected-state saved-tensor contract."
+  }
+}

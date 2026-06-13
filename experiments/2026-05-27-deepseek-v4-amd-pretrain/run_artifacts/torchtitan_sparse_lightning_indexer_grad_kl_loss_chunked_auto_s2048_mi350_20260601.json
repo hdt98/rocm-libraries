@@ -1,0 +1,76 @@
+{
+  "deferred_forward_loss": null,
+  "deferred_grad_norms": {},
+  "device": "cuda",
+  "direct_grad_norms": {},
+  "direct_loss": null,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {},
+  "li_kl_chunk_size": 16,
+  "li_kl_chunk_size_arg": null,
+  "max_grad_diff": null,
+  "parity_skipped": true,
+  "read": "Parity was skipped for long-sequence timing. The timing block below measures the current public Ascend-style wrapper; no correctness claim is made by this run.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 512,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 2048,
+    "topk": 512
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 4029.125,
+      "mean_ms": 4029.125,
+      "median_ms": 4029.125,
+      "min_ms": 4029.125,
+      "samples_ms": [
+        4029.125
+      ],
+      "stdev_ms": 0.0
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 4.843310307478532e-05,
+      "index_q": 5.164672984392382e-05,
+      "weights": 4.493507731240243e-05
+    },
+    "li_kl_chunk_size": 16,
+    "li_kl_chunk_size_arg": null,
+    "li_kl_chunk_size_env": null,
+    "li_kl_max_selected_main_k_elements_env": null,
+    "peak_memory_allocated_bytes": 3049797632,
+    "peak_memory_allocated_gib": 2.8403453826904297,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle in PyTorch.",
+    "timed_iters": 1,
+    "wall": {
+      "enabled": true,
+      "max_ms": 4029.194034053944,
+      "mean_ms": 4029.194034053944,
+      "median_ms": 4029.194034053944,
+      "min_ms": 4029.194034053944,
+      "samples_ms": [
+        4029.194034053944
+      ],
+      "stdev_ms": 0.0
+    },
+    "warmup_iters": 0
+  },
+  "top_indices_equal": null,
+  "top_indices_shape": [
+    1,
+    2048,
+    512
+  ]
+}

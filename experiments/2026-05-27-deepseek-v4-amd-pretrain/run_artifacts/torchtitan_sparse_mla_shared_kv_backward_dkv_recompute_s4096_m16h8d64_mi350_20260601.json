@@ -1,0 +1,67 @@
+{
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "correctness": {
+    "candidate_norm": 1378.1890869140625,
+    "dkv_atol": 0.1,
+    "max_abs_diff": 0.04511833190917969,
+    "mean_abs_diff": 0.0007713497616350651,
+    "passed": true,
+    "reference_norm": 1378.19921875
+  },
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "read": "This isolates the hard dKV side of sparse MLA backward. The candidate recomputes QK, dO.V, probabilities, and grad logits inside the tile, then atomic-adds directly into shared latent KV gradients. It intentionally avoids materialized selected KV, probs, grad_logits, and grad_selected tensors.",
+  "scope": "sparse_mla_shared_latent_kv_backward_dkv_recompute_triton_probe",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compressed_groups": 1024,
+    "csa_count": 512,
+    "dim": 512,
+    "heads": 64,
+    "kv_len": 5120,
+    "local_count": 128,
+    "materialized_probs_fp32_gib": 0.625,
+    "materialized_shared_selected_kv_fp32_gib": 5.0,
+    "selected_count": 640,
+    "seq_len": 4096
+  },
+  "status": "passed",
+  "tile": {
+    "block_d": 64,
+    "block_h": 8,
+    "block_m": 16
+  },
+  "timing": {
+    "triton_dkv_recompute": {
+      "checksum_norm": 1378.1890869140625,
+      "event": {
+        "enabled": true,
+        "max_ms": 473.580078125,
+        "mean_ms": 473.5769805908203,
+        "median_ms": 473.5769805908203,
+        "min_ms": 473.5738830566406,
+        "samples_ms": [
+          473.580078125,
+          473.5738830566406
+        ],
+        "stdev_ms": 0.004380574846828282
+      },
+      "label": "triton_dkv_recompute",
+      "peak_memory_allocated_bytes": 922749440,
+      "peak_memory_allocated_gib": 0.859377384185791,
+      "wall": {
+        "enabled": true,
+        "max_ms": 473.750926903449,
+        "mean_ms": 473.7347119371407,
+        "median_ms": 473.7347119371407,
+        "min_ms": 473.71849697083235,
+        "samples_ms": [
+          473.750926903449,
+          473.71849697083235
+        ],
+        "stdev_ms": 0.02293142526665676
+      }
+    }
+  }
+}

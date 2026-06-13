@@ -1,0 +1,53 @@
+{
+  "date": "2026-06-08",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "visible_device": "HIP_VISIBLE_DEVICES=2",
+  "probe": "tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py",
+  "shape": {
+    "layers": 12,
+    "expert_params": 36,
+    "dtype": "bfloat16",
+    "expert_param_bytes_gib": 18.0,
+    "param_plus_grad_bytes_gib": 36.0
+  },
+  "rows": [
+    {
+      "kind": "muon_batched",
+      "muon_ns_steps": 5,
+      "muon_workspace_mode": "none",
+      "muon_ns_compute_dtype": "bfloat16",
+      "step_2_gpu_ms": 662.67578125,
+      "step_2_wall_ms": 662.7127779647708,
+      "step_peak_allocated_gib": 56.32421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0,
+      "workspace_bytes_gib": 0.0
+    },
+    {
+      "kind": "muon_batched",
+      "muon_ns_steps": 5,
+      "muon_workspace_mode": "prealloc",
+      "muon_ns_compute_dtype": "bfloat16",
+      "step_2_gpu_ms": 662.8084716796875,
+      "step_2_wall_ms": 662.838386837393,
+      "step_peak_allocated_gib": 55.57422733306885,
+      "mem_after_step_gib": 55.57421875,
+      "state_after_step_gib": 18.0,
+      "workspace_bytes_gib": 1.5
+    },
+    {
+      "kind": "muon_batched",
+      "muon_ns_steps": 1,
+      "muon_workspace_mode": "prealloc",
+      "muon_ns_compute_dtype": "bfloat16",
+      "step_2_gpu_ms": 216.2071075439453,
+      "step_2_wall_ms": 216.23748494312167,
+      "step_peak_allocated_gib": 55.57422733306885,
+      "mem_after_step_gib": 55.57421875,
+      "state_after_step_gib": 18.0,
+      "workspace_bytes_gib": 1.5
+    }
+  ],
+  "decision": "Preallocated workspace does not make the quality-safer NS=5 Muon update faster on the current Nexus ROCm image. NS=5 remains about 3.07x slower than NS=1 on the same expert-bank slice, so a promotable Muon branch still needs a lower-level fused/distributed Newton-Schulz implementation or a separate training-quality gate for NS=1."
+}

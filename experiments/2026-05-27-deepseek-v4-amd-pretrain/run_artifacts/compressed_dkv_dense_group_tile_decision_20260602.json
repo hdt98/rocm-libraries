@@ -1,0 +1,75 @@
+{
+  "artifact": "compressed_dkv_dense_group_tile_decision_20260602",
+  "created_date": "2026-06-02",
+  "status": "scalar_lds_dense_group_tile_rejected_for_production",
+  "scope": "Actual-LI layer-2 compressed dKV many-to-one accumulation wall.",
+  "source_artifacts": {
+    "tile_budget": "run_artifacts/actual_li_tile_budget_lds_hash_candidate_summary_20260602.json",
+    "s128_smoke": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s128_layer2_20260602.json",
+    "s512_smoke": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s512_layer2_sb128_20260602.json",
+    "s4096_timing": "run_artifacts/compressed_dkv_segmented_hip_accumulator_densegroup_s4096_layer2_sb256_timing_20260602.json",
+    "s4096_rocprof": "run_artifacts/compressed_dkv_dense_group_tile_rocprof_s4096_20260602.json"
+  },
+  "what_23p813x_means": {
+    "read": "The 23.813x number is only the modeled coalesced-write target for S4096 layer2 with token_block=32, selected_block=512, and d_block=16. It divides raw query-major dKV atomic elements by tile-coalesced compressed-group/D write elements.",
+    "formula": "805044224 / 33806848 = 23.813051840857806",
+    "raw_query_major_atomic_elements": 805044224,
+    "coalesced_active_list_atomic_elements": 33806848,
+    "not_a_speedup": true
+  },
+  "new_dense_group_tile_probe": {
+    "mechanism": "One CTA per batch/seq_tile/selected_tile/D16 tile keeps a dense compressed-group x D16 table in LDS, accumulates selected token contributions locally, then emits sparse global atomics for touched groups.",
+    "contract": "Consumes diagnostic materialized probs and grad_logits; validates the compressed dKV accumulation/write path only. It is not the final fused sparse-MLA/LI backward kernel.",
+    "why_tested": "It checks whether local accumulation can realize the write-reduction ladder before investing in CK-Tile/MFMA segmented accumulation."
+  },
+  "results": {
+    "s128_layer2": {
+      "seq_len": 128,
+      "topk": 32,
+      "compressed_groups": 32,
+      "parity_passed": true,
+      "dense_group_max_abs_diff": 0.0000152587890625,
+      "scalar_hip_ms": 0.48456400632858276,
+      "dense_group_tile_ms": 0.5083640217781067,
+      "pytorch_reference_ms": 0.48724400997161865,
+      "modeled_dense_group_reduction_x": 14.0
+    },
+    "s512_layer2": {
+      "seq_len": 512,
+      "topk": 128,
+      "compressed_groups": 128,
+      "parity_passed": true,
+      "dense_group_max_abs_diff": 0.000030517578125,
+      "scalar_hip_ms": 7.498163223266602,
+      "dense_group_tile_ms": 4.142244815826416,
+      "pytorch_reference_ms": 1.5825769901275635,
+      "modeled_dense_group_reduction_x": 30.0,
+      "read": "Local accumulation is a real improvement over scalar global-style HIP at this size, but remains slower than materialized GEMM-shaped PyTorch reference."
+    },
+    "s4096_layer2_sb256_timing_only": {
+      "seq_len": 4096,
+      "topk": 512,
+      "compressed_groups": 1024,
+      "skip_correctness": true,
+      "seq_chunk": 32,
+      "selected_block": 256,
+      "block_d": 16,
+      "selected_tiles": 2,
+      "dense_group_dynamic_shared_bytes": 69632,
+      "raw_query_major_atomic_elements": 805044224,
+      "dense_group_tile_global_atomic_elements": 67613696,
+      "dense_group_tile_reduction_x": 11.906525920428903,
+      "dense_group_tile_ms": 121.80220031738281,
+      "rocprof_kernel_ms": 120.074022,
+      "rocprof_kernel_trace_percentage": 87.52,
+      "peak_memory_gib": 3.5668997764587402,
+      "read": "This is the lower-pressure selected_block=256 bring-up rung. It halves the selected span, so it gets about half the full 23.813x write-reduction target. Runtime is far too slow because the body is scalar and contends in LDS/local atomics. rocprof confirms the HIP kernel itself is the wall, not Python setup or memory copies."
+    }
+  },
+  "decision": {
+    "keep": "The tile-local accumulation contract and the 32x512/D16 primary target remain valid.",
+    "reject": "Do not pursue this scalar dense-LDS table as a production kernel. It proves correctness and some S512 directionality, but S4096 timing is not viable.",
+    "next": "Implement the same accumulation contract with MFMA-shaped query-major recompute and segmented/local dKV reduction, preferably CK-Tile or equivalent. The kernel must avoid dense route materialization, preserve query-major selected-key reuse, and reduce global dKV writes inside the tile before touching global memory.",
+    "target_gate": "A viable next candidate must beat the existing materialized BMM floor directionally while removing its 4-8 GiB route/prob workspace; otherwise it will not close the sparse-attention backward gap toward the Ascend-style target."
+  }
+}

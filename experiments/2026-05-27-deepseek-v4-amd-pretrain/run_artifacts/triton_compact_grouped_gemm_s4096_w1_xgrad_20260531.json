@@ -1,0 +1,288 @@
+{
+  "best_triton": {
+    "block_k": 64,
+    "block_m": 32,
+    "block_n": 128,
+    "compact_tflops_median": 136.53162356453998,
+    "median_ms": 7.927333831787109,
+    "min_ms": 7.8829731941223145,
+    "num_warps": 4,
+    "speedup_vs_torch_padded_gather_median": 0.386073169857317,
+    "timing_ms": {
+      "triton_compact_bm32_bn128_bk64_w4_ms_max": 8.09813404083252,
+      "triton_compact_bm32_bn128_bk64_w4_ms_mean": 7.9547656059265135,
+      "triton_compact_bm32_bn128_bk64_w4_ms_median": 7.927333831787109,
+      "triton_compact_bm32_bn128_bk64_w4_ms_min": 7.8829731941223145
+    }
+  },
+  "check": {
+    "atol": 0.5,
+    "config": {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 128,
+      "num_warps": 4
+    },
+    "max_abs": 0.0,
+    "ok": true,
+    "pct_close": 100.0,
+    "rel_l2": 0.0,
+    "rtol": 0.025
+  },
+  "failed_triton_configs": [],
+  "flops": {
+    "compact": 1082331758592.0,
+    "compact_vs_padded_flop_ratio": 0.7272727272727273,
+    "padded_global_max": 1488206168064.0
+  },
+  "op": "w1_xgrad",
+  "op_read": "dGate/dUp [assignments, intermediate] x w1/w3 [experts, intermediate, hidden]",
+  "probe": "triton_compact_grouped_gemm",
+  "read": "Promote only if the best Triton compact tile beats padded torch.bmm plus gather with correct BF16 output. A win here is necessary but not sufficient for full-layer promotion because wgrad and compact-to-token reductions still need kernels.",
+  "route_stats": {
+    "assignments": 24576,
+    "experts": 384,
+    "max_per_expert": 88,
+    "mean_per_expert": 64.0,
+    "min_per_expert": 45,
+    "padded_rows_global_max": 33792,
+    "padding_multiplier_global_max": 1.375
+  },
+  "shape": {
+    "K": 3072,
+    "N": 7168,
+    "assignments": 24576,
+    "device": "AMD Instinct MI350X VF",
+    "dtype": "bfloat16",
+    "experts": 384,
+    "tokens": 4096,
+    "topk": 6
+  },
+  "torch_padded_bmm_gather": {
+    "compact_equivalent_tflops_median": 300.2297292228294,
+    "median_ms": 3.6050119400024414,
+    "padded_tflops_median": 412.8158776813905,
+    "timing_ms": {
+      "torch_padded_bmm_gather_ms_max": 3.888612985610962,
+      "torch_padded_bmm_gather_ms_mean": 3.64754056930542,
+      "torch_padded_bmm_gather_ms_median": 3.6050119400024414,
+      "torch_padded_bmm_gather_ms_min": 3.5003719329833984
+    }
+  },
+  "torch_padded_bmm_only": {
+    "compact_equivalent_tflops_median": 351.9537609949555,
+    "median_ms": 3.0752100944519043,
+    "padded_tflops_median": 483.9364213680638,
+    "timing_ms": {
+      "torch_padded_bmm_only_ms_max": 3.0780510902404785,
+      "torch_padded_bmm_only_ms_mean": 3.0708186626434326,
+      "torch_padded_bmm_only_ms_median": 3.0752100944519043,
+      "torch_padded_bmm_only_ms_min": 3.052251100540161
+    }
+  },
+  "torch_padded_bmm_out": {
+    "compact_equivalent_tflops_median": 353.6418332695812,
+    "median_ms": 3.0605309009552,
+    "padded_tflops_median": 486.2575207456741,
+    "timing_ms": {
+      "torch_padded_bmm_out_ms_max": 3.0702109336853027,
+      "torch_padded_bmm_out_ms_mean": 3.0563865184783934,
+      "torch_padded_bmm_out_ms_median": 3.0605309009552,
+      "torch_padded_bmm_out_ms_min": 3.0429298877716064
+    }
+  },
+  "triton_results": [
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 128,
+      "compact_tflops_median": 136.53162356453998,
+      "median_ms": 7.927333831787109,
+      "min_ms": 7.8829731941223145,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.386073169857317,
+      "timing_ms": {
+        "triton_compact_bm32_bn128_bk64_w4_ms_max": 8.09813404083252,
+        "triton_compact_bm32_bn128_bk64_w4_ms_mean": 7.9547656059265135,
+        "triton_compact_bm32_bn128_bk64_w4_ms_median": 7.927333831787109,
+        "triton_compact_bm32_bn128_bk64_w4_ms_min": 7.8829731941223145
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 64,
+      "compact_tflops_median": 106.58341267614021,
+      "median_ms": 10.154786109924316,
+      "min_ms": 10.042824745178223,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.3013880221429903,
+      "timing_ms": {
+        "triton_compact_bm32_bn64_bk64_w4_ms_max": 10.365507125854492,
+        "triton_compact_bm32_bn64_bk64_w4_ms_mean": 10.162065887451172,
+        "triton_compact_bm32_bn64_bk64_w4_ms_median": 10.154786109924316,
+        "triton_compact_bm32_bn64_bk64_w4_ms_min": 10.042824745178223
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 128,
+      "compact_tflops_median": 78.41611536067802,
+      "median_ms": 13.802414894104004,
+      "min_ms": 13.654828071594238,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.22173879893021992,
+      "timing_ms": {
+        "triton_compact_bm16_bn128_bk64_w4_ms_max": 13.8570556640625,
+        "triton_compact_bm16_bn128_bk64_w4_ms_mean": 13.793113899230956,
+        "triton_compact_bm16_bn128_bk64_w4_ms_median": 13.802414894104004,
+        "triton_compact_bm16_bn128_bk64_w4_ms_min": 13.654828071594238
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 128,
+      "compact_tflops_median": 73.5520407467177,
+      "median_ms": 14.71518325805664,
+      "min_ms": 14.713374137878418,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.20798455902882101,
+      "timing_ms": {
+        "triton_compact_bm16_bn128_bk64_w8_ms_max": 14.796934127807617,
+        "triton_compact_bm16_bn128_bk64_w8_ms_mean": 14.742216110229492,
+        "triton_compact_bm16_bn128_bk64_w8_ms_median": 14.71518325805664,
+        "triton_compact_bm16_bn128_bk64_w8_ms_min": 14.713374137878418
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 64,
+      "compact_tflops_median": 71.2102642341277,
+      "median_ms": 15.199097633361816,
+      "min_ms": 15.14614200592041,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.20136267130999774,
+      "timing_ms": {
+        "triton_compact_bm16_bn64_bk64_w4_ms_max": 15.2911376953125,
+        "triton_compact_bm16_bn64_bk64_w4_ms_mean": 15.202402496337891,
+        "triton_compact_bm16_bn64_bk64_w4_ms_median": 15.199097633361816,
+        "triton_compact_bm16_bn64_bk64_w4_ms_min": 15.14614200592041
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 64,
+      "compact_tflops_median": 64.65125319750057,
+      "median_ms": 16.741079330444336,
+      "min_ms": 16.648239135742188,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.18281562619379624,
+      "timing_ms": {
+        "triton_compact_bm32_bn64_bk64_w8_ms_max": 16.778554916381836,
+        "triton_compact_bm32_bn64_bk64_w8_ms_mean": 16.726220321655273,
+        "triton_compact_bm32_bn64_bk64_w8_ms_median": 16.741079330444336,
+        "triton_compact_bm32_bn64_bk64_w8_ms_min": 16.648239135742188
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 32,
+      "block_n": 128,
+      "compact_tflops_median": 61.37517971135865,
+      "median_ms": 17.634681701660156,
+      "min_ms": 17.6112003326416,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.1735518084608852,
+      "timing_ms": {
+        "triton_compact_bm32_bn128_bk64_w8_ms_max": 17.778724670410156,
+        "triton_compact_bm32_bn128_bk64_w8_ms_mean": 17.67080307006836,
+        "triton_compact_bm32_bn128_bk64_w8_ms_median": 17.634681701660156,
+        "triton_compact_bm32_bn128_bk64_w8_ms_min": 17.6112003326416
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 16,
+      "block_n": 64,
+      "compact_tflops_median": 53.8215991899146,
+      "median_ms": 20.109617233276367,
+      "min_ms": 20.064420700073242,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.15219239955948988,
+      "timing_ms": {
+        "triton_compact_bm16_bn64_bk64_w8_ms_max": 20.18661880493164,
+        "triton_compact_bm16_bn64_bk64_w8_ms_mean": 20.12683448791504,
+        "triton_compact_bm16_bn64_bk64_w8_ms_median": 20.109617233276367,
+        "triton_compact_bm16_bn64_bk64_w8_ms_min": 20.064420700073242
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 128,
+      "compact_tflops_median": 42.03516583498247,
+      "median_ms": 25.748245239257812,
+      "min_ms": 25.689210891723633,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.11886366905845966,
+      "timing_ms": {
+        "triton_compact_bm8_bn128_bk64_w4_ms_max": 25.781291961669922,
+        "triton_compact_bm8_bn128_bk64_w4_ms_mean": 25.734672927856444,
+        "triton_compact_bm8_bn128_bk64_w4_ms_median": 25.748245239257812,
+        "triton_compact_bm8_bn128_bk64_w4_ms_min": 25.689210891723633
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 64,
+      "compact_tflops_median": 39.78826235370183,
+      "median_ms": 27.202287673950195,
+      "min_ms": 27.078205108642578,
+      "num_warps": 4,
+      "speedup_vs_torch_padded_gather_median": 0.11251005568498804,
+      "timing_ms": {
+        "triton_compact_bm8_bn64_bk64_w4_ms_max": 27.246408462524414,
+        "triton_compact_bm8_bn64_bk64_w4_ms_mean": 27.190783309936524,
+        "triton_compact_bm8_bn64_bk64_w4_ms_median": 27.202287673950195,
+        "triton_compact_bm8_bn64_bk64_w4_ms_min": 27.078205108642578
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 128,
+      "compact_tflops_median": 32.22135406680868,
+      "median_ms": 33.590511322021484,
+      "min_ms": 33.4169807434082,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.09111295959787184,
+      "timing_ms": {
+        "triton_compact_bm8_bn128_bk64_w8_ms_max": 33.61605453491211,
+        "triton_compact_bm8_bn128_bk64_w8_ms_mean": 33.56330490112305,
+        "triton_compact_bm8_bn128_bk64_w8_ms_median": 33.590511322021484,
+        "triton_compact_bm8_bn128_bk64_w8_ms_min": 33.4169807434082
+      }
+    },
+    {
+      "block_k": 64,
+      "block_m": 8,
+      "block_n": 64,
+      "compact_tflops_median": 30.586342802311453,
+      "median_ms": 35.386112213134766,
+      "min_ms": 35.36506652832031,
+      "num_warps": 8,
+      "speedup_vs_torch_padded_gather_median": 0.08648960593696359,
+      "timing_ms": {
+        "triton_compact_bm8_bn64_bk64_w8_ms_max": 35.41478729248047,
+        "triton_compact_bm8_bn64_bk64_w8_ms_mean": 35.38862762451172,
+        "triton_compact_bm8_bn64_bk64_w8_ms_median": 35.386112213134766,
+        "triton_compact_bm8_bn64_bk64_w8_ms_min": 35.36506652832031
+      }
+    }
+  ]
+}

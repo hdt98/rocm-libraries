@@ -1,0 +1,66 @@
+{
+  "artifact": "sparse_mla_query_major_union_operand_decision_20260605",
+  "scope": "S4096 layer-2 actual-LI sparse-MLA backward dKV path",
+  "status": "correctness_passed_latency_candidate_not_yet_e2e_materialized",
+  "corrected_read": {
+    "keep_query_major": true,
+    "union_role": "compressed-group union is the dKV operand/epilogue axis, not the owner of the whole backward kernel",
+    "why_user_correction_is_right": "The current 11.1 ms Triton boundary and the desired union path both start from q, kv, indices, lse, and dO. The goal is not to introduce new math or a route-major owner; it is to consume QK/P/grad_logits/scaled-dP while they are hot in the query-major producer, then write dKV by compressed-group union rows.",
+    "remaining_issue": "The 6.26 ms union result consumed materialized probs and grad_logits. A separate dKV split must either read those slabs from HBM or recompute them. The source-boundary union run recomputes them and therefore lands at 8.22-8.79 ms rather than 6.26 ms."
+  },
+  "baseline": {
+    "current_full_sparse_attention_backward_ms": 11.13,
+    "matched_single_token_full_ms": 11.076744079589844,
+    "matched_single_token_no_dkv_ms": 1.990291953086853,
+    "current_full_boundary_read": "single-token query-major Triton source-boundary sparse-attention backward"
+  },
+  "materialized_prob_union_slice": {
+    "artifact": "actual_li_union_gather_operand_reformulation_decision_20260605.json",
+    "median_ms": 6.258606910705566,
+    "shape": "S4096 layer2 T8 K512 U256 D64 H64",
+    "read": "Good dKV slice, but starts after probs and grad_logits/scaled-dP have already been materialized."
+  },
+  "source_boundary_query_major_union_t4": {
+    "timing_artifact": "sparse_mla_query_recompute_union_operand_t4k512_u64_s4096_layer2_20260605.json",
+    "correctness_artifact": "sparse_mla_query_recompute_union_operand_t4k512_u64_s4096_layer2_correctness_20260605.json",
+    "shape": "S4096 layer2 token_block=4 selected_block=512 union_block=64 H64 D512",
+    "correctness": {
+      "passed": true,
+      "max_abs_diff": 0.06618833541870117,
+      "mean_abs_diff": 0.0002345552493352443,
+      "dkv_atol": 1.0
+    },
+    "timing_skip_correctness": {
+      "dkv_only_full_ms": 8.218957901000977,
+      "dkv_only_sink_ms": 7.163912773132324,
+      "split_schedule_ms": 10.20924985408783,
+      "split_beats_matched_single_token": true,
+      "split_speedup_vs_matched_single_token_x": 1.0849713973015036
+    },
+    "timing_correctness_run_one_sample": {
+      "dkv_only_full_ms": 8.789405822753906,
+      "split_schedule_ms": 10.77969777584076,
+      "split_beats_matched_single_token": true,
+      "split_speedup_vs_matched_single_token_x": 1.0275560882991375
+    },
+    "route": {
+      "valid_pairs": 1572352,
+      "coalesced_unique_groups": 515790,
+      "modeled_write_reduction_x": 3.04843444037302,
+      "duplicate_token_group_hits": 0,
+      "union_route_slots_mib": 30.40625
+    }
+  },
+  "decision": {
+    "promote_as_full_sparse_attention_replacement": false,
+    "promote_as_next_kernel_direction": true,
+    "reason": "The query-major union source-boundary dKV split is correct and narrowly beats the split latency gate, but it still does not produce dQ and dKV from the same hot score/prob page in one owner. It is evidence for query-major union epilogue fusion, not an e2e TorchTitan candidate yet.",
+    "next_kernel_contract": [
+      "Keep the single-token or small-token query-major CTA shape that gives the 1.99 ms no-dKV path.",
+      "Build P and scaled-dP once from q, kv, indices, lse, and dO.",
+      "Consume the same score/prob page for dQ and compressed-group union dKV before HBM.",
+      "Use the forward-known union_route_slots sidecar only as dKV epilogue metadata.",
+      "Promote only when the full source-boundary dQ+dKV kernel beats 11.13 ms and then measure TorchTitan e2e TFLOPs."
+    ]
+  }
+}

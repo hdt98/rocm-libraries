@@ -1,0 +1,74 @@
+{
+  "artifact": "amd_4x_gbs128_ga8_profile_plan_blocked_20260605",
+  "created_at": "2026-06-05",
+  "status": "blocked_by_active_external_gpu_workload",
+  "user_request": "Rerun the AMD best 4xMI350 candidate closer to Ascend with GA=8 and GBS=128, then profile AMD and compare root-cause gaps.",
+  "node_check": {
+    "target_host": "do-sonle5-mi350-gpu",
+    "hostname": "son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1",
+    "gpu_state": "all 8 GPUs occupied, GPU use 0% but about 76% VRAM allocated per GPU",
+    "blocking_process": {
+      "pid": 1218761,
+      "owner": "root",
+      "elapsed": "about 3 hours at inspection",
+      "command": "python3 -m sglang.launch_server --model-path /scratch/tanth/models/Qwen3-32B --trust-remote-code --tp-size 8 --dtype bfloat16 --host 0.0.0.0 --port 30000 --mem-fraction-static 0.85",
+      "docker_container": "sglang-track-a-amd-qwen3-32b-30000",
+      "image": "lmsysorg/sglang:v0.5.12.post1-rocm700-mi35x"
+    },
+    "policy": "Do not stop or kill external GPU workloads without explicit user approval."
+  },
+  "shape_semantics": {
+    "important_correction": "On 4 GPUs, MBS=1 and GBS=128 implies GA=32, not GA=8. To have both GA=8 and GBS=128 on 4 GPUs, MBS must be 4.",
+    "formula": "global_batch_size = world_size * micro_batch_size * gradient_accumulation_steps",
+    "current_best_amd_4x": {
+      "artifact": "run_artifacts/torchtitan_query_recompute_stability_4x_s4096_gbs64_20260604.json",
+      "shape": "4xMI350, MBS=1, GBS=64, GA=16, S=4096, FSDP4/EP4, no activation checkpointing, query_recompute shared-KV backward",
+      "late_mean_tflops_per_gpu": 77.4,
+      "late_mean_tokens_per_gpu_s": 4090.33,
+      "peak_memory_gib": 144.52
+    },
+    "ascend_reference_local_run": {
+      "shape": "16 Ascend 910C logical dies, local_batch_size=1, GBS=128, GA=8, S=4096, EP16, full activation checkpointing",
+      "log": "/data2/sonle/dsv4_ascend910_fit_20260601/logs/bf16_compile_customopp_novirtual_fullac_forcebalance_5step_20260602T032337.log"
+    }
+  },
+  "recommended_run_lanes": [
+    {
+      "name": "throughput_tokens_per_step_match",
+      "priority": 1,
+      "shape": "4xMI350, MBS=1, GBS=128, GA=32, S=4096",
+      "why": "Matches Ascend global tokens/step while keeping the current per-GPU microbatch and memory footprint closest to the best AMD run.",
+      "expected_risk": "Should have similar activation memory to the current MBS=1 run, but twice as many accumulation microsteps per optimizer step."
+    },
+    {
+      "name": "ga_cadence_match",
+      "priority": 2,
+      "shape": "4xMI350, MBS=1, GBS=32, GA=8, S=4096",
+      "why": "Matches Ascend gradient accumulation cadence, but not global tokens/step.",
+      "expected_risk": "Lower tokens/step and less comparable to the memory-equivalent throughput target."
+    },
+    {
+      "name": "literal_gbs128_ga8_match",
+      "priority": 3,
+      "shape": "4xMI350, MBS=4, GBS=128, GA=8, S=4096",
+      "why": "Mathematically satisfies both requested GBS=128 and GA=8 on 4 GPUs.",
+      "expected_risk": "High OOM risk for the current best no-AC path because the MBS=1 run already peaks around 144 GiB/GPU."
+    }
+  ],
+  "prepared_commands": {
+    "recommended_no_profile_gate_gbs128_mbs1_ga32": "env IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True RUN_ID=torchtitan_dsv4_query_recompute_4x_s4096_gbs128_mbs1_ga32_steps6_20260605 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "matching_profile_gate_gbs128_mbs1_ga32": "env IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=1 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=6 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CANARY_DSV4_PROFILE_TIMING_PATH=/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_profile_4x_s4096_gbs128_mbs1_ga32_20260605/profiling/profile_timing CANARY_MORI_AITER_TIMING_PATH=/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_query_recompute_profile_4x_s4096_gbs128_mbs1_ga32_20260605/profiling/mori_timing RUN_ID=torchtitan_dsv4_query_recompute_profile_4x_s4096_gbs128_mbs1_ga32_20260605 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run",
+    "literal_gbs128_ga8_mbs4_oom_probe": "env IMAGE=sonle5/nexus-titan-rocm722-mori-tilelang:20260604 GPUS_PER_NODE=4 CANARY_VISIBLE_DEVICES=0,1,2,3 CANARY_EP=4 CANARY_MBS=4 CANARY_GBS=128 CANARY_SEQ_LEN=4096 CANARY_STEPS=3 CANARY_CHECKPOINT_ENABLE=false CANARY_ACTIVATION_CHECKPOINT_MODE=none CANARY_SHAREDKV_BACKWARD_MODE=query_recompute CANARY_MOE_COMM_BACKEND=mori CANARY_EXPERIMENTAL_MORI_AITER_MOE=true CANARY_MORI_AITER_BACKWARD_MODE=routed CANARY_MORI_AITER_FORWARD_MODE=aiter CANARY_MORI_AITER_LOCAL_VJP_MODE=padded CANARY_MORI_AITER_LOCAL_VJP_SWIGLU_BACKEND=triton CANARY_MORI_SHMEM_HEAP_SIZE=32G CANARY_PYTORCH_ALLOC_CONF=expandable_segments:True CANARY_PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True RUN_ID=torchtitan_dsv4_query_recompute_4x_s4096_gbs128_mbs4_ga8_oomprobe_20260605 experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh run"
+  },
+  "planned_profile_analysis": {
+    "summarizer": "python3 /local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/summarize_full_run_profile.py --run ep4=/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/<profile_run_id>/profiling --steady-after-call-id 0 --dsv4-steady-after-call-id 0 --pretty",
+    "mori_skew_analyzer": "python3 /local/data/sonle5/dsv4_pretrain_canary_20260527/tools/dsv4_runtime_probe/analyze_mori_step_skew.py --run ep4=/local/data/sonle5/dsv4_pretrain_canary_20260527/outputs/<profile_run_id>/profiling --steady-after-call-id 0 --pretty",
+    "compare_against_ascend": [
+      "End-to-end node tokens/s and normalized TFLOPs/token.",
+      "SparseAttnSharedkvGrad and SparseLightningIndexerGradKLLoss public-boundary latency.",
+      "MORI routed local VJP, combine dX wait/skew, and loss/lm-head buckets.",
+      "Activation-checkpoint/no-AC caveat, because Ascend reference uses full activation checkpointing while the current AMD best is no-AC."
+    ]
+  },
+  "dependency_pin_changes": []
+}

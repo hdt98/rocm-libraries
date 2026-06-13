@@ -1,0 +1,69 @@
+{
+  "artifact": "hipkittens_sharedkv_qchunk_d512_rowterms_score_gate_20260607",
+  "date": "2026-06-07",
+  "status": "diagnostic_not_promoted",
+  "purpose": "Gate the HipKittens SharedKV rewrite after moving from the D128 q-chunk slice to a full-D512 row-term producer while preserving the fast q-chunk/shared-KV ownership shape.",
+  "source": {
+    "kernel": "tools/dsv4_runtime_probe/hipkittens_sharedkv_owner/sharedkv_qchunk_d512_rowterms_score.cpp",
+    "probe": "tools/dsv4_runtime_probe/probe_hipkittens_sharedkv_qchunk_d512_rowterms_score.py",
+    "reference_snapshot": "sources/references/hipkittens@cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "remote": {
+    "host": "do-vunguyen-mi350-gpu",
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "scratch_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527"
+  },
+  "build": {
+    "command_shape": "make -B hk_sharedkv_qchunk_d512_rowterms_score GPU_TARGET=CDNA4 ATTN_B=4 ATTN_N=4096 ATTN_Q_N=4096 ATTN_KV_N=1024 ATTN_H=64 ATTN_H_KV=1 ATTN_QUERY_CHUNKS=16 ATTN_NUM_WARPS=4",
+    "resource_report": {
+      "total_sgprs": 106,
+      "vgprs": 256,
+      "agprs": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    }
+  },
+  "measurement": {
+    "command_shape": "PYTHONPATH=. python3 ../probe_hipkittens_sharedkv_qchunk_d512_rowterms_score.py --batch 4 --seq 4096 --kv-seq 1024 --heads 64 --kv-heads 1 --dim 512 --query-chunks 16 --num-warps 4 --warmup 2 --iters 10",
+    "shape": {
+      "batch": 4,
+      "query_seq": 4096,
+      "kv_seq": 1024,
+      "heads": 64,
+      "kv_heads": 1,
+      "dim": 512,
+      "kv_tiles": 16,
+      "seq_blocks": 4,
+      "query_chunks": 16,
+      "num_warps": 4,
+      "query_steps_per_chunk": 256,
+      "active_tiles": 16
+    },
+    "latency_ms": {
+      "median": 10.770027160644531,
+      "mean": 10.777226829528809,
+      "min": 10.743900299072266,
+      "max": 10.847419738769531
+    },
+    "output_sanity": {
+      "sink_nonzero": 256,
+      "sink_abs_max": 256.0,
+      "scratch_sentinel_nonzero": 256,
+      "scratch_note": "dK/dV scratch uses direct sentinel writes for coordinate sanity. This gate is not a dKV-correctness result."
+    }
+  },
+  "comparison": {
+    "previous_d128_qchunk_kernel_median_ms": 1.8654219508171082,
+    "previous_d128_qchunk_plus_sink_median_ms": 2.671031951904297,
+    "current_triton_c4_sharedkv_boundary_ms": 11.018,
+    "current_triton_c4_sharedkv_full_with_grad_sink_gate_ms": 11.13
+  },
+  "read": {
+    "positive": "The q-chunk D512 producer compiles on MI350 with no spills and preserves the C4-shaped Q=4096, KV=1024, H64/HKV1 ownership shape.",
+    "negative": "Full-D row-term replay alone is about 10.77 ms before production dQ, dOriKV, route-aware dCmpKV, and dSinks are emitted. That is already near the whole retained Triton C4 SharedKV boundary, so this simple q-chunk full-D extension is not a promotable latency path.",
+    "decision": "Do not integrate this gate into TorchTitan or extend it by simply adding outputs. The next HipKittens/HIP branch needs a different full-D schedule: compute QK and dO*V row terms once with better K/V chunk reuse, then feed dQ/dOriKV/dCmpKV epilogues. The D128 q-chunk slice remains useful as a schedule substrate, but its 1.9 ms timing does not extrapolate to D512."
+  },
+  "e2e_tflops": "Not measured. This gate does not beat the current Triton C4 SharedKV source-boundary latency and is not a full backward kernel."
+}

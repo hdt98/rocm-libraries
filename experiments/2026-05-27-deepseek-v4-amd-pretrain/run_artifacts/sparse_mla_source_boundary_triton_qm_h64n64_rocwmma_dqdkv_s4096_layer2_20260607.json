@@ -1,0 +1,233 @@
+{
+  "artifact": "sparse_mla_source_boundary_hip_coop_probe",
+  "status": "timed",
+  "scope": "source-boundary compressed sparse-MLA backward producer: q,dO,output,lse,kv,LI route to dQ+dKV from one query-major scorepage producer",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "backend_path": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+  "build_seconds": 11.491584026953205,
+  "extension_dir": "/workspace/torch_extensions_triton_qm_h64n64_rocwmma_dqdkv_20260607_v2",
+  "build_carrier": {
+    "hip_build_mode": "prebuilt_object",
+    "kernel_source_flavor": "triton_query_major_h64n64_rocwmma",
+    "external_hip_source_path": "tools/dsv4_runtime_probe/source_boundary_triton_query_major_h64n64_rocwmma_dkv.hip",
+    "hipcc": "/opt/rocm/bin/hipcc",
+    "hip_defines": [
+      "TRITON_QM_DKV_MODE=2",
+      "TRITON_QM_THREADS=1024"
+    ],
+    "read": "prebuilt_object bypasses PyTorch hipify by compiling raw HIP with hipcc and linking the object into the Torch C++ wrapper."
+  },
+  "shape": {
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "dim": 512,
+    "compress_ratio": 4,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "kv_len": 5120,
+    "valid_pairs": 1572352
+  },
+  "tile": {
+    "seq_chunk": 1,
+    "selected_block": 64,
+    "block_d": 16,
+    "threads": 1024,
+    "k_tile": 16,
+    "h_tile": 16,
+    "forward_group_sidecar_ordered_by_group": false,
+    "schedule_read": "Triton-schedule-spec HIP/CK full-boundary rung. One CTA owns one query token and one H64 head block, processes selected slots as K64 windows, recomputes QK and dO.V over D512 with CK MFMA, forms the H64xK64 prob/scaled-dP page, accumulates dQ in per-wave H16xD16 registers across all selected windows, and emits compressed dKV with the same raw global atomic shape as the retained fast Triton baseline. d_sinks is returned by a separate head-wise row reduction so the hot producer is not poisoned by 64-address sink atomics."
+  },
+  "union_sidecar": null,
+  "contract": {
+    "formula": "dQ[token,h,d] = sum_k scaled_dP[token,h,k] * KV[group(token,k),d]; dKV[g,d] += sum_{token,k,h:group(token,k)=g} prob[token,h,k] * grad_output[token,h,d] + scaled_dP[token,h,k] * q[token,h,d]; d_sinks[h] += -exp(attn_sink[h] - lse[token,h]) * sum_d grad_output[token,h,d] * output[token,h,d]",
+    "source_boundary": true,
+    "emits_dq": true,
+    "emits_dkv": true,
+    "emits_valid_dkv": true,
+    "emits_d_sinks": true,
+    "forward_sidecar_contract": "group_ids[B,S,K] carried from forward in original selected-slot order",
+    "materialized_probs_grad_logits": false,
+    "materialized_scaled_dp_page": false,
+    "hip_source_includes_torch_extension": false,
+    "hip_source_headers": "external_source_see_path",
+    "cpp_source_includes": [
+      "torch/extension.h"
+    ]
+  },
+  "route_stats": {
+    "token_block": 1,
+    "selected_block": 64,
+    "d_block": 16,
+    "d_blocks_per_full_dim": 32,
+    "tiles": 32768,
+    "nonempty_tiles": 25576,
+    "baseline_valid_pairs": 1572352,
+    "coalesced_unique_groups": 1572352,
+    "baseline_atomic_add_elements": 805044224,
+    "coalesced_atomic_add_elements": 805044224,
+    "route_atomic_reduction_x": 1.0,
+    "valid_pairs_per_tile": {
+      "mean": 47.984375,
+      "p50": 64.0,
+      "p90": 64.0,
+      "p99": 64.0,
+      "max": 64
+    },
+    "unique_groups_per_tile": {
+      "mean": 47.984375,
+      "p50": 64.0,
+      "p90": 64.0,
+      "p99": 64.0,
+      "max": 64
+    },
+    "read": "baseline elements model the current query-major per-selected-group dKV writes. Coalesced elements model one write per unique compressed group per token/selected tile and D block."
+  },
+  "boundary_route_fanin": {
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4,
+    "actual_compressed": {
+      "rows": 1024,
+      "nonzero_rows": 1024,
+      "zero_rows": 0,
+      "total_selections": 1572352,
+      "min": 1,
+      "min_nonzero": 1,
+      "max": 3499,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 1535.5,
+      "p50_all_rows": 1420.5,
+      "p90_all_rows": 3059.1000000000004,
+      "p99_all_rows": 3413.16,
+      "p50_nonzero_rows": 1420.5,
+      "p90_nonzero_rows": 3059.1000000000004,
+      "p99_nonzero_rows": 3413.16,
+      "gini": 0.38915823461643767,
+      "top1_share": 0.002225328679583198,
+      "top8_share": 0.017700871051774668,
+      "top16_share": 0.035047495726147834,
+      "top64_share": 0.13582136824324326
+    },
+    "prefix_compressed_same_topk": {
+      "rows": 1024,
+      "nonzero_rows": 512,
+      "zero_rows": 512,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 2049,
+      "max": 4093,
+      "mean_all_rows": 1535.5,
+      "mean_nonzero_rows": 3071.0,
+      "p50_all_rows": 1024.5,
+      "p90_all_rows": 3683.8,
+      "p99_all_rows": 4052.08,
+      "p50_nonzero_rows": 3071.0,
+      "p90_nonzero_rows": 3888.6000000000004,
+      "p99_nonzero_rows": 4072.56,
+      "gini": 0.5555734339384565,
+      "top1_share": 0.0026031066834907197,
+      "top8_share": 0.020753622598502115,
+      "top16_share": 0.04134443178117877,
+      "top64_share": 0.16147020514490393
+    },
+    "valid_selected_per_query": {
+      "rows": 4096,
+      "nonzero_rows": 4093,
+      "zero_rows": 3,
+      "total_selections": 1572352,
+      "min": 0,
+      "min_nonzero": 1,
+      "max": 512,
+      "mean_all_rows": 383.875,
+      "mean_nonzero_rows": 384.15636452479845,
+      "p50_all_rows": 512.0,
+      "p90_all_rows": 512.0,
+      "p99_all_rows": 512.0,
+      "p50_nonzero_rows": 512.0,
+      "p90_nonzero_rows": 512.0,
+      "p99_nonzero_rows": 512.0,
+      "gini": 0.22245742365577173,
+      "top1_share": 0.00032562683165092806,
+      "top8_share": 0.0026050146532074245,
+      "top16_share": 0.005210029306414849,
+      "top64_share": 0.020840117225659396
+    },
+    "atomic_estimates": {
+      "block_h_16": {
+        "head_blocks": 4,
+        "actual_atomic_add_elements": 3220176896,
+        "prefix_atomic_add_elements": 3220176896
+      },
+      "block_h_64": {
+        "head_blocks": 1,
+        "actual_atomic_add_elements": 805044224,
+        "prefix_atomic_add_elements": 805044224
+      }
+    },
+    "actual_vs_prefix_total_selection_ratio": 1.0,
+    "read": "Actual LightningIndexer top-k fan-in is counted per compressed group from the TorchTitan-shaped boundary tensors. Prefix stats are the structured route used by earlier synthetic dKV probes at the same top-k; matching totals do not imply matching topology."
+  },
+  "correctness": {
+    "passed": null,
+    "dq_atol": 0.75,
+    "dkv_atol": 0.75,
+    "max_abs_diff": null,
+    "mean_abs_diff": null,
+    "reference_norm": null,
+    "candidate_norm": null
+  },
+  "timing_ms": {
+    "source_boundary_query_major_dq_dkv": {
+      "label": "source_boundary_query_major_dq_dkv",
+      "wall": {
+        "enabled": true,
+        "samples_ms": [
+          57.37368203699589,
+          57.27856303565204,
+          57.05770698841661,
+          57.06198699772358,
+          57.05237598158419
+        ],
+        "mean_ms": 57.16486300807446,
+        "median_ms": 57.06198699772358,
+        "min_ms": 57.05237598158419,
+        "max_ms": 57.37368203699589,
+        "stdev_ms": 0.15103997839486144
+      },
+      "event": {
+        "enabled": true,
+        "samples_ms": [
+          57.22991180419922,
+          57.14267349243164,
+          57.038230895996094,
+          56.97930908203125,
+          57.03523254394531
+        ],
+        "mean_ms": 57.0850715637207,
+        "median_ms": 57.038230895996094,
+        "min_ms": 56.97930908203125,
+        "max_ms": 57.22991180419922,
+        "stdev_ms": 0.100200244549683
+      },
+      "peak_memory_allocated_bytes": 2218796032,
+      "peak_memory_allocated_gib": 2.0664148330688477,
+      "checksum_norm": {
+        "tensor_0_norm": 239.09872436523438,
+        "tensor_1_norm": 859.3544921875,
+        "tensor_2_norm": "NaN"
+      }
+    }
+  },
+  "gate": {
+    "candidate_event_median_ms": 57.038230895996094,
+    "triton_full_sparse_attention_backward_ms": 11.13,
+    "triton_sparse_atomic_dkv_wall_ms": 8.80629825592041,
+    "passes_triton_full_boundary_gate": false,
+    "read": "This query-major same-producer dQ+dKV source-boundary probe emits both outputs from one score/prob/scaled-dP producer. Passing would promote the scorepage consumer contract toward a cooperative owner; failing rejects this simple same-launch D16 replay because dQ still reloads KV and dKV still uses raw compressed-group atomics."
+  }
+}

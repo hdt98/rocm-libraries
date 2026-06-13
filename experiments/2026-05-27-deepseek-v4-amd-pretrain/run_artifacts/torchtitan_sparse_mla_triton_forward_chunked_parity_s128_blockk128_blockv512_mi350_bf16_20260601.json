@@ -1,0 +1,65 @@
+{
+  "batch": 1,
+  "candidate_compressed_groups": 32,
+  "candidate_estimated_selected_state_elements": 1342177280,
+  "candidate_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_triton_forward_backend",
+  "candidate_loss": 0.021132487803697586,
+  "candidate_mode": "fused",
+  "candidate_selected_keys": 160,
+  "candidate_sparse_used": true,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "environment": {
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_KEYS": "128",
+    "TORCHTITAN_DSV4_TRITON_SPARSE_MLA_BLOCK_V": "512"
+  },
+  "flavor": "flash_4layer",
+  "grad_none_mismatches": [],
+  "layer_id": 2,
+  "max_input_grad_abs_diff": 1.1920928955078125e-07,
+  "max_output_abs_diff": 0.00390625,
+  "max_param_grad_abs_diff": 9.5367431640625e-07,
+  "nonfinite_diffs": [],
+  "param_grad_abs_diffs": {
+    "indexer.weights_proj.weight": 0.0,
+    "indexer.wk.weight": 0.0,
+    "indexer.wq.weight": 0.0,
+    "kv_norm.weight": 9.5367431640625e-07,
+    "q_norm.weight": 2.9802322387695312e-08,
+    "wkv_a.weight": 9.5367431640625e-07,
+    "wkv_b.weight": 2.384185791015625e-07,
+    "wo.weight": 1.1920928955078125e-07,
+    "wq_a.weight": 5.960464477539063e-08,
+    "wq_b.weight": 5.960464477539063e-08
+  },
+  "reference_compressed_groups": 32,
+  "reference_estimated_selected_state_elements": 1342177280,
+  "reference_kernel_module": null,
+  "reference_loss": 0.021132495254278183,
+  "reference_mode": "manual_stream",
+  "reference_selected_keys": 160,
+  "reference_sparse_used": true,
+  "seed": 1234,
+  "seq_len": 128,
+  "status": "passed",
+  "timing": {
+    "candidate": {
+      "enabled": true,
+      "iters": 3,
+      "last_loss": 0.021132487803697586,
+      "mean_ms": 45.79902700303743,
+      "peak_memory_allocated_bytes": 5499692544,
+      "peak_memory_allocated_gib": 5.121987819671631,
+      "warmup_iters": 1
+    },
+    "reference": {
+      "enabled": true,
+      "iters": 3,
+      "last_loss": 0.021132495254278183,
+      "mean_ms": 44.972504023462534,
+      "peak_memory_allocated_bytes": 5491303936,
+      "peak_memory_allocated_gib": 5.114175319671631,
+      "warmup_iters": 1
+    }
+  }
+}

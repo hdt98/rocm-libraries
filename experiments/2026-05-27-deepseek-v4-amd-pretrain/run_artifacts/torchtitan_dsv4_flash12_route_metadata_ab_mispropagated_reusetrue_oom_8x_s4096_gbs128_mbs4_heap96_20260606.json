@@ -1,0 +1,46 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_route_metadata_ab_mispropagated_reusetrue_oom_8x_s4096_gbs128_mbs4_heap96_20260606",
+  "date": "2026-06-06",
+  "host": "do-vunguyen-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_route_metadata_ab_reusefalse_8x_s4096_gbs128_mbs4_heap96_steps3_20260606/docker-run.log",
+  "run_id": "torchtitan_dsv4_flash12_route_metadata_ab_reusefalse_8x_s4096_gbs128_mbs4_heap96_steps3_20260606",
+  "status": "failed_after_step1_misnamed_run_id",
+  "requested_knob": {
+    "CANARY_MORI_AITER_REUSE_FORWARD_ROUTE_METADATA": "false"
+  },
+  "effective_header_knob": {
+    "mori_aiter_reuse_forward_route_metadata": true
+  },
+  "read": "The local env requested reuse_forward_route_metadata=false, but the run header printed true because the launcher run-path propagation was missing at launch time. Treat this as a failed reuse=true smoke, not the intended false A/B.",
+  "shape": {
+    "gpus": 8,
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "fsdp": 8,
+    "expert_parallel": 8,
+    "activation_checkpoint": "none",
+    "mori_shmem_heap_size": "96G"
+  },
+  "step1": {
+    "loss": 12.38886,
+    "grad_norm": 10.625,
+    "tokens_per_gpu_s_by_rank": [1748, 1751, 1747, 1747, 1746, 1747, 1749, 1748],
+    "tflops_per_gpu_by_rank": [88.51, 88.67, 88.43, 88.44, 88.41, 88.44, 88.55, 88.48],
+    "memory_gib_by_rank": [141.83, 141.74, 142.95, 144.06, 142.19, 140.92, 141.88, 142.40]
+  },
+  "failure": {
+    "first_failed_rank": 4,
+    "other_failed_rank": 1,
+    "site": "aiter/fused_moe.py:fused_moe_2stages",
+    "allocation": "a2 = torch.empty(...)",
+    "requested_allocation_gib": 3.0,
+    "rank4_free_gib": 2.46,
+    "rank4_allocated_by_pytorch_gib": 169.27,
+    "rank1_free_gib": 1.65,
+    "rank1_allocated_by_pytorch_gib": 170.22
+  },
+  "decision": "not_promoted; rerun the actual reuse=false A/B only after the fixed launcher propagation is staged, and consider MBS/heap memory headroom because this tuple OOMs in AITER forward on step 2."
+}

@@ -1,0 +1,80 @@
+{
+  "device": "cuda",
+  "dtype": "bf16",
+  "kernel": {
+    "read": "Prefix-selected torch.bmm floor for compact LI gradients. It tests whether MI350 library GEMM can beat the scalar Triton dot loops, but it is not a general dynamic-topk production kernel.",
+    "workspace": {
+      "head_logits_logical_bytes": 524288,
+      "index_logits_bytes": 16384,
+      "main_logits_logical_bytes": 524288,
+      "row_count": 125.0,
+      "target_probs_bytes": 16384
+    }
+  },
+  "matmul_dtype": "input",
+  "max_abs_diff": {
+    "index_k": 6.020069122314453e-06,
+    "index_q": 3.4868717193603516e-06,
+    "weights": 8.52346420288086e-06
+  },
+  "oracle": {
+    "grad_norms": {
+      "index_k": 0.0009141878690570593,
+      "index_q": 0.0009185621165670455,
+      "weights": 0.000768651079852134
+    },
+    "loss": 0.016752004623413086,
+    "row_count": 125.0
+  },
+  "scope": "torch_compact_prefix_sparse_lightning_indexer_grad_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "groups": 32,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "seq_len": 128,
+    "topk": 32
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 2.279057025909424,
+      "mean_ms": 1.6216386953989665,
+      "median_ms": 1.3292900323867798,
+      "min_ms": 1.2565690279006958,
+      "samples_ms": [
+        2.279057025909424,
+        1.3292900323867798,
+        1.2565690279006958
+      ],
+      "stdev_ms": 0.5705008607283024
+    },
+    "peak_memory_allocated_bytes": 195393536,
+    "peak_memory_allocated_gib": 0.1819744110107422,
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 2.3321820190176368,
+      "mean_ms": 1.6589079750701785,
+      "median_ms": 1.358825946226716,
+      "min_ms": 1.2857159599661827,
+      "samples_ms": [
+        2.3321820190176368,
+        1.358825946226716,
+        1.2857159599661827
+      ],
+      "stdev_ms": 0.5842171866804132
+    },
+    "warmup_iters": 1
+  },
+  "torch_grad_norms": {
+    "index_k": 0.0009141379850916564,
+    "index_q": 0.0009189237607643008,
+    "weights": 0.0007686343742534518
+  }
+}

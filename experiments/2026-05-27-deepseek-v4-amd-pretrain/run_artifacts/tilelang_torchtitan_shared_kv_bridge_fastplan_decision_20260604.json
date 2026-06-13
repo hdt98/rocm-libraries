@@ -1,0 +1,39 @@
+{
+  "status": "ok",
+  "scope": "torchtitan_shared_kv_tilelang_compressed_dkv_bridge_fastplan",
+  "decision": "Keep the opt-in TorchTitan TileLang compressed-dKV bridge as the semantic integration path. The vectorized CPU route-plan rewrite removes the immediate Python-loop cliff, but the path is still not a production speed promotion because S4096 bridge timing is dominated by explicit selected-state/probability/logit construction plus remaining CPU route metadata.",
+  "code": {
+    "adapter": "tools/dsv4_runtime_probe/tilelang_sparse_dkv_selected_limit_adapter.py",
+    "backend": "sources/wip/torchtitan/torchtitan/models/deepseek_v4/sparse_mla_shared_kv_triton_forward_backend.py",
+    "verifier": "tools/dsv4_runtime_probe/verify_torchtitan_shared_kv_tilelang_backward_bridge.py"
+  },
+  "implementation_change": {
+    "panelize_groups": "vectorized per-panel cumsum/scatter instead of token/selected Python loops",
+    "compact_slots": "dense route-tile by group-panel active mask plus cumsum slot lookup for panelized LI routes",
+    "verifier": "adds timing-only flags --skip-parity and --skip-explicit-timing for large S4096 bridge timing"
+  },
+  "results": {
+    "s512_bridge_before_ms": 581.0192260742188,
+    "s512_bridge_after_ms": 9.20290470123291,
+    "s512_bridge_artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_s512_h64_d512_k128_unique_tb128_fastplan2_20260604.json",
+    "s512_dkv_compressed_vs_tilelang_bf16_ref_max_abs": 0.0009765625,
+    "s512_dkv_compressed_vs_explicit_pytorch_max_abs": 0.03125,
+    "s4096_static_plan_before_ms": 6702.804954024032,
+    "s4096_static_plan_after_ms": 563.1433490198106,
+    "s4096_adapter_artifact": "run_artifacts/tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_fastplan2_20260604.json",
+    "s4096_adapter_kernel_only_ms": 6.226562023162842,
+    "s4096_adapter_pack_plus_kernel_ms": 8.806940078735352,
+    "s4096_bridge_timing_artifact": "run_artifacts/torchtitan_shared_kv_tilelang_bridge_s4096_h64_d512_k512_unique_tb16_timing_fastplan2_20260604.json",
+    "s4096_bridge_explicit_tilelang_dkv_ms": 75.74524688720703
+  },
+  "read": {
+    "what_improved": "The route metadata bridge is no longer hundreds of ms at S512 and the target-shape CPU route-plan wall fell by about 11.9x.",
+    "what_did_not_improve": "The selected-limit TileLang dKV kernel itself remains about 6 ms, but the integrated S4096 backward bridge is still about 75.7 ms because it materializes selected KV/probs/grad_logits and computes route metadata on CPU.",
+    "production_requirement": "Reuse or GPU-produce LI route metadata, avoid selected-KV materialization, and fuse or adjacent-produce P/dP so the TileLang dKV producer consumes on-chip tiles rather than materialized [S,K,H] slabs."
+  },
+  "next": [
+    "Move route selected-limit metadata construction onto GPU or reuse the existing cheap LI prepack output.",
+    "Split S4096 explicit_tilelang_dkv timing into selected-KV gather, score/prob/logit construction, local dKV, route plan, pack, and TileLang kernel.",
+    "Prototype a no-selected-KV bridge that feeds compressed route/P/dP directly into the selected-limit producer."
+  ]
+}

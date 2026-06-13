@@ -1,0 +1,86 @@
+{
+  "artifact": "sparse_attn_plus_li_split_stream_latency_budget",
+  "date": "2026-06-05",
+  "status": "computed_from_existing_s4096_artifacts_needs_direct_combined_run",
+  "shape": {
+    "device": "MI350X",
+    "batch": 1,
+    "seq_len": 4096,
+    "layer_id": 2,
+    "heads": 64,
+    "shared_kv_dim": 512,
+    "topk": 512,
+    "compressed_groups": 1024,
+    "compress_ratio": 4
+  },
+  "question": "If SparseAttnSharedkvGrad emits dQ and dKV on separate dependency streams, what is the apple-to-apple latency when SparseLightningIndexerGradKLLoss is included?",
+  "source_artifacts": {
+    "sparse_attn_retained_gate": "run_artifacts/sparse_mla_nozero_split_stream_decision_20260605.json",
+    "sparse_attn_split_raw": "run_artifacts/sparse_mla_full_sharedkv_split_union_compressed_nozero_s4096_layer2_t4_u256_20260605.json",
+    "li_public_abi_triton_backend": "run_artifacts/torchtitan_sparse_li_kl_triton_backend_public_abi_sharedkv_s4096_timing_mi350_20260602.json",
+    "li_unfused_pipeline_diagnostic": "run_artifacts/torchtitan_sparse_li_full_pipeline_tl_dot_shifted_s4096_bwd_h64k512d128dot64_mi350_20260601.json",
+    "li_public_abi_pytorch_baseline": "run_artifacts/torchtitan_sparse_lightning_indexer_grad_kl_loss_public_abi_s4096_timing_mi350_20260601.json"
+  },
+  "li_latency_ms": {
+    "public_abi_pytorch_status": "oom_at_s4096",
+    "public_abi_pytorch_error": "Tried to allocate 256 GiB while timing the PyTorch recompute public wrapper.",
+    "public_abi_triton_backend_event_median": 4.1715,
+    "unfused_pipeline_diagnostic_event_median": 4.4870,
+    "chosen_for_budget": "public_abi_triton_backend_event_median",
+    "read": "The PyTorch public wrapper is not a valid S4096 latency baseline because it OOMs. The current measurable public ABI baseline is the triton_tl_dot backend at 4.1715 ms. The unfused diagnostic floor is 4.4870 ms and is kept as a conservative cross-check."
+  },
+  "baseline_serial_ms": {
+    "sparse_attn_sharedkv_grad_retained": 11.1347,
+    "sparse_lightning_indexer_grad_kl_loss": 4.1715,
+    "combined": 15.3062,
+    "combined_using_unfused_li_pipeline": 15.6217,
+    "formula": "SparseAttnSharedkvGrad + SparseLightningIndexerGradKLLoss"
+  },
+  "candidate_dependent_li_after_dkv_ms": {
+    "three_branch_split": {
+      "dq_branch": 10.5359,
+      "local_dkv_branch": 1.9692,
+      "compressed_dkv_branch": 10.0727,
+      "li_after_compressed_dkv": 4.1715,
+      "combined": 14.2442,
+      "combined_using_unfused_li_pipeline": 14.5597,
+      "formula": "max(dQ, local_dKV, compressed_dKV + LI)",
+      "delta_vs_serial_baseline": -1.0620,
+      "speedup_vs_serial_baseline_x": 1.0746
+    },
+    "fused_local_two_branch_split": {
+      "dq_plus_local_dkv_branch": 12.2447,
+      "compressed_dkv_branch": 11.4335,
+      "li_after_compressed_dkv": 4.1715,
+      "combined": 15.6050,
+      "combined_using_unfused_li_pipeline": 15.9205,
+      "formula": "max(dQ+local_dKV, compressed_dKV + LI)",
+      "delta_vs_serial_baseline": 0.2988,
+      "speedup_vs_serial_baseline_x": 0.9809
+    },
+    "read": "If LI truly sits behind the compressed dKV/compressor branch, the current three-branch split gives only about 1.06 ms improvement versus serialized baseline. The fused-local split is worse than serialized because the compressed branch is slower under overlap and then pays LI."
+  },
+  "candidate_independent_li_lower_bound_ms": {
+    "three_branch_split": {
+      "sparse_attn_parallel_makespan": 12.5525,
+      "li": 4.1715,
+      "combined_lower_bound": 12.5525,
+      "formula": "max(SparseAttn split makespan, LI)"
+    },
+    "fused_local_two_branch_split": {
+      "sparse_attn_parallel_makespan": 12.2984,
+      "li": 4.1715,
+      "combined_lower_bound": 12.2984,
+      "formula": "max(SparseAttn split makespan, LI)"
+    },
+    "read": "This is only valid if SparseLightningIndexerGradKLLoss can run independently from dKV/compressor outputs. It is not the conservative candidate for the user's dKV-dependent schedule."
+  },
+  "decision": {
+    "apple_to_apple_baseline_ms": 15.3062,
+    "apple_to_apple_current_candidate_ms": 14.2442,
+    "current_candidate_promotable": false,
+    "reason": "The dKV-dependent split saves only about 1.06 ms and still does not address the sparse-attention branch replay wall. It is useful as a scheduling contract but not a materialized e2e TFLOPs candidate.",
+    "next_measurement": "Run a direct combined benchmark that launches SparseAttnSharedkvGrad split streams and SparseLightningIndexerGradKLLoss on the dKV-dependent branch in the same process, then compare against a serialized SparseAttnSharedkvGrad + LI public-ABI triton backend baseline."
+  },
+  "dependency_pin_changes": []
+}

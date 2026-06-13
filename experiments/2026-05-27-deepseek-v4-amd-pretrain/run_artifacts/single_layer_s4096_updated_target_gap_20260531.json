@@ -1,0 +1,125 @@
+{
+  "artifact": "single_layer_s4096_updated_target_gap_20260531",
+  "superseded_by": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_target_correction_20260531.json",
+  "date_local": "2026-05-31",
+  "scope": "Historical one-MI350 DeepSeek V4-Pro target-gap artifact. Its MoE M=12288 1.3 ms per-expert framing has been superseded by the corrected whole-MoE expert-GEMM target artifact.",
+  "source_artifacts": {
+    "direct_full_layer": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+    "block_profile": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/profile_dispatch_fix_s4096_20260531.json",
+    "isolated_dynamic_moe": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/dynamic_moe_bridge_ops_s4096_decision_20260531.json",
+    "aiter_w2_dgrad_s4096": "experiments/2026-05-27-deepseek-v4-amd-pretrain/run_artifacts/aiter_gmm_config_sweep_refine_s4096_20260531.json"
+  },
+  "target_basis": {
+    "single_layer_s4096_ms": 24.9,
+    "single_layer_s4096_layer_tokens_per_s": 164497.99196787147,
+    "single_layer_s4096_implied_end_to_end_tokens_per_gpu_s_for_43_layers": 3825.5346969272435,
+    "forward_attention_s4096_ms": 3.6,
+    "moe_expert_gemm_m12288_ms": 1.3,
+    "eight_gpu_canary_tokens_per_gpu_s": 3245,
+    "eight_gpu_canary_node_tokens_per_s": 25960,
+    "eight_gpu_canary_step_time_s_at_gbs128": 20.2,
+    "eight_gpu_canary_layer_tokens_per_s_if_43_layers": 139535,
+    "eight_gpu_canary_equivalent_s4096_layer_ms_if_43_layers": 29.354642562439533,
+    "read": "The 24.9 ms single-layer target is stricter than the 3,245 tok/GPU/s 8-GPU canary target when normalized over 43 layers, so use 24.9 ms as the one-GPU microbench optimization anchor and 3,245 tok/GPU/s for distributed canary reporting."
+  },
+  "current_direct_full_layer": {
+    "shape": {
+      "batch": 1,
+      "seqlen": 4096,
+      "hidden": 7168,
+      "dtype": "bfloat16"
+    },
+    "avg_ms": 76.57323967820655,
+    "min_ms": 76.30661700386554,
+    "tokens_per_s": 53491.27211037617,
+    "estimated_tflops": 276.50802181590427,
+    "gap_vs_24p9_ms_x": 3.0752305091649216,
+    "required_reduction_to_24p9_ms": 51.673239678206545,
+    "tokens_per_s_ratio_to_24p9_target": 0.32517887852787994
+  },
+  "current_block_profile": {
+    "phase_total_ms": 80.14213608212286,
+    "phase_ms": {
+      "forward": 29.254085035063326,
+      "loss": 0.1288590719923377,
+      "backward": 50.7591919740662
+    },
+    "forward_subsystems_ms": {
+      "attention": 11.372324777767062,
+      "moe": 16.550355008803308,
+      "boundary": 0.7366630015894771
+    },
+    "backward_subsystems_ms": {
+      "attention_dgrad": 15.414595021866262,
+      "attention_wgrad": 16.02412003558129,
+      "moe_dgrad": 33.95195095799863,
+      "moe_wgrad": 33.05861901026219,
+      "boundary_dgrad": 1.6688748728483915,
+      "boundary_wgrad": 1.2782689882442355
+    },
+    "dominant_blocks_ms": {
+      "moe.routed.dgrad": 32.52341493498534,
+      "moe.routed.wgrad": 31.744241947308183,
+      "moe.routed_experts_forward": 14.586042962037027,
+      "attention.wgrad": 16.02412003558129,
+      "attention.dgrad": 15.414595021866262,
+      "attn.sparse_mla_forward": 7.066873949952424,
+      "attention.sparse_mla.dgrad_qkv": 8.870605961419642,
+      "attention.sparse_mla.sink_wgrad": 8.92455701250583
+    }
+  },
+  "current_vs_updated_targets": {
+    "full_layer": {
+      "current_avg_ms": 76.57323967820655,
+      "target_ms": 24.9,
+      "gap_x": 3.0752305091649216,
+      "required_reduction_ms": 51.673239678206545
+    },
+    "forward_attention": {
+      "current_ms": 11.372324777767062,
+      "target_ms": 3.6,
+      "gap_x": 3.158979104935295,
+      "required_reduction_ms": 7.772324777767062
+    },
+    "moe_expert_gemm_m12288_proxy_from_integrated_profile": {
+      "target_ms": 1.3,
+      "routed_w1_wgrad_m24576_ms": 6.8113460438326,
+      "routed_w1_wgrad_normalized_m12288_ms": 3.4056730219163,
+      "routed_w1_wgrad_gap_x": 2.6197484783971537,
+      "routed_w2_wgrad_m24576_ms": 6.753368070349097,
+      "routed_w2_wgrad_normalized_m12288_ms": 3.3766840351745486,
+      "routed_w3_wgrad_m24576_ms": 6.4341690158471465,
+      "routed_w3_wgrad_normalized_m12288_ms": 3.2170845079235733,
+      "routed_w2_dgrad_m24576_ms": 3.1955590238794684,
+      "routed_w2_dgrad_normalized_m12288_ms": 1.5977795119397342,
+      "routed_w1w3_dgrad_pair_m24576_ms": 7.252842071466148,
+      "routed_w1w3_dgrad_normalized_single_gemm_m12288_ms": 1.813210517866537,
+      "caveat": "These are normalized proxies from integrated S4096 routed MoE attribution. The new launcher action probe-expert-gemm-12288 should replace this with direct M=12288 one-expert BF16 GEMM timings when the GPU is idle."
+    },
+    "moe_expert_gemm_m12288_proxy_from_isolated_s4096_w2_dgrad": {
+      "torch_padded_bmm_out_m24576_median_ms": 4.259036064147949,
+      "torch_padded_bmm_out_normalized_m12288_ms": 2.1295180320739746,
+      "best_aiter_m24576_median_ms": 4.9874467849731445,
+      "best_aiter_normalized_m12288_ms": 2.4937233924865723,
+      "target_ms": 1.3,
+      "torch_padded_bmm_out_gap_x": 1.6380907939030573,
+      "best_aiter_gap_x": 1.9182487634512093,
+      "read": "For this shape the torch padded bmm(out=) baseline still beats the best swept AITER config, so the next kernel path needs compact-native grouped GEMM efficiency rather than a wrapper-only AITER promotion."
+    }
+  },
+  "decision": {
+    "updated_target_status": "not_close",
+    "next_primary_one_gpu_action": "Run probe-expert-gemm-12288 on do-sonle-kernel when idle, then use direct M=12288 fwd/dgrad/wgrad GEMM measurements to decide whether the largest gap is library GEMM selection, grouped routing overhead, or custom compact-native kernels.",
+    "next_optimization_focus": [
+      "MoE routed backward remains the largest absolute block: routed dgrad 32.5 ms and routed wgrad 31.7 ms in the S4096 block profile.",
+      "Attention is also above the new anchor: forward attention is 11.37 ms vs the 3.6 ms target, with sparse MLA forward and sparse MLA backward subblocks dominant.",
+      "Route padding/tile-row savings alone are insufficient for the new 24.9 ms layer target; the target requires a step change in MoE grouped GEMM efficiency and attention sparse MLA kernels."
+    ]
+  },
+  "commands": {
+    "existing_direct_full_layer": "RUN_TAG=retained_compact_reduce_goal_cont_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-4096",
+    "existing_block_profile_source": "profile_dispatch_fix_s4096_20260531.json was produced by profile_microbench.py with S=4096 block and backward attribution timers.",
+    "new_direct_m12288_probe": "RUN_TAG=expert_gemm_m12288_20260531 TARGET_HOST=do-sonle-kernel CONTAINER=b9d33e6e8227 bash experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh probe-expert-gemm-12288"
+  },
+  "dependency_pin_changes": []
+}

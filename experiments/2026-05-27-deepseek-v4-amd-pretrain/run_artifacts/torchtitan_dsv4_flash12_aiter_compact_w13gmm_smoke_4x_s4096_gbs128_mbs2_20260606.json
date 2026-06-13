@@ -1,0 +1,99 @@
+{
+  "artifact_type": "torchtitan_deepseek_v4_flash_12layer_w13gmm_smoke",
+  "created_at": "2026-06-06T03:02:00Z",
+  "host": "do-vunguyen-mi350-gpu",
+  "run_id": "torchtitan_dsv4_flash12_aiter_compact_w13gmm_smoke_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "raw_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_aiter_compact_w13gmm_smoke_4x_s4096_gbs128_mbs2_heap40_steps2_20260606/docker-run.log",
+  "dump_folder": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_aiter_compact_w13gmm_smoke_4x_s4096_gbs128_mbs2_heap40_steps2_20260606",
+  "status": "completed_two_steps_rejected_not_promoted",
+  "shape": {
+    "gpus": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4,
+    "micro_batch_size": 2,
+    "global_batch_size": 128,
+    "gradient_accumulation_steps": 16,
+    "sequence_length": 4096,
+    "steps": 2,
+    "activation_checkpoint_mode": "none",
+    "checkpoint_enable": false
+  },
+  "model": {
+    "name": "flash_12layer_ceiling_probe",
+    "compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "parameter_count_total": 81244314368,
+    "parameter_count_dense": 3620330240,
+    "parameter_count_sparse": 77623984128,
+    "parameter_count_active": 5746842368
+  },
+  "runtime": {
+    "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+    "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+    "visible_devices": "0,1,2,3",
+    "dataset": "tests/assets/c4_test",
+    "mori_shmem_heap_size": "40G",
+    "mori_comm_backend": "mori",
+    "mori_aiter_forward_mode": "aiter",
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_save_forward_dispatch": true,
+    "mori_aiter_local_vjp_mode": "aiter_compact",
+    "mori_aiter_local_vjp_aiter_wgrad_op": "ptgmm",
+    "mori_aiter_compact_recompute_mode": "w13_gmm",
+    "mori_aiter_xgrad_mode": "full",
+    "mori_aiter_local_vjp_transpose_cache_size": 0,
+    "sparse_mla_max_seq_len": 4096,
+    "sparse_mla_compress_ratio_allowlist": "4,128",
+    "sparse_mla_backward_mode": "shared_kv",
+    "sparse_mla_kernel_module": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "sharedkv_backward_mode": "query_recompute",
+    "sharedkv_block_h": 64,
+    "sharedkv_block_n": 64,
+    "sharedkv_block_d": 128,
+    "li_kl_backend": "triton_tl_dot",
+    "dsv4_profile_sharedkv_backward": false,
+    "chunked_ce_num_chunks": 8,
+    "persist_jit_cache": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "loss": 12.37175,
+      "grad_norm": 16.625,
+      "tokens_per_gpu_s_mean": 2556.0,
+      "node_tokens_s_mean": 10224.0,
+      "tflops_per_gpu_mean": 129.42,
+      "peak_logged_memory_gib": 188.12
+    },
+    {
+      "step": 2,
+      "loss": 8.3468,
+      "grad_norm": 91.5,
+      "tokens_per_gpu_s_mean": 3899.0,
+      "node_tokens_s_mean": 15596.0,
+      "tflops_per_gpu_mean": 197.41,
+      "peak_logged_memory_gib": 223.64
+    }
+  ],
+  "summary": {
+    "step2_tokens_per_gpu_s_mean": 3899.0,
+    "step2_node_tokens_s_mean": 15596.0,
+    "step2_tflops_per_gpu_mean": 197.41,
+    "peak_logged_memory_gib": 223.64,
+    "target_tokens_per_gpu_s": 12200,
+    "target_ratio_tokens_per_gpu_step2": 0.31959016393442625,
+    "derived_flops_per_token_gflop_step2": 50.63093098230316
+  },
+  "comparison": {
+    "retained_artifact": "run_artifacts/torchtitan_dsv4_flash12_allcompressed_h64n64d128_materialized_4x_s4096_gbs128_mbs2_20260606.json",
+    "retained_step2_tokens_per_gpu_s": 4107.0,
+    "retained_step2_tflops_per_gpu": 207.96,
+    "retained_step2_peak_logged_memory_gib": 223.19,
+    "step2_tokens_per_gpu_delta_pct": -5.06,
+    "step2_tflops_delta_pct": -5.07,
+    "peak_memory_delta_gib": 0.45
+  },
+  "read": "The opt-in w13_gmm branch combines W1/W3 gate-up recompute into one grouped-GMM output, mirroring the Ascend grouped expert convention at the adapter level. It trains for two S4096 steps but is slower than the retained expert_loop recompute branch on the same step-2 gate, so it is rejected. The result suggests the AMD MoE path needs a fused compact owner-rank training backward, not another Python/AITER adapter-level grouped-GMM recompute variant."
+}

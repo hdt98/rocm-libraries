@@ -1,0 +1,74 @@
+{
+  "deferred_forward_loss": null,
+  "deferred_grad_norms": {},
+  "device": "cuda",
+  "direct_grad_norms": {},
+  "direct_loss": null,
+  "dtype": "bfloat16",
+  "grad_max_abs_diff": {},
+  "max_grad_diff": null,
+  "parity_skipped": true,
+  "read": "Parity was skipped for long-sequence timing. The timing block below measures the current public Ascend-style wrapper; no correctness claim is made by this run.",
+  "scope": "torchtitan_deepseek_v4_deferred_sparse_li_kl_loss",
+  "seed": 1234,
+  "shape": {
+    "batch": 1,
+    "compress_ratio": 4,
+    "dim": 4096,
+    "groups": 256,
+    "head_dim": 128,
+    "main_head_dim": 512,
+    "main_heads": 64,
+    "n_heads": 64,
+    "q_lora_rank": 1024,
+    "seq_len": 1024,
+    "topk": 256
+  },
+  "status": "passed",
+  "timing": {
+    "cuda_event": {
+      "enabled": true,
+      "max_ms": 69.02533721923828,
+      "mean_ms": 68.05787913004558,
+      "median_ms": 67.57489776611328,
+      "min_ms": 67.57340240478516,
+      "samples_ms": [
+        69.02533721923828,
+        67.57340240478516,
+        67.57489776611328
+      ],
+      "stdev_ms": 0.8378436159479168
+    },
+    "enabled": true,
+    "forward_loss": 0.0,
+    "grad_norms": {
+      "index_k": 0.00011017118231393397,
+      "index_q": 0.00011560484563233331,
+      "weights": 9.34344861889258e-05
+    },
+    "peak_memory_allocated_bytes": 86417803264,
+    "peak_memory_allocated_gib": 80.48285102844238,
+    "read": "This times the current public Ascend-style wrapper's forward plus backward path. Forward is a dummy zero scalar; backward recomputes the selected sparse LI KL oracle in PyTorch.",
+    "timed_iters": 3,
+    "wall": {
+      "enabled": true,
+      "max_ms": 69.07249405048788,
+      "mean_ms": 68.0868443256865,
+      "median_ms": 67.59424996562302,
+      "min_ms": 67.59378896094859,
+      "samples_ms": [
+        69.07249405048788,
+        67.59378896094859,
+        67.59424996562302
+      ],
+      "stdev_ms": 0.853597732033132
+    },
+    "warmup_iters": 1
+  },
+  "top_indices_equal": null,
+  "top_indices_shape": [
+    1,
+    1024,
+    256
+  ]
+}

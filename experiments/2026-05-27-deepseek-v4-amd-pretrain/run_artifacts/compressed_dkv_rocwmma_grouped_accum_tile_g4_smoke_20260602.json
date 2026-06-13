@@ -1,0 +1,57 @@
+{
+  "artifact": "compressed_dkv_rocwmma_grouped_accum_tile_smoke",
+  "scope": "single_16x16_bf16_rocwmma_contribution_tile_with_lds_grouped_accumulation",
+  "arch": "gfx950",
+  "torch_version": "2.13.0a0+gitccf72d7",
+  "torch_hip": "7.2.53211",
+  "device": "AMD Instinct MI350X VF",
+  "shape": {
+    "k_tile": 16,
+    "d_tile": 16,
+    "h_dim": 64,
+    "group_count": 4,
+    "touched_groups": 4,
+    "formula": "out[g,d] = sum_{k:group[k]=g} (dL_scaled[k,H] @ Q[H,d] + P[k,H] @ dO[H,d])"
+  },
+  "dtype": {
+    "inputs": "bfloat16",
+    "accumulator": "float32",
+    "output": "float32"
+  },
+  "build_seconds": 0.5811856221407652,
+  "extension_dir": "/workspace/cache/torch_extensions_rocwmma_grouped_accum_20260602a",
+  "parity": {
+    "allclose": true,
+    "atol": 1e-05,
+    "rtol": 1e-05,
+    "max_abs_diff": 1.1920928955078125e-07,
+    "mean_abs_diff": 2.3690517991781235e-08,
+    "reference_max_abs": 1.2615447044372559
+  },
+  "timing_ms": {
+    "warmup_iters": 10,
+    "timed_iters": 50,
+    "median_ms": 0.007360000163316727,
+    "min_ms": 0.006479999981820583,
+    "max_ms": 0.022321000695228577,
+    "mean_ms": 0.007888140063732863
+  },
+  "modeled_write_reduction": {
+    "selected_rows": 16,
+    "grouped_rows": 4,
+    "reduction_x": 4.0
+  },
+  "tensor_stats": {
+    "reference": {
+      "norm": 4.29228401184082,
+      "max_abs": 1.2615447044372559,
+      "mean_abs": 0.42909887433052063
+    },
+    "candidate": {
+      "norm": 4.29228401184082,
+      "max_abs": 1.2615447044372559,
+      "mean_abs": 0.42909887433052063
+    }
+  },
+  "read": "This validates the first in-kernel contract for the compressed-dKV write-wall fix: compute selected-row contributions once with rocWMMA, reduce duplicate compressed groups in LDS, and write grouped rows. It is still a single tiny tile and does not implement the full query-major S4096 route schedule."
+}

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-09",
+  "summary": "A current-source torch materializer control stayed healthy, while restoring the MORI compact pack source-info output pointer recovered the MORI compact branch. The no-src-info cleanup is rejected as an e2e regression despite making the local pack timer look smaller.",
+  "code_change": {
+    "file": "sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "mechanism": "Restore allocation of the compact-pack hot_src_info tensor and pass its data_ptr to launch_hot_helper_compact_pack. The tensor remains unused by TorchTitan, but the MORI pack ABI now matches the previously healthy e2e branch."
+  },
+  "torch_materializer_current_source_control": {
+    "run_id": "torchtitan_dsv4_flash12_current_source_torchmaterialize_control_retry_8x_s4096_gbs128_steps6_20260609",
+    "host": "do-sonle5-mi350-gpu",
+    "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS8_GBS128_S4096",
+    "standard_ep_hot_split_materialize_backend": "torch",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "result": "completed_six_steps_control",
+    "step_metrics": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s": 1607,
+        "tflops_per_gpu": 81.35,
+        "loss": 12.32826,
+        "grad_norm": 20.0,
+        "peak_logged_memory_gib_rankmax": 216.42
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s": 8026,
+        "tflops_per_gpu": 406.35,
+        "loss": 9.02888,
+        "grad_norm": 64.0,
+        "peak_logged_memory_gib_rankmax": 250.36
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s": 8361,
+        "tflops_per_gpu": 423.32,
+        "loss": 19.73836,
+        "grad_norm": 109.5,
+        "peak_logged_memory_gib_rankmax": 250.37
+      },
+      {
+        "step": 4,
+        "tokens_per_gpu_s": 8356,
+        "tflops_per_gpu": 423.07,
+        "loss": 16.19438,
+        "grad_norm": 56.75,
+        "peak_logged_memory_gib_rankmax": 250.37
+      },
+      {
+        "step": 5,
+        "tokens_per_gpu_s": 8433,
+        "tflops_per_gpu": 426.98,
+        "loss": 8.01552,
+        "grad_norm": 39.5,
+        "peak_logged_memory_gib_rankmax": 250.37
+      },
+      {
+        "step": 6,
+        "tokens_per_gpu_s": 8458,
+        "tflops_per_gpu": 428.21,
+        "loss": 6.77043,
+        "grad_norm": 30.125,
+        "peak_logged_memory_gib_rankmax": 250.37
+      }
+    ],
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8326.8,
+    "steps_2_to_6_tflops_per_gpu_mean": 421.586,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8415.667,
+    "steps_4_to_6_tflops_per_gpu_mean": 426.087,
+    "peak_logged_memory_gib_rankmax": 250.37,
+    "read": "Current source with the old torch materialized-row path remains in the healthy band, so the no-src-info regression is not a broad source-code leak."
+  },
+  "mori_compact_restored_srcinfo_gate": {
+    "run_id": "torchtitan_dsv4_flash12_mori_compact_restored_srcinfo_8x_s4096_gbs128_steps6_20260609",
+    "host": "do-sonle5-mi350-gpu",
+    "shape": "TP1_PP1_CP1_FSDP8_EP8_MBS8_GBS128_S4096",
+    "standard_ep_hot_split_materialize_backend": "mori_compact",
+    "standard_ep_hot_split_materialize_rows": "owner_compact",
+    "standard_ep_hot_split_presort_mode": "owner_compact",
+    "standard_ep_hot_split_weight_layout": "selected",
+    "standard_ep_hot_split_weight_order": "owner_compact",
+    "standard_ep_hot_weight_forward_backend": "mori_sdma",
+    "standard_ep_hot_weight_reduce_backend": "mori_sdma",
+    "standard_ep_hot_split_weighted_scatter_backend": "triton_bwd",
+    "result": "completed_six_steps_recovered_not_promoted",
+    "step_metrics": [
+      {
+        "step": 1,
+        "tokens_per_gpu_s": 1625,
+        "tflops_per_gpu": 82.28,
+        "loss": 12.21630,
+        "grad_norm": 19.75,
+        "peak_logged_memory_gib_rankmax": 218.77
+      },
+      {
+        "step": 2,
+        "tokens_per_gpu_s": 7999,
+        "tflops_per_gpu": 404.99,
+        "loss": 8.27113,
+        "grad_norm": 31.625,
+        "peak_logged_memory_gib_rankmax": 251.87
+      },
+      {
+        "step": 3,
+        "tokens_per_gpu_s": 8420,
+        "tflops_per_gpu": 426.30,
+        "loss": 18.16229,
+        "grad_norm": 127.5,
+        "peak_logged_memory_gib_rankmax": 251.88
+      },
+      {
+        "step": 4,
+        "tokens_per_gpu_s": 8457,
+        "tflops_per_gpu": 428.17,
+        "loss": 22.00296,
+        "grad_norm": 79.0,
+        "peak_logged_memory_gib_rankmax": 251.88
+      },
+      {
+        "step": 5,
+        "tokens_per_gpu_s": 8519,
+        "tflops_per_gpu": 431.31,
+        "loss": 21.55898,
+        "grad_norm": 19.5,
+        "peak_logged_memory_gib_rankmax": 251.88
+      },
+      {
+        "step": 6,
+        "tokens_per_gpu_s": 8438,
+        "tflops_per_gpu": 427.23,
+        "loss": 15.11144,
+        "grad_norm": 25.625,
+        "peak_logged_memory_gib_rankmax": 251.88
+      }
+    ],
+    "steps_2_to_6_tokens_per_gpu_s_mean": 8286.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 423.598,
+    "steps_4_to_6_tokens_per_gpu_s_mean": 8471.333,
+    "steps_4_to_6_tflops_per_gpu_mean": 428.903,
+    "peak_logged_memory_gib_rankmax": 251.88
+  },
+  "comparison": {
+    "no_srcinfo_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_compact_no_srcinfo_controls_8x_s4096_gbs128_20260609.json",
+    "no_srcinfo_owner_steps_2_to_6_tokens_per_gpu_s_mean": 6814.6,
+    "restored_srcinfo_vs_no_srcinfo_owner_steps_2_to_6_delta_pct": 21.600,
+    "previous_healthy_mori_compact_artifact": "run_artifacts/torchtitan_dsv4_flash12_mori_compact_ownercompact_hotweight_order_8x_s4096_gbs128_20260609.json",
+    "previous_healthy_mori_compact_steps_2_to_6_tokens_per_gpu_s_mean": 8375.2,
+    "restored_srcinfo_vs_previous_healthy_steps_2_to_6_delta_pct": -1.062,
+    "torch_control_steps_2_to_6_tokens_per_gpu_s_mean": 8326.8,
+    "restored_srcinfo_vs_torch_control_steps_2_to_6_delta_pct": -0.483,
+    "retained_current_best_artifact": "run_artifacts/torchtitan_dsv4_flash12_adamw_quality20_mbs8_attention_ac_triton_bwdscatter_8x_s4096_gbs128_20260608.json",
+    "retained_current_best_steps_2_to_20_tokens_per_gpu_s_mean": 8518.84,
+    "restored_srcinfo_vs_retained_current_best_steps_2_to_20_delta_pct": -2.724
+  },
+  "decision": "Restore the source-info pointer contract and reject the no-src-info cleanup. The safe lesson is that removing unused-looking MORI ABI outputs can change e2e behavior even when local pack timing looks better. Continue native hot/cold/helper work only through measured ABI-preserving changes.",
+  "validation": {
+    "local_py_compile": "python3 -m py_compile sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "local_diff_check": "git diff --check -- sources/wip/torchtitan/torchtitan/models/common/token_dispatcher.py",
+    "invalid_control_attempt": "torchtitan_dsv4_flash12_current_source_torchmaterialize_control_8x_s4096_gbs128_steps6_20260609 failed before training because CANARY_OPTIMIZER_IMPLEMENTATION=adamw is invalid for the current TorchTitan CLI.",
+    "nonfinite_metrics_seen": false
+  }
+}

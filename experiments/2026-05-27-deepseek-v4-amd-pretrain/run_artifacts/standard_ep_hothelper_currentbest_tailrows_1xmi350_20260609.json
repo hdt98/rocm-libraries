@@ -1,0 +1,150 @@
+{
+  "artifact": "standard_ep_hothelper_currentbest_tailrows_1xmi350_20260609",
+  "date": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "kind": "current_best_standard_ep_hothelper_tailrow_vjp_probe_summary",
+  "result": "completed_three_1xmi350_tailrow_owner_vjp_probes_diagnostic_only",
+  "source_current_best_profile": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_currentbest_hotvjp_fragmentation_summary_20260608.json",
+    "run_id": "torchtitan_dsv4_flash12_currentbest_mbs8_hotvjp_detail_8x_s4096_gbs128_steps2_20260608",
+    "helper_vjp_remote_rows_median": 69634.5,
+    "helper_vjp_remote_rows_p95": 128284.2,
+    "helper_vjp_remote_rows_max": 147159
+  },
+  "probe_command_shape": {
+    "script": "tools/dsv4_runtime_probe/probe_owned_expert_vjp_ep_shape.py",
+    "common_args": "--world-size 1 --hidden 4096 --intermediate 2048 --experts 8 --topk 1 --dtype bfloat16 --warmup 1 --iters 3 --backend torch --grouped-mm-autograd --grouped-mm-scatter-autograd --grouped-mm-scatter-backend triton --grouped-mm-manual-return",
+    "runtime": "HIP_VISIBLE_DEVICES=1 PYTHONPATH=/workspace/sources/wip/torchtitan inside Nexus ROCm 7.2 MORI image"
+  },
+  "rows": [
+    {
+      "label": "medianrows",
+      "source": "late-window helper_vjp remote rows median from current-best 8x profile",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/currentbest_hotvjp_tail_20260609/standard_ep_hothelper_currentbest_medianrows_1xmi350_20260609.json",
+      "tokens_per_rank": 69635,
+      "route_stats": {
+        "assignments_to_owner_rank": 69635,
+        "mean_per_local_expert": 8704.375,
+        "max_per_local_expert": 8830,
+        "padding_multiplier_local_max": 1.0144323975012566
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 16.520788192749023,
+        "grouped_mm_only_forward_graph": 5.2016987800598145,
+        "grouped_mm_only_backward_saved_graph": 11.4119291305542,
+        "grouped_mm_scatter_full_forward_backward": 26.790708541870117,
+        "grouped_mm_scatter_forward_graph": 7.720489025115967,
+        "grouped_mm_scatter_backward_saved_graph": 10.835563659667969,
+        "manual_return_full_forward_backward": 21.907211303710938,
+        "torch_padded_full_vjp": 19.18362045288086,
+        "torch_padded_forward_recompute": 6.526033878326416,
+        "torch_padded_wgrad": 4.37929105758667,
+        "torch_padded_xgrad_reduce": 4.852015972137451,
+        "torch_padded_dgrad_swiglu": 4.566171169281006,
+        "manual_compact_grad": 3.8108839988708496,
+        "manual_weighted_grad_y": 1.588178038597107,
+        "manual_dtopk_compact": 2.7008309364318848,
+        "manual_dtopk_dense_scatter": 2.46970796585083,
+        "manual_dx_dense_scatter": 1.469177007675171
+      },
+      "estimated_tflops": {
+        "grouped_mm_only_full_forward_backward": 636.4425717929627,
+        "grouped_mm_scatter_full_forward_backward": 392.4693857576503,
+        "torch_padded_full_vjp": 548.0995076641543
+      },
+      "derived": {
+        "grouped_mm_only_vs_padded_speedup": 1.1611807033093344,
+        "grouped_mm_scatter_vs_padded_speedup": 0.7160549868585802,
+        "scatter_boundary_tax_ms": 10.269920349121094,
+        "manual_return_tax_vs_grouped_mm_ms": 5.386423110961914
+      }
+    },
+    {
+      "label": "p95rows",
+      "source": "late-window helper_vjp remote rows p95 from current-best 8x profile",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/currentbest_hotvjp_tail_20260609/standard_ep_hothelper_currentbest_p95rows_1xmi350_20260609.json",
+      "tokens_per_rank": 128284,
+      "route_stats": {
+        "assignments_to_owner_rank": 128284,
+        "mean_per_local_expert": 16035.5,
+        "max_per_local_expert": 16286,
+        "padding_multiplier_local_max": 1.0156215895980794
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 24.104999542236328,
+        "grouped_mm_only_forward_graph": 7.346846103668213,
+        "grouped_mm_only_backward_saved_graph": 17.053560256958008,
+        "grouped_mm_scatter_full_forward_backward": 30.088436126708984,
+        "grouped_mm_scatter_forward_graph": 12.064343452453613,
+        "grouped_mm_scatter_backward_saved_graph": 17.68008804321289,
+        "manual_return_full_forward_backward": 32.06553649902344,
+        "torch_padded_full_vjp": 33.00162887573242,
+        "torch_padded_forward_recompute": 10.708887100219727,
+        "torch_padded_wgrad": 7.363566875457764,
+        "torch_padded_xgrad_reduce": 8.12869644165039,
+        "torch_padded_dgrad_swiglu": 8.497020721435547,
+        "manual_compact_grad": 4.983218193054199,
+        "manual_weighted_grad_y": 2.33182692527771,
+        "manual_dtopk_compact": 3.0652759075164795,
+        "manual_dtopk_dense_scatter": 3.0843160152435303,
+        "manual_dx_dense_scatter": 2.4394280910491943
+      },
+      "estimated_tflops": {
+        "grouped_mm_only_full_forward_backward": 803.5775052455751,
+        "grouped_mm_scatter_full_forward_backward": 643.7767424841791,
+        "torch_padded_full_vjp": 586.9478585143354
+      },
+      "derived": {
+        "grouped_mm_only_vs_padded_speedup": 1.3690781789025794,
+        "grouped_mm_scatter_vs_padded_speedup": 1.0968210091330552,
+        "scatter_boundary_tax_ms": 5.983436584472656,
+        "manual_return_tax_vs_grouped_mm_ms": 7.960536956787109
+      }
+    },
+    {
+      "label": "maxrows",
+      "source": "late-window helper_vjp remote rows max from current-best 8x profile",
+      "remote_raw_summary": "/scratch/sonle5/dsv4_pretrain_canary_20260527/probe_outputs/currentbest_hotvjp_tail_20260609/standard_ep_hothelper_currentbest_maxrows_1xmi350_20260609.json",
+      "tokens_per_rank": 147159,
+      "route_stats": {
+        "assignments_to_owner_rank": 147159,
+        "mean_per_local_expert": 18394.875,
+        "max_per_local_expert": 18589,
+        "padding_multiplier_local_max": 1.0105532111525628
+      },
+      "median_ms": {
+        "grouped_mm_only_full_forward_backward": 30.590879440307617,
+        "grouped_mm_only_forward_graph": 9.814621925354004,
+        "grouped_mm_only_backward_saved_graph": 20.903005599975586,
+        "grouped_mm_scatter_full_forward_backward": 37.49904251098633,
+        "grouped_mm_scatter_forward_graph": 15.27321720123291,
+        "grouped_mm_scatter_backward_saved_graph": 21.666532516479492,
+        "manual_return_full_forward_backward": 39.228214263916016,
+        "torch_padded_full_vjp": 37.450321197509766,
+        "torch_padded_forward_recompute": 12.307867050170898,
+        "torch_padded_wgrad": 8.304057121276855,
+        "torch_padded_xgrad_reduce": 9.454870223999023,
+        "torch_padded_dgrad_swiglu": 9.366352081298828,
+        "manual_compact_grad": 5.722745895385742,
+        "manual_weighted_grad_y": 2.674431085586548,
+        "manual_dtopk_compact": 3.5087199211120605,
+        "manual_dtopk_dense_scatter": 3.4988410472869873,
+        "manual_dx_dense_scatter": 2.7080318927764893
+      },
+      "estimated_tflops": {
+        "grouped_mm_only_full_forward_backward": 726.3689495247985,
+        "grouped_mm_scatter_full_forward_backward": 592.5555287867948,
+        "torch_padded_full_vjp": 593.3264189353207
+      },
+      "derived": {
+        "grouped_mm_only_vs_padded_speedup": 1.2242315972179574,
+        "grouped_mm_scatter_vs_padded_speedup": 0.9987007317996909,
+        "scatter_boundary_tax_ms": 6.908163070678711,
+        "manual_return_tax_vs_grouped_mm_ms": 8.637334823608398
+      }
+    }
+  ],
+  "read": "At current-best MBS8 hot-helper tail row sizes, compact grouped-MM-only VJP is still better than padded torch, but the scatter-inclusive/full helper boundary erases most of that gain. At the max-tail row count, grouped_mm_scatter full fwd+bwd is 37.499 ms versus padded full VJP 37.450 ms, while grouped_mm_only is 30.591 ms. This makes the next MoE/EP optimization gate a first-class compact-row helper VJP/dispatcher return contract that keeps dX/dTopK return and weighted scatter inside the compact layout, rather than another isolated grouped-MM or hot-weight transport swap.",
+  "promotion_status": "diagnostic_only_no_e2e_promotion"
+}

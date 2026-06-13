@@ -1,0 +1,113 @@
+{
+  "artifact": "torchtitan_mori_aiter_routed_padded_vjp_longseq_threshold_4x_20260602",
+  "created_date": "2026-06-02",
+  "status": "s2048_pass_s4096_backward_fault",
+  "host": "do-sonle5-mi350-gpu",
+  "remote_root": "/scratch/sonle5/dsv4_pretrain_canary_20260527",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "common_knobs": {
+    "gpus": 4,
+    "visible_devices": "0,1,2,3",
+    "tp": 1,
+    "pp": 1,
+    "cp": 1,
+    "fsdp": 4,
+    "ep": 4,
+    "mbs": 1,
+    "global_batch_size": 64,
+    "gradient_accumulation_steps": 16,
+    "activation_checkpoint_mode": "full",
+    "checkpoint_enable": false,
+    "moe_comm_backend": "mori",
+    "experimental_mori_aiter_moe": true,
+    "mori_aiter_backward_mode": "routed",
+    "mori_aiter_local_vjp_mode": "padded",
+    "mori_shmem_heap_size": "32G",
+    "persist_jit_cache": "auto"
+  },
+  "runs": [
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s1024_gbs64_acfull_heap32g_20260602",
+      "seq_len": 1024,
+      "status": "pass",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S1024",
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s1024_gbs64_acfull_heap32g_20260602/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s1024_gbs64_acfull_heap32g_20260602",
+      "step2": {
+        "loss": 9.93446,
+        "grad_norm": 20.75,
+        "memory_gib_range": [
+          97.87,
+          127.60
+        ],
+        "tps_per_gpu_median": 2934,
+        "node_tps_from_median": 11736,
+        "tflops_per_gpu_median": 41.335,
+        "mfu_percent_median": 1.79
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "memory_access_fault_count": 0,
+      "mori_heap_oom": false
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s2048_gbs64_acfull_heap32g_20260602",
+      "seq_len": 2048,
+      "status": "pass",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S2048",
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s2048_gbs64_acfull_heap32g_20260602/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s2048_gbs64_acfull_heap32g_20260602",
+      "step2": {
+        "loss": 10.14578,
+        "grad_norm": 21.375,
+        "memory_gib_range": [
+          124.34,
+          192.76
+        ],
+        "tps_per_gpu_median": 4144,
+        "node_tps_from_median": 16576,
+        "tflops_per_gpu_median": 65.06,
+        "mfu_percent_median": 2.82
+      },
+      "training_completed_count": 4,
+      "process_group_destroyed_count": 4,
+      "memory_access_fault_count": 0,
+      "mori_heap_oom": false
+    },
+    {
+      "run_id": "torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_acfull_heap32g_20260602",
+      "seq_len": 4096,
+      "status": "fail",
+      "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS1_GBS64_S4096",
+      "log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_acfull_heap32g_20260602/docker-run.log",
+      "output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_direct_dsv4_mori_aiter_routed_padded_vjp_4x_s4096_gbs64_acfull_heap32g_20260602",
+      "failure": {
+        "phase": "backward_mori_routed_dispatch",
+        "summary": "GPU memory access fault before first training step metric; rank processes abort with SIGABRT.",
+        "mori_heap_oom": false,
+        "memory_access_fault_count": 4,
+        "source_file": "sources/wip/torchtitan/torchtitan/models/common/mori_aiter_moe.py",
+        "dispatch_line": 430,
+        "sync_line": 436,
+        "source_read": "The fault surfaces at recv_count = int(total_recv.item()) immediately after op.dispatch in _compute_mori_routed_vjp; the .item() call is likely the synchronization point that reports a preceding MORI dispatch or buffer fault.",
+        "key_log_lines": [
+          "Memory access fault by GPU node-2 on address 0x7d597b2f0000. Reason: Unknown.",
+          "Memory access fault by GPU node-3 on address 0x7e3795a74000. Reason: Unknown.",
+          "Memory access fault by GPU node-4 on address 0x712dfb618000. Reason: Unknown.",
+          "Memory access fault by GPU node-5 on address 0x75d327a34000. Reason: Unknown.",
+          "Fatal Python error: Aborted",
+          "mori_aiter_moe.py, line 436 in _compute_mori_routed_vjp",
+          "exitcode: -6 (SIGABRT)"
+        ]
+      },
+      "training_completed_count": 0,
+      "process_group_destroyed_count": 0
+    }
+  ],
+  "attempted_8x_s4096": {
+    "status": "not_run",
+    "intended_shape": "TP1_PP1_CP1_FSDP8_EP8_MBS1_GBS128_S4096",
+    "reason": "The launcher idle guard found an external process using GPUs 4 and 5, so the 8x S4096 run was skipped and the 4x target slice used idle GPUs 0-3 instead."
+  },
+  "read": "4xMI350 routed+padded MORI training with full activation checkpointing passes S1024 and S2048 but fails at S4096 during routed MoE backward. This is not the earlier MORI static heap OOM; the next ladder rung is localizing MORI routed backward buffer/count capacity or chunking before retrying the full S4096 target shape."
+}

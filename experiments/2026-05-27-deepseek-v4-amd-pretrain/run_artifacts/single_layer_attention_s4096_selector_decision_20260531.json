@@ -1,0 +1,117 @@
+{
+  "artifact": "single_layer_attention_s4096_selector_decision",
+  "date_local": "2026-05-31",
+  "host": "do-sonle-kernel",
+  "container": "b9d33e6e8227",
+  "remote_profile_root": "/local/data/sonle5/dsv4_amd_sonle5_port_pr23882_20260510/tmp/dsv4_layer_microbench_retained_20260531/profiles/retained_attention_s4096_goal_cont_20260531T1200Z",
+  "local_raw_artifact_dir": "run_artifacts/single_layer_attention_sweep_s4096_goal_cont_20260531",
+  "command": "RUN_TAG=retained_attention_s4096_goal_cont_20260531T1200Z experiments/2026-05-27-deepseek-v4-amd-pretrain/tools/dsv4_layer_microbench/run_retained_mi350_suite.sh bench-attn-sweep-4096",
+  "shape": {
+    "batch": 1,
+    "seqlen": 4096,
+    "hidden": 7168,
+    "dtype": "bfloat16",
+    "moe_impl": "grouped-expert-batches-dynamic-compact-reduce-bmm-out-dgrad-dense-wgrad",
+    "boundary_impl": "separate",
+    "rmsnorm_save_policy": "saved-accum",
+    "warmup": 1,
+    "iters": 2
+  },
+  "target": {
+    "normalized_layer_tokens_per_s": 128100,
+    "target_ms": 32.0
+  },
+  "ranking_by_avg_ms": [
+    {
+      "label": "bf16_contract",
+      "avg_ms": 77.08402449497953,
+      "min_ms": 76.62397099193186,
+      "tokens_per_s": 53136.82085017203,
+      "estimated_tflops": 274.67578614599967
+    },
+    {
+      "label": "qnorm",
+      "avg_ms": 100.48478102544323,
+      "min_ms": 99.90309807471931,
+      "tokens_per_s": 40762.39165971684,
+      "estimated_tflops": 210.70966977670844
+    },
+    {
+      "label": "triton_rope",
+      "avg_ms": 104.30763196200132,
+      "min_ms": 104.06883293762803,
+      "tokens_per_s": 39268.45929636433,
+      "estimated_tflops": 202.9872084064687
+    },
+    {
+      "label": "fast_rope",
+      "avg_ms": 107.46988997561857,
+      "min_ms": 106.84322298038751,
+      "tokens_per_s": 38113.00077565213,
+      "estimated_tflops": 197.0143919590826
+    },
+    {
+      "label": "fwd_bwd",
+      "avg_ms": 108.51502045989037,
+      "min_ms": 108.29690692480654,
+      "tokens_per_s": 37745.92662509772,
+      "estimated_tflops": 195.11690582302444
+    },
+    {
+      "label": "sinkgrad",
+      "avg_ms": 159.04549200786278,
+      "min_ms": 103.22622396051884,
+      "tokens_per_s": 25753.63783210847,
+      "estimated_tflops": 133.12615629752813,
+      "note": "Noisy two-iteration timing; min is still slower than retained bf16_contract."
+    }
+  ],
+  "best": {
+    "label": "bf16_contract",
+    "attention_impl": "sparse-gather-manual-bwd-split-comp-no-kv-cat-prealloc-bmm-out-comp-sel-baddbmm-triton-softmax-fwd-bwd-fast-triton-rope-qnorm-bf16-contract-window-tail-sum",
+    "avg_ms": 77.08402449497953,
+    "gap_to_32ms_target": 2.4088757654681104
+  },
+  "comparison_to_existing_evidence": {
+    "s2048_attention_selector_sweep": {
+      "artifact": "run_artifacts/single_layer_attention_sweep_20260531.json",
+      "best_label": "bf16_contract",
+      "best_avg_ms": 53.54428302962333,
+      "read": "The development-shape selector sweep also selected bf16_contract; non-bf16-contract variants were 6.7-10.1 ms slower at S2048."
+    },
+    "canonical_s4096_best_full_layer": {
+      "artifact": "run_artifacts/single_layer_retained_compact_reduce_s4096_goal_cont_20260531.json",
+      "avg_ms": 76.57323967820655,
+      "min_ms": 76.30661700386554,
+      "tokens_per_s": 53491.27211037617,
+      "estimated_tflops": 276.5080216286923
+    },
+    "s4096_block_profile": {
+      "artifact": "run_artifacts/rocprof_blocks_4k_torch_summary_20260531.json",
+      "forward_attention_ms": 11.393201886676252,
+      "forward_moe_ms": 16.161937965080142,
+      "attention_dgrad_ms": 15.817380975931883,
+      "attention_wgrad_ms": 16.206818050704896,
+      "moe_dgrad_ms": 33.31206098664552,
+      "moe_wgrad_ms": 32.90863404981792,
+      "sparse_mla_dgrad_qkv_ms": 8.983634994365275,
+      "sparse_mla_sink_wgrad_ms": 8.915195008739829,
+      "routed_w1_w3_dgrad_ms": 6.912695011124015,
+      "routed_w2_dgrad_ms": 3.161274013109505,
+      "routed_w1_w2_w3_wgrad_ms": [
+        6.795236025936902,
+        6.677425932139158,
+        6.225747987627983
+      ]
+    }
+  },
+  "decision": {
+    "selector_swap_status": "demote_existing_attention_selector_swaps",
+    "read": "The retained bf16_contract selector is still best at the primary S4096 shape. Selector swapping among the current sparse MLA/RoPE/QNorm variants cannot close the 2.4x S4096 target gap.",
+    "next_best_actions": [
+      "Profile sparse_mla backward internals or reduce sparse MLA backward launch count; the S4096 block profile shows sparse_mla dgrad_qkv and sink_wgrad at about 8.9 ms each.",
+      "Continue replacing routed MoE dgrad/wgrad with a custom CK/TileLang grouped scheduler; routed W1/W2/W3 wgrad and W1/W3/W2 dgrad remain the largest repeated blocks.",
+      "Treat attention selector changes as correctness/contract experiments only unless they reduce sparse_mla backward cost directly."
+    ]
+  }
+}

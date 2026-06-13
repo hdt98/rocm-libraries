@@ -1,0 +1,151 @@
+{
+  "artifact": "torchtitan_dsv4_flash12_4x_mbs8_expertmuon_fit_failures_20260609",
+  "created_at": "2026-06-09",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Can expert-Muon plus attention-only activation checkpointing move the 4xMI350 flash-12 shape from MBS4/GA8 to MBS8/GA4 at GBS128?",
+  "shape": {
+    "model": "deepseek_v4_flash_12layer_ceiling_probe",
+    "recipe_compress_ratios": [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "torchtitan_code_compress_ratios": [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128],
+    "gpus": 4,
+    "visible_devices": "2,3,4,5",
+    "sequence_length": 4096,
+    "global_batch_size": 128,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 4,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "context_parallel": 1,
+    "fsdp": 4,
+    "expert_parallel": 4
+  },
+  "common_env": {
+    "CANARY_DSV4_EXPERTS_ON_MUON": "1",
+    "CANARY_OPTIMIZER_MUON_IMPL": "batched",
+    "CANARY_OPTIMIZER_MUON_CHUNK_MATRICES": "4",
+    "CANARY_OPTIMIZER_MUON_NS_STEPS": "1",
+    "CANARY_OPTIMIZER_MUON_STATE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_NS_COMPUTE_DTYPE": "bfloat16",
+    "CANARY_OPTIMIZER_MUON_WORKSPACE_MODE": "prealloc",
+    "CANARY_ACTIVATION_CHECKPOINT_MODE": "selective",
+    "CANARY_ACTIVATION_CHECKPOINT_SCOPE": "attention_only",
+    "CANARY_MOE_COMM_BACKEND": "standard",
+    "CANARY_MOE_BALANCED_MOE_MODE": "execute",
+    "CANARY_MOE_BALANCED_MOE_HOT_EXPERTS": "8",
+    "CANARY_STANDARD_EP_LOCAL_EXPERT_BACKEND": "grouped_mm",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_FORWARD_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_WEIGHT_REDUCE_BACKEND": "torch",
+    "CANARY_STANDARD_EP_HOT_SPLIT_MATERIALIZE_ROWS": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_PRESORT_MODE": "owner_compact",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHT_LAYOUT": "selected",
+    "CANARY_STANDARD_EP_HOT_SPLIT_WEIGHTED_SCATTER_BACKEND": "triton_bwd",
+    "CANARY_SPARSE_MLA_MAX_SEQ_LEN": "4096",
+    "CANARY_SPARSE_MLA_COMPRESS_RATIO_ALLOWLIST": "4,128",
+    "CANARY_SPARSE_MLA_BACKWARD_MODE": "shared_kv",
+    "CANARY_SPARSE_MLA_KERNEL_MODULE": "torchtitan.models.deepseek_v4.sparse_mla_shared_kv_triton_forward_backend",
+    "CANARY_SHAREDKV_BACKWARD_MODE": "query_recompute",
+    "CANARY_SHAREDKV_SCATTER_MODE": "triton_bwd",
+    "CANARY_SHAREDKV_BLOCK_H": "64",
+    "CANARY_SHAREDKV_BLOCK_N": "64",
+    "CANARY_SHAREDKV_BLOCK_D": "128",
+    "CANARY_LI_KL_BACKEND": "triton_tl_dot",
+    "CANARY_PYTORCH_ALLOC_CONF": "expandable_segments:True"
+  },
+  "attempts": [
+    {
+      "run_id": "torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_torchtransport_slice2345_fit_20260609",
+      "chunked_ce_num_chunks": 8,
+      "result": "failed_after_step1",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_torchtransport_slice2345_fit_20260609/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_torchtransport_slice2345_fit_20260609",
+      "step1": {
+        "tokens_per_gpu_s_min": 3757,
+        "tokens_per_gpu_s_max": 3766,
+        "tflops_per_gpu_min": 190.21,
+        "tflops_per_gpu_max": 190.67,
+        "loss": 12.33305,
+        "grad_norm": 19.375,
+        "memory_gib_min": 264.53,
+        "memory_gib_max": 266.53
+      },
+      "failure": {
+        "kind": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem": "4 MB",
+        "phase": "next_step_loss_cross_entropy",
+        "top_stack": [
+          "torchtitan/components/loss.py:37 cross_entropy_loss",
+          "torchtitan/components/loss.py:480 __call__",
+          "torchtitan/trainer.py:797 forward_backward_step"
+        ]
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce32_torchtransport_slice2345_fit_20260609",
+      "chunked_ce_num_chunks": 32,
+      "result": "failed_after_step1",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce32_torchtransport_slice2345_fit_20260609/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce32_torchtransport_slice2345_fit_20260609",
+      "step1": {
+        "tokens_per_gpu_s_min": 3682,
+        "tokens_per_gpu_s_max": 3683,
+        "tflops_per_gpu_min": 186.43,
+        "tflops_per_gpu_max": 186.48,
+        "loss": 12.06726,
+        "grad_norm": 19.5,
+        "memory_gib_min": 264.03,
+        "memory_gib_max": 267.21
+      },
+      "failure": {
+        "kind": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem": "0 MB",
+        "phase": "next_step_loss_lm_head_linear",
+        "top_stack": [
+          "torchtitan/protocols/module.py:233 forward_with_redistribution",
+          "torchtitan/components/loss.py:473 __call__",
+          "torchtitan/trainer.py:797 forward_backward_step"
+        ]
+      }
+    },
+    {
+      "run_id": "torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce128_torchtransport_slice2345_fit_20260609",
+      "chunked_ce_num_chunks": 128,
+      "result": "failed_after_step1",
+      "remote_log": "/scratch/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce128_torchtransport_slice2345_fit_20260609/docker-run.log",
+      "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_flash12_4x_mbs8_expertmuon_attention_ac_ce128_torchtransport_slice2345_fit_20260609",
+      "step1": {
+        "tokens_per_gpu_s_min": 3652,
+        "tokens_per_gpu_s_max": 3654,
+        "tflops_per_gpu_min": 184.91,
+        "tflops_per_gpu_max": 185.03,
+        "loss": 12.27218,
+        "grad_norm": 19.125,
+        "memory_gib_min": 263.54,
+        "memory_gib_max": 265.08
+      },
+      "failure": {
+        "kind": "HSA_STATUS_ERROR_OUT_OF_RESOURCES",
+        "available_free_mem": "0 MB",
+        "phase": "next_step_moe_hot_weight_alignment",
+        "top_stack": [
+          "torchtitan/models/common/moe.py:682 _standard_ep_hot_to_owner_compact_order",
+          "torchtitan/models/common/moe.py:1700 _selected_weight_compact_to_hot",
+          "torchtitan/models/common/moe.py:1723 _align_selected_hot_weight_to_row_groups",
+          "torchtitan/models/common/moe.py:1735 _standard_ep_hot_split_forward"
+        ]
+      }
+    }
+  ],
+  "comparison_reference": {
+    "artifact": "run_artifacts/torchtitan_dsv4_flash12_4x_mbs4_torchtransport_attention_ac_20260609.json",
+    "shape": "TP1_PP1_CP1_FSDP4_EP4_MBS4_GBS128_S4096_GA8",
+    "steps_2_to_6_tokens_per_gpu_s_mean": 6977.6,
+    "steps_2_to_6_tflops_per_gpu_mean": 353.3,
+    "peak_logged_memory_gib": 259.98
+  },
+  "decision": {
+    "promote": false,
+    "read": "Expert-Muon prealloc plus attention-only activation checkpointing does not unlock the 4xMI350 MBS8/GA4 shape. The run reaches one metric step, but the second step repeatedly runs out of ROCm resources even when loss/lm-head chunking is raised from 8 to 32 and 128 chunks. Peak logged allocation is already about 263.5-267.2 GiB at step 1, leaving insufficient runtime headroom for the next-step loss or hot-helper MoE forward.",
+    "next_action": "Keep the 4x retained reference at MBS4/GA8. Closing the 4x gap needs lower activation/loss/MoE hot-helper transient memory or a first-class compact-row hot-helper dispatcher, not optimizer-state savings alone."
+  }
+}

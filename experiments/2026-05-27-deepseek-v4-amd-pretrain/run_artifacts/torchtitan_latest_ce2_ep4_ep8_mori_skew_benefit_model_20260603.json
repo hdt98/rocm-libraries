@@ -1,0 +1,228 @@
+{
+  "ep4": {
+    "call_count": 64,
+    "current_model": {
+      "critical_ms_sum": 3763.016293823719,
+      "max_local_vjp_ms_sum": 3721.52042388916,
+      "median_rank_combine_dx_ms_sum": 1251.4741463065147,
+      "median_rank_local_vjp_ms_sum": 2519.188500404358,
+      "raw_combine_floor_ms_sum": 41.49586993455887,
+      "raw_combine_floor_pct_of_critical": 1.1027289465279888,
+      "read": "Critical model is per-call max(owner local VJP) plus the observed raw combine floor. The large rank-local combine totals are mostly wait for the per-call owner-VJP tail."
+    },
+    "fit": {
+      "absolute_error_ms": {
+        "max": 0.803433358669281,
+        "median": 0.13584035634994507,
+        "min": 0.0,
+        "n": 256,
+        "p90": 0.4407610297203064
+      },
+      "model": "combine_dx ~= raw_combine_floor_per_call + max(0, max(local_vjp_ms) - local_vjp_ms_rank)",
+      "observed_combine_dx_ms": {
+        "max": 100.83154296875,
+        "median": 13.104901313781738,
+        "min": 0.5674449801445007,
+        "n": 256,
+        "p90": 40.4610481262207
+      },
+      "observed_wait_over_raw_floor_ms": {
+        "max": 100.24357694387436,
+        "median": 12.43795531988144,
+        "min": 0.0,
+        "n": 256,
+        "p90": 39.84586262702942
+      },
+      "pearson_observed_vs_predicted": 0.9999534795885039,
+      "predicted_combine_dx_ms": {
+        "max": 100.23629289865494,
+        "median": 13.407786905765533,
+        "min": 0.5674449801445007,
+        "n": 256,
+        "p90": 40.04107928276062
+      }
+    },
+    "rank_count": 4,
+    "record_count": 256,
+    "root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_profile_latest_ce2_ep4_s4096_gbs64_20260603",
+    "scenarios": [
+      {
+        "critical_ms": 3721.52042388916,
+        "name": "eliminate_raw_combine_floor_only",
+        "note": "Upper bound for improving registered combine compute while leaving owner-rank VJP skew untouched.",
+        "saved_ms": 41.49586993455887,
+        "saved_pct_of_mori_critical": 1.1027289465279888
+      },
+      {
+        "critical_ms": 3390.8642514348035,
+        "name": "uniform_owner_vjp_10pct_faster",
+        "note": "Faster VJP math for every owner rank; also shrinks skew wait in the simple arrival model.",
+        "saved_ms": 372.15204238891556,
+        "saved_pct_of_mori_critical": 9.88972710534719
+      },
+      {
+        "critical_ms": 2832.636187851429,
+        "name": "uniform_owner_vjp_25pct_faster",
+        "note": "Faster VJP math for every owner rank; representative of a real fused/grouped training GEMM win.",
+        "saved_ms": 930.38010597229,
+        "saved_pct_of_mori_critical": 24.724317763368003
+      },
+      {
+        "critical_ms": 1902.256081879139,
+        "name": "uniform_owner_vjp_50pct_faster",
+        "note": "Aggressive owner-rank VJP fusion target.",
+        "saved_ms": 1860.76021194458,
+        "saved_pct_of_mori_critical": 49.448635526736005
+      },
+      {
+        "critical_ms": 3328.0114091038704,
+        "name": "speed_high_recv_ranks_25pct",
+        "note": "Only ranks above the call median recv_count get a 25% local-VJP speedup.",
+        "saved_ms": 435.00488471984863,
+        "saved_pct_of_mori_critical": 11.560005345547587
+      },
+      {
+        "critical_ms": 3413.533238708973,
+        "name": "speed_top_recv_quartile_25pct",
+        "note": "Only the per-call top receive-count quartile gets a 25% local-VJP speedup.",
+        "saved_ms": 349.4830551147461,
+        "saved_pct_of_mori_critical": 9.287311768709493
+      },
+      {
+        "critical_ms": 2736.360719025135,
+        "name": "cap_each_call_max_to_second_max",
+        "note": "Perfectly removes only the worst owner-rank tail per call.",
+        "saved_ms": 1026.655574798584,
+        "saved_pct_of_mori_critical": 27.28278313553001
+      },
+      {
+        "critical_ms": 2993.024612724781,
+        "name": "cap_each_call_to_p75_local_vjp",
+        "note": "Idealized load-balance/fusion case where no rank exceeds per-call p75 local VJP.",
+        "saved_ms": 769.991681098938,
+        "saved_pct_of_mori_critical": 20.462087351647508
+      },
+      {
+        "critical_ms": 2545.5479796528816,
+        "name": "cap_each_call_to_median_local_vjp",
+        "note": "Very aggressive idealized load-balance/fusion case where no rank exceeds per-call median local VJP.",
+        "saved_ms": 1217.4683141708374,
+        "saved_pct_of_mori_critical": 32.35352225737321
+      }
+    ],
+    "steady_after_call_id": 64
+  },
+  "ep8": {
+    "call_count": 64,
+    "current_model": {
+      "critical_ms_sum": 3762.2228474915028,
+      "max_local_vjp_ms_sum": 3733.7580795288086,
+      "median_rank_combine_dx_ms_sum": 1777.4390807449818,
+      "median_rank_local_vjp_ms_sum": 2008.166856765747,
+      "raw_combine_floor_ms_sum": 28.464767962694168,
+      "raw_combine_floor_pct_of_critical": 0.7565944154975647,
+      "read": "Critical model is per-call max(owner local VJP) plus the observed raw combine floor. The large rank-local combine totals are mostly wait for the per-call owner-VJP tail."
+    },
+    "fit": {
+      "absolute_error_ms": {
+        "max": 25.3681720495224,
+        "median": 0.27963049709796906,
+        "min": 0.0,
+        "n": 512,
+        "p90": 0.9128381937742234
+      },
+      "model": "combine_dx ~= raw_combine_floor_per_call + max(0, max(local_vjp_ms) - local_vjp_ms_rank)",
+      "observed_combine_dx_ms": {
+        "max": 139.383544921875,
+        "median": 23.478665351867676,
+        "min": 0.38168400526046753,
+        "n": 512,
+        "p90": 57.0897918701172
+      },
+      "observed_wait_over_raw_floor_ms": {
+        "max": 138.8896999359131,
+        "median": 23.06185095012188,
+        "min": 0.0,
+        "n": 512,
+        "p90": 56.60515496134759
+      },
+      "pearson_observed_vs_predicted": 0.9971752735342969,
+      "predicted_combine_dx_ms": {
+        "max": 138.81430625915527,
+        "median": 23.283377826213837,
+        "min": 0.38168400526046753,
+        "n": 512,
+        "p90": 57.85341042280201
+      }
+    },
+    "rank_count": 8,
+    "record_count": 512,
+    "root": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/torchtitan_dsv4_profile_latest_ce2_ep8_s4096_gbs128_20260603",
+    "scenarios": [
+      {
+        "critical_ms": 3733.7580795288086,
+        "name": "eliminate_raw_combine_floor_only",
+        "note": "Upper bound for improving registered combine compute while leaving owner-rank VJP skew untouched.",
+        "saved_ms": 28.464767962694168,
+        "saved_pct_of_mori_critical": 0.7565944154975647
+      },
+      {
+        "critical_ms": 3388.8470395386225,
+        "name": "uniform_owner_vjp_10pct_faster",
+        "note": "Faster VJP math for every owner rank; also shrinks skew wait in the simple arrival model.",
+        "saved_ms": 373.3758079528802,
+        "saved_pct_of_mori_critical": 9.924340558450227
+      },
+      {
+        "critical_ms": 2828.7833276093006,
+        "name": "uniform_owner_vjp_25pct_faster",
+        "note": "Faster VJP math for every owner rank; representative of a real fused/grouped training GEMM win.",
+        "saved_ms": 933.4395198822021,
+        "saved_pct_of_mori_critical": 24.810851396125607
+      },
+      {
+        "critical_ms": 1895.3438077270985,
+        "name": "uniform_owner_vjp_50pct_faster",
+        "note": "Aggressive owner-rank VJP fusion target.",
+        "saved_ms": 1866.8790397644043,
+        "saved_pct_of_mori_critical": 49.62170279225121
+      },
+      {
+        "critical_ms": 2939.4818196594715,
+        "name": "speed_high_recv_ranks_25pct",
+        "note": "Only ranks above the call median recv_count get a 25% local-VJP speedup.",
+        "saved_ms": 822.7410278320312,
+        "saved_pct_of_mori_critical": 21.868482043284637
+      },
+      {
+        "critical_ms": 3047.7153544723988,
+        "name": "speed_top_recv_quartile_25pct",
+        "note": "Only the per-call top receive-count quartile gets a 25% local-VJP speedup.",
+        "saved_ms": 714.507493019104,
+        "saved_pct_of_mori_critical": 18.991631330278818
+      },
+      {
+        "critical_ms": 2991.1045384705067,
+        "name": "cap_each_call_max_to_second_max",
+        "note": "Perfectly removes only the worst owner-rank tail per call.",
+        "saved_ms": 771.1183090209961,
+        "saved_pct_of_mori_critical": 20.496348575819916
+      },
+      {
+        "critical_ms": 2494.3985405266285,
+        "name": "cap_each_call_to_p75_local_vjp",
+        "note": "Idealized load-balance/fusion case where no rank exceeds per-call p75 local VJP.",
+        "saved_ms": 1267.8243069648743,
+        "saved_pct_of_mori_critical": 33.69880941024554
+      },
+      {
+        "critical_ms": 1975.3982510864735,
+        "name": "cap_each_call_to_median_local_vjp",
+        "note": "Very aggressive idealized load-balance/fusion case where no rank exceeds per-call median local VJP.",
+        "saved_ms": 1786.8245964050293,
+        "saved_pct_of_mori_critical": 47.49385320426756
+      }
+    ],
+    "steady_after_call_id": 64
+  }
+}

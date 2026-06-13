@@ -1,0 +1,62 @@
+{
+  "artifact": "hipkittens_gqa_bwd_dense_synthlse_b4n4096h64hkv1_20260607",
+  "status": "dense_shared_kv_head_control_not_sparse_sharedkv_candidate",
+  "host": "do-vunguyen-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "reference_snapshot": {
+    "path": "sources/references/hipkittens",
+    "commit": "cd090ae98ee4e7b8d3d5291fc62cfd716aecb946"
+  },
+  "build": {
+    "command": "export THUNDERKITTENS_ROOT=/workspace/sources/references/hipkittens; make clean && make GPU_TARGET=CDNA4 ATTN_B=4 ATTN_N=4096 ATTN_H=64 ATTN_H_KV=1 tk_kernel_bkwd tk_kernel_bkwd_prep",
+    "target": "gfx950",
+    "combined_kernel_resource_report": {
+      "sgpr": 100,
+      "vgpr": 256,
+      "agpr": 256,
+      "scratch_bytes_per_lane": 0,
+      "occupancy_waves_per_simd": 1,
+      "sgpr_spill": 0,
+      "vgpr_spill": 0
+    }
+  },
+  "probe": {
+    "command": "python /workspace/tools/dsv4_runtime_probe/probe_hipkittens_gqa_bwd_synth_lse.py --batch 4 --seq 4096 --heads 64 --kv-heads 1 --dim 128 --warmup 5 --iters 20",
+    "timed_boundary": "HipKittens dispatch_prep + dispatch_bwd_combined + dispatch_dq_shuffle",
+    "shape": {
+      "batch": 4,
+      "seq": 4096,
+      "heads": 64,
+      "kv_heads": 1,
+      "dim": 128,
+      "causal": false
+    },
+    "hk_event_ms": {
+      "median": 17.42890453338623,
+      "mean": 17.432299900054932,
+      "min": 17.275287628173828,
+      "max": 17.640485763549805
+    },
+    "hk_wall_ms": {
+      "median": 17.45876151835546,
+      "mean": 17.46379300020635,
+      "min": 17.351874033920467,
+      "max": 17.65300997067243
+    },
+    "dense_bwd_tflops_at_event_median": 315.42763507305125,
+    "precompute_O_L_ms": 1528.2500520115718,
+    "finite": {
+      "dQ": true,
+      "dK": true,
+      "dV": true,
+      "delta": true
+    },
+    "norms": {
+      "dQ": 23.496463775634766,
+      "dK": 23.31223487854004,
+      "dV": 90.48905944824219,
+      "delta": 46.74551010131836
+    }
+  },
+  "read": "This H_KV=1 dense control is closer to DSv4's shared-KV head topology than the H_KV=8 control, but it is not the sparse selected SharedKV backward candidate. It shows the existing HipKittens dense schedule does not automatically get faster when all 64 query heads share one KV head; the DSv4 fork still needs a dedicated sparse/local/compressed epilogue and likely schedule changes."
+}

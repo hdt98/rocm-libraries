@@ -1,0 +1,102 @@
+{
+  "artifact": "qdo_resident_tilelang_selected_limit_decision_20260604",
+  "status": "candidate_retained_benchmark_only",
+  "scope": "S4096 layer-2 actual-LI compressed dKV producer/reducer branch for token/Q-dO-resident group-aware epilogue",
+  "shape": {
+    "seq_len": 4096,
+    "layer_id": 2,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk": 512,
+    "valid_pairs": 1572352,
+    "dtype": "bf16 inputs, fp32 dKV"
+  },
+  "baselines": {
+    "current_triton_sparse_atomic_wall_ms": "about 8.0-8.8",
+    "best_prior_tilelang_selected_limit_kernel_only_ms": 6.180109977722168,
+    "best_prior_tilelang_selected_limit_pack_plus_kernel_ms": 8.177932739257812
+  },
+  "feasibility": {
+    "artifact": "qdo_resident_two_level_segmented_producer_plan_s4096_layer2_20260604.json",
+    "read": "The corrected head-aware LDS model rejects the highest modeled-write-reduction token_window=32/64 rows for a Q/dO-resident producer. The first feasible high-return row is token_window=16 with selected/group panel 512 and micro_selected 256 under a 160 KiB budget; token_window=8 fits the stricter 96 KiB target but has lower write reduction."
+  },
+  "rejected_branches": [
+    {
+      "name": "triton_full_active_table_u1024",
+      "artifact": "no_json_launch_failure",
+      "result": "Triton shared-memory OOR",
+      "required_shared_bytes": 524288,
+      "hardware_limit_bytes": 163840,
+      "read": "A one-CTA all-active-group accumulator for 16x256 is too large in Triton."
+    },
+    {
+      "name": "triton_partial_active_table_u256",
+      "artifact": "qdo_resident_dotk_micro_s4096_layer2_sc16_u256d16h64k256_timing_20260604.json",
+      "kernel_median_ms": 126.54954528808594,
+      "write_reduction_x": 6.221961932650073,
+      "read": "Fits by splitting active groups into four active blocks, but reloads/recomputes Q/dO and performs dense route-table work per block. This destroys the fast query-major producer."
+    },
+    {
+      "name": "tilelang_block_k128",
+      "artifact": "no_json_launch_failure",
+      "result": "compiled but HIP launch failed with invalid argument",
+      "read": "Larger K sweep is not usable in the current TileLang selected-limit kernel shape."
+    },
+    {
+      "name": "tilelang_block_d32",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_k64d32_20260604.json",
+      "kernel_median_ms": 10.500590324401855,
+      "pack_plus_kernel_median_ms": 12.513530731201172,
+      "read": "Lower D-block LDS pressure loses because it doubles D-block work."
+    },
+    {
+      "name": "tilelang_group_panel256",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb16_gp256cap256_k64d64_20260604.json",
+      "kernel_median_ms": 6.408182144165039,
+      "pack_plus_kernel_median_ms": 8.39232063293457,
+      "read": "Smaller group accumulator loses to extra panel work."
+    },
+    {
+      "name": "tilelang_threads256",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_k64d64_thr256_20260604.json",
+      "kernel_median_ms": 6.410223007202148,
+      "pack_plus_kernel_median_ms": 8.395002365112305,
+      "read": "Fewer threads lose versus the retained 512-thread kernel."
+    }
+  ],
+  "retained_candidates": [
+    {
+      "name": "tilelang_tb8_gp512_k64d64_thr512",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb8_cap512_k64d64_20260604.json",
+      "kernel_median_ms": 6.042540073394775,
+      "pack_plus_kernel_median_ms": 8.042718887329102,
+      "hsk_bf16_source_kernel_median_ms": 6.274540901184082,
+      "write_reduction_x": 5.992446329686077,
+      "read": "Best measured kernel-only/pack-plus-kernel timing in this sweep. Lower write reduction than TB32, but better scheduling."
+    },
+    {
+      "name": "tilelang_tb32_gp512_k64d64_thr512",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb32_cap512_k64d64_20260604.json",
+      "kernel_median_ms": 6.043018817901611,
+      "pack_plus_kernel_median_ms": 8.053277969360352,
+      "hsk_bf16_source_kernel_median_ms": 6.358541011810303,
+      "write_reduction_x": 23.813773153406938,
+      "read": "Essentially tied with TB8 on kernel timing while preserving much higher modeled write reduction. Worth keeping as the integration candidate if route-plan stability matters more than the tiny timing edge."
+    },
+    {
+      "name": "tilelang_tb16_gp512_k64d64_thr512_prior",
+      "artifact": "tilelang_selected_limit_adapter_bshd_s4096_tb16_cap512_20260604.json",
+      "kernel_median_ms": 6.180109977722168,
+      "pack_plus_kernel_median_ms": 8.177932739257812,
+      "write_reduction_x": 11.953140798066032,
+      "read": "Stable prior base; slightly slower than TB8/TB32."
+    }
+  ],
+  "decision": {
+    "promote_for_next_kernel_work": "tilelang_tb32_gp512_k64d64_thr512 or tilelang_tb8_gp512_k64d64_thr512",
+    "why_faster_than_raw_sparse_atomic": "It keeps the selected-limit TileLang MFMA producer and reduces by compressed group inside the CTA before global dKV writes, cutting global write/atomic volume versus one selected-row atomic per token/slot/D.",
+    "why_not_e2e_yet": "The fast kernel-only path still consumes materialized packed probabilities and scaled grad logits. The pack bridge costs about 2 ms and, in TorchTitan, earlier bridge paths also materialized selected-state tensors before TileLang. Production must fuse probability/dP production from q, dO, output/lse, compressed KV, and LI indices directly into this selected-limit body.",
+    "next_step": "Port/fuse the sparse-MLA backward boundary into the retained TileLang selected-limit body so it consumes q, dO, compressed KV, top indices/source indices, output, lse, and delta directly, with no global probs/grad_logits/selected-KV slabs."
+  }
+}

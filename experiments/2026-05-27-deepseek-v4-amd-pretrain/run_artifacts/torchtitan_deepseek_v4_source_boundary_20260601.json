@@ -1,0 +1,82 @@
+{
+  "artifact": "torchtitan_deepseek_v4_source_boundary_20260601",
+  "purpose": "Record the first direct TorchTitan DeepSeek-V4 Flash 4-layer source/config boundary check that skips Primus.",
+  "result": "passed_source_and_config_parse_training_pending",
+  "execution_path": "direct_torchtitan_torchrun",
+  "primus_policy": {
+    "primus_cli_used": false,
+    "primus_runtime_image_allowed": false,
+    "launcher_refusal_check": {
+      "command": "env IMAGE=rocm/primus:v26.2 launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+      "exit_code": 3,
+      "result": "passed_refused_primus_runtime_image_before_staging"
+    }
+  },
+  "local_source": {
+    "torchtitan_path": "sources/wip/torchtitan",
+    "module": "torchtitan.models.deepseek_v4",
+    "config_registry": "torchtitan.models.deepseek_v4.config_registry",
+    "config_name": "deepseek_v4_flash_4layer_bf16_canary",
+    "model_spec_name": "deepseek_v4",
+    "model_spec_flavor": "flash_4layer",
+    "implementation_status": "structural_canary_dense_mla_fallback",
+    "attention_status": "dense_mla_fallback_missing_sparse_mla_indexer",
+    "router_score_func": "sqrtsoftplus",
+    "source_check_command": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-source",
+    "source_check_result": "passed_py_compile"
+  },
+  "runtime_image_selection": {
+    "selected_default": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "selected_reason": "This non-Primus image has TorchTitan dependencies and the newer PyTorch distributed APIs required by the local WIP TorchTitan snapshot.",
+    "rejected_images": [
+      {
+        "image": "rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.9.1",
+        "check": "direct check-config",
+        "result": "failed_missing_torchtitan_dependency_tyro"
+      },
+      {
+        "image": "onenexus/nexus-titan:rocm724-pytorch291",
+        "check": "direct check-config",
+        "result": "failed_missing_torch_distributed_mesh_layout"
+      },
+      {
+        "image": "rocm/primus:v26.2",
+        "check": "direct check-config",
+        "result": "refused_by_launcher_policy"
+      }
+    ]
+  },
+  "config_parse": {
+    "command": "launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh check-config",
+    "target_host": "do-sonle5-mi350-gpu",
+    "runtime_image": "onenexus/nexus-titan:rocm722-pytorch-nightly",
+    "result": "passed",
+    "stdout": [
+      "model_spec deepseek_v4 flash_4layer",
+      "model_config Config deepseek_v4",
+      "implementation_status structural_canary_dense_mla_fallback",
+      "shape 1 64 4096 2",
+      "parallelism -1 4",
+      "router_score_func sqrtsoftplus",
+      "attention_status dense_mla_fallback_missing_sparse_mla_indexer"
+    ],
+    "shape": {
+      "local_batch_size": 1,
+      "global_batch_size": 64,
+      "seq_len": 4096,
+      "steps": 2,
+      "data_parallel_shard_degree": -1,
+      "expert_parallel_degree": 4,
+      "tensor_parallel_degree": 1,
+      "pipeline_parallel_degree": 1,
+      "context_parallel_degree": 1
+    }
+  },
+  "remaining_before_canary": [
+    "Replace or explicitly gate the dense MLA fallback with the DSv4 sparse MLA/indexer path.",
+    "Run the direct 4xMI350 2-step BF16 canary from torchtitan/train.py.",
+    "Rerun FSDP/EP process-group probe on the selected direct runtime.",
+    "Record checkpoint/resume, loss or health movement, and throughput."
+  ],
+  "dependency_pin_changes": []
+}

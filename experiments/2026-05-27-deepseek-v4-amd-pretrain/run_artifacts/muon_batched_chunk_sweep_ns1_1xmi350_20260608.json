@@ -1,0 +1,92 @@
+{
+  "artifact": "muon_batched_chunk_sweep_ns1_1xmi350_20260608",
+  "created_at": "2026-06-08",
+  "host": "do-sonle5-mi350-gpu",
+  "image": "onenexus/nexus-titan:rocm722-pytorch-nightly-mori",
+  "question": "Can a different batched expert-Muon chunk size reduce the remaining optimizer-step wall?",
+  "remote_output_dir": "/scratch/sonle5/dsv4_pretrain_canary_20260527/outputs/muon_batched_chunk_sweep_ns1_1xmi350_20260608",
+  "runtime_probe": {
+    "torch_version": "2.13.0a0+gitccf72d7",
+    "torch_hip": "7.2.53211",
+    "has_torch_optim_muon": true,
+    "torch_optim_muon_source": "/opt/conda/envs/py_3.10/lib/python3.10/site-packages/torch/optim/_muon.py",
+    "torch_optim_muon_impl_read": "The installed torch.optim.Muon is single-tensor only; its functional API raises if foreach=True and calls _single_tensor_muon, which runs Newton-Schulz matmuls one 2D parameter at a time."
+  },
+  "command_shape": {
+    "device": "1xMI350",
+    "layers": 12,
+    "expert_tensors_per_layer": 3,
+    "local_experts": 32,
+    "matrix_count": 1152,
+    "dtype": "bfloat16",
+    "muon_ns_steps": 1,
+    "muon_ns_compute_dtype": "bfloat16",
+    "swept_env": "TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES",
+    "base_command": "docker run --rm --entrypoint /bin/bash --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --network=host --security-opt seccomp=unconfined -v /scratch/sonle5/dsv4_pretrain_canary_20260527:/workspace -w /workspace -e HIP_VISIBLE_DEVICES=0 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True -e TORCHTITAN_OPTIMIZER_MUON_NS_COMPUTE_DTYPE=bfloat16 -e PYTHONPATH=/workspace/sources/wip/torchtitan onenexus/nexus-titan:rocm722-pytorch-nightly-mori -lc 'python3 /workspace/tools/dsv4_optimizer_preflight/probe_muon_optimizer_step.py --layers 12 --modes muon_batched --muon-ns-steps 1 --repeat 2'"
+  },
+  "results": [
+    {
+      "chunk_matrices": 1,
+      "step_gpu_ms": 295.67578125,
+      "step_wall_ms": 295.69869209080935,
+      "peak_allocated_gib": 54.13671922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 2,
+      "step_gpu_ms": 237.5780487060547,
+      "step_wall_ms": 237.59905295446515,
+      "peak_allocated_gib": 54.19921922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 4,
+      "step_gpu_ms": 212.137939453125,
+      "step_wall_ms": 212.16260199435055,
+      "peak_allocated_gib": 54.32421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 8,
+      "step_gpu_ms": 215.2655792236328,
+      "step_wall_ms": 215.28855105862021,
+      "peak_allocated_gib": 54.57421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 16,
+      "step_gpu_ms": 220.3240509033203,
+      "step_wall_ms": 220.3471059910953,
+      "peak_allocated_gib": 55.07421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 32,
+      "step_gpu_ms": 223.92791748046875,
+      "step_wall_ms": 223.96059893071651,
+      "peak_allocated_gib": 56.07421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    },
+    {
+      "chunk_matrices": 64,
+      "step_gpu_ms": 224.01962280273438,
+      "step_wall_ms": 224.04832998290658,
+      "peak_allocated_gib": 56.07421922683716,
+      "mem_after_step_gib": 54.07421875,
+      "state_after_step_gib": 18.0
+    }
+  ],
+  "best": {
+    "chunk_matrices": 4,
+    "step_gpu_ms": 212.137939453125,
+    "peak_allocated_gib": 54.32421922683716
+  },
+  "read": "The current chunk4 default is already the best measured NS1 point on the 12-layer expert-bank slice. Larger chunks do not improve speed and raise peak memory; smaller chunks are slower from extra loop/launch overhead. Combined with the runtime source check showing torch.optim.Muon has no foreach/fused path, this closes the easy Muon optimizer-step tuning branch.",
+  "decision": "Do not run another e2e Muon chunk-size candidate. Keep expert-Muon batched chunk4 as the diagnostic memory branch and return optimization focus to MoE/EP helper VJP, weighted combine/scatter, and C4 sparse-MLA SharedKV backward."
+}

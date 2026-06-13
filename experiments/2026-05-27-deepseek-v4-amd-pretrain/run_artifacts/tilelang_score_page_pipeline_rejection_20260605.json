@@ -1,0 +1,78 @@
+{
+  "status": "rejected_for_latency",
+  "scope": "sparse_mla_backward_score_page_tilelang_gate",
+  "read": "A TileLang HBM/L2 score-page producer-consumer path was implemented and measured at the real S4096 actual-LI layer-2 route. Page-size 4096 matches the full-slab control, but smaller pages get much slower as page count rises. This rejects a multi-launch HBM/L2 score-page ring as the sparse-attention backward fix. The next viable branch is a lower-level HIP/CK/rocWMMA cooperative kernel where the score tile is produced and consumed inside the same workgroup or persistent producer-consumer kernel before global memory.",
+  "shape": {
+    "seq_len": 4096,
+    "compressed_groups": 1024,
+    "heads": 64,
+    "dim": 512,
+    "topk_arg": 1024,
+    "actual_li_topk": 512,
+    "actual_li_valid_pairs": 1572352,
+    "actual_li_compress_ratio": 4,
+    "route_pattern": "actual_li_panel",
+    "group_panel_size": 512,
+    "token_block": 16,
+    "selected_window": 512,
+    "block_k": 64,
+    "block_d": 64,
+    "threads": 512,
+    "device": "AMD Instinct MI350X VF",
+    "torch_hip_version": "7.2.26015-fc0010cf6a"
+  },
+  "baseline": {
+    "mode": "recompute_pdp_store_then_dkv_limited",
+    "artifact": "run_artifacts/tilelang_sparse_pdp_store_then_dkv_current_s4096_tb16_cap512_k64d64_thr512_20260605.json",
+    "median_ms": 16.305349349975586,
+    "peak_memory_gib": 4.129889011383057,
+    "score_slab_mib": 1024.0
+  },
+  "score_page_sweep": [
+    {
+      "page_tokens": 4096,
+      "page_count": 1,
+      "score_page_mib": 1024.0,
+      "median_ms": 16.411911964416504,
+      "peak_memory_gib": 4.163586616516113,
+      "artifact": "run_artifacts/tilelang_sparse_pdp_page_then_dkv_s4096_p4096_tb16_cap512_k64d64_thr512_20260605.json"
+    },
+    {
+      "page_tokens": 2048,
+      "page_count": 2,
+      "score_page_mib": 512.0,
+      "median_ms": 22.645912170410156,
+      "peak_memory_gib": 4.1638312339782715,
+      "artifact": "run_artifacts/tilelang_sparse_pdp_page_then_dkv_s4096_p2048_tb16_cap512_k64d64_thr512_20260605.json"
+    },
+    {
+      "page_tokens": 1024,
+      "page_count": 4,
+      "score_page_mib": 256.0,
+      "median_ms": 33.38406562805176,
+      "peak_memory_gib": 3.664442539215088,
+      "artifact": "run_artifacts/tilelang_sparse_pdp_page_then_dkv_s4096_p1024_tb16_cap512_k64d64_thr512_20260605.json"
+    },
+    {
+      "page_tokens": 512,
+      "page_count": 8,
+      "score_page_mib": 128.0,
+      "median_ms": 55.394962310791016,
+      "peak_memory_gib": 3.4145073890686035,
+      "artifact": "run_artifacts/tilelang_sparse_pdp_page_then_dkv_s4096_p512_tb16_cap512_k64d64_thr512_20260605.json"
+    }
+  ],
+  "interpretation": {
+    "latency_trend": "Smaller score pages save scratch memory but add repeated producer, consumer, zero, and page accumulation launches. Latency rises from 16.41 ms at one page to 55.39 ms at eight pages.",
+    "comparison_to_current_sparse_atomic_wall_ms": 8.0,
+    "comparison_to_full_slab_pipeline_ms": 16.305349349975586,
+    "decision": "Do not pursue multi-launch TileLang HBM/L2 score pages for performance. Use the result as evidence for moving to a cooperative same-kernel implementation.",
+    "next_kernel_contract": "q,dO,output,lse,compressed_kv,indices -> per-workgroup score/prob/scaled-dP tile -> immediate D-parallel dQ and group-aware dKV reduction -> reduced global dKV writes, without materialized P/scaled-dP HBM slabs."
+  },
+  "validation": {
+    "local_py_compile": true,
+    "remote_runtime": "rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4-tilelang-fragconvert-v4full",
+    "timing_counts": "warmup=1, timed=2 for p4096/p2048/p1024; warmup=1, timed=3 for p512",
+    "correctness_reference": "not run for the page sweep; q/dO/output/lse/compressed_kv checksums match across same-seed full-slab and page runs, and the p4096 page control matches full-slab latency. Full correctness remains required before any promotion, but the branch is already rejected on latency."
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "artifact": "optimizer_mixed_muon_adamw_smoke_continuation",
+  "date_local": "2026-05-31",
+  "run_id": "torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z",
+  "node": "do-sonle5-mi350-gpu",
+  "image": "rocm/primus:v26.2",
+  "launcher": "experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh",
+  "command": "env RUN_ID=torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z bash experiments/2026-05-27-deepseek-v4-amd-pretrain/launchers/torchtitan_mixed_muon_adamw_smoke.sh all",
+  "remote_stage": "/local/data/sonle5/dsv4_pretrain_canary_20260527/wip_optimizer_smoke/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z",
+  "remote_log_dir": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z",
+  "latest_optimizer_smoke_id": "torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z",
+  "modes": {
+    "toy": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "muon_params": [
+        "expert_weight",
+        "proj.weight"
+      ],
+      "state_dict_keys": 2,
+      "torch_version": "2.10.0a0+git449b176",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z/toy.log"
+    },
+    "deepseek_debugmodel": {
+      "status": "passed",
+      "optimizer_types": [
+        "AdamW",
+        "Muon"
+      ],
+      "param_counts": {
+        "AdamW": 21,
+        "Muon": 62
+      },
+      "stepped_params": [
+        "tok_embeddings.weight",
+        "layers.1.moe.router.gate.weight",
+        "layers.1.moe.experts.w1"
+      ],
+      "muon_sample": [
+        "layers.0.attention.wkv_a.weight",
+        "layers.0.attention.wkv_b.weight",
+        "layers.0.attention.wo.weight",
+        "layers.0.attention.wq.weight",
+        "layers.0.feed_forward.w1.weight",
+        "layers.0.feed_forward.w2.weight",
+        "layers.0.feed_forward.w3.weight",
+        "layers.1.attention.wkv_a.weight"
+      ],
+      "state_dict_keys": 2,
+      "torch_version": "2.10.0a0+git449b176",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z/deepseek-debugmodel.log"
+    },
+    "muon_shard_contract": {
+      "status": "passed",
+      "matrix_row_shard_rel_l2_vs_full": 0.46550610661506653,
+      "matrix_column_shard_rel_l2_vs_full": 0.7442668676376343,
+      "batched_expert_axis_shard_rel_l2_vs_full": 0.0,
+      "batched_row_axis_shard_rel_l2_vs_full": 0.46919289231300354,
+      "batched_column_axis_shard_rel_l2_vs_full": 0.7377979159355164,
+      "conclusion": "Reference Muon is checkpointable for bring-up, but local-shard Muon is not equivalent when FSDP cuts a matrix axis. A faithful distributed Muon path still needs coordinated matrix-level update semantics and optimizer-state checkpointing.",
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z/muon-shard-contract.log"
+    },
+    "unit": {
+      "status": "passed",
+      "tests": 15,
+      "elapsed_s": 0.298,
+      "log": "/local/data/sonle5/dsv4_pretrain_canary_20260527/logs/torchtitan_mixed_muon_adamw_smoke_continuation_20260531T0624Z/unit.log"
+    }
+  },
+  "interpretation": [
+    "The mixed optimizer implementation still routes toy rank-2/rank-3 matrix parameters to Muon and exception parameters to AdamW.",
+    "The TorchTitan DeepSeek-V3 debugmodel routes most matrix weights to Muon while keeping embeddings and other exceptions on AdamW.",
+    "Native per-inner optimizer state dictionaries still round-trip in both toy and DeepSeek debugmodel smokes.",
+    "The Muon shard-contract probe preserves the known limitation: the bring-up Muon reference is not a faithful distributed/FSDP-sharded Muon update when a matrix axis is cut."
+  ],
+  "remaining_required_evidence": [
+    "Run the real mixed Muon/AdamW checkpoint resume from load_step=1 through step 2 on an idle 8xMI350 node.",
+    "Replace the bring-up local-shard Muon semantics with a coordinated distributed Muon state/update path before treating this as faithful DeepSeek-V4 optimizer integration."
+  ]
+}

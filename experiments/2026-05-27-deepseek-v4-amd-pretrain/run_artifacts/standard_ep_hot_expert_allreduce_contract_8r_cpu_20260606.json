@@ -1,0 +1,204 @@
+{
+  "args": {
+    "atol": 2e-05,
+    "backend": "gloo",
+    "device": "cpu",
+    "experts_per_rank": 4,
+    "hidden": 32,
+    "hot_experts": 2,
+    "intermediate": 16,
+    "output": "outputs/standard_ep_hot_expert_allreduce_contract_8r_cpu_20260606.json",
+    "rtol": 2e-05,
+    "scale": 0.03,
+    "seed": 20260606,
+    "tokens_per_rank": 8
+  },
+  "artifact": "standard_ep_hot_expert_allreduce_contract",
+  "next_gate": "Integrate this primitive around standard EP dispatch: mask remote-hot rows out of normal owner all-to-all, compute them locally with replicated hot weights, then add remote-hot outputs directly to source tokens while cold/local-hot rows use the existing standard combine.",
+  "owner_rank": 7,
+  "passed": true,
+  "rank_results": [
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": 1.0522430784476455e-06,
+      "passed": true,
+      "rank": 0,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": 7.151669478844269e-09,
+      "passed": true,
+      "rank": 1,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": 5.603395720754634e-07,
+      "passed": true,
+      "rank": 2,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": 5.911497282795608e-07,
+      "passed": true,
+      "rank": 3,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": 2.6803735408975626e-07,
+      "passed": true,
+      "rank": 4,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": -1.253105665455223e-06,
+      "passed": true,
+      "rank": 5,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {},
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": false,
+      "local_loss": -1.2306323924349272e-06,
+      "passed": true,
+      "rank": 6,
+      "world": 8
+    },
+    {
+      "device": "cpu",
+      "diffs": {
+        "dw1_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.094947017729282e-13,
+          "mean_abs": 8.21549859392201e-14,
+          "rel_l2": 6.659310488503516e-08,
+          "shape": [
+            2,
+            16,
+            32
+          ]
+        },
+        "dw2_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.094947017729282e-13,
+          "mean_abs": 8.592172112686924e-14,
+          "rel_l2": 6.756131104867375e-08,
+          "shape": [
+            2,
+            32,
+            16
+          ]
+        },
+        "dw3_hot": {
+          "actual_finite": true,
+          "expected_finite": true,
+          "max_abs": 9.094947017729282e-13,
+          "mean_abs": 8.546809093790131e-14,
+          "rel_l2": 6.799525366096577e-08,
+          "shape": [
+            2,
+            16,
+            32
+          ]
+        }
+      },
+      "helper_local_hot_buffer_grad_norms": {
+        "dw1_hot": 7.366851787082851e-05,
+        "dw2_hot": 7.900010677985847e-05,
+        "dw3_hot": 7.478653424186632e-05
+      },
+      "hot_experts": [
+        28,
+        29
+      ],
+      "is_owner_rank": true,
+      "local_loss": 5.033961656408792e-07,
+      "passed": true,
+      "rank": 7,
+      "world": 8
+    }
+  ],
+  "scope": "Distributed autograd probe for owner-filled hot expert weight buffers, differentiable all_reduce replication, helper-side remote-hot compute, and owner-side hot weight grad reduction."
+}
