@@ -165,7 +165,7 @@ def _build_dsv3_layers(
     num_experts: int,
     num_shared_experts: int,
     router_top_k: int,
-    router_score_func: Literal["sigmoid", "softmax"],
+    router_score_func: Literal["sigmoid", "softmax", "sqrtsoftplus"],
     router_num_expert_groups: int | None = None,
     router_num_limited_groups: int | None = None,
     router_route_scale: float = 1.0,
@@ -522,11 +522,83 @@ def _671b(
     )
 
 
+def _dsv4_reduced_12l(
+    attn_backend: str,
+    moe_comm_backend: str,
+    non_blocking_capacity_factor: float | None = None,
+) -> DeepSeekV3Model.Config:
+    dim = 4096
+    n_layers = 12
+    vocab_size = 129280
+    n_heads = 64
+    q_lora_rank = 1024
+    kv_lora_rank = 512
+    qk_nope_head_dim = 448
+    qk_rope_head_dim = 64
+    v_head_dim = 512
+    dense_hidden_dim = 2048
+    moe_hidden_dim = 2048
+    num_experts = 256
+    num_shared_experts = 1
+    n_dense_layers = 0
+
+    layers = _build_dsv3_layers(
+        n_layers=n_layers,
+        n_dense_layers=n_dense_layers,
+        dim=dim,
+        n_heads=n_heads,
+        q_lora_rank=q_lora_rank,
+        kv_lora_rank=kv_lora_rank,
+        qk_nope_head_dim=qk_nope_head_dim,
+        qk_rope_head_dim=qk_rope_head_dim,
+        v_head_dim=v_head_dim,
+        mscale=1.0,
+        dense_hidden_dim=dense_hidden_dim,
+        moe_hidden_dim=moe_hidden_dim,
+        num_experts=num_experts,
+        num_shared_experts=num_shared_experts,
+        router_top_k=6,
+        router_score_func="sqrtsoftplus",
+        router_route_scale=1.5,
+        router_route_norm=True,
+        score_before_experts=False,
+        attn_backend=attn_backend,
+        moe_comm_backend=moe_comm_backend,
+        non_blocking_capacity_factor=non_blocking_capacity_factor,
+    )
+    return DeepSeekV3Model.Config(
+        vocab_size=vocab_size,
+        dim=dim,
+        tok_embeddings=Embedding.Config(
+            num_embeddings=vocab_size, embedding_dim=dim, param_init=_EMBEDDING_INIT
+        ),
+        norm=RMSNorm.Config(normalized_shape=dim, param_init=_NORM_INIT),
+        lm_head=Linear.Config(
+            in_features=dim,
+            out_features=vocab_size,
+            param_init=_output_linear_init(dim),
+        ),
+        rope=RoPE.Config(
+            dim=qk_rope_head_dim,
+            max_seq_len=4096,
+            theta=10000.0,
+            backend="complex",
+            scaling="yarn",
+            rope_factor=16.0,
+            beta_fast=32.0,
+            beta_slow=1.0,
+            original_seq_len=65536,
+        ),
+        layers=layers,
+    )
+
+
 deepseekv3_configs = {
     "debugmodel": _debugmodel,
     "16B": _16b,
     "236B": _236b,
     "671B": _671b,
+    "dsv4_reduced_12l": _dsv4_reduced_12l,
 }
 
 

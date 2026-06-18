@@ -17,6 +17,7 @@ from torchtitan.models.deepseek_v3.config_registry import (
     deepseek_v3_debugmodel_ep,
     deepseek_v3_debugmodel_flex_attn,
     deepseek_v3_debugmodel_flex_attn_ep,
+    deepseek_v4_reduced_12l,
 )
 from torchtitan.trainer import Trainer
 
@@ -74,6 +75,12 @@ def graph_trainer_deepseek_v3_16b_sdpa() -> GraphTrainer.Config:
 
 def graph_trainer_deepseek_v3_671b() -> GraphTrainer.Config:
     config = to_graph_trainer_config(deepseek_v3_671b(), model_registry)
+    config.compile = GraphTrainerCompileConfig(enable=True)
+    return config
+
+
+def graph_trainer_deepseek_v4_reduced_12l() -> GraphTrainer.Config:
+    config = to_graph_trainer_config(deepseek_v4_reduced_12l(), model_registry)
     config.compile = GraphTrainerCompileConfig(enable=True)
     return config
 
