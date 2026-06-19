@@ -86,11 +86,11 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                                                    int StrideE,
                                                    int n_warmup,
                                                    int n_iter,
-                                                   uint64_t rotating      = 0,
+                                                   uint64_t rotating     = 0,
                                                    int determinism_check = 1,
-                                                   int instance_index     = -1)
+                                                   int instance_index    = -1)
 {
-    bool pass = true;
+    bool pass         = true;
     determinism_check = std::max(1, determinism_check);
 
     auto f_host_tensor_descriptor = [](std::size_t row, std::size_t col, int& stride, auto layout) {
@@ -235,65 +235,63 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
 
     std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
 
-    auto check_row_relative_error = [&](const auto& actual,
-                                        const auto& expected,
-                                        const std::string& label) {
-        // sglang#28685 showed sparse per-row spikes near tile boundaries.
-        double worst_row_rel_max_error = -1;
-        int worst_row_rel              = 0;
-        int bad_row_count              = 0;
-        int sampled_bad_row_count      = 0;
-        std::string bad_row_sample;
+    auto check_row_relative_error =
+        [&](const auto& actual, const auto& expected, const std::string& label) {
+            // sglang#28685 showed sparse per-row spikes near tile boundaries.
+            double worst_row_rel_max_error = -1;
+            int worst_row_rel              = 0;
+            int bad_row_count              = 0;
+            int sampled_bad_row_count      = 0;
+            std::string bad_row_sample;
 
-        for(int m = 0; m < M; ++m)
-        {
-            double row_max_abs_error = 0;
-            double row_ref_max_abs   = 0;
+            for(int m = 0; m < M; ++m)
+            {
+                double row_max_abs_error = 0;
+                double row_ref_max_abs   = 0;
 
-            for(int n = 0; n < N; ++n)
-            {
-                const float actual_value   = ck::type_convert<float>(actual(m, n));
-                const float expected_value = ck::type_convert<float>(expected(m, n));
-                row_max_abs_error          = std::max(
-                    row_max_abs_error,
-                    std::abs(static_cast<double>(actual_value) -
-                             static_cast<double>(expected_value)));
-                row_ref_max_abs =
-                    std::max(row_ref_max_abs, std::abs(static_cast<double>(expected_value)));
-            }
-
-            const double row_rel_max_error = row_max_abs_error / std::max(row_ref_max_abs, 1.0);
-            if(row_rel_max_error > worst_row_rel_max_error)
-            {
-                worst_row_rel_max_error = row_rel_max_error;
-                worst_row_rel           = m;
-            }
-            if(row_rel_max_error > 0.1)
-            {
-                ++bad_row_count;
-                if(sampled_bad_row_count < 16)
+                for(int n = 0; n < N; ++n)
                 {
-                    if(!bad_row_sample.empty())
+                    const float actual_value   = ck::type_convert<float>(actual(m, n));
+                    const float expected_value = ck::type_convert<float>(expected(m, n));
+                    row_max_abs_error          = std::max(row_max_abs_error,
+                                                 std::abs(static_cast<double>(actual_value) -
+                                                          static_cast<double>(expected_value)));
+                    row_ref_max_abs =
+                        std::max(row_ref_max_abs, std::abs(static_cast<double>(expected_value)));
+                }
+
+                const double row_rel_max_error = row_max_abs_error / std::max(row_ref_max_abs, 1.0);
+                if(row_rel_max_error > worst_row_rel_max_error)
+                {
+                    worst_row_rel_max_error = row_rel_max_error;
+                    worst_row_rel           = m;
+                }
+                if(row_rel_max_error > 0.1)
+                {
+                    ++bad_row_count;
+                    if(sampled_bad_row_count < 16)
                     {
-                        bad_row_sample += ",";
+                        if(!bad_row_sample.empty())
+                        {
+                            bad_row_sample += ",";
+                        }
+                        bad_row_sample += std::to_string(m);
+                        ++sampled_bad_row_count;
                     }
-                    bad_row_sample += std::to_string(m);
-                    ++sampled_bad_row_count;
                 }
             }
-        }
 
-        const bool pass_row_relative_check = bad_row_count == 0;
-        if(!pass_row_relative_check)
-        {
-            std::cout << label << " rowrel_max=" << worst_row_rel_max_error
-                      << " rowrel_worst_row=" << worst_row_rel
-                      << " rowrel_bad_rows_gt_0p1=" << bad_row_count << "/" << M
-                      << " rowrel_bad_row_sample=" << bad_row_sample << std::endl;
-        }
+            const bool pass_row_relative_check = bad_row_count == 0;
+            if(!pass_row_relative_check)
+            {
+                std::cout << label << " rowrel_max=" << worst_row_rel_max_error
+                          << " rowrel_worst_row=" << worst_row_rel
+                          << " rowrel_bad_rows_gt_0p1=" << bad_row_count << "/" << M
+                          << " rowrel_bad_row_sample=" << bad_row_sample << std::endl;
+            }
 
-        return pass_row_relative_check;
-    };
+            return pass_row_relative_check;
+        };
 
     // Run reference GEMM
     if(do_verification)
@@ -393,7 +391,8 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
             std::unique_ptr<Tensor<EDataType>> first_device_result;
             if(determinism_check > 1)
             {
-                first_device_result = std::make_unique<Tensor<EDataType>>(e_m_n_device_result.mDesc);
+                first_device_result =
+                    std::make_unique<Tensor<EDataType>>(e_m_n_device_result.mDesc);
             }
 
             if(do_verification || determinism_check > 1)
@@ -417,11 +416,10 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                     double atol       = 5e-2;
                     bool current_pass = ck::utils::check_err(
                         e_m_n_device_result, e_m_n_host_result, msg, rtol, atol);
-                    current_pass =
-                        check_row_relative_error(e_m_n_device_result,
-                                                 e_m_n_host_result,
-                                                 "Reference row-relative check") &&
-                        current_pass;
+                    current_pass = check_row_relative_error(e_m_n_device_result,
+                                                            e_m_n_host_result,
+                                                            "Reference row-relative check") &&
+                                   current_pass;
                     pass = pass & current_pass;
                     if(!current_pass)
                     {
@@ -457,18 +455,17 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                 invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, false, 0, 0, 1});
                 c_device_buf.FromDevice(e_m_n_device_result.mData.data());
 
-                const auto byte_count = first_device_result->mData.size() * sizeof(EDataType);
-                const bool deterministic =
-                    std::memcmp(e_m_n_device_result.mData.data(),
-                                first_device_result->mData.data(),
-                                byte_count) == 0;
+                const auto byte_count    = first_device_result->mData.size() * sizeof(EDataType);
+                const bool deterministic = std::memcmp(e_m_n_device_result.mData.data(),
+                                                       first_device_result->mData.data(),
+                                                       byte_count) == 0;
 
                 if(!deterministic)
                 {
                     pass = false;
                     std::cout << op_ptr->GetTypeString()
-                              << " produced nondeterministic output on repeat " << repeat
-                              << " of " << determinism_check << std::endl;
+                              << " produced nondeterministic output on repeat " << repeat << " of "
+                              << determinism_check << std::endl;
                     check_row_relative_error(
                         e_m_n_device_result, *first_device_result, "Determinism mismatch");
                     break;

@@ -420,9 +420,7 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
         // The empty asm is a read/write VGPR use of the updated accumulator.
         // It keeps each post-scale accumulator definition visible to the
         // optimizer, which enables determinism for bitwise-stable repeated launches.
-        auto anchor_accumulator_value = [&](auto& value) {
-            asm volatile("" : "+v"(value));
-        };
+        auto anchor_accumulator_value = [&](auto& value) { asm volatile("" : "+v"(value)); };
 
         __builtin_amdgcn_sched_barrier(0);
         static_assert(CScaleThreadDesc{}.GetLength(Number<0>{}) == 1,
@@ -726,8 +724,8 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
                                     c_thread_buf_per_scale
                                         .GetVectorTypeReference(Number<scale_buf_offset>{})
                                         .template AsType<AccDataType>()(t);
-                                c_acc_vec(t) =
-                                    __builtin_elementwise_fma(c_partial_acc, c_scale_thread, c_acc_vec(t));
+                                c_acc_vec(t) = __builtin_elementwise_fma(
+                                    c_partial_acc, c_scale_thread, c_acc_vec(t));
                                 anchor_accumulator_value(c_acc_vec(t));
                             });
                         });
@@ -866,7 +864,8 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
                         auto& c_acc_vec = c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                                               .template AsType<AccDataType>();
                         const auto c_partial_acc =
-                            c_thread_buf_per_scale.GetVectorTypeReference(Number<scale_buf_offset>{})
+                            c_thread_buf_per_scale
+                                .GetVectorTypeReference(Number<scale_buf_offset>{})
                                 .template AsType<AccDataType>()(t);
                         c_acc_vec(t) =
                             __builtin_elementwise_fma(c_partial_acc, c_scale_thread, c_acc_vec(t));
@@ -978,7 +977,8 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
                         auto& c_acc_vec = c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                                               .template AsType<AccDataType>();
                         const auto c_partial_acc =
-                            c_thread_buf_per_scale.GetVectorTypeReference(Number<scale_buf_offset>{})
+                            c_thread_buf_per_scale
+                                .GetVectorTypeReference(Number<scale_buf_offset>{})
                                 .template AsType<AccDataType>()(t);
                         c_acc_vec(t) =
                             __builtin_elementwise_fma(c_partial_acc, c_scale_thread, c_acc_vec(t));
@@ -1087,7 +1087,8 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
                         auto& c_acc_vec = c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                                               .template AsType<AccDataType>();
                         const auto c_partial_acc =
-                            c_thread_buf_per_scale.GetVectorTypeReference(Number<scale_buf_offset>{})
+                            c_thread_buf_per_scale
+                                .GetVectorTypeReference(Number<scale_buf_offset>{})
                                 .template AsType<AccDataType>()(t);
                         c_acc_vec(t) =
                             __builtin_elementwise_fma(c_partial_acc, c_scale_thread, c_acc_vec(t));

@@ -289,9 +289,7 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
         // The empty asm is a read/write VGPR use of the updated accumulator.
         // It keeps each post-scale accumulator definition visible to the
         // optimizer, which enables determinism for bitwise-stable repeated launches.
-        auto anchor_accumulator_value = [&](auto& value) {
-            asm volatile("" : "+v"(value));
-        };
+        auto anchor_accumulator_value = [&](auto& value) { asm volatile("" : "+v"(value)); };
 
         // __builtin_amdgcn_sched_barrier(0);
         auto a_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, ComputeDataType>(
@@ -507,13 +505,14 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
                         // Keep the post-scale FMA scalar; the old packed 2-lane update hits
                         // ROCm 7.2 gfx950 illegal-type legalization/codegen issues.
                         static_for<0, xdlops_gemm.GetRegSizePerXdlops(), 1>{}([&](auto t) {
-                            auto& c_acc_vec = c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
-                                                  .template AsType<AccDataType>();
+                            auto& c_acc_vec =
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
+                                    .template AsType<AccDataType>();
                             const auto c_partial_acc =
                                 c_thread_buf_per_scale.GetVectorTypeReference(Number<0>{})
                                     .template AsType<AccDataType>()(t);
-                            c_acc_vec(t) =
-                                __builtin_elementwise_fma(c_partial_acc, c_scale_thread, c_acc_vec(t));
+                            c_acc_vec(t) = __builtin_elementwise_fma(
+                                c_partial_acc, c_scale_thread, c_acc_vec(t));
                             anchor_accumulator_value(c_acc_vec(t));
                         });
                     });
