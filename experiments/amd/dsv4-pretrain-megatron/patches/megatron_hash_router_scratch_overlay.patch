@@ -1,0 +1,80 @@
+diff --git a/megatron/core/transformer/moe/moe_utils.py b/megatron/core/transformer/moe/moe_utils.py
+index 0f4316edc7..ff808ba55f 100644
+--- a/megatron/core/transformer/moe/moe_utils.py
++++ b/megatron/core/transformer/moe/moe_utils.py
+@@ -731,8 +731,19 @@ def topk_routing_with_score_function(
+         if tid2eid is not None:
+             assert not tid2eid.requires_grad
+             assert input_ids is not None and not input_ids.requires_grad
++            if torch.any((input_ids < 0) | (input_ids >= tid2eid.size(0))):
++                raise RuntimeError(
++                    "Dsv4 hash-router input_ids are outside tid2eid: "
++                    f"min={int(input_ids.min().item())} max={int(input_ids.max().item())} "
++                    f"tid2eid_rows={tid2eid.size(0)}"
++                )
+             top_indices = tid2eid[input_ids]
+-            assert torch.all(top_indices >= 0)
++            if torch.any((top_indices < 0) | (top_indices >= logits.size(1))):
++                raise RuntimeError(
++                    "Dsv4 hash-router tid2eid contains invalid expert ids: "
++                    f"min={int(top_indices.min().item())} max={int(top_indices.max().item())} "
++                    f"num_experts={logits.size(1)}"
++                )
+         else:
+             assert expert_bias is not None
+             scores_for_routing = scores + expert_bias
+diff --git a/megatron/core/transformer/moe/router.py b/megatron/core/transformer/moe/router.py
+index 9805707812..750025794e 100644
+--- a/megatron/core/transformer/moe/router.py
++++ b/megatron/core/transformer/moe/router.py
+@@ -25,6 +25,28 @@ from megatron.core.transformer.moe.moe_utils import (
+ from megatron.core.transformer.transformer_config import TransformerConfig
+
+
++def _build_dsv4_scratch_tid2eid(vocab_size: int, num_experts: int, topk: int) -> torch.Tensor:
++    """Build deterministic hash routing for scratch DSV4 pretraining.
++
++    Checkpointed DSV4 models carry ``tid2eid`` weights. Pretraining from
++    scratch needs a valid table before any checkpoint exists, otherwise
++    hash-routed layers start with all ``-1`` expert ids.
++    """
++    assert vocab_size > 0
++    assert 0 < topk <= num_experts
++
++    token_ids = torch.arange(vocab_size, dtype=torch.int64).unsqueeze(1)
++    slots = torch.arange(topk, dtype=torch.int64).unsqueeze(0)
++    base = (token_ids * 1103515245 + 12345) % num_experts
++
++    if num_experts & (num_experts - 1) == 0:
++        stride = ((token_ids * 214013 + 2531011) % (num_experts // 2)) * 2 + 1
++    else:
++        stride = torch.ones_like(base)
++
++    return ((base + slots * stride) % num_experts).to(torch.int32)
++
++
+ class Router(ABC, MegatronModule):
+     """Base Router class"""
+
+@@ -247,11 +269,13 @@ class TopKRouter(Router):
+
+        if mode_hash:
+-            self.tid2eid = torch.nn.Parameter(
+-                torch.full(
+-                    (int(self.config.vocab_size), int(self.topk)),
+-                    -1,
+-                    dtype=torch.int32,
+-                    **alloc_kwargs,
+-                ),
+-                requires_grad=False,
++            if hasattr(self, 'tid2eid') and 'tid2eid' not in self._buffers:
++                del self.tid2eid
++            self.register_buffer(
++                'tid2eid',
++                _build_dsv4_scratch_tid2eid(
++                    self.config.vocab_size,
++                    self.config.num_moe_experts,
++                    self.topk,
++                ).to(**alloc_kwargs),
++                persistent=True,
+             )

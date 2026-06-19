@@ -1,0 +1,29 @@
+diff --git a/transformer_engine/pytorch/optimizers/fused_adam.py b/transformer_engine/pytorch/optimizers/fused_adam.py
+--- a/transformer_engine/pytorch/optimizers/fused_adam.py
++++ b/transformer_engine/pytorch/optimizers/fused_adam.py
+@@ -285,7 +285,24 @@ class FusedAdam(torch.optim.Optimizer):
+             self.dtype_to_range_map[scaled_state.dtype] = max_range
+         if unscaled_state.device != scaled_state.device:
+             unscaled_state = unscaled_state.to(scaled_state.device)
+-        min_val, max_val = torch.aminmax(unscaled_state)
++        if isinstance(unscaled_state, DTensor):
++            local_unscaled = unscaled_state.to_local()
++            if local_unscaled.numel() == 0:
++                scale.fill_(1.0)
++                return
++            min_val, max_val = torch.aminmax(local_unscaled)
++            absmax = torch.maximum(-min_val, max_val)
++            absmax = absmax.to(dtype=torch.float32, device=local_unscaled.device)
++            torch.div(absmax, max_range, out=scale)
++            if isinstance(scaled_state, DTensor):
++                rscale = torch.where(scale > 0, scale.reciprocal(), 0.0)
++                local_unscaled.mul_(rscale.to(local_unscaled.device))
++                scaled_state.to_local().copy_(local_unscaled)
++                return
++        elif unscaled_state.numel() == 0:
++            scale.fill_(1.0)
++            return
++        min_val, max_val = torch.aminmax(unscaled_state)
+         absmax = torch.maximum(-min_val, max_val)
+         absmax = absmax.to(dtype=torch.float32, device=unscaled_state.device)
+         torch.div(absmax, max_range, out=scale)

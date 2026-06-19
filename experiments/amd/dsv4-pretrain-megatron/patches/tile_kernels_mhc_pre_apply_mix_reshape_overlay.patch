@@ -1,0 +1,22 @@
+diff --git a/modeling/mhc/ops/pre_apply_mix.py b/modeling/mhc/ops/pre_apply_mix.py
+index 56191a2..fc9e815 100644
+--- a/modeling/mhc/ops/pre_apply_mix.py
++++ b/modeling/mhc/ops/pre_apply_mix.py
+@@ -28,7 +28,7 @@ class MHCPreApplyMix(torch.autograd.Function):
+         if hasattr(x.untyped_storage(), 'grad_from_mhc_post'):
+             x_grad = x.untyped_storage().grad_from_mhc_post
+             mix_grad = ctx.bwd_kernel(
+-                o_grad.view(-1, h),
++                o_grad.reshape(-1, h),
+                 x.view(-1, mhc, h),
+                 mix.view(-1, mhc),
+                 x_grad.view(-1, mhc, h),
+@@ -39,7 +39,7 @@ class MHCPreApplyMix(torch.autograd.Function):
+         else:
+             x_grad = torch.zeros_like(x)
+             mix_grad = ctx.bwd_kernel(
+-                o_grad.view(-1, h),
++                o_grad.reshape(-1, h),
+                 x.view(-1, mhc, h),
+                 mix.view(-1, mhc),
+                 x_grad.view(-1, mhc, h),

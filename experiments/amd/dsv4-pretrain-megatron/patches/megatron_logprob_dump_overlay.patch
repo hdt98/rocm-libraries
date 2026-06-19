@@ -1,0 +1,95 @@
+diff --git a/pretrain_gpt.py b/pretrain_gpt.py
+--- a/pretrain_gpt.py
++++ b/pretrain_gpt.py
+@@ -62,6 +62,73 @@
+
+ stimer = StragglerDetector()
+
++_DSV4_LOGPROB_DUMP_CACHE = {}
++_DSV4_LOGPROB_DUMP_DONE = False
++
++
++def _dsv4_logprob_dump_path():
++    return os.environ.get("DSV4_LOGPROB_DUMP_PATH")
++
++
++def _dsv4_dump_rank0() -> bool:
++    return int(os.environ.get("RANK", "0")) == 0
++
++
++def _maybe_cache_dsv4_logprob_batch(tokens, labels, loss_mask, position_ids) -> None:
++    """Cache the first rank-0 fixed batch for optional DSV4 logprob comparison."""
++    global _DSV4_LOGPROB_DUMP_CACHE
++    if _DSV4_LOGPROB_DUMP_CACHE or _DSV4_LOGPROB_DUMP_DONE:
++        return
++    if not _dsv4_logprob_dump_path() or not _dsv4_dump_rank0():
++        return
++    if tokens is None or labels is None or loss_mask is None:
++        return
++    _DSV4_LOGPROB_DUMP_CACHE = {
++        "tokens": tokens.detach().cpu(),
++        "labels": labels.detach().cpu(),
++        "loss_mask": loss_mask.detach().cpu(),
++    }
++    if position_ids is not None:
++        _DSV4_LOGPROB_DUMP_CACHE["position_ids"] = position_ids.detach().cpu()
++
++
++def _maybe_write_dsv4_logprobs(loss_mask, output_tensor) -> None:
++    """Write target-token logprobs for the first rank-0 microbatch when requested."""
++    global _DSV4_LOGPROB_DUMP_DONE
++    if _DSV4_LOGPROB_DUMP_DONE or not _DSV4_LOGPROB_DUMP_CACHE:
++        return
++    path = _dsv4_logprob_dump_path()
++    if not path or not _dsv4_dump_rank0():
++        return
++    losses = output_tensor.detach().float()
++    target_loss_mask = _DSV4_LOGPROB_DUMP_CACHE.get("loss_mask", loss_mask)
++    if losses.numel() != target_loss_mask.numel():
++        raise RuntimeError(
++            "DSV4_LOGPROB_DUMP_PATH expected per-token losses with "
++            f"{target_loss_mask.numel()} values, got {losses.numel()}"
++        )
++    losses = losses.reshape(target_loss_mask.shape)
++    payload = dict(_DSV4_LOGPROB_DUMP_CACHE)
++    payload.update(
++        {
++            "logprobs": (-losses).cpu(),
++            "losses": losses.cpu(),
++            "metadata": {
++                "rank": int(os.environ.get("RANK", "0")),
++                "world_size": int(os.environ.get("WORLD_SIZE", "1")),
++                "local_rank": int(os.environ.get("LOCAL_RANK", "0")),
++                "source": "Megatron-LM pretrain_gpt.py DSV4_LOGPROB_DUMP_PATH",
++            },
++        }
++    )
++    directory = os.path.dirname(path)
++    if directory:
++        os.makedirs(directory, exist_ok=True)
++    tmp_path = f"{path}.tmp"
++    torch.save(payload, tmp_path)
++    os.replace(tmp_path, path)
++    _DSV4_LOGPROB_DUMP_DONE = True
++
+
+ def get_batch(data_iterator, vp_stage: Optional[int] = None):
+     """Generate a batch."""
+@@ -157,7 +223,9 @@
+             message="Spiky loss",
+             tolerance=0.0,  # forward pass calculations are determinisic
+             fatal=False,
+         )
++
++    _maybe_write_dsv4_logprobs(loss_mask, output_tensor)
+
+     return loss, num_tokens, report
+
+@@ -183,6 +251,7 @@
+         vp_stage = get_attr_wrapped_model(model, "vp_stage")
+         tokens, labels, loss_mask, attention_mask, position_ids, packed_seq_params = get_batch(data_iterator, vp_stage)
+     timers('batch-generator').stop()
++    _maybe_cache_dsv4_logprob_batch(tokens, labels, loss_mask, position_ids)
+
+     with stimer:
+         if args.use_legacy_models:

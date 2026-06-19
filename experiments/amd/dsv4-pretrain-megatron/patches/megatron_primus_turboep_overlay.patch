@@ -1,0 +1,105 @@
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -2759,6 +2759,20 @@ def _add_moe_args(parser):
+                        help="some MoE routers have a D2H sync that will break cuda graphs.  If this flag is set the router will switch" \
+                        " to dropping and padding during decode time which does not have a D2H sync. The capacity factor is set to the" \
+                        " max that an expert could see during inference so no tokens are actually dropped.")
++    group.add_argument('--enable-primus-turbo', action='store_true', default=False,
++                       help='Enable Primus Turbo patches when the primus_turbo package is installed.')
++    group.add_argument('--use-turbo-deepep', action='store_true', default=False,
++                       help='Replace Megatron flex MoE dispatcher with Primus Turbo DeepEP.')
++    group.add_argument('--use-turbo-grouped-gemm', action='store_true', default=False,
++                       help='Use Primus Turbo grouped GEMM for MoE experts when available.')
++    group.add_argument('--use-turbo-grouped-mlp', action='store_true', default=False,
++                       help='Deprecated alias for --use-turbo-grouped-gemm, retained for Primus compatibility.')
++    group.add_argument('--turbo-deepep-num-cu', type=int, default=32,
++                       help='Number of CUs used by the Primus Turbo DeepEP dispatcher.')
++    group.add_argument('--turbo-deepep-use-comm-stream', action='store_true', default=False,
++                       help='Use the Primus Turbo DeepEP communication stream path.')
++    group.add_argument('--turbo-sync-free-moe-stage', type=int, default=0,
++                       help='Primus Turbo sync-free MoE stage; 0 disables sync-free MoE.')
+     return parser
+
+ def _add_mla_args(parser):
+@@ -2859,6 +2873,8 @@ def _add_experimental_args(parser):
+
+     group.add_argument('--enable-experimental', action='store_true',
+                        help='Enable experimental features.')
++    group.add_argument('--disable-compile-dependencies', action='store_true', default=False,
++                       help='Skip Megatron dataset helper and legacy fused-kernel compilation.')
+     group.add_argument('--spec', type=str, default=None, nargs='*',
+                        help='Specify the <module_location function_name> pair '
+                        'that returns a spec to customize a model, transformer '
+diff --git a/megatron/training/initialize.py b/megatron/training/initialize.py
+--- a/megatron/training/initialize.py
++++ b/megatron/training/initialize.py
+@@ -166,7 +166,8 @@ def initialize_megatron(
+         _init_autoresume()
+
+         # Compile dependencies.
+-        _compile_dependencies()
++        if not args.disable_compile_dependencies:
++            _compile_dependencies()
+
+         if args.tp_comm_overlap:
+             # TODO: Should this be activated with just decoder-tp-comm-overlap too?
+diff --git a/megatron/training/training.py b/megatron/training/training.py
+--- a/megatron/training/training.py
++++ b/megatron/training/training.py
+@@ -216,6 +216,48 @@ def print_datetime(string, override_timestamp=None):
+         time_str = datetime.fromtimestamp(override_timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')
+     print_rank_0(f'[{string}] datetime: {time_str} ')
+
++
++_DSV4_PRIMUS_TURBOEP_PATCHED = False
++
++
++def maybe_patch_dsv4_primus_turboep(args):
++    """Apply the Primus Turbo DeepEP dispatcher patch for explicit DSV4 runs."""
++    global _DSV4_PRIMUS_TURBOEP_PATCHED
++
++    if _DSV4_PRIMUS_TURBOEP_PATCHED:
++        return
++    if not getattr(args, 'use_turbo_deepep', False):
++        return
++    if getattr(args, 'tensor_model_parallel_size', 1) != 1:
++        raise RuntimeError('Primus Turbo DeepEP requires tensor_model_parallel_size == 1')
++
++    import importlib.util
++
++    if importlib.util.find_spec('primus_turbo') is None:
++        raise RuntimeError(
++            'Primus Turbo DeepEP requested, but primus_turbo is not importable. '
++            'Use a Primus image/runtime that provides primus_turbo.'
++        )
++
++    from megatron.core.transformer.moe import moe_layer, token_dispatcher
++    from primus.backends.megatron.core.extensions.primus_turbo import (
++        PrimusTurboDeepEPTokenDispatcher,
++    )
++
++    args.moe_enable_deepep = True
++    args.moe_token_dispatcher_type = 'flex'
++    args.moe_flex_dispatcher_backend = 'deepep'
++    if not hasattr(args, 'moe_router_force_load_balancing'):
++        args.moe_router_force_load_balancing = False
++    token_dispatcher.MoEFlexTokenDispatcher = PrimusTurboDeepEPTokenDispatcher
++    moe_layer.MoEFlexTokenDispatcher = PrimusTurboDeepEPTokenDispatcher
++    _DSV4_PRIMUS_TURBOEP_PATCHED = True
++    print_rank_0(
++        'DSV4 Primus TurboEP DeepEP dispatcher enabled: patched MoEFlexTokenDispatcher '
++        f'-> {PrimusTurboDeepEPTokenDispatcher.__name__}'
++    )
++
++
+ def num_floating_point_operations(args, batch_size):
+     def calculate_layer_counts():
+         """Calculate the number of attention, Mamba, and MLP layers."""
+@@ -1163,6 +1205,7 @@ def get_model(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap
+     """Build the model."""
+     args = get_args()
+     args.model_type = model_type
++    maybe_patch_dsv4_primus_turboep(args)
+     if pg_collection is None:
+         pg_collection = ProcessGroupCollection.use_mpu_process_groups()

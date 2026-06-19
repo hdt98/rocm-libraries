@@ -152,31 +152,3 @@ def deepseek_v3_671b() -> Trainer.Config:
         ),
         compile=compile_config,
     )
-
-
-def deepseek_v4_reduced_12l() -> Trainer.Config:
-    return Trainer.Config(
-        loss=ChunkedCELoss.Config(),
-        hf_assets_path="./tests/assets/tokenizer",
-        metrics=MetricsProcessor.Config(log_freq=1),
-        model_spec=model_registry("dsv4_reduced_12l", attn_backend="sdpa"),
-        dataloader=HuggingFaceTextDataLoader.Config(dataset="c4_test"),
-        optimizer=OptimizersContainer.Config(lr=1e-6, weight_decay=0.1),
-        lr_scheduler=LRSchedulersContainer.Config(
-            warmup_steps=2,
-            decay_ratio=0.8,
-            decay_type="linear",
-            min_lr_factor=0.1,
-        ),
-        training=TrainingConfig(
-            local_batch_size=1,
-            seq_len=4096,
-            steps=10,
-        ),
-        parallelism=ParallelismConfig(
-            tensor_parallel_degree=8,
-            expert_parallel_degree=8,
-        ),
-        checkpoint=CheckpointManager.Config(interval=10),
-        activation_checkpoint=ActivationCheckpointConfig(mode="selective"),
-    )

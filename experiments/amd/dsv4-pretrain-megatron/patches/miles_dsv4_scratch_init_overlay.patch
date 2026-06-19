@@ -1,0 +1,47 @@
+diff --git a/miles_plugins/models/deepseek_v4/deepseek_v4.py b/miles_plugins/models/deepseek_v4/deepseek_v4.py
+index b7c4996b5..4a9afcde2 100644
+--- a/miles_plugins/models/deepseek_v4/deepseek_v4.py
++++ b/miles_plugins/models/deepseek_v4/deepseek_v4.py
+@@ -217,6 +217,8 @@ class DeepSeekV4Attention(MegatronModule):
+         self.attn_sink.tensor_model_parallel = True
+         self.attn_sink.partition_dim = 0
+         self.attn_sink.partition_stride = 1
++        if config.perform_initialization:
++            torch.nn.init.zeros_(self.attn_sink)
+
+         self.wq_a = TELinear(
+             self.dim,
+diff --git a/miles_plugins/models/deepseek_v4/ops/compressor.py b/miles_plugins/models/deepseek_v4/ops/compressor.py
+index 6f83a0c7e..5e69e1abc 100644
+--- a/miles_plugins/models/deepseek_v4/ops/compressor.py
++++ b/miles_plugins/models/deepseek_v4/ops/compressor.py
+@@ -88,6 +88,8 @@ class DeepSeekV4Compressor(nn.Module):
+         self.norm = RMSNorm(self.head_dim, norm_eps)
+
+         self.ape._keep_fp32 = True
++        if config.perform_initialization:
++            torch.nn.init.zeros_(self.ape)
+
+         base = config.dsv4_compress_rope_theta
+         assert rope_head_dim == 64
+diff --git a/miles_plugins/models/deepseek_v4/ops/hyper_connection.py b/miles_plugins/models/deepseek_v4/ops/hyper_connection.py
+index 51e9ae673..80ea9e81e 100644
+--- a/miles_plugins/models/deepseek_v4/ops/hyper_connection.py
++++ b/miles_plugins/models/deepseek_v4/ops/hyper_connection.py
+@@ -41,6 +41,17 @@ class HCHeadParams(MegatronModule):
+         self.hc_head_base = torch.nn.Parameter(torch.empty(hc_mult, dtype=torch.float32))
+         self.hc_head_scale = torch.nn.Parameter(torch.empty(1, dtype=torch.float32))
+
++        if config.perform_initialization:
++            # DSV4 checkpoints carry HC head tensors. For scratch pretraining,
++            # start from a finite identity-ish mixer over duplicated HC states.
++            pre_target = max(
++                min(1.0 / hc_mult - config.dsv4_hc_eps, 1.0 - 1e-6),
++                1e-6,
++            )
++            pre_base = float(torch.logit(torch.tensor(pre_target, dtype=torch.float32)).item())
++            torch.nn.init.zeros_(self.hc_head_fn)
++            torch.nn.init.constant_(self.hc_head_base, pre_base)
++            torch.nn.init.zeros_(self.hc_head_scale)
+         for p in [self.hc_head_fn, self.hc_head_base, self.hc_head_scale]:
+             p._keep_fp32 = True

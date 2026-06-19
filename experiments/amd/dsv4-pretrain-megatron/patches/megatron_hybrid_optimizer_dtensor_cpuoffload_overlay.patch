@@ -1,0 +1,112 @@
+diff --git a/megatron/core/optimizer/cpu_offloading/hybrid_optimizer.py b/megatron/core/optimizer/cpu_offloading/hybrid_optimizer.py
+--- a/megatron/core/optimizer/cpu_offloading/hybrid_optimizer.py
++++ b/megatron/core/optimizer/cpu_offloading/hybrid_optimizer.py
+@@ -1,8 +1,31 @@
+ from collections import defaultdict
+ from typing import Dict
+
+ import torch
+
++try:
++    from torch.distributed.tensor import DTensor
++except ImportError:
++    DTensor = None
++
++
++def _is_dtensor(tensor):
++    return DTensor is not None and isinstance(tensor, DTensor)
++
++
++def _local_tensor(tensor):
++    if _is_dtensor(tensor):
++        return tensor.to_local()
++    return tensor
++
++
++def _copy_tensor_data_(dst, src, non_blocking=True):
++    dst_local = _local_tensor(dst)
++    src_local = _local_tensor(src)
++    src_local = src_local.to(device=dst_local.device, dtype=dst_local.dtype)
++    dst_local.data.copy_(src_local.data, non_blocking=non_blocking)
++    return dst
++
+
+ def _param_generator(cpu_optimizer):
+     for group in cpu_optimizer.param_groups:
+@@ -90,6 +112,7 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+                     continue
+                 fp32_param = self.param_to_fp32_param[param]
+                 grad = getattr(param, "decoupled_grad", param.grad)
++                grad = _local_tensor(grad) if grad is not None else None
+                 if grad is not None:
+                     fp32_param.grad = grad.to(fp32_param.dtype)
+                     fp32_param.requires_grad = True
+@@ -103,8 +126,12 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+         for optimizer in self.cpu_optimizers:
+             for param in _param_generator(optimizer):
+                 gpu_param = self.cpu_copys_map_gpu_param[param]
+                 grad = getattr(gpu_param, "decoupled_grad", gpu_param.grad)
+-                if grad is None:
++                if grad is None and _is_dtensor(gpu_param):
++                    gpu_param_local = _local_tensor(gpu_param)
++                    grad = getattr(gpu_param_local, "decoupled_grad", gpu_param_local.grad)
++                grad = _local_tensor(grad) if grad is not None else None
++                if grad is None:
+                     param.requires_grad = False
+                     continue
+
+@@ -126,7 +153,7 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+                 with torch.cuda.stream(self._h2d_stream):
+                     for param in _param_generator(optimizer):
+                         gpu_param = self.cpu_copys_map_gpu_param[param]
+-                        gpu_param.data.copy_(param.data, non_blocking=True)
++                        _copy_tensor_data_(gpu_param, param, non_blocking=True)
+                 self._h2d_stream.record_event().wait(torch.cuda.current_stream())
+
+             return param_copy_back_gpu_hook
+@@ -143,7 +170,7 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+
+                         if param in self.param_to_fp32_param:
+                             fp32_param = self.param_to_fp32_param[param]
+-                            param.data.copy_(fp32_param.data)
++                            _copy_tensor_data_(param, fp32_param)
+
+             return fp32_param_copy_back_gpu_hook
+
+@@ -268,13 +295,14 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+             gpu_group["params"] = []
+             cpu_group["params"] = []
+             for param in group["params"]:
++                param_local = _local_tensor(param)
+                 orig_param = param
+                 cpu_copy = False
+-                if offload_params_numel < offload_threshold and param.is_cuda:
+-                    param = param.detach().clone().cpu().pin_memory()
++                if offload_params_numel < offload_threshold and param_local.is_cuda:
++                    param = param_local.detach().clone().cpu().pin_memory()
+                     offload_params_numel += param.numel()
+                     cpu_copy = True
+-                if self.param_update_in_fp32 and param.dtype != torch.float32:
++                if self.param_update_in_fp32 and _local_tensor(param).dtype != torch.float32:
+                     param = param.detach().clone().float()
+                     param_to_fp32_param[orig_param] = param
+
+@@ -384,7 +412,7 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+                 continue
+             # Do the device/dtype conversion inside copy_ so the destination
+             # tensor owns the synchronization. Creating an intermediate
+             # non_blocking CPU tensor can race with the following CPU copy.
+-            inner_param.data.copy_(v["master_param"].detach(), non_blocking=False)
++            _copy_tensor_data_(inner_param, v["master_param"].detach(), non_blocking=False)
+
+     def update_fp32_param_by_new_param(self):
+         """
+@@ -396,7 +424,7 @@ class HybridDeviceOptimizer(torch.optim.Optimizer):
+             if inner_param is param:
+                 continue
+             # Blocking direct D2H copy is required here.
+-            inner_param.data.copy_(param.detach(), non_blocking=False)
++            _copy_tensor_data_(inner_param, param.detach(), non_blocking=False)
+
+     def _register_load_state_dict_hooks(self):
+         def pre_load_state_dict_hook(self, state_dict):

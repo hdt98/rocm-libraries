@@ -1,0 +1,118 @@
+diff --git a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_indexer_fwd.py b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_indexer_fwd.py
+--- a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_indexer_fwd.py
++++ b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_indexer_fwd.py
+@@ -4,6 +4,7 @@
+ #   - Uses causal mask via cu_seqlens instead of variable-length packed sequences
+ #   - Supports compressed KV (seq_len_kv = seq_len_q / compress_ratio)
+ import tilelang
++import os
+ import torch
+ from tilelang import language as T
+
+@@ -179,6 +180,33 @@ def indexer_fwd_interface(q, kv, weights, cu_seqlen_ks, cu_seqlen_ke, clean_logits=True):
+         clean_logits_kernel(logits, cu_seqlen_ks, cu_seqlen_ke)
+     return logits
+
++
++def _batched_indexer_fwd_torch(q, k, weights, cu_seqlen_ks, cu_seqlen_ke):
++    """Chunked PyTorch reference for V4 Lightning indexer logits."""
++    seqlen, batch, heads, dim = q.shape
++    seq_len_kv = k.shape[0]
++    chunk = int(os.environ.get("MILES_DSV4_INDEXER_REF_CHUNK", "128"))
++    kv_pos = torch.arange(seq_len_kv, device=q.device).view(1, seq_len_kv)
++    all_logits = torch.empty([batch, seqlen, seq_len_kv], device=q.device, dtype=torch.float32)
++
++    with torch.no_grad():
++        for b in range(batch):
++            kb = k[:, b, :].float()
++            for start in range(0, seqlen, chunk):
++                end = min(start + chunk, seqlen)
++                q_chunk = q[start:end, b, :, :].float()
++                w_chunk = weights[start:end, b, :].float()
++                scores = torch.einsum("qhd,kd->qhk", q_chunk, kb)
++                scores = torch.relu(scores) * w_chunk.unsqueeze(-1)
++                logits = scores.sum(dim=1)
++
++                cu_s = cu_seqlen_ks[start:end].long().view(end - start, 1)
++                cu_e = cu_seqlen_ke[start:end].long().view(end - start, 1)
++                valid = (kv_pos >= cu_s) & (kv_pos < cu_e)
++                all_logits[b, start:end] = logits.masked_fill(~valid, float("-inf"))
++
++    return all_logits
++
+
+ def batched_indexer_fwd(q, k, weights, cu_seqlen_ks, cu_seqlen_ke):
+     """Batched forward: loops over batch dim.
+@@ -196,6 +228,9 @@ def batched_indexer_fwd(q, k, weights, cu_seqlen_ks, cu_seqlen_ke):
+     seqlen, batch, heads, dim = q.shape
+     seq_len_kv = k.shape[0]
+
++    if os.environ.get("MILES_DSV4_INDEXER_IMPL", "tilelang").lower() in {"torch", "torch_dense", "pytorch"}:
++        return _batched_indexer_fwd_torch(q, k, weights, cu_seqlen_ks, cu_seqlen_ke)
++
+     all_logits = torch.empty([batch, seqlen, seq_len_kv], device=q.device, dtype=torch.float32)
+     for b in range(batch):
+         all_logits[b] = indexer_fwd_interface(
+diff --git a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla.py b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla.py
+--- a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla.py
++++ b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla.py
+@@ -1,4 +1,5 @@
++import os
+ import torch
+
+ from miles_plugins.models.deepseek_v4.ops.kernel import tilelang_sparse_mla_bwd as sparse_mla_bwd
+ from miles_plugins.models.deepseek_v4.ops.kernel import tilelang_sparse_mla_fwd as sparse_mla_fwd
+@@ -29,5 +30,53 @@ class DeepSeekV4SparseAttention(torch.autograd.Function):
+         return dq, dkv, d_attn_sink, None, None
+
+
++def _sparse_attn_torch_dense(q, kv, attn_sink, topk_idxs, sm_scale=None):
++    """Chunked PyTorch reference for DSV4 sparse MLA forward.
++
++    This intentionally computes only the forward path for logprob oracle runs.
++    Training/perf runs keep the TileLang path.
++    """
++    qf = q.float()
++    kvf = kv.float()
++    batch, seqlen, heads, dim = q.shape
++    seq_len_kv = kv.shape[1]
++    topk = topk_idxs.shape[-1]
++    if sm_scale is None:
++        sm_scale = dim**-0.5
++
++    chunk = int(os.environ.get("MILES_DSV4_SPARSE_MLA_REF_CHUNK", "128"))
++    kv_pos = torch.arange(seq_len_kv, device=q.device)
++    batch_idx_base = torch.arange(batch, device=q.device).view(batch, 1, 1)
++    out = torch.empty((batch, seqlen, heads, dim), device=q.device, dtype=torch.float32)
++
++    with torch.no_grad():
++        for start in range(0, seqlen, chunk):
++            end = min(start + chunk, seqlen)
++            q_chunk = qf[:, start:end]
++            idx = topk_idxs[:, start:end].to(torch.long)
++            valid_idx = idx != -1
++            safe_idx = idx.clamp(min=0)
++
++            scores = torch.einsum("bchd,bnd->bchn", q_chunk, kvf) * sm_scale
++            mask = torch.zeros((batch, end - start, seq_len_kv), device=q.device, dtype=torch.bool)
++            local_q_idx = torch.arange(end - start, device=q.device).view(1, end - start, 1)
++            mask[batch_idx_base.expand(batch, end - start, topk)[valid_idx],
++                 local_q_idx.expand(batch, end - start, topk)[valid_idx],
++                 safe_idx[valid_idx]] = True
++            scores = scores.masked_fill(~mask.unsqueeze(2), float("-inf"))
++
++            scores_max = scores.max(dim=-1, keepdim=True).values.clamp(min=-1e30)
++            exp_scores = torch.exp(scores - scores_max)
++            numerator = torch.einsum("bchn,bnd->bchd", exp_scores, kvf)
++            sum_exp = exp_scores.sum(dim=-1)
++            sink_term = torch.exp(attn_sink.view(1, 1, heads) - scores_max.squeeze(-1))
++            denominator = sum_exp + sink_term
++            out[:, start:end] = numerator / denominator.unsqueeze(-1)
++
++    return out.to(dtype=q.dtype)
++
++
+ def sparse_attn_tilelang(q, kv, attn_sink, topk_idxs, sm_scale=None):
++    if os.environ.get("MILES_DSV4_SPARSE_MLA_IMPL", "tilelang").lower() in {"torch", "torch_dense", "pytorch"}:
++        return _sparse_attn_torch_dense(q, kv, attn_sink, topk_idxs, sm_scale)
+     return DeepSeekV4SparseAttention.apply(q, kv, attn_sink, topk_idxs, sm_scale)

@@ -1,0 +1,33 @@
+diff --git a/megatron/core/transformer/moe/moe_layer.py b/megatron/core/transformer/moe/moe_layer.py
+index c5953a45b1..3a95f19f34 100644
+--- a/megatron/core/transformer/moe/moe_layer.py
++++ b/megatron/core/transformer/moe/moe_layer.py
+@@ -439,18 +439,25 @@ class MoELayer(BaseMoELayer):
+             return output, mlp_bias
+
+         if self.moe_layer_recompute:
++            def checkpointed_custom_forward(hidden_states):
++                return custom_forward(
++                    hidden_states,
++                    intermediate_tensors=None,
++                    padding_mask=padding_mask,
++                    input_ids=input_ids,
++                )
++
+             if self.config.fp8 or self.config.fp4:
+                 outputs = te_checkpoint(
+-                    custom_forward,
++                    checkpointed_custom_forward,
+                     False,
+                     tensor_parallel.random.get_cuda_rng_tracker,
+                     parallel_state.get_tensor_model_parallel_group(),
+                     hidden_states,
+-                    padding_mask,
+                 )
+             else:
+                 outputs = tensor_parallel.checkpoint(
+-                    custom_forward, False, hidden_states, padding_mask
++                    checkpointed_custom_forward, False, hidden_states
+                 )
+         else:
+             outputs = custom_forward(hidden_states, intermediate_tensors, padding_mask, input_ids=input_ids)

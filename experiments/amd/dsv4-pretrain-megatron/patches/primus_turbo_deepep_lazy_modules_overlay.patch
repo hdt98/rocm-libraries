@@ -1,0 +1,70 @@
+diff --git a/primus_turbo/pytorch/modules/__init__.py b/primus_turbo/pytorch/modules/__init__.py
+--- a/primus_turbo/pytorch/modules/__init__.py
++++ b/primus_turbo/pytorch/modules/__init__.py
+@@ -1,6 +1,9 @@
+-from .attention import *
+-from .grouped_linear import *
+-from .linear import *
+-from .linear_fp8 import *
+ from .moe import *
+-from .normalization import *
++
++import os
++
++if os.getenv("PRIMUS_TURBO_IMPORT_FULL_MODULES", "0") == "1":
++    from .attention import *
++    from .grouped_linear import *
++    from .linear import *
++    from .linear_fp8 import *
++    from .normalization import *
+diff --git a/primus_turbo/pytorch/ops/__init__.py b/primus_turbo/pytorch/ops/__init__.py
+--- a/primus_turbo/pytorch/ops/__init__.py
++++ b/primus_turbo/pytorch/ops/__init__.py
+@@ -1,21 +1,25 @@
+-import warnings
++import os
+
+-try:
+-    from .async_tp import (
+-        fused_all_gather_matmul,
+-        fused_all_gather_scaled_matmul,
+-        fused_matmul_reduce_scatter,
+-    )
+-except ImportError as e:
+-    warnings.warn(f"Primus-Turbo can't support Async-TP - {e}")
++from .moe import *
++
++if os.getenv("PRIMUS_TURBO_IMPORT_GEMM", "0") == "1":
++    from .gemm import *
+
+-from .activation import *
+-from .attention import *
+-from .gemm import *
+-from .gemm_fp4 import *
+-from .gemm_fp8 import *
+-from .grouped_gemm import *
+-from .grouped_gemm_fp8 import *
+-from .moe import *
+-from .normalization import *
+-from .quantization import *
++if os.getenv("PRIMUS_TURBO_IMPORT_FULL_MODULES", "0") == "1":
++    import warnings
++
++    try:
++        from .async_tp import (
++            fused_all_gather_matmul,
++            fused_all_gather_scaled_matmul,
++            fused_matmul_reduce_scatter,
++        )
++    except ImportError as e:
++        warnings.warn(f"Primus-Turbo can't support Async-TP - {e}")
++
++    from .activation import *
++    from .attention import *
++    from .gemm import *
++    from .gemm_fp4 import *
++    from .gemm_fp8 import *
++    from .grouped_gemm import *
++    from .grouped_gemm_fp8 import *
++    from .normalization import *
++    from .quantization import *

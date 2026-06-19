@@ -1,0 +1,75 @@
+diff --git a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py
+index 4d148a3d04..5993380600 100644
+--- a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py
++++ b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_bwd.py
+@@ -5,6 +5,8 @@
+ #   - Single-head KV: kv shape [B, S_kv, D] (no kv_group, no D/D_tail split)
+ #   - Index shape: [B, S, topk] (no kv_group dim)
+ #   - Outputs: dQ [B, S, H, D], dKV [B, S_kv, D], dAttnSink [H]
++import os
++
+ import tilelang
+ import torch
+ from tilelang import language as T
+@@ -93,6 +95,7 @@ def bwd(
+     topk,
+     sm_scale=None,
+     block_size=32,
++    block_h=0,
+     num_stages=0,
+     threads=128,
+     indices_dtype=T.int32,
+@@ -116,7 +119,7 @@ def bwd(
+     attn_sink_shape = [H]
+
+     padded_H = max(tilelang.math.next_power_of_2(H), 16)
+-    block_H = min(64, padded_H)
++    block_H = min(64, padded_H) if block_h <= 0 else min(block_h, padded_H)
+     assert padded_H % block_H == 0
+     NH = padded_H // block_H
+     BS = block_size
+@@ -262,7 +265,13 @@ def sparse_mqa_bwd_interface(q, kv, attn_sink, o, do, topk_idxs, lse, sm_scale=N
+     topk = topk_idxs.shape[-1]
+
+     # Pad topk to next multiple of block_size (kernel requires divisibility)
+-    block_size = 32
++    block_size = int(
++        os.environ.get(
++            "MILES_DSV4_SPARSE_MLA_BWD_BLOCK_SIZE",
++            os.environ.get("MILES_DSV4_SPARSE_MLA_BLOCK_I", "32"),
++        )
++    )
++    block_h = int(os.environ.get("MILES_DSV4_SPARSE_MLA_BWD_BLOCK_H", "0"))
+     padded_topk = (topk + block_size - 1) // block_size * block_size
+     if padded_topk != topk:
+         pad = torch.full((B, S, padded_topk - topk), -1, device=topk_idxs.device, dtype=topk_idxs.dtype)
+@@ -270,7 +280,7 @@ def sparse_mqa_bwd_interface(q, kv, attn_sink, o, do, topk_idxs, lse, sm_scale=N
+         topk = padded_topk
+
+     preprocess_kernel = preprocess(B, S, H, D)
+-    bwd_kernel = bwd(B, S, S_kv, H, D, topk, sm_scale)
++    bwd_kernel = bwd(B, S, S_kv, H, D, topk, sm_scale, block_size=block_size, block_h=block_h)
+     postprocess_kernel = postprocess(B, S_kv, D)
+
+     delta = preprocess_kernel(o, do)
+diff --git a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_fwd.py b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_fwd.py
+index dabf52aa3e..fb94cc9df0 100644
+--- a/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_fwd.py
++++ b/miles_plugins/models/deepseek_v4/ops/kernel/tilelang_sparse_mla_fwd.py
+@@ -5,6 +5,8 @@
+ #   - Single-head KV: kv shape [B, S_kv, D] (no kv_group, no D/D_tail split)
+ #   - Index shape: [B, S, topk] (no kv_group dim)
+ #   - Output: [B, S, H, D] + LSE [B, S, H]
++import os
++
+ import tilelang
+ import torch
+ from tilelang import language as T
+@@ -164,6 +166,7 @@ def sparse_mqa_fwd_interface(q, kv, attn_sink, topk_idxs, sm_scale=None, block_I
+         lse: [B, S, H] fp32
+     """
+     assert q.is_contiguous() and kv.is_contiguous() and topk_idxs.is_contiguous()
++    block_I = int(os.environ.get("MILES_DSV4_SPARSE_MLA_BLOCK_I", block_I))
+     batch, seq_len, heads, dim = q.shape
+     _, seq_len_kv, kv_dim = kv.shape
+     assert kv_dim == dim

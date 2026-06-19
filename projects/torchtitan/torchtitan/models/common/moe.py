@@ -126,7 +126,7 @@ class TokenChoiceTopKRouter(Module):
         num_expert_groups: int | None = None  # must be a divisor of num_experts
         num_limited_groups: int | None = None
         top_k: int = 1
-        score_func: Literal["softmax", "sigmoid", "sqrtsoftplus"] = "sigmoid"
+        score_func: Literal["softmax", "sigmoid"] = "sigmoid"
         route_norm: bool = False
         route_scale: float = 1.0
         _debug_force_load_balance: bool = False
@@ -224,13 +224,12 @@ class TokenChoiceTopKRouter(Module):
         with torch.autocast(device_type=x.device.type, dtype=torch.float32):
             scores = self.gate(x)
 
-        # Score functions run in float32 to avoid loss spikes in MoE routing.
+        # By default, sigmoid or softmax is performed in float32 to avoid loss explosion
+        # scored is already float32 from the autocast above.
         if self.score_func == "sigmoid":
-            scores = torch.sigmoid(scores.float())
+            scores = torch.sigmoid(scores)
         elif self.score_func == "softmax":
-            scores = F.softmax(scores, dim=-1, dtype=torch.float32)
-        elif self.score_func == "sqrtsoftplus":
-            scores = F.softplus(scores.float()).sqrt()
+            scores = F.softmax(scores, dim=-1)
         else:
             raise NotImplementedError(f"Unknown score function {self.score_func}")
 

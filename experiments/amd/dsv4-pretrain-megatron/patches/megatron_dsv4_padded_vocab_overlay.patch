@@ -1,0 +1,16 @@
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+index 28fea46195..b567f5813f 100644
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -1390,6 +1390,11 @@ def core_transformer_config_from_args(args, config_class=None):
+
+     kw_args['post_self_attn_layernorm'] = args.post_self_attn_layernorm
+     kw_args['post_mlp_layernorm'] = args.post_mlp_layernorm
++    if (
++        getattr(args, 'experimental_attention_variant', None) == 'dsv4'
++        and getattr(args, 'padded_vocab_size', None) is not None
++    ):
++        kw_args['vocab_size'] = args.padded_vocab_size
+
+     # handle quantization config
+     # NOTE: Kitchen arguments are only added to the namespace when

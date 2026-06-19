@@ -1,0 +1,48 @@
+diff --git a/megatron/core/tensor_parallel/random.py b/megatron/core/tensor_parallel/random.py
+index 5350aa1..f2364df 100644
+--- a/megatron/core/tensor_parallel/random.py
++++ b/megatron/core/tensor_parallel/random.py
+@@ -598,6 +598,8 @@ class CheckpointWithoutOutputFunction(torch.autograd.Function):
+         # the CheckpointWithoutOutput object is passed in, then it can access the saved input
+         # tensors later for recomputation
+         checkpoint_without_output_obj.ctx = ctx
++        ctx.run_function = run_function
++        ctx.rng_states = checkpoint_without_output_obj.rng_states
+         return outputs
+
+     @staticmethod
+@@ -607,5 +609,34 @@ class CheckpointWithoutOutputFunction(torch.autograd.Function):
+         # because the saved tensors are already cached by the recomputation.
+         # This is to avoid double-reloading the inputs in CPU offloading scenario.
++        if not hasattr(ctx, "inputs") or ctx.inputs is None:
++            inputs = ctx.saved_tensors
++            with _fork_rng():
++                _set_all_rng_states(*ctx.rng_states)
++                detached_inputs = detach_variable(inputs)
++                if ctx.fp8:
++                    recompute_ctx = activation_recompute_forward(
++                        activation_recompute=True, recompute_phase=True
++                    )
++                    fp8_ctx = fp8_autocast(enabled=ctx.fp8, fp8_recipe=ctx.fp8_recipe)
++                else:
++                    recompute_ctx = contextlib.nullcontext()
++                    fp8_ctx = contextlib.nullcontext()
++
++                with torch.enable_grad(), fp8_ctx, recompute_ctx:
++                    outputs = ctx.run_function(*detached_inputs)
++
++            if isinstance(outputs, torch.Tensor):
++                outputs = (outputs,)
++
++            outputs, args = zip(
++                *filter(lambda x: torch.is_tensor(x[0]) and x[0].requires_grad, zip(outputs, args))
++            )
++            torch.autograd.backward(outputs, args)
++            grads = tuple(inp.grad if isinstance(inp, torch.Tensor) else inp for inp in detached_inputs)
++            ctx.run_function = None
++            ctx.rng_states = None
++            return (None, None) + grads
++
+         inputs = ctx.inputs
+         outputs = ctx.outputs
+         torch.autograd.backward(outputs, args)
