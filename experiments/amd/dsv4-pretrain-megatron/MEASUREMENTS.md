@@ -39,6 +39,12 @@ Megatron logs did not emit a retry count. The runner now writes
 `host_env.txt` and `container_env.txt` contents under the JSON `env` key.
 Older row directories keep the available `run_metadata.json` and `host_env.txt`
 or `host_env.json` captured by the earlier wrapper.
+Artifact audit: every path referenced below exists on
+`son-le5-mlops-ubuntu-gpu-mi350x8-2304gb-ric1`. For older reconstructed rows,
+node/image/exit status live in `run_metadata.json` and `status.json` in the
+same run directory, with launch env in `host_env.txt` or `host_env.json`.
+`source_sha` is blank when the source mount was not a Git checkout; use the
+recorded `source_fingerprint` as the source-state identifier.
 
 Post-prune validation completed.
 
