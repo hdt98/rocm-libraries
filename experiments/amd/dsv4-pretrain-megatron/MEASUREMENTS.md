@@ -8,7 +8,11 @@ and `DISABLE_SAVE=1`.
 
 | Candidate | Oracle | Config | Tokens | Logprob diff | Evidence |
 |---|---|---|---:|---|---|
-| Standard EP Megatron | PyTorch dense reference branches in Miles DSV4 plugin | TP=1 EP=4 FSDP=4 MBS=2 GBS=8, mHC off, fixed rank-0 batch, matched weights | 8192 | max 0.1168928; mean 0.0144115; RMS 0.0199401 | `/local/data/sonle5/dsv4_pretrain_rl/runs/dsv4_standard_pytorch_oracle_mbs2_20260618T204647Z/correctness_vs_candidate.json` |
+| Standard EP Megatron | PyTorch reference Sparse MLA and Lightning Indexer branches in Miles DSV4 plugin | TP=1 EP=4 FSDP=4 MBS=2 GBS=8, mHC off, fixed rank-0 batch, matched weights | 8192 | max 0.1168928; mean 0.0144115; RMS 0.0199401 | `/local/data/sonle5/dsv4_pretrain_rl/runs/dsv4_standard_pytorch_oracle_mbs2_20260618T204647Z/correctness_vs_candidate.json` |
+
+The correctness comparison JSON records matched `tokens`, `labels`,
+`loss_mask`, and `position_ids`, each with shape `[2,4096]`. Candidate
+logprobs are flattened to `[8192]`; oracle logprobs are `[2,4096]`.
 
 Candidate artifact:
 `/local/data/sonle5/dsv4_pretrain_rl/runs/dsv4_standard_logprob_dump_mbs2_cachefix_20260618T202953Z/candidate_logprobs.pt`
