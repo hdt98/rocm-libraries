@@ -48,6 +48,11 @@ Post-prune validation completed.
   `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprimus_current_20260619T162534Z`
   reached exit 0, iter20 138.1, avg 2-20 130.44, avg 13-20 136.40
   TFLOP/s/GPU, peak 235274.14/241124 MB.
+- Current post-cleanup 4x Standard EP validation for fingerprint
+  `934d9325a94231d939900eb6343b47ac5fcb80edf848253648b856a45de640e7`:
+  `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune934d_20260619T181446Z`
+  reached exit 0, iter20 136.3, avg 2-20 131.18, avg 13-20 136.31
+  TFLOP/s/GPU, peak 235274.26/241120 MB.
 - Previous 8x post-prune validation for fingerprint
   `ade7b3851976c66b2ee20db65898cf95e4e6a87e56106d8ab8b8faecca285734`:
   `megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postpruneade7_20260619T151907Z`
@@ -79,6 +84,7 @@ Post-prune validation completed.
 Evidence:
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune1617_20260619T140503Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprimus_current_20260619T162534Z/measurement.json`;
+`/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune934d_20260619T181446Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postpruneade7_20260619T151907Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_20260619T171443Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z/measurement.json`;
