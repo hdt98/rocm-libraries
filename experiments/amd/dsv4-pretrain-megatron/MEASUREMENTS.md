@@ -68,6 +68,14 @@ Post-prune validation completed.
   reached exit 0, iter20 228.8, avg 2-20 215.19, avg 13-20 230.31
   TFLOP/s/GPU, peak 239449.48/254006 MB, so the current harness is not
   slower than the previous 8x post-prune best within run-to-run variance.
+- Current post-cleanup 8x Standard EP validation for fingerprint
+  `934d9325a94231d939900eb6343b47ac5fcb80edf848253648b856a45de640e7`:
+  `megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprune934d_r2_20260619T183810Z`
+  reached exit 0, iter20 222.6, avg 2-20 217.96, avg 13-20 226.41
+  TFLOP/s/GPU, peak 239449.85/255044 MB. The first `934d` 8x launch failed
+  before Megatron init because `main_grads_dtype=bf16` requires
+  `ACCUMULATE_ALLREDUCE_GRADS_IN_FP32=0`; the corrected `r2` launch is the
+  validation row.
 - A previous post-prune 4x mHC-on validation for fingerprint
   `ade7b3851976c66b2ee20db65898cf95e4e6a87e56106d8ab8b8faecca285734`,
   `megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_mhcon_postpruneade7_20260619T153341Z`,
@@ -88,6 +96,8 @@ Evidence:
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postpruneade7_20260619T151907Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_20260619T171443Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z/measurement.json`;
+`/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprune934d_20260619T183626Z/measurement.json`;
+`/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprune934d_r2_20260619T183810Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_mhcon_postpruneade7_20260619T153341Z/measurement.json`;
 `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_mhcon_postprimus_current_20260619T164858Z/measurement.json`.
 
