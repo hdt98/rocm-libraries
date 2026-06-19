@@ -5,12 +5,12 @@ diff --git a/primus/backends/megatron/core/extensions/primus_turbo.py b/primus/b
  from contextlib import contextmanager, nullcontext
 +import os
  from typing import Callable, List, Optional, Tuple
-@@ -1578,8 +1578,8 @@ class PrimusTurboDeepEPTokenDispatcher(MoETokenDispatcher):
+@@ -1578,8 +1579,8 @@ class PrimusTurboDeepEPTokenDispatcher(MoETokenDispatcher):
              deepep_num_use_cu=args.turbo_deepep_num_cu,
              deepep_num_worst_tokens=num_worst_tokens,
              deepep_use_cuda_num_tokens_per_expert=use_turbo_grouped_gemm,
--            deepep_async_finish=True,
--            deepep_allocate_on_comm_stream=True,
+-            deepep_async_finish=not args.turbo_deepep_disable_async_finish,
+-            deepep_allocate_on_comm_stream=not args.turbo_deepep_disable_allocate_on_comm_stream,
 +            deepep_async_finish=not (getattr(args, "turbo_deepep_disable_async_finish", False) or os.getenv("TURBO_DEEPEP_DISABLE_ASYNC_FINISH", "0") == "1"),
 +            deepep_allocate_on_comm_stream=not (getattr(args, "turbo_deepep_disable_allocate_on_comm_stream", False) or os.getenv("TURBO_DEEPEP_DISABLE_ALLOCATE_ON_COMM_STREAM", "0") == "1"),
          )
