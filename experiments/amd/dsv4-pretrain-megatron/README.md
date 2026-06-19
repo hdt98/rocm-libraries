@@ -65,6 +65,24 @@ TP-heavy probes use `TP=4 EP=4 NUM_GPUS_PER_NODE=4` or
 `BLOCK_I=64 BWD_BLOCK_SIZE=64 BWD_BLOCK_H=16`, and for completed TP=8 rows
 `DISABLE_RECOMPUTE=1`.
 
+## Correctness
+
+Set `DSV4_LOGPROB_DUMP_PATH=/path/to/logprobs.pt` on a short TP=1 EP=4
+FSDP=4 run to dump the first rank-0 fixed batch and target-token logprobs.
+The payload contains `tokens`, `labels`, `loss_mask`, `position_ids`,
+`logprobs`, `losses`, and metadata.
+
+For the PyTorch-oracle pass, keep the same seed and launch shape, and add:
+
+```bash
+MILES_DSV4_INDEXER_IMPL=pytorch \
+MILES_DSV4_SPARSE_MLA_IMPL=pytorch \
+DSV4_LOGPROB_DUMP_PATH=/path/to/oracle_logprobs.pt
+```
+
+The recorded oracle comparison matched `tokens`, `labels`, `loss_mask`, and
+`position_ids`, each shaped `[2,4096]`, and compared 8192 logprobs.
+
 ## Notes
 
 - TP=1 FSDP rows use selective recompute over `mlp moe mla_up_proj layernorm`.
