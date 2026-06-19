@@ -119,7 +119,7 @@ Evidence:
 - Miles path/SHA: `/local/data/sonle5/dsv4_pretrain_rl/deps/miles-pr1300-full`, `0dc10df6488aab5a08d883d7eebb1565303158fd`
 - current local experiment fingerprint, excluding `MEASUREMENTS.md` and
   `__pycache__`:
-  `934d9325a94231d939900eb6343b47ac5fcb80edf848253648b856a45de640e7`
+  `9e21cf2f19d84fbc3b2cac6b1057072db19118ba4a1daf4fadc97be5ba016758`
 - latest Primus async/allocation diagnostic run recorded source fingerprint:
   `af487ec4383019f25e1ee2d3f40a796904077e25798f6641e476bf3f09f2cea1`
 - remote source mount: `/local/data/sonle5/dsv4_pretrain_rl/source`
