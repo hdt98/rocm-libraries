@@ -60,7 +60,7 @@ MILES_PATCHES_DEFAULT="${RECIPE_DIR}/patches/miles_dsv4_scratch_init_overlay.pat
 TILE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/tile_kernels_mhc_pre_apply_mix_reshape_overlay.patch"
 TE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/te_fused_adam_dtensor_precision_aware_overlay.patch"
 PRIMUS_MEGATRON_PATCHES_DEFAULT="${RECIPE_DIR}/patches/megatron_primus_turboep_overlay.patch"
-PRIMUS_SOURCE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/primus_deepep_dispatch_knobs_overlay.patch ${RECIPE_DIR}/patches/primus_deepep_dispatch_env_fallback_overlay.patch"
+PRIMUS_SOURCE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/primus_deepep_dispatch_knobs_overlay.patch"
 PRIMUS_PACKAGE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/primus_turbo_deepep_lazy_modules_overlay.patch"
 DTENSOR_CPU_OFFLOAD_PATCHES_DEFAULT="${RECIPE_DIR}/patches/megatron_hybrid_optimizer_dtensor_cpuoffload_overlay.patch"
 
