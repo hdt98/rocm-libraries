@@ -36,7 +36,7 @@ source_fingerprint_or_none() {
   local path="$1"
   [ -d "${path}/experiments/amd/dsv4-pretrain-megatron" ] || return 0
   cd "${path}"
-  find experiments/amd/dsv4-pretrain-megatron -type f ! -path '*/__pycache__/*' ! -path '*/MEASUREMENTS.md' -print \
+  find experiments/amd/dsv4-pretrain-megatron -type f ! -path '*/__pycache__/*' ! -path '*/MEASUREMENTS.md' ! -path '*/README.md' -print \
     | sort | xargs sha256sum | sha256sum | awk '{print $1}'
 }
 

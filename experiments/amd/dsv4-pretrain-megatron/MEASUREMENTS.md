@@ -22,7 +22,7 @@ Oracle artifact:
 |---|---|---|---|---|
 | 4x mHC off | `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune1617_20260619T140503Z` | TP=1 EP=4 FSDP=4 MBS=2 GBS=128, Standard EP `alltoall`, CPU optimizer offload | iter20 138.2; avg 2-20 133.15; avg 13-20 138.59 TFLOP/s/GPU; peak 235275.25/241054 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune1617_20260619T140503Z/measurement.json` |
 | 4x mHC on | `megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_4567_20260618T181309Z` | TP=1 EP=4 FSDP=4 MBS=2 GBS=128, Standard EP `alltoall`, CPU optimizer offload | iter20 126.0; avg 2-20 121.36; avg 13-20 126.65 TFLOP/s/GPU; peak 235308.06/241154 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_4567_20260618T181309Z/measurement.json` |
-| 8x TP=1 mHC off | `megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z` | TP=1 EP=8 FSDP=8 MBS=4 GBS=128, Standard EP `alltoall`, TE fused Adam, validation fingerprint `3d0b...`; current `934d...` validation below | iter20 228.8; avg 2-20 215.19; avg 13-20 230.31 TFLOP/s/GPU; peak 239449.48/254006 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z/measurement.json` |
+| 8x TP=1 mHC off | `megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z` | TP=1 EP=8 FSDP=8 MBS=4 GBS=128, Standard EP `alltoall`, TE fused Adam, validation fingerprint `3d0b...`; post-cleanup `934d...` validation below | iter20 228.8; avg 2-20 215.19; avg 13-20 230.31 TFLOP/s/GPU; peak 239449.48/254006 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprimus_current_r2_20260619T172546Z/measurement.json` |
 | 8x TP=1 mHC on | `megatron_standard_no_mtp_mhcon_tp1ep8_mbs4_gbs128_8xmi350_cpuoffload_fp16main_20260618T191007Z` | TP=1 EP=8 FSDP=8 MBS=4 GBS=128, Standard EP `alltoall`, CPU optimizer offload, fp16 main params | iter20 113.5; avg 2-20 99.22; avg 13-20 106.91 TFLOP/s/GPU; peak 210404.47/221692 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcon_tp1ep8_mbs4_gbs128_8xmi350_cpuoffload_fp16main_20260618T191007Z/measurement.json` |
 | 8x TP=8 MBS=4 | `megatron_standard_no_mtp_mhcoff_tp8ep8_mbs4_gbs128_8xmi350_tp8ep8_fsdp1_block64_norecompute_20step_20260618T222957Z` | TP=8 EP=8 FSDP=1 MBS=4 GBS=128, Standard EP `alltoall`, no recompute | iter20 79.8; avg 2-20 75.39; avg 13-20 80.30 TFLOP/s/GPU; peak 209183.20/214160 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp8ep8_mbs4_gbs128_8xmi350_tp8ep8_fsdp1_block64_norecompute_20step_20260618T222957Z/measurement.json` |
 | 8x TP=8 MBS=8 | `megatron_standard_no_mtp_mhcoff_tp8ep8_mbs8_gbs128_8xmi350_tp8ep8_fsdp1_mbs8_block64_norecompute_20step_20260618T230344Z` | TP=8 EP=8 FSDP=1 MBS=8 GBS=128, Standard EP `alltoall`, no recompute | iter20 89.5; avg 2-20 53.83; avg 13-20 66.49 TFLOP/s/GPU; peak 209361.36/240024 MB | `/local/data/sonle5/dsv4_pretrain_rl/runs/megatron_standard_no_mtp_mhcoff_tp8ep8_mbs8_gbs128_8xmi350_tp8ep8_fsdp1_mbs8_block64_norecompute_20step_20260618T230344Z/measurement.json` |
@@ -43,12 +43,12 @@ Post-prune validation completed.
   `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune1617_20260619T140503Z`
   reached iter20 138.2, avg 2-20 133.15, avg 13-20 138.59
   TFLOP/s/GPU, peak 235275.25/241054 MB.
-- Current 4x Standard EP validation for fingerprint
+- Previous 4x Standard EP validation for fingerprint
   `3d0b4bf22a1031d17340e17278be71f4717c4c34dbc3a7ac7f413a38984b2bfa`:
   `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprimus_current_20260619T162534Z`
   reached exit 0, iter20 138.1, avg 2-20 130.44, avg 13-20 136.40
   TFLOP/s/GPU, peak 235274.14/241124 MB.
-- Current post-cleanup 4x Standard EP validation for fingerprint
+- Post-cleanup 4x Standard EP validation for recorded fingerprint
   `934d9325a94231d939900eb6343b47ac5fcb80edf848253648b856a45de640e7`:
   `megatron_standard_no_mtp_mhcoff_tp1ep4_mbs2_gbs128_4xmi350_postprune934d_20260619T181446Z`
   reached exit 0, iter20 136.3, avg 2-20 131.18, avg 13-20 136.31
@@ -68,7 +68,7 @@ Post-prune validation completed.
   reached exit 0, iter20 228.8, avg 2-20 215.19, avg 13-20 230.31
   TFLOP/s/GPU, peak 239449.48/254006 MB, so the current harness is not
   slower than the previous 8x post-prune best within run-to-run variance.
-- Current post-cleanup 8x Standard EP validation for fingerprint
+- Post-cleanup 8x Standard EP validation for recorded fingerprint
   `934d9325a94231d939900eb6343b47ac5fcb80edf848253648b856a45de640e7`:
   `megatron_standard_no_mtp_mhcoff_tp1ep8_mbs4_gbs128_8xmi350_postprune934d_r2_20260619T183810Z`
   reached exit 0, iter20 222.6, avg 2-20 217.96, avg 13-20 226.41
@@ -81,7 +81,7 @@ Post-prune validation completed.
   `megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_mhcon_postpruneade7_20260619T153341Z`,
   reached iter20 121.9, avg 2-20 122.26, avg 13-20 126.65
   TFLOP/s/GPU, peak 235308.33/241218 MB.
-- Current 4x mHC-on validation for fingerprint
+- Previous 4x mHC-on validation for fingerprint
   `3d0b4bf22a1031d17340e17278be71f4717c4c34dbc3a7ac7f413a38984b2bfa`:
   `megatron_standard_no_mtp_mhcon_tp1ep4_mbs2_gbs128_4xmi350_mhcon_postprimus_current_20260619T164858Z`
   observed all 20 iterations, iter20 122.5, avg 2-20 120.46, avg 13-20
@@ -117,9 +117,9 @@ Evidence:
 - Primus image tried: `sonle5/dsv4-pr1300-megatron-primus-turbo:rocm720-mi35x-20260618`
 - official Primus diagnostic image: `rocm/primus:v26.3`
 - Miles path/SHA: `/local/data/sonle5/dsv4_pretrain_rl/deps/miles-pr1300-full`, `0dc10df6488aab5a08d883d7eebb1565303158fd`
-- current local experiment fingerprint, excluding `MEASUREMENTS.md` and
-  `__pycache__`:
-  `9e21cf2f19d84fbc3b2cac6b1057072db19118ba4a1daf4fadc97be5ba016758`
+- current local runtime fingerprint, excluding `MEASUREMENTS.md`, `README.md`,
+  and `__pycache__`:
+  `b5cd21ad449d395f2f8d58acb4025d940df2009a87fd1e2ac06f152afe281b2e`
 - latest Primus async/allocation diagnostic run recorded source fingerprint:
   `af487ec4383019f25e1ee2d3f40a796904077e25798f6641e476bf3f09f2cea1`
 - remote source mount: `/local/data/sonle5/dsv4_pretrain_rl/source`
