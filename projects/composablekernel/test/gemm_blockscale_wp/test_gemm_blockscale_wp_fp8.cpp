@@ -83,18 +83,30 @@ TYPED_TEST(TestGemmBlockScaleWP_FP8_MK_NK, Glm52OutOfAllowlistAccuracyAndDetermi
     }
 
     constexpr std::tuple<int, int, int> shapes[] = {
-        // M, N, K. Representative GLM-5.2-FP8 block-FP8 linear projections
-        // reported to route to bpreshuffle on gfx950 because their (N, K) pairs
-        // are outside SGLang's tuned Triton allowlist.
-        {8, 2048, 6144},   // q_a_proj: hidden_size -> q_lora_rank
-        {8, 16384, 2048},  // q_b_proj: q_lora_rank -> n_head * qk_head_dim
-        {8, 28672, 512},   // kv_b_proj: kv_lora_rank -> n_head * (qk_nope + v)
+        // M, N, K. GLM-5.2-FP8 block-FP8 linear shapes from
+        // sgl-project/sglang#28685: concrete projection repros plus the
+        // kv_b_proj row-boundary sweep where bad rows clustered near 16-row
+        // tile edges.
+        {8, 2048, 6144},     // q_a_proj: hidden_size -> q_lora_rank
+        {8, 16384, 2048},    // q_b_proj short prefill
+        {64, 16384, 2048},   // q_b_proj reporter repro
+        {12, 6144, 12288},   // mlp.down_proj short prefill
+        {64, 6144, 12288},   // mlp.down_proj reporter repro
+        {8, 28672, 512},     // kv_b_proj short smoke
+        {12, 28672, 512},    // kv_b_proj short prefill
+        {32, 28672, 512},    // kv_b_proj row-boundary sweep
+        {48, 28672, 512},    // kv_b_proj row-boundary sweep
+        {56, 28672, 512},    // kv_b_proj row-boundary sweep
+        {64, 28672, 512},    // kv_b_proj reporter repro
+        {72, 28672, 512},    // kv_b_proj row-boundary sweep
+        {96, 28672, 512},    // kv_b_proj row-boundary sweep
+        {128, 28672, 512},   // kv_b_proj row-boundary sweep
     };
 
     for(const auto& shape : shapes)
     {
         // do_verification=true compares against the profiler's dequantized FP32
-        // host GEMM oracle; determinism_check=2 reruns the same device problem.
-        this->Run(std::get<0>(shape), std::get<1>(shape), std::get<2>(shape), 0, 1, 2, true);
+        // host GEMM oracle; determinism_check=4 reruns the same device problem.
+        this->Run(std::get<0>(shape), std::get<1>(shape), std::get<2>(shape), 0, 1, 4, true);
     }
 }
