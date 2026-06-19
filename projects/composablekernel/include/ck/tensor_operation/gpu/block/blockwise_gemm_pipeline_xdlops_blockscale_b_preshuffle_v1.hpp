@@ -288,7 +288,7 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
 
         // The empty asm is a read/write VGPR use of the updated accumulator.
         // It keeps each post-scale accumulator definition visible to the
-        // optimizer, which is required for bitwise-stable repeated launches.
+        // optimizer, which enables determinism for bitwise-stable repeated launches.
         auto anchor_accumulator_value = [&](auto& value) {
             asm volatile("" : "+v"(value));
         };

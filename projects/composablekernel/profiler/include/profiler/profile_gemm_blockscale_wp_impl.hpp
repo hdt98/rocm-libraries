@@ -431,10 +431,8 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                 else
                 {
 #endif
-                    bool current_pass =
-                        ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
-                    pass = pass & current_pass;
-                    if(!current_pass)
+                    pass = pass & ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
+                    if(!pass)
                     {
                         std::cout << op_ptr->GetTypeString() << " failed" << std::endl;
                     }
