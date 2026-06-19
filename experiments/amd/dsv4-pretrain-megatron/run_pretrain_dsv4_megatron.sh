@@ -60,7 +60,6 @@ MILES_PATCHES_DEFAULT="${RECIPE_DIR}/patches/miles_dsv4_scratch_init_overlay.pat
 TILE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/tile_kernels_mhc_pre_apply_mix_reshape_overlay.patch"
 TE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/te_fused_adam_dtensor_precision_aware_overlay.patch"
 PRIMUS_MEGATRON_PATCHES_DEFAULT="${RECIPE_DIR}/patches/megatron_primus_turboep_overlay.patch"
-PRIMUS_SOURCE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/primus_deepep_dispatch_knobs_overlay.patch"
 PRIMUS_PACKAGE_PATCHES_DEFAULT="${RECIPE_DIR}/patches/primus_turbo_deepep_lazy_modules_overlay.patch"
 DTENSOR_CPU_OFFLOAD_PATCHES_DEFAULT="${RECIPE_DIR}/patches/megatron_hybrid_optimizer_dtensor_cpuoffload_overlay.patch"
 
@@ -155,8 +154,6 @@ if [ "${DSV4_EP_BACKEND}" = "primus_turboep" ]; then
   PRIMUS_TURBO_ROOT="$(python3 -c 'import importlib.util,pathlib; spec=importlib.util.find_spec("primus_turbo"); assert spec and spec.origin; print(pathlib.Path(spec.origin).resolve().parent.parent)')"
   patch_array "${PRIMUS_TURBO_PACKAGE_OVERLAY_PATCHES:-${PRIMUS_PACKAGE_PATCHES_DEFAULT}}" PRIMUS_PACKAGE_PATCHES
   apply_overlays PrimusTurbo "${PRIMUS_TURBO_ROOT}" "${PRIMUS_PACKAGE_PATCHES[@]}"
-  patch_array "${PRIMUS_SOURCE_OVERLAY_PATCHES:-${PRIMUS_SOURCE_PATCHES_DEFAULT}}" PRIMUS_SOURCE_PATCHES
-  apply_overlays PrimusSource "${PRIMUS_PATH}" "${PRIMUS_SOURCE_PATCHES[@]}"
   [ "${TP}" = "1" ] || { echo "DSV4_EP_BACKEND=primus_turboep requires TP=1" >&2; exit 2; }
   MOE_TOKEN_DISPATCHER_TYPE="flex"
   MOE_FLEX_DISPATCHER_BACKEND="deepep"
@@ -206,8 +203,6 @@ if [ "${DSV4_EP_BACKEND}" = "primus_turboep" ]; then
   [ "${DISABLE_COMPILE_DEPENDENCIES}" = "1" ] && OPTIONAL_ARGS+=(--disable-compile-dependencies)
   [ "${USE_TURBO_GROUPED_GEMM:-0}" = "1" ] && OPTIONAL_ARGS+=(--use-turbo-grouped-gemm)
   [ "${TURBO_DEEPEP_USE_COMM_STREAM:-0}" = "1" ] && OPTIONAL_ARGS+=(--turbo-deepep-use-comm-stream)
-  [ "${TURBO_DEEPEP_DISABLE_ASYNC_FINISH:-0}" = "1" ] && OPTIONAL_ARGS+=(--turbo-deepep-disable-async-finish)
-  [ "${TURBO_DEEPEP_DISABLE_ALLOCATE_ON_COMM_STREAM:-0}" = "1" ] && OPTIONAL_ARGS+=(--turbo-deepep-disable-allocate-on-comm-stream)
 fi
 [ -n "${EXTRA_MEGATRON_ARGS}" ] && read -r -a EXTRA_ARGS <<< "${EXTRA_MEGATRON_ARGS}" && OPTIONAL_ARGS+=("${EXTRA_ARGS[@]}")
 
