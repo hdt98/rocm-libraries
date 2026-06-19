@@ -40,7 +40,7 @@ enum struct ScaleBlockTile
 
 int profile_gemm_blockscale_weighpreshuffle(int argc, char* argv[])
 {
-    if(argc != 15 && argc != 18)
+    if(argc != 15 && argc != 18 && argc != 19)
     {
         printf("arg1: tensor operation (" OP_NAME ": " OP_DESC ")\n");
         printf("arg2: data type (0: fp32; 1: fp16; 2: bf16; 3: int8; 4: f8@f16; 5: f16@f8; 6: "
@@ -61,6 +61,7 @@ int profile_gemm_blockscale_weighpreshuffle(int argc, char* argv[])
         printf("arg15: number of warm-up cycles (default 1)\n");
         printf("arg16: number of iterations (default 10)\n");
         printf("arg17: memory for rotating buffer (default 0, size in MB)\n");
+        printf("arg18: deterministic repeat check count (default 1)\n");
         exit(1);
     }
 
@@ -80,14 +81,19 @@ int profile_gemm_blockscale_weighpreshuffle(int argc, char* argv[])
     const int StrideB = std::stoi(argv[13]);
     const int StrideE = std::stoi(argv[14]);
 
-    int n_warmup      = 1;
-    int n_iter        = 10;
-    uint64_t rotating = 0;
-    if(argc == 18)
+    int n_warmup          = 1;
+    int n_iter            = 10;
+    uint64_t rotating     = 0;
+    int determinism_check = 1;
+    if(argc >= 18)
     {
         n_warmup = std::stoi(argv[15]);
         n_iter   = std::stoi(argv[16]);
         rotating = std::stoull(argv[17]) * 1024 * 1024;
+    }
+    if(argc == 19)
+    {
+        determinism_check = std::stoi(argv[18]);
     }
 
     using F32  = float;
@@ -151,7 +157,8 @@ int profile_gemm_blockscale_weighpreshuffle(int argc, char* argv[])
             (StrideE < 0) ? DefaultStrideE : StrideE,
             n_warmup,
             n_iter,
-            rotating);
+            rotating,
+            determinism_check);
 
         return pass ? 0 : 1;
     };

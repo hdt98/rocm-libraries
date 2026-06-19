@@ -679,6 +679,8 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
         index_t BK0;
         index_t MBlock;
         index_t NBlock;
+        // Optional accumulator anchor plumbing for the bpreshuffle block pipeline.
+        // Defaults are runtime-null for production kernel launches.
         float* p_accum_observer;
         index_t AccumObserverTileM;
         index_t AccumObserverTileN;
@@ -1279,21 +1281,14 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
                 accum_observer_args...);
         };
 
-        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
-        {
-            run_blockwise_gemm_pipeline(problem.p_accum_observer,
-                                        problem.AccumObserverTileM,
-                                        problem.AccumObserverTileN,
-                                        problem.AccumObserverKBlock,
-                                        problem.AccumObserverMRepeat,
-                                        problem.AccumObserverThread,
-                                        block_m_id,
-                                        block_n_id);
-        }
-        else
-        {
-            run_blockwise_gemm_pipeline();
-        }
+        run_blockwise_gemm_pipeline(problem.p_accum_observer,
+                                    problem.AccumObserverTileM,
+                                    problem.AccumObserverTileN,
+                                    problem.AccumObserverKBlock,
+                                    problem.AccumObserverMRepeat,
+                                    problem.AccumObserverThread,
+                                    block_m_id,
+                                    block_n_id);
 
         // shuffle C and write out
 
@@ -1564,21 +1559,14 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
                 accum_observer_args...);
         };
 
-        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
-        {
-            run_blockwise_gemm_pipeline(problem.p_accum_observer,
-                                        problem.AccumObserverTileM,
-                                        problem.AccumObserverTileN,
-                                        problem.AccumObserverKBlock,
-                                        problem.AccumObserverMRepeat,
-                                        problem.AccumObserverThread,
-                                        block_m_id,
-                                        block_n_id);
-        }
-        else
-        {
-            run_blockwise_gemm_pipeline();
-        }
+        run_blockwise_gemm_pipeline(problem.p_accum_observer,
+                                    problem.AccumObserverTileM,
+                                    problem.AccumObserverTileN,
+                                    problem.AccumObserverKBlock,
+                                    problem.AccumObserverMRepeat,
+                                    problem.AccumObserverThread,
+                                    block_m_id,
+                                    block_n_id);
 
         // shuffle C and write out
         const auto ds_grid_desc_m_n = MakeDsGridDescriptor_M_N(

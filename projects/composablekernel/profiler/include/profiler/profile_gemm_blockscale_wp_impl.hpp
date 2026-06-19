@@ -3,8 +3,13 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <memory>
+#include <string>
 #include <typeinfo>
 
 #include "ck/ck.hpp"
@@ -81,9 +86,11 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                                                    int StrideE,
                                                    int n_warmup,
                                                    int n_iter,
-                                                   uint64_t rotating = 0)
+                                                   uint64_t rotating      = 0,
+                                                   int determinism_check = 1)
 {
     bool pass = true;
+    determinism_check = std::max(1, determinism_check);
 
     auto f_host_tensor_descriptor = [](std::size_t row, std::size_t col, int& stride, auto layout) {
         using namespace ck::literals;
@@ -227,6 +234,58 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
 
     std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
 
+    auto report_worst_row_error = [&](const auto& actual,
+                                      const auto& expected,
+                                      const std::string& label) {
+        double worst_row_max_abs_error  = -1;
+        double worst_row_mean_abs_error = 0;
+        int worst_row                   = 0;
+        int worst_col                   = 0;
+        float worst_actual              = 0;
+        float worst_expected            = 0;
+
+        for(int m = 0; m < M; ++m)
+        {
+            double row_sum_abs_error = 0;
+            double row_max_abs_error = -1;
+            int row_worst_col        = 0;
+            float row_worst_actual   = 0;
+            float row_worst_expected = 0;
+
+            for(int n = 0; n < N; ++n)
+            {
+                const float actual_value   = ck::type_convert<float>(actual(m, n));
+                const float expected_value = ck::type_convert<float>(expected(m, n));
+                const double abs_error =
+                    std::abs(static_cast<double>(actual_value) - static_cast<double>(expected_value));
+                row_sum_abs_error += abs_error;
+
+                if(abs_error > row_max_abs_error)
+                {
+                    row_max_abs_error = abs_error;
+                    row_worst_col     = n;
+                    row_worst_actual  = actual_value;
+                    row_worst_expected = expected_value;
+                }
+            }
+
+            if(row_max_abs_error > worst_row_max_abs_error)
+            {
+                worst_row_max_abs_error  = row_max_abs_error;
+                worst_row_mean_abs_error = row_sum_abs_error / N;
+                worst_row                = m;
+                worst_col                = row_worst_col;
+                worst_actual             = row_worst_actual;
+                worst_expected           = row_worst_expected;
+            }
+        }
+
+        std::cout << label << " worst_row=" << worst_row << " worst_col=" << worst_col
+                  << " row_max_abs_error=" << worst_row_max_abs_error
+                  << " row_mean_abs_error=" << worst_row_mean_abs_error
+                  << " actual=" << worst_actual << " expected=" << worst_expected << std::endl;
+    };
+
     // Run reference GEMM
     if(do_verification)
     {
@@ -282,6 +341,7 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
     float best_ave_time   = 0;
     float best_tflops     = 0;
     float best_gb_per_sec = 0;
+    int num_supported_ops = 0;
 
     // profile device GEMM instances
     for(auto& op_ptr : op_ptrs)
@@ -311,16 +371,30 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
 
         if(op_ptr->IsSupportedArgument(argument_ptr.get()))
         {
+            ++num_supported_ops;
 
             // re-init C to zero before profiling next kernel
             c_device_buf.SetZero();
 
             invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, false, 0, n_warmup, n_iter});
 
-            if(do_verification)
+            std::unique_ptr<Tensor<EDataType>> first_device_result;
+            if(determinism_check > 1)
+            {
+                first_device_result = std::make_unique<Tensor<EDataType>>(e_m_n_device_result.mDesc);
+            }
+
+            if(do_verification || determinism_check > 1)
             {
                 c_device_buf.FromDevice(e_m_n_device_result.mData.data());
+                if(first_device_result)
+                {
+                    first_device_result->mData = e_m_n_device_result.mData;
+                }
+            }
 
+            if(do_verification)
+            {
 #if defined CK_ENABLE_FP8
                 // set softer tolerances for fp8
                 if constexpr(is_same_v<A0DataType, f8_t> || is_same_v<B0DataType, f8_t> ||
@@ -335,15 +409,21 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                     if(!current_pass)
                     {
                         std::cout << op_ptr->GetTypeString() << " failed" << std::endl;
+                        report_worst_row_error(
+                            e_m_n_device_result, e_m_n_host_result, "Reference mismatch");
                     }
                 }
                 else
                 {
 #endif
-                    pass = pass & ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
-                    if(!pass)
+                    bool current_pass =
+                        ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
+                    pass = pass & current_pass;
+                    if(!current_pass)
                     {
                         std::cout << op_ptr->GetTypeString() << " failed" << std::endl;
+                        report_worst_row_error(
+                            e_m_n_device_result, e_m_n_host_result, "Reference mismatch");
                     }
 #if defined CK_ENABLE_FP8
                 }
@@ -357,6 +437,30 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                         << std::endl;
                     LogRangeAsType<float>(std::cout << "c_device: ", e_m_n_device_result.mData, ",")
                         << std::endl;
+                }
+            }
+
+            for(int repeat = 1; repeat < determinism_check; ++repeat)
+            {
+                c_device_buf.SetZero();
+                invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, false, 0, 0, 1});
+                c_device_buf.FromDevice(e_m_n_device_result.mData.data());
+
+                const auto byte_count = first_device_result->mData.size() * sizeof(EDataType);
+                const bool deterministic =
+                    std::memcmp(e_m_n_device_result.mData.data(),
+                                first_device_result->mData.data(),
+                                byte_count) == 0;
+
+                if(!deterministic)
+                {
+                    pass = false;
+                    std::cout << op_ptr->GetTypeString()
+                              << " produced nondeterministic output on repeat " << repeat
+                              << " of " << determinism_check << std::endl;
+                    report_worst_row_error(
+                        e_m_n_device_result, *first_device_result, "Determinism mismatch");
+                    break;
                 }
             }
 
@@ -391,6 +495,12 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
         {
             std::cout << op_ptr->GetTypeString() << " does not support this problem" << std::endl;
         }
+    }
+
+    if(num_supported_ops == 0)
+    {
+        std::cout << "No gemm_blockscale_wp instances support this problem" << std::endl;
+        pass = false;
     }
 
     if constexpr(is_same<EDataType, float>::value)

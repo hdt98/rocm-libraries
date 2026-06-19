@@ -34,7 +34,13 @@ class TestGemmBlockscaleWPCommon : public ::testing::Test
     static constexpr index_t ScaleBlockN = 128;
     static constexpr index_t ScaleBlockK = 128;
 
-    void Run(const int M, const int N, const int K, int n_warmup = 1, int n_iter = 10)
+    void Run(const int M,
+             const int N,
+             const int K,
+             int n_warmup          = 1,
+             int n_iter            = 10,
+             int determinism_check = 1,
+             bool do_verification  = verify_)
     {
         bool all_success = true;
 
@@ -56,7 +62,7 @@ class TestGemmBlockscaleWPCommon : public ::testing::Test
                                                                         ScaleBlockK,
                                                                         ALayout,
                                                                         BLayout,
-                                                                        CLayout>(verify_,
+                                                                        CLayout>(do_verification,
                                                                                  init_method_,
                                                                                  log_,
                                                                                  bench_,
@@ -67,7 +73,9 @@ class TestGemmBlockscaleWPCommon : public ::testing::Test
                                                                                  StrideB,
                                                                                  StrideC,
                                                                                  n_warmup,
-                                                                                 n_iter);
+                                                                                 n_iter,
+                                                                                 0,
+                                                                                 determinism_check);
 
         EXPECT_TRUE(all_success);
     }
