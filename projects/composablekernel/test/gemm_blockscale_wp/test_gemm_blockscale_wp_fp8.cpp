@@ -69,9 +69,7 @@ TYPED_TEST(TestGemmBlockScaleWP_FP8_MK_NK, ReportedWkvDeterminism)
                         "8192x512xK determinism repro shapes.";
     }
 
-    // ROCm/aiter#3261 repro sweep from the original CK stabilizer investigation.
-    // Skip the host reference because these are large determinism regression
-    // cases, not practical CPU GEMM unit-test sizes.
+    // Large WKV shapes from ROCm/aiter#3261. Check determinism only.
     constexpr int M    = 8192;
     constexpr int N    = 512;
     constexpr int Ks[] = {384, 640, 3968, 4096, 4224};
@@ -89,30 +87,27 @@ TYPED_TEST(TestGemmBlockScaleWP_FP8_MK_NK, Glm52OutOfAllowlistAccuracyAndDetermi
     }
 
     constexpr std::tuple<int, int, int> shapes[] = {
-        // M, N, K. GLM-5.2-FP8 block-FP8 linear shapes from
-        // sgl-project/sglang#28685: concrete projection repros plus the
-        // kv_b_proj row-boundary sweep where bad rows clustered near 16-row
-        // tile edges.
-        {8, 2048, 6144},   // q_a_proj: hidden_size -> q_lora_rank
-        {8, 16384, 2048},  // q_b_proj short prefill
-        {64, 16384, 2048}, // q_b_proj reporter repro
-        {12, 6144, 12288}, // mlp.down_proj short prefill
-        {64, 6144, 12288}, // mlp.down_proj reporter repro
-        {8, 28672, 512},   // kv_b_proj short smoke
-        {12, 28672, 512},  // kv_b_proj short prefill
-        {32, 28672, 512},  // kv_b_proj row-boundary sweep
-        {48, 28672, 512},  // kv_b_proj row-boundary sweep
-        {56, 28672, 512},  // kv_b_proj row-boundary sweep
-        {64, 28672, 512},  // kv_b_proj reporter repro
-        {72, 28672, 512},  // kv_b_proj row-boundary sweep
-        {96, 28672, 512},  // kv_b_proj row-boundary sweep
-        {128, 28672, 512}, // kv_b_proj row-boundary sweep
+        // GLM-5.2-FP8 projection shapes from sgl-project/sglang#28685.
+        // The kv_b_proj cases cover the reported M-row boundary failures.
+        {8, 2048, 6144},   // q_a_proj
+        {8, 16384, 2048},  // q_b_proj
+        {64, 16384, 2048}, // q_b_proj
+        {12, 6144, 12288}, // mlp.down_proj
+        {64, 6144, 12288}, // mlp.down_proj
+        {8, 28672, 512},   // kv_b_proj
+        {12, 28672, 512},  // kv_b_proj
+        {32, 28672, 512},  // kv_b_proj
+        {48, 28672, 512},  // kv_b_proj
+        {56, 28672, 512},  // kv_b_proj
+        {64, 28672, 512},  // kv_b_proj
+        {72, 28672, 512},  // kv_b_proj
+        {96, 28672, 512},  // kv_b_proj
+        {128, 28672, 512}, // kv_b_proj
     };
 
     for(const auto& shape : shapes)
     {
-        // do_verification=true compares against the profiler's dequantized FP32
-        // host GEMM oracle; determinism_check=4 reruns the same device problem.
+        // Compare to host reference and repeat the device run.
         this->Run(std::get<0>(shape), std::get<1>(shape), std::get<2>(shape), 0, 1, 4, true);
     }
 }

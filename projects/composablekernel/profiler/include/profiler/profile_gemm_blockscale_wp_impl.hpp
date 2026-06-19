@@ -74,6 +74,7 @@ template <typename A0DataType,
           typename ALayout,
           typename BLayout,
           typename ELayout>
+// clang-format off
 bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                                                    int init_method,
                                                    bool do_log,
@@ -86,11 +87,13 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                                                    int StrideE,
                                                    int n_warmup,
                                                    int n_iter,
-                                                   uint64_t rotating     = 0,
+                                                   uint64_t rotating = 0,
                                                    int determinism_check = 1,
-                                                   int instance_index    = -1)
+                                                   int instance_index = -1)
+// clang-format on
 {
-    bool pass         = true;
+    bool pass = true;
+
     determinism_check = std::max(1, determinism_check);
 
     auto f_host_tensor_descriptor = [](std::size_t row, std::size_t col, int& stride, auto layout) {
