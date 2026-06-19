@@ -47,8 +47,17 @@ experiments/amd/dsv4-pretrain-megatron/scripts/run_megatron_perf_row.sh
 8x TP=1 EP=8 FSDP=8 MBS=4 GBS=128:
 
 ```bash
+BASE=/local/data/sonle5/dsv4_pretrain_rl \
 GPUS=0,1,2,3,4,5,6,7 LOGICAL_GPUS=0,1,2,3,4,5,6,7 \
-NUM_GPUS_PER_NODE=8 GPU_LABEL=8xmi350 TP=1 EP=8 MBS=4 GBS=128
+NUM_GPUS_PER_NODE=8 GPU_LABEL=8xmi350 \
+TP=1 EP=8 MBS=4 GBS=128 MHC=off TRAIN_ITERS=20 DISABLE_SAVE=1 \
+USE_MEGATRON_FSDP=1 DATA_PARALLEL_SHARDING_STRATEGY=optim_grads_params \
+USE_PRECISION_AWARE_OPTIMIZER=1 \
+MAIN_GRADS_DTYPE=bf16 MAIN_PARAMS_DTYPE=fp16 \
+EXP_AVG_DTYPE=bf16 EXP_AVG_SQ_DTYPE=bf16 \
+ACCUMULATE_ALLREDUCE_GRADS_IN_FP32=0 \
+OVERLAP_GRAD_REDUCE=0 OVERLAP_PARAM_GATHER=0 \
+experiments/amd/dsv4-pretrain-megatron/scripts/run_megatron_perf_row.sh
 ```
 
 TP-heavy probes use `TP=4 EP=4 NUM_GPUS_PER_NODE=4` or
