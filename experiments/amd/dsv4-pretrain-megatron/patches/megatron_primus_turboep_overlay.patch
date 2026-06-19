@@ -1,7 +1,7 @@
 diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
 --- a/megatron/training/arguments.py
 +++ b/megatron/training/arguments.py
-@@ -2759,6 +2759,20 @@ def _add_moe_args(parser):
+@@ -2759,6 +2759,24 @@ def _add_moe_args(parser):
                         help="some MoE routers have a D2H sync that will break cuda graphs.  If this flag is set the router will switch" \
                         " to dropping and padding during decode time which does not have a D2H sync. The capacity factor is set to the" \
                         " max that an expert could see during inference so no tokens are actually dropped.")
@@ -17,12 +17,16 @@ diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
 +                       help='Number of CUs used by the Primus Turbo DeepEP dispatcher.')
 +    group.add_argument('--turbo-deepep-use-comm-stream', action='store_true', default=False,
 +                       help='Use the Primus Turbo DeepEP communication stream path.')
++    group.add_argument('--turbo-deepep-disable-async-finish', action='store_true', default=False,
++                       help='Disable async finish in the Primus Turbo DeepEP dispatcher.')
++    group.add_argument('--turbo-deepep-disable-allocate-on-comm-stream', action='store_true', default=False,
++                       help='Disable comm-stream tensor allocation in the Primus Turbo DeepEP dispatcher.')
 +    group.add_argument('--turbo-sync-free-moe-stage', type=int, default=0,
 +                       help='Primus Turbo sync-free MoE stage; 0 disables sync-free MoE.')
      return parser
 
  def _add_mla_args(parser):
-@@ -2859,6 +2873,8 @@ def _add_experimental_args(parser):
+@@ -2859,6 +2877,8 @@ def _add_experimental_args(parser):
 
      group.add_argument('--enable-experimental', action='store_true',
                         help='Enable experimental features.')

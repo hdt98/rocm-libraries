@@ -67,9 +67,12 @@ TP-heavy probes use `TP=4 EP=4 NUM_GPUS_PER_NODE=4` or
   blocked in Transformer Engine BF16 `generic_gemm` at `wq_a`.
   The launcher defaults to DeepEP-only for this backend; the current
   DeepEP-only smoke gets through model/dataloader setup and fails with SIGSEGV
-  before iter1 with the `TURBO` dispatch/combine backend. The `DEEP_EP`
-  dispatch/combine backend fails cleanly because neither tried Primus image
-  contains the `deep_ep` Python package. Set `PRIMUS_TURBO_ENABLE_FULL_STACK=1`
-  to reproduce the broader Primus TESpecProvider/linear replacement path.
+  before iter1 with the `TURBO` dispatch/combine backend. The same native
+  dispatch crash remains with `TURBO_DEEPEP_DISABLE_ASYNC_FINISH=1` and
+  `TURBO_DEEPEP_DISABLE_ALLOCATE_ON_COMM_STREAM=1`, so the diagnostic knobs are
+  available but do not fix the current image. The `DEEP_EP` dispatch/combine
+  backend fails cleanly because neither tried Primus image contains the
+  `deep_ep` Python package. Set `PRIMUS_TURBO_ENABLE_FULL_STACK=1` to reproduce
+  the broader Primus TESpecProvider/linear replacement path.
 - Correctness/perf rows, failure evidence, artifact paths, and source
   fingerprints are in `MEASUREMENTS.md`.

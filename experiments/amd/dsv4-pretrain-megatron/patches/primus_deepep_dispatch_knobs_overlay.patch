@@ -1,0 +1,14 @@
+diff --git a/primus/backends/megatron/core/extensions/primus_turbo.py b/primus/backends/megatron/core/extensions/primus_turbo.py
+--- a/primus/backends/megatron/core/extensions/primus_turbo.py
++++ b/primus/backends/megatron/core/extensions/primus_turbo.py
+@@ -1578,8 +1578,8 @@ class PrimusTurboDeepEPTokenDispatcher(MoETokenDispatcher):
+             deepep_num_use_cu=args.turbo_deepep_num_cu,
+             deepep_num_worst_tokens=num_worst_tokens,
+             deepep_use_cuda_num_tokens_per_expert=use_turbo_grouped_gemm,
+-            deepep_async_finish=True,
+-            deepep_allocate_on_comm_stream=True,
++            deepep_async_finish=not args.turbo_deepep_disable_async_finish,
++            deepep_allocate_on_comm_stream=not args.turbo_deepep_disable_allocate_on_comm_stream,
+         )
+         # This is just a place holder.
+         # The communication manager class is not used in Primus Turbo's DeepEP dispatcher.
